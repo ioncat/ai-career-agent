@@ -199,7 +199,10 @@ class CVDocument(FPDF):
                 self.write(6, m.group(1), link=m.group(2))
                 self.set_text_color(0, 0, 0)
             elif part:
-                self.write(6, re.sub(r"\*\*([^*]+)\*\*", r"\1", part))
+                self.set_text_color(0, 0, 0)
+                plain_text = re.sub(r"\*\*([^*]+)\*\*", r"\1", part)
+                w = self.get_string_width(plain_text)
+                self.cell(w, 6, plain_text, new_x="RIGHT", new_y="LAST")
         self.ln(6)
         self.ln(1)
 
@@ -328,6 +331,10 @@ class CVDocument(FPDF):
 def render_md(pdf: CVDocument, text: str) -> None:
     lines = text.split("\n")
     i = 0
+    is_cover = any(
+        re.search(r"cover letter", line, re.IGNORECASE)
+        for line in lines if line.strip().startswith("#")
+    )
 
     # Detect CV-style header: a contacts line (markdown links) within the first few
     # non-empty lines. Cover letters / prose have none → skip header parsing so the
@@ -408,7 +415,9 @@ def render_md(pdf: CVDocument, text: str) -> None:
                     i += 1
                 pdf.quick_scan_block(qs_lines)
                 continue
-            if level <= 3:
+            if is_cover and level == 1:
+                pdf.name_block(heading)
+            elif level <= 3:
                 pdf.section_header(heading)
             else:
                 pdf.subsection_header(heading)
@@ -472,6 +481,8 @@ def render_md(pdf: CVDocument, text: str) -> None:
             continue
 
         pdf.paragraph(s)
+        if is_cover:
+            pdf.ln(3)
         i += 1
 
 
