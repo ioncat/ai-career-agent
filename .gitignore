@@ -55,8 +55,10 @@ seen_jobs.json
 CLAUDE.md
 docs/discovery/
 
-# Personal skill + profile (private data — not for public repo)
-skill/
+# Skill pipeline — base files (SKILL.md, SKILL_TYPES.md, users.yaml) are tracked.
+# Personal data (user profiles, active_user state) is private.
+skill/users/
+skill/active_user
 
 # Skill-type-specific prompts (contain user-specific contact info and personal framing)
 # prompts/generic/ is public; prompts/pm/ and any other skill-type dirs are private

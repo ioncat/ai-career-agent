@@ -1,0 +1,10 @@
+# Registry only — routing and identification.
+# All user preferences and settings live in users/[id]/PROFILE.md.
+
+users:
+  - id: "1"
+    name: "Alex Bondarenko"
+    slug: "alex"
+  - id: "2"
+    name: "Maria Beleshko"
+    slug: "maria"
