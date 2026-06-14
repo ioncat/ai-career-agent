@@ -153,3 +153,65 @@ Example: `Execution-heavy Generalist` · `Coordination-heavy Client-facing`
 - Which phrases repeat? What does the company emotionally value?
 - Which dominates: Speed / Ownership / Alignment / Process / Autonomy / Predictability / Reliability / Service?
 - Culture type: founder-led / process-driven / hierarchical / collaborative?
+
+---
+
+### 1.7 Vacancy Score
+
+Compute **vacancy attractiveness** — how good this opportunity is, independent of candidate fit.
+
+**Step 1 — Read from active user PROFILE.md → `## Vacancy Preferences`:**
+- `domain_interests` list
+- `company_stage_prefs` list
+
+**Step 2 — Score each dimension:**
+
+| Dim | Scale | Values |
+|-----|-------|--------|
+| `company_tier` | 1–4 | top-global brand=4 · established regional/intl=3 · local known=2 · unknown/small=1 |
+| `seniority` | 1–4 | senior/lead/head=4 · mid-senior=3 · mid=2 · junior/unclear=1 |
+| `market_scope` | 1–3 | global product=3 · regional=2 · local only=1 |
+| `company_type` | 1–3 | product company=3 · product+services/hybrid=2 · outsourcing/agency=1 |
+| `company_stage_fit` | 1–3 | exact match user prefs=3 · partial match=2 · mismatch=1 |
+| `domain_score` | 1–5 | personal_interest(0–2) + longevity(0–3), clamped 1–5 |
+| `remote_policy` | 1–3 | full remote=3 · hybrid/flexible=2 · on-site=1 |
+| `compensation` | 1–3 | indicated+market rate=3 · partial or below market=2 · not stated=1 |
+
+**domain_score detail:**
+- `personal_interest`: 2 = domain in user's `domain_interests`; 1 = adjacent/partial; 0 = unrelated
+- `longevity`: 3 = growing market (AI, fintech, cybersecurity, dev tools); 2 = stable; 1 = declining/commodity
+- `domain_score` = max(1, personal_interest + longevity)
+
+**company_stage_fit:** match company stage from section 1.2 against user's `company_stage_prefs`. Stages: startup / founder-led / scaleup / enterprise.
+
+**Step 3 — Composite formula:**
+```
+vacancy_score = round(
+  (company_tier/4*12 + seniority/4*12 + market_scope/3*8 +
+   company_type/3*18 + company_stage_fit/3*10 +
+   domain_score/5*25 + remote_policy/3*10 + compensation/3*5) / 10,
+  1)
+```
+
+**Step 4 — Output:**
+
+Add `**VScore:** X.X/10` to the Quick Scan block (before Recommendation).
+
+Then output the breakdown table in this section:
+
+```
+**VScore:** X.X/10
+
+| Dim | Score | Reasoning |
+|-----|-------|-----------|
+| company_tier | N/4 | [one phrase] |
+| seniority | N/4 | [one phrase] |
+| market_scope | N/3 | [one phrase] |
+| company_type | N/3 | [one phrase] |
+| company_stage_fit | N/3 | [one phrase — which stage matched] |
+| domain_score | N/5 | interest=N, longevity=N |
+| remote_policy | N/3 | [one phrase] |
+| compensation | N/3 | [one phrase] |
+```
+
+**Also include in p1 DB write:** `vacancy_score` (float) and `vacancy_dims` (object with all 8 dims).

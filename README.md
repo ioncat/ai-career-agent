@@ -91,16 +91,19 @@ flowchart TD
     PROF["PROFILE.md\n🔵 prompt cache"] --> P1
     PROF --> P3
 
-    P1 --> P2["Phase 2 — Fit Scoring\nVerdict · Key Barriers · Adaptation Plan · Fit Breakdown"]
-    P2 --> QS["Quick Scan → Telegram\nScore / Verdict / Barriers / Warnings"]
+    P1 --> VS["VScore — Vacancy Attractiveness\n8 dims: tier · seniority · domain · remote · comp…"]
+    P1 --> P2["Phase 2 — Fit Scoring\nFit × VScore matrix · Barriers · Adaptation Plan"]
+    VS --> P2
+    P2 --> QS["Quick Scan → Telegram\nFit / VScore / Verdict / Barriers / Warnings"]
 
-    QS -->|"apply / apply with adaptation"| P3["Phase 3 — CV Draft\nhidden from user"]
+    QS -->|"apply / take a chance"| P3["Phase 3 — CV Draft\nhidden from user"]
     P3 --> P35["Phase 3.5 — Self-Review\ncross-checks Adaptation Plan · shown for approval"]
     P35 --> PDF["CV.pdf → Telegram"]
     PDF --> P4["Phase 4 — Cover Letter → Telegram"]
 ```
 
-**3-way verdict:** apply · apply with adaptation · don't apply  
+**3-way verdict:** apply · take a chance · decline — driven by Fit × VScore matrix  
+**VScore (1–10):** vacancy attractiveness composite — company tier, seniority, market scope, domain fit, remote policy, compensation — computed in Phase 1, shown in tracker  
 **Fit Breakdown:** per-requirement ✅/⚠️/❌ table — pet-projects never equal commercial experience  
 **Archetype-aware:** JD signals Founder Proxy vs Executor → different CV framing per vacancy
 

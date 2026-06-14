@@ -27,6 +27,8 @@ Read `skill/active_user` → ID → `skill/users.yaml` → name + slug. Then dis
   [2] API (расход токенов)     │   [12] Role — Company ♻️
   [3] Другой профиль (-u)      │   [13] обработать все (batch)
                                │   [14] пропустить inbox → новая
+                               │   [15] Загрузить по URL
+                               │   [16] Обновить inbox
 ```
 
 Left column = Block 1 (`1–10`). Right column = Block 2 (`11–20`). `│` separates them.
@@ -44,7 +46,7 @@ Left column = Block 1 (`1–10`). Right column = Block 2 (`11–20`). `│` sepa
 
 - **Answer 1/2** → set `MODE = local|api`. If an action wasn't also given → re-display Block 2 only ("Что обрабатываем?").
 - **Answer 3** → show user list (same as `-l`), stop — user re-runs with `-u`.
-- **Answer 11–1X (a vacancy)** → process that inbox item. `13` = batch, `14` = skip inbox → new vacancy.
+- **Answer 11–1X (a vacancy)** → process that inbox item. `[batch]` = all, `[skip→new]` = пропустить inbox, `[URL]` = вставь JD/URL → старт, `[refresh]` = пересканировать inbox_manual → перерисовать Block 2.
 - **Combined answer** (e.g. `2 11`, `1, 13`) → set mode AND act in one step. Preferred — kills the round-trip.
 - **Action given without mode** → default `MODE = local` (most common). Show `[Локально]` in status lines.
 
@@ -319,8 +321,8 @@ python scripts/inbox_scan.py --user-id [user_id]
   1. Role — Company   🆕 новая
   2. Role — Company   ♻️ уже обработана
 
-/analyze      — обробити з активним профілем
-/analyze -u   — обробити з іншим профілем
+/analyze      — запустить с активным профилем
+/analyze -u   — запустить с другим профилем
 ```
 
 Stop after display.
@@ -354,9 +356,14 @@ python scripts/inbox_scan.py --user-id [user_id] --json
   [12] Role — Company ♻️
   [13] обработать все (batch)
   [14] пропустить inbox → новая вакансия
+  [N+1] Загрузить по URL — вставь JD-ссылку или текст
+  [N+2] Обновить inbox — пересканировать inbox_manual
 ```
 
    Multi-select inbox items via any separator: `11`, `11,12`, `11 12`.
+
+   **[N+1] Загрузить по URL:** пользователь вставляет URL или текст JD → pipeline стартует как для новой вакансии.
+   **[N+2] Обновить inbox:** пересканировать `inbox_manual/` и перерисовать Block 2 с актуальным списком. Полезно если пользователь только что дропнул файл.
 
 5. Profile is fixed by `active_user` / `-u` — never re-ask it here.
    *(mode handled by Block 1 — do not ask separately)*

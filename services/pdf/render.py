@@ -201,8 +201,7 @@ class CVDocument(FPDF):
             elif part:
                 self.set_text_color(0, 0, 0)
                 plain_text = re.sub(r"\*\*([^*]+)\*\*", r"\1", part)
-                w = self.get_string_width(plain_text)
-                self.cell(w, 6, plain_text, new_x="RIGHT", new_y="LAST")
+                self.write(6, plain_text)
         self.ln(6)
         self.ln(1)
 

@@ -1,6 +1,6 @@
 # career-agent — Backlog
 
-> Last updated: 2026-06-04 (2nd session)
+> Last updated: 2026-06-14
 > Epic format: post-pivot epics (13+) live in `docs/delivery/epics/`. This file = priority tracker + status overview.
 > Pre-pivot epics (1–12): `docs/delivery/epics-archive/EPIC-01-12-pre-pivot.md`
 
@@ -11,6 +11,23 @@
 **Goal:** Draw the boundary — deterministic work in Python (FSM orchestrator), LLM only for irreducible cognitive phases (single structured calls). Source: `docs/discovery/hypotheses/H-002`.
 
 **Task 1 (TOMORROW 2026-06-05):** deterministic PDF templating (CV + cover templates) — replaces fragile `render_md`. Cleanest "remove from AI contour" win; independent of the rest. See EPIC-21 for full task list (blocker-ordered) + classification + target architecture.
+
+---
+
+## ✅ VScore + Recommendation Matrix (2026-06-14)
+
+- **VScore** — 8-dimension vacancy attractiveness score (1–10): company_tier, seniority, market_scope, company_type, company_stage_fit, domain_score (interest + longevity), remote_policy, compensation
+- `prompts/pm/phase1_analysis.md` + `prompts/generic/phase1_analysis.md` — section 1.7 added (formula, output, domain_score detail)
+- `skill/SKILL.md` — Quick Scan format: `**VScore:** X.X/10`; p1 JSON schema extended with `vacancy_score` + `vacancy_dims`
+- `skill/users/1/PROFILE.md` — `## Vacancy Preferences` (domain_interests + company_stage_prefs); extensible per user, no code changes needed
+- `web/reader.py` — `VacancyView.vacancy_score`; parsed from `analysis_json.p1.vacancy_score`
+- `web/templates/tracker.html` — VScore column (green ≥7.5 / amber 5.5–7.4 / gray <5.5); colspan 12→13; search `.trim()` fix
+- **Fit × VScore recommendation matrix** — `prompts/pm/phase2_fit.md` + `prompts/generic/phase2_fit.md` + `skill/SKILL.md`:
+  - Hard blockers OR fit < 5 → `decline` always (VScore cannot override)
+  - Fit 5–6 + VScore ≥7.5 → `take a chance — premium opportunity`
+  - Fit 5–6 + VScore <5.5 → `decline — not worth the effort`
+  - Fit ≥7 + VScore <5.5 → `apply — limited upside`
+  - Labels are display-only (Quick Scan); DB stores base value
 
 ---
 
@@ -323,11 +340,11 @@ See `docs/delivery/epics-archive/EPIC-01-12-pre-pivot.md`
 - **EPIC-17 Phase 1** — Telegram onboarding: /start FSM, PDF upload (pypdf), profile_json in DB, /update_profile, /set_skill, ClaudeProvider loads from DB, MULTI_USER_ENABLED flag (2026-06-01, 250 tests)
 
 ### Batch mode for inbox (2026-06-02)
-- **Trigger**: 3+ вакансій в inbox → автоматично batch mode (без флагів)
-- **Flow**: "Обробляємо N вакансій..." → Phase 1+2 тихо по всіх → зведена таблиця → Approve / Try chance / Пропустити
-- **Таблиця**: #, Компанія — Роль, Src, Fit, Рекоменд. (✅/⚠️/❌), Рівень/$, Ключовий gap; сортування ✅→⚠️→❌ + fit DESC
-- **Sequential mode**: 1–3 вакансій → поведінка без змін
-- **move-processed**: після Phase 1+2 (незалежно від рішення про Phase 3+4)
+- **Trigger**: 3+ vacancies in inbox → auto batch mode (no flags needed)
+- **Flow**: "Processing N vacancies..." → Phase 1+2 silent for all → consolidated table → Approve / Try chance / Skip
+- **Table**: #, Company — Role, Src, Fit, Rec (✅/⚠️/❌), Level/$, Key gap; sort ✅→⚠️→❌ + fit DESC
+- **Sequential mode**: 1–2 vacancies → behavior unchanged
+- **move-processed**: after Phase 1+2 (regardless of Phase 3+4 decision)
 
 ### URL deduplication + Local mode → Tracker (2026-06-02)
 - **`normalize_url()`** — strips UTM/tracking params, trailing slash, lowercases host; all boards safe (IDs in path)

@@ -55,6 +55,7 @@ class VacancyView:
     salary: str = ""         # "$4500" or "" if unknown
     applied: bool = False   # True if CV was submitted to this vacancy
     starred: bool = False   # True if marked as favourite
+    vacancy_score: str = "—"  # "7.2" or "—" — attractiveness score from p1
 
     # ── Derived properties ────────────────────────────────────────────────────
 
@@ -178,6 +179,7 @@ def build_vacancy_view(row: object, candidate_name: str = "Candidate") -> Vacanc
 
     # Primary source for blockers: analysis_json DB column (p2.key_barriers)
     # Overrides file-parsed blockers when DB data is available
+    vacancy_score_str = "—"
     if db_analysis_json:
         try:
             aj = json.loads(db_analysis_json)
@@ -190,6 +192,10 @@ def build_vacancy_view(row: object, candidate_name: str = "Candidate") -> Vacanc
                     blockers = kb
             if not db_salary and p2.get("salary"):
                 db_salary = p2["salary"]
+            p1 = aj.get("p1", {})
+            vs = p1.get("vacancy_score")
+            if vs is not None:
+                vacancy_score_str = str(vs)
         except Exception:
             pass  # keep file-parsed values
 
@@ -214,6 +220,7 @@ def build_vacancy_view(row: object, candidate_name: str = "Candidate") -> Vacanc
         salary=db_salary,
         applied=db_applied,
         starred=db_starred,
+        vacancy_score=vacancy_score_str,
     )
 
 

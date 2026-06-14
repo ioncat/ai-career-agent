@@ -201,3 +201,34 @@ async def test_set_starred_not_found(client):
     """PATCH /api/vacancies/9999/starred returns 404 for missing vacancy."""
     resp = client.patch("/api/vacancies/9999/starred", json={"starred": True})
     assert resp.status_code == 404
+
+
+# ── PATCH /api/vacancies/{id}/salary ──────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_set_salary(client):
+    """PATCH /api/vacancies/{id}/salary persists value in DB."""
+    vid = await database.insert_vacancy(url="https://example.com/sal1", title="Salary Test", user_id=1)
+    resp = client.patch(f"/api/vacancies/{vid}/salary", json={"salary": "$4500"})
+    assert resp.status_code == 200
+    assert resp.json()["salary"] == "$4500"
+    row = await database.get_vacancy_by_id(vid)
+    assert row["salary"] == "$4500"
+
+
+@pytest.mark.asyncio
+async def test_set_salary_clear(client):
+    """PATCH /api/vacancies/{id}/salary with empty string clears the field."""
+    vid = await database.insert_vacancy(url="https://example.com/sal2", title="Salary Clear", user_id=1)
+    await database.set_vacancy_salary(vid, "$3000")
+    resp = client.patch(f"/api/vacancies/{vid}/salary", json={"salary": ""})
+    assert resp.status_code == 200
+    row = await database.get_vacancy_by_id(vid)
+    assert row["salary"] is None
+
+
+@pytest.mark.asyncio
+async def test_set_salary_not_found(client):
+    """PATCH /api/vacancies/9999/salary returns 404 for missing vacancy."""
+    resp = client.patch("/api/vacancies/9999/salary", json={"salary": "$5000"})
+    assert resp.status_code == 404

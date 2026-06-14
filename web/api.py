@@ -265,3 +265,17 @@ async def api_set_starred(vacancy_id: int, req: StarredUpdate):
         raise HTTPException(status_code=404, detail="Vacancy not found")
     await database.set_vacancy_starred(vacancy_id, req.starred)
     return {"vacancy_id": vacancy_id, "starred": req.starred}
+
+
+class SalaryUpdate(BaseModel):
+    salary: str  # free-form text, e.g. "$4500" or "3000–4500 USD"; empty string clears
+
+
+@app.patch("/api/vacancies/{vacancy_id}/salary")
+async def api_set_salary(vacancy_id: int, req: SalaryUpdate):
+    """Set user-entered salary for a vacancy. Empty string clears the field."""
+    row = await database.get_vacancy_by_id(vacancy_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Vacancy not found")
+    await database.set_vacancy_salary(vacancy_id, req.salary)
+    return {"vacancy_id": vacancy_id, "salary": req.salary}

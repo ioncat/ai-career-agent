@@ -437,6 +437,16 @@ async def set_vacancy_starred(vacancy_id: int, starred: bool) -> None:
         await db.commit()
 
 
+async def set_vacancy_salary(vacancy_id: int, salary: str) -> None:
+    """Set user-entered salary for a vacancy. Empty string clears the field."""
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE vacancies SET salary = ?, updated_at = datetime('now') WHERE id = ?",
+            (salary or None, vacancy_id),
+        )
+        await db.commit()
+
+
 async def list_vacancies(
     status: str | None = None,
     user_id: int | None = None,

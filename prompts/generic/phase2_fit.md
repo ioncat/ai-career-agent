@@ -45,10 +45,25 @@ Output this block exactly as shown, filling in the placeholders.
 
 ---
 
-**Recommendation rules (pick exactly one):**
-- **apply** — score ≥ 7, no hard blockers, candidate profile directly matches role requirements
-- **take a chance** — score 4–6, gaps exist but bridgeable with reframing; candidate has transferable evidence
-- **decline** — score < 4 OR any hard blocker present
+**Recommendation rules — Fit + VScore combined:**
+
+**Step 1 — Hard knockouts (VScore cannot override):**
+- Any hard blocker present → **decline** regardless of scores
+- Fit score < 5 → **decline** regardless of VScore
+
+**Step 2 — No hard blockers: Fit × VScore matrix:**
+
+| Fit | VScore | Recommendation (Quick Scan label) |
+|-----|--------|-----------------------------------|
+| ≥ 7 | ≥ 7.5 | `apply — strong match` |
+| ≥ 7 | 5–7.4 | `apply` |
+| ≥ 7 | < 5.5 | `apply — limited upside` |
+| 5–6 | ≥ 7.5 | `take a chance — premium opportunity` |
+| 5–6 | 5–7.4 | `take a chance` |
+| 5–6 | < 5.5 | `decline — not worth the effort` |
+
+**VScore source:** Phase 1 section 1.7 → `vacancy_score` field.
+**DB value:** store base only (`apply` / `take a chance` / `decline`) — label is display-only, not persisted.
 
 **Fit score guidance — be critical, start from neutral:**
 - Baseline: 5.0

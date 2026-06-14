@@ -50,11 +50,11 @@ Most applicants are generic candidates. The HM's first screening question is: **
 
 ## Output Format — ALWAYS TWO VARIANTS SIDE-BY-SIDE
 
-Generate **Варіант A** and **Варіант B** simultaneously. Display as two sections for direct comparison. User picks one (or requests a mix). Save only the approved version.
+Generate **Variant A** and **Variant B** simultaneously. Display as two sections for direct comparison. User picks one (or requests a mix). Save only the approved version.
 
 ---
 
-**ВАРІАНТ A — Narrative (short paragraphs)**
+**Variant A — Narrative (short paragraphs)**
 Concise, direct. Leads with tenure + role scope. Second paragraph: most relevant domain evidence. No bullets, no metrics. Natural professional tone.
 
 **English template:**
@@ -85,7 +85,7 @@ Happy to connect and learn more.
 
 ---
 
-**ВАРІАНТ B — Bullets with evidence**
+**Variant B — Bullets with evidence**
 Evidence-heavy. Three specific bullets, each with a verifiable fact. Best for roles where structured proof matters.
 
 **English template:**

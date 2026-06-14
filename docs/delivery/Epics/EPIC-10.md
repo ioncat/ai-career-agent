@@ -30,17 +30,13 @@ Registered in `agent.py` ToolRegistry.
 |-------|-------------|-------|--------|
 | Phase 4 | `phase4_cover.md` | JD text + JD_analysis.md + [Name]_CV.md | Cover message (greeting + 3 bullets + closing) |
 
-Cover structure (Ukrainian):
+Cover structure (Ukrainian-language JD — greeting/closing in Ukrainian, bullets in target language):
 ```
-Вітаю!
+[Ukrainian greeting]
 
-Кілька ключових моментів з мого досвіду, які найбільше стосуються вашої ролі:
+[2–3 bullet matches — specific, active verbs, concrete fact]
 
-- [Match #1 — specific, active verbs, concrete fact]
-- [Match #2]
-- [Match #3 — metric or methodology]
-
-Буду радий поспілкуватися і дізнатися більше про [product/team].
+[Ukrainian closing referencing company/role]
 
 [Name]
 ```

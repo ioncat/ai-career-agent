@@ -33,6 +33,8 @@ tr:hover:not(.date-sep) td{background:#fafafa}
 .vname a:hover{border-bottom-color:#1d4ed8;color:#1d4ed8}
 .cat{color:#6b7280;font-size:12px;max-width:220px}
 .fit{font-weight:600;white-space:nowrap;color:#1d4ed8}
+.vscore{font-weight:600;white-space:nowrap;color:#7c3aed}
+.vscore-hi{color:#16a34a}.vscore-mid{color:#d97706}.vscore-lo{color:#9ca3af}
 .tick{color:#16a34a;font-weight:700}
 .cross{color:#9ca3af}
 .num{color:#9ca3af;font-size:11px;text-align:right;white-space:nowrap;width:28px}
@@ -66,7 +68,9 @@ tr:hover:not(.date-sep) td{background:#fafafa}
 .site-dou{background:#dcfce7;color:#166534}
 .site-linkedin{background:#dbeafe;color:#1e40af}
 .site-other,.site-{background:#f3f4f6;color:#6b7280}
-.salary-badge{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:10px;font-size:11px;background:#d1fae5;color:#065f46;font-weight:600}
+.salary-input{margin-left:6px;padding:1px 5px;border-radius:10px;font-size:11px;font-weight:600;border:1px solid transparent;background:#d1fae5;color:#065f46;width:90px;outline:none;font-family:inherit}
+.salary-input:placeholder-shown{background:#f3f4f6;color:#9ca3af;font-weight:400}
+.salary-input:focus{border-color:#6ee7b7;background:#ecfdf5}
 .barriers-cell{max-width:220px;vertical-align:top;font-size:11px;color:#374151;line-height:1.5}
 .applied-chk{width:15px;height:15px;cursor:pointer;accent-color:#16a34a}
 .saved-flash{display:inline-block;margin-left:5px;font-size:10px;font-weight:600;color:#16a34a;opacity:1;transition:opacity .4s ease}
@@ -129,8 +133,10 @@ tr[data-starred="1"] .star-btn{color:#f59e0b}
       <th style="width:28px" title="Избранное">⭐</th>
       <th onclick="sort(1)">Вакансия</th>
       <th onclick="sort(2)">Фит</th>
+      <th title="Vacancy Score — привлекательность роли">VScore</th>
       <th>Рекоменд.</th>
       <th>Категория</th>
+      <th>Зарплата</th>
       <th>Барьеры</th>
       <th>Анализ</th>
       <th>CV</th>
@@ -143,7 +149,7 @@ tr[data-starred="1"] .star-btn{color:#f59e0b}
   {% for v in vacancies %}
     {% if v.date != ns.last_date %}
     <tr class="date-sep" data-group-date="{{ v.date }}">
-      <td colspan="11"><span class="grp-icon" data-type="date" data-date="{{ v.date }}">▼</span>{{ v.date }}</td>
+      <td colspan="13"><span class="grp-icon" data-type="date" data-date="{{ v.date }}">▼</span>{{ v.date }}</td>
     </tr>
     {% set ns.last_date = v.date %}
     {% endif %}
@@ -152,8 +158,10 @@ tr[data-starred="1"] .star-btn{color:#f59e0b}
       <td style="text-align:center"><button class="star-btn" data-id="{{ v.id }}" onclick="toggleStarred(this)" title="Избранное">{{ '★' if v.starred else '☆' }}</button></td>
       <td class="vname"><span class="site-chip site-{{ v.site or 'other' }}">{{ v.site_display }}</span><a href="{{ v.url }}" target="_blank" rel="noopener">{{ v.title }}</a></td>
       <td class="fit">{{ v.fit_score }}</td>
+      <td class="vscore {% if v.vacancy_score != '—' %}{% set vs = v.vacancy_score | float %}{% if vs >= 7.5 %}vscore-hi{% elif vs >= 5.5 %}vscore-mid{% else %}vscore-lo{% endif %}{% endif %}">{{ v.vacancy_score }}</td>
       <td>{% if v.rec_class == 'rec-yes' %}✅{% elif v.rec_class == 'rec-no' %}❌{% elif v.rec_class == 'rec-consider' %}⚠️{% endif %} {{ v.recommendation }}{% if v.warn_count > 0 %}<span class="warn-chip" data-warn="{{ v.warn_text_escaped }}">⚠ {{ v.warn_count }}</span>{% endif %}</td>
-      <td class="cat">{{ v.category }}{% if v.salary %} <span class="salary-badge">{{ v.salary }}</span>{% endif %}</td>
+      <td class="cat">{{ v.category }}</td>
+      <td><input class="salary-input" data-id="{{ v.id }}" value="{{ v.salary }}" placeholder="—" onblur="saveSalary(this)" onkeydown="if(event.key==='Enter'){this.blur()}"></td>
       <td class="barriers-cell">{% if v.barriers_list %}{% for b in v.barriers_list %}{{ b }}{% if not loop.last %} · {% endif %}{% endfor %}{% else %}<span class="cross">—</span>{% endif %}</td>
       <td>{% if v.has_analysis %}<span class="tick">✓</span>{% else %}<span class="cross">—</span>{% endif %}</td>
       <td>{% if v.has_pdf %}<a href="{{ v.cv_pdf_url }}" target="_blank" class="tick" style="text-decoration:none" title="Открыть CV PDF">✓</a>{% else %}<span class="cross">—</span>{% endif %}</td>
@@ -161,7 +169,7 @@ tr[data-starred="1"] .star-btn{color:#f59e0b}
       <td style="text-align:center"><input type="checkbox" class="applied-chk" data-id="{{ v.id }}" {% if v.applied %}checked{% endif %} onchange="toggleApplied(this)" title="Отмечено как отправлено"></td>
     </tr>
     <tr class="expand-row" data-for="{{ v.id }}" style="display:none">
-      <td colspan="11">
+      <td colspan="13">
         <div class="analysis-body">
           {% if v.has_analysis %}{{ v.analysis_md | markdown | safe }}{% else %}<em>Анализ отсутствует.</em>{% endif %}
         </div>
@@ -183,7 +191,7 @@ function rowMatchesFilter(row) {
   const site    = document.getElementById('f-site').value;
   const applied = document.getElementById('f-applied').value;
   const starred = document.getElementById('f-starred').value;
-  const txt     = document.getElementById('f-text').value.toLowerCase();
+  const txt     = document.getElementById('f-text').value.trim().toLowerCase();
   return (!rec     || row.classList.contains(rec))
       && (!site    || row.dataset.site === site)
       && (!applied || row.dataset.applied === applied)
@@ -357,6 +365,30 @@ async function toggleStarred(btn) {
     if (row) row.dataset.starred = starred ? '0' : '1';
   }
   applyViz();
+}
+
+async function saveSalary(inp) {
+  const id = inp.dataset.id;
+  const salary = inp.value.trim();
+  inp.value = salary; // normalise whitespace
+  try {
+    const resp = await fetch(`/api/vacancies/${id}/salary`, {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({salary})
+    });
+    if (resp.ok) {
+      const cell = inp.parentElement;
+      const existing = cell.querySelector('.saved-flash');
+      if (existing) existing.remove();
+      const flash = document.createElement('span');
+      flash.className = 'saved-flash';
+      flash.textContent = '✓';
+      cell.appendChild(flash);
+      setTimeout(() => flash.classList.add('fade'), 1200);
+      setTimeout(() => flash.remove(), 1600);
+    }
+  } catch(_) {}
 }
 
 // ── Warn modal ────────────────────────────────────────────────────────────────
