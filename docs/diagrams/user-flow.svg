@@ -1,0 +1,113 @@
+<svg viewBox="0 0 680 980" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, -apple-system, sans-serif">
+  <title>Career Agent — User Flow</title>
+  <desc>BPMN-style flowchart showing the 8-step Career Agent pipeline from JD discovery to cover letter delivery</desc>
+
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="3.5" orient="auto">
+      <path d="M0,0 L0,7 L8,3.5 Z" fill="#6b7280"/>
+    </marker>
+    <marker id="arrow-red" markerWidth="8" markerHeight="8" refX="7" refY="3.5" orient="auto">
+      <path d="M0,0 L0,7 L8,3.5 Z" fill="#ef4444"/>
+    </marker>
+    <marker id="arrow-green" markerWidth="8" markerHeight="8" refX="7" refY="3.5" orient="auto">
+      <path d="M0,0 L0,7 L8,3.5 Z" fill="#22c55e"/>
+    </marker>
+  </defs>
+
+  <!-- START -->
+  <circle cx="340" cy="36" r="18" fill="#111827"/>
+  <text x="340" y="41" text-anchor="middle" fill="white" font-size="11" font-weight="600">START</text>
+
+  <line x1="340" y1="54" x2="340" y2="76" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- STEP 1 -->
+  <rect x="160" y="78" width="360" height="52" rx="6" fill="#f3f4f6" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="340" y="100" text-anchor="middle" fill="#111827" font-size="13" font-weight="600">1. JD Discovery &amp; Extraction</text>
+  <text x="340" y="118" text-anchor="middle" fill="#6b7280" font-size="11">Automatic via RSS  ·  Manual (URL / paste)</text>
+
+  <line x1="340" y1="130" x2="340" y2="152" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- STEP 2 -->
+  <rect x="160" y="154" width="360" height="52" rx="6" fill="#f3f4f6" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="340" y="176" text-anchor="middle" fill="#111827" font-size="13" font-weight="600">2. Deep Analysis  <tspan fill="#6b7280" font-weight="400" font-size="11">(Phase 1)</tspan></text>
+  <text x="340" y="194" text-anchor="middle" fill="#6b7280" font-size="11">Employer pain · Archetype · VScore (8 dims)</text>
+
+  <line x1="340" y1="206" x2="340" y2="228" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- STEP 3 -->
+  <rect x="160" y="230" width="360" height="52" rx="6" fill="#f3f4f6" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="340" y="252" text-anchor="middle" fill="#111827" font-size="13" font-weight="600">3. Fit Scoring  <tspan fill="#6b7280" font-weight="400" font-size="11">(Phase 2)</tspan></text>
+  <text x="340" y="270" text-anchor="middle" fill="#6b7280" font-size="11">Fit × VScore matrix · Barriers · Adaptation Plan</text>
+
+  <line x1="340" y1="282" x2="340" y2="308" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- GATEWAY -->
+  <polygon points="340,310 400,346 340,382 280,346" fill="#fffbeb" stroke="#d97706" stroke-width="2"/>
+  <text x="340" y="340" text-anchor="middle" fill="#92400e" font-size="11" font-weight="700">Recommendation?</text>
+  <text x="340" y="356" text-anchor="middle" fill="#92400e" font-size="10">Quick Scan → Telegram</text>
+
+  <!-- DECLINE -->
+  <line x1="400" y1="346" x2="560" y2="346" stroke="#ef4444" stroke-width="1.5" marker-end="url(#arrow-red)"/>
+  <text x="480" y="338" text-anchor="middle" fill="#ef4444" font-size="11" font-weight="600">decline</text>
+  <rect x="562" y="322" width="100" height="48" rx="6" fill="#fef2f2" stroke="#ef4444" stroke-width="1.5"/>
+  <text x="612" y="342" text-anchor="middle" fill="#ef4444" font-size="11" font-weight="600">Pipeline</text>
+  <text x="612" y="358" text-anchor="middle" fill="#ef4444" font-size="11" font-weight="600">stops ✗</text>
+
+  <!-- APPLY -->
+  <line x1="340" y1="382" x2="340" y2="406" stroke="#22c55e" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+  <text x="355" y="398" fill="#16a34a" font-size="11" font-weight="600">apply / take a chance</text>
+
+  <!-- STEP 4 -->
+  <rect x="160" y="408" width="360" height="52" rx="6" fill="#f3f4f6" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="340" y="430" text-anchor="middle" fill="#111827" font-size="13" font-weight="600">4. Objection Handling  <tspan fill="#6b7280" font-weight="400" font-size="11">(Phase 2.5)</tspan></text>
+  <text x="340" y="448" text-anchor="middle" fill="#6b7280" font-size="11">Resolve gaps interactively · Evidence → PROFILE.md</text>
+  <text x="152" y="437" text-anchor="end" fill="#6b7280" font-size="10" font-style="italic">if barriers</text>
+
+  <line x1="340" y1="460" x2="340" y2="482" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- STEP 5 -->
+  <rect x="160" y="484" width="360" height="52" rx="6" fill="#f3f4f6" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="340" y="506" text-anchor="middle" fill="#111827" font-size="13" font-weight="600">5. CV Draft  <tspan fill="#6b7280" font-weight="400" font-size="11">(Phase 3 · hidden)</tspan></text>
+  <text x="340" y="524" text-anchor="middle" fill="#6b7280" font-size="11">Tailored to JD pain &amp; Adaptation Plan</text>
+
+  <line x1="340" y1="536" x2="340" y2="558" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- STEP 6 -->
+  <rect x="160" y="560" width="360" height="52" rx="6" fill="#f3f4f6" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="340" y="582" text-anchor="middle" fill="#111827" font-size="13" font-weight="600">6. Self-Review  <tspan fill="#6b7280" font-weight="400" font-size="11">(Phase 3.5)</tspan></text>
+  <text x="340" y="600" text-anchor="middle" fill="#6b7280" font-size="11">Word freq · Tools gap · Tone check · User sees CV</text>
+
+  <line x1="340" y1="612" x2="340" y2="634" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- STEP 7 -->
+  <rect x="160" y="636" width="360" height="52" rx="6" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+  <text x="340" y="658" text-anchor="middle" fill="#111827" font-size="13" font-weight="600">7. Approval → CV.pdf → Telegram</text>
+  <text x="340" y="676" text-anchor="middle" fill="#6b7280" font-size="11">User approves · PDF rendered · Delivered</text>
+
+  <line x1="340" y1="688" x2="340" y2="710" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- STEP 8 -->
+  <rect x="160" y="712" width="360" height="52" rx="6" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+  <text x="340" y="734" text-anchor="middle" fill="#111827" font-size="13" font-weight="600">8. Cover Letter → CoverLetter.pdf → Telegram</text>
+  <text x="340" y="752" text-anchor="middle" fill="#6b7280" font-size="11">Phase 4 · Two variants · User picks</text>
+
+  <line x1="340" y1="764" x2="340" y2="790" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- END -->
+  <circle cx="340" cy="808" r="18" fill="#111827"/>
+  <circle cx="340" cy="808" r="13" fill="none" stroke="white" stroke-width="2"/>
+  <text x="340" y="812" text-anchor="middle" fill="white" font-size="10" font-weight="600">END</text>
+
+  <!-- LEGEND -->
+  <rect x="30" y="880" width="620" height="76" rx="6" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1"/>
+  <text x="44" y="900" fill="#6b7280" font-size="11" font-weight="600">LEGEND</text>
+  <rect x="44" y="910" width="14" height="14" rx="3" fill="#f3f4f6" stroke="#d1d5db" stroke-width="1.5"/>
+  <text x="64" y="922" fill="#6b7280" font-size="11">Pipeline step (automated)</text>
+  <polygon points="148,917 162,924 148,931 134,924" fill="#fffbeb" stroke="#d97706" stroke-width="1.5"/>
+  <text x="168" y="928" fill="#6b7280" font-size="11">Decision gateway</text>
+  <rect x="280" y="910" width="14" height="14" rx="3" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+  <text x="300" y="922" fill="#6b7280" font-size="11">Delivery to user (Telegram)</text>
+  <line x1="446" y1="917" x2="466" y2="917" stroke="#ef4444" stroke-width="2" marker-end="url(#arrow-red)"/>
+  <text x="472" y="921" fill="#6b7280" font-size="11">Decline path (early exit)</text>
+  <text x="44" y="946" fill="#6b7280" font-size="10" font-style="italic">Phase 2.5 skipped if no barriers. Phases 3–3.5 hidden from user until Self-Review output.</text>
+</svg>

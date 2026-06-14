@@ -17,7 +17,7 @@ Core focus is PdM / PO: fit analysis understands product archetypes (Delivery vs
 
 ## The Problem
 
-An active search means evaluating 30–100 vacancies. Most candidates decide emotionally — real barriers get missed, wrong roles get pursued. Then 2–4 hours per CV, often wasted.
+An active search means evaluating 30–100 vacancies. Most candidates decide emotionally — real barriers get missed, wrong roles get pursued. Then 30–90 minutes per CV, often wasted.
 
 Real example: self-assessed at 10/10 fit → agent returned 4/10. Delta = 6 points, one hidden requirement.
 
