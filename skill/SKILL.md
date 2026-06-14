@@ -111,7 +111,7 @@ Skip only when: `decline` (not worth it) OR clean `apply` with zero barriers.
 
 ### Nature (per EPIC-21)
 
-Cognitive + interactive (dialogue + judgment) → stays LLM. The barrier-list scaffolding is deterministic. A dedicated `prompts/[skill_type]/phase2_5_objections.md` is a follow-up (EPIC-21 / BACKLOG); for now this section is the spec.
+Cognitive + interactive (dialogue + judgment) → stays LLM. The barrier-list scaffolding is deterministic. Prompt: `prompts/[skill_type]/phase2_5_objections.md`.
 
 ---
 
@@ -153,7 +153,7 @@ ALL phases are skill_type-specific. No universal phase files remain in prompts/ 
 |-------|------------|-------|
 | Phase 1 | `prompts/[skill_type]/phase1_analysis.md` | JD text + active user PROFILE.md in context |
 | Phase 2 | `prompts/[skill_type]/phase2_fit.md` | JD text + Phase 1 output |
-| Phase 2.5 | *(orchestration — see "Phase 2.5 — Objection Handling" section; no prompt file yet)* | Phase 2 Key Barriers + Fit Breakdown ⚠️/❌ + Adaptation Plan |
+| Phase 2.5 | `prompts/[skill_type]/phase2_5_objections.md` | Phase 2 Key Barriers + Fit Breakdown ⚠️/❌ + Adaptation Plan |
 | Phase 3 | `prompts/[skill_type]/phase3_cv_draft.md` | JD text + JD_analysis.md + language + name + **resolved objections** |
 | Phase 3.5 | `prompts/[skill_type]/phase3_5_review.md` | CV draft + JD_analysis.md |
 | Phase 4 | `prompts/[skill_type]/phase4_cover.md` | JD text + approved CV + JD_analysis.md |
