@@ -113,7 +113,7 @@ flowchart TD
 
 | Decision | Alternative | Reason |
 |----------|-------------|--------|
-| **PM/PO/PM as ICP — not generic job seekers** | Serve all roles | PM job search has PM-specific archetypes (Founder Proxy vs Executor, discovery vs delivery bias), domain signals, and lexicon that generic tools miss entirely. Vertical depth beats horizontal breadth. A tool built for everyone is optimized for no one. |
+| **PdM/PO as ICP — not generic job seekers** | Serve all roles | PdM job search has role-specific archetypes (Founder Proxy vs Executor, discovery vs delivery bias), domain signals, and lexicon that generic tools miss entirely. Vertical depth beats horizontal breadth. A tool built for everyone is optimized for no one. |
 | **Decision-first pipeline** — analyze fit before generating anything | Generate CV for every vacancy | Effort should follow a go/no-go verdict, not precede it. Don't optimize a document the user shouldn't send. |
 | **RSS-first workflow** — jobs are pushed to the user | Manual vacancy search | Users should *evaluate* opportunities, not spend time *finding* them. |
 | **Telegram as primary UI** | Web app / dedicated client | Zero install, already in the user's pocket, native push + inline approve/skip buttons. The interaction is decisions, not browsing. |
