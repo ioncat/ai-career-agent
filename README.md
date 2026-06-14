@@ -1,14 +1,8 @@
-# Hiring is broken. You can fix your side.
+# Career Agent
 
-**Career Agent** — *For your next career move*
+**AI job search counselor for PdM · PO**
 
-Job search has become needlessly hard. Employers bury their real pain inside generic JDs. Candidates fire off generic CVs hoping something lands. Both sides drown in noise.
-
-**Our belief:** a good match is a conversation of relevance. The employer states the problem they need solved. The candidate understands it and responds with their strongest, most relevant evidence.
-
-**Today** Career Agent serves the candidate side: it reads the employer's real intent out of the JD, judges honest fit, and surfaces the candidate's strongest relevant story — or tells them to walk away.
-
-**North star:** close the loop on both sides, so employers and candidates reach the most relevant offers to each other.
+Reads vacancies deeply, scores honest fit, and generates targeted CVs — so candidates apply to the right roles and win them.
 
 ---
 
@@ -23,20 +17,19 @@ Core focus is PdM / PO: fit analysis understands product archetypes (Delivery vs
 
 ## The Problem
 
-Job seekers spend hours tailoring CVs **before** knowing if they're even a strong candidate.
+An active search means evaluating 30–100 vacancies. Most candidates decide emotionally — real barriers get missed, wrong roles get pursued. Then 2–4 hours per CV, often wasted.
 
-Most tools help you write faster. This system answers two questions, in order:
-
-1. **Should you apply?** — an honest read of the vacancy and your real fit. Weak odds → it tells you to skip.
-2. **How do you win this one?** — if worth it, a CV that puts your strongest, most relevant sides forward.
-
-The leverage is your profile: onboard once, and Career Agent turns deep JD analysis into a winning pitch — automatically, for every vacancy.
+Real example: self-assessed at 10/10 fit → agent returned 4/10. Delta = 6 points, one hidden requirement.
 
 ---
 
 ## Product Vision
 
-**Career Agent is a focused vertical service** — purpose-built for PM job search. Tight pipeline by design: each phase solves a specific problem for the job seeker, nothing more.
+Career Agent builds a picture of the candidate — through structured onboarding, LinkedIn/CV data, and evidence surfaced during the pipeline. That knowledge compounds with every session.
+
+When fit is real: a targeted CV from actual experience, cross-checked against the vacancy's requirements, delivered as PDF. No fabricated claims. The user approves — or requests edits. Everything else is automated.
+
+**Candidates spend time on decisions, not on writing.**
 
 ---
 
