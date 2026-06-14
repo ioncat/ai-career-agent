@@ -7,7 +7,7 @@ Manual URL input is a fallback, not the default.
 flowchart LR
     M["services/job-monitor/\nRSS auto-discovery"] -->|"pushes new vacancy"| A
     A["🔔 Telegram\nNew job at X — Analyze?"]
-    A -->|✅ Yes| C["Deep JD Analytics\nScore · Verdict · Barriers"]
+    A -->|✅ Yes| C["Deep JD Analytics\nScore · Recommendation · Barriers"]
     C --> D["Telegram\nGenerate CV?"]
     D -->|📄 Yes| E["AI drafts CV\n+ self-review pass"]
     E --> F["User approves\nvia Telegram"]

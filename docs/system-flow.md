@@ -58,11 +58,11 @@ flowchart TD
         FIT --> SAVE12[/"→ JD_analysis.md\n(full output, silent save)"/]
     end
 
-    P12 --> QUICK_SCAN["Quick Scan — shown in chat\nScore X/10 · Verdict · Barriers · Warnings"]
+    P12 --> QUICK_SCAN["Quick Scan — shown in chat\nScore X/10 · Recommendation · Barriers · Warnings"]
 
     %% ─── GO / NO-GO DECISION ─────────────────────────────────────────────────
 
-    QUICK_SCAN --> VERDICT{"Verdict?"}
+    QUICK_SCAN --> VERDICT{"Recommendation?"}
     VERDICT -->|"🚫 Don't apply\nblockers found"| NO_APPLY(["🛑 Stop\nanalysis saved\nno CV generated"])
     VERDICT -->|"⚠️ Apply with adaptation\nor ✅ Apply"| PREFLIGHT
 

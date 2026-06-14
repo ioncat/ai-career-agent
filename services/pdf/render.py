@@ -99,7 +99,7 @@ def strip_md_inline(text: str) -> str:
     return text
 
 
-def _verdict_color(verdict_text: str) -> tuple[int, int, int]:
+def _recommendation_color(verdict_text: str) -> tuple[int, int, int]:
     v = verdict_text.lower()
     if "не подавать" in v:  return (200, 0, 0)
     if "с адаптацией" in v: return (200, 130, 0)
@@ -266,7 +266,7 @@ class CVDocument(FPDF):
         verdict = kv.get("Recommendation", kv.get("Рекомендация", kv.get("Verdict", kv.get("Вердикт", ""))))
         if verdict:
             self.set_font(FONT_NAME, "B", 14)
-            self.set_text_color(*_verdict_color(verdict))
+            self.set_text_color(*_recommendation_color(verdict))
             self.cell(0, 11, verdict.upper(), new_x="LMARGIN", new_y="NEXT")
             self.ln(3)
 

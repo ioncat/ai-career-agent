@@ -13,7 +13,7 @@ flowchart TD
     P1 --> VS["VScore — Vacancy Attractiveness\n8 dims: tier · seniority · domain · remote · comp…"]
     P1 --> P2["Phase 2 — Fit Scoring\nFit × VScore matrix · Barriers · Adaptation Plan"]
     VS --> P2
-    P2 --> QS["Quick Scan → Telegram\nFit / VScore / Verdict / Barriers / Warnings"]
+    P2 --> QS["Quick Scan → Telegram\nFit / VScore / Recommendation / Barriers / Warnings"]
 
     QS -->|"apply / take a chance"| P25["Phase 2.5 — Objection Handling\nresolve barriers before CV · updates PROFILE.md"]
     QS -->|"decline"| Z["❌ Pipeline stops"]
@@ -23,7 +23,7 @@ flowchart TD
     PDF --> P4["Phase 4 — Cover Letter → Telegram\ntwo variants · user picks"]
 ```
 
-**3-way verdict:** `apply` · `take a chance` · `decline` — driven by Fit × VScore matrix  
+**3-way recommendation:** `apply` · `take a chance` · `decline` — driven by Fit × VScore matrix  
 **VScore (1–10):** vacancy attractiveness — company tier, seniority, market scope, domain fit, remote policy, compensation  
 **Fit Breakdown:** per-requirement ✅/⚠️/❌ — pet-projects never equal commercial experience  
 **Archetype-aware:** Founder Proxy vs Executor signal → different CV framing per vacancy

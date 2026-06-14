@@ -46,7 +46,7 @@ The leverage is your profile: onboard once, and Career Agent turns deep JD analy
 
 **2. Deep Analysis (Phase 1)** — employer's real pain, hidden requirements, role archetype, **VScore** (vacancy attractiveness, 8 dims).
 
-**3. Fit Scoring (Phase 2)** — Fit × VScore matrix → verdict: `apply` · `take a chance` · `decline`. Key Barriers + Adaptation Plan. `decline` → pipeline stops, no CV wasted.
+**3. Fit Scoring (Phase 2)** — Fit × VScore matrix → recommendation: `apply` · `take a chance` · `decline`. Key Barriers + Adaptation Plan. `decline` → pipeline stops, no CV wasted.
 
 **4. Objection Handling (Phase 2.5)** — if barriers exist: resolve gaps interactively before writing anything. Resolved evidence saved to PROFILE.md.
 
@@ -74,7 +74,7 @@ The leverage is your profile: onboard once, and Career Agent turns deep JD analy
 | Decision | Alternative | Reason |
 |----------|-------------|--------|
 | **PdM / PO as primary ICP** (PM, BA as extended) | Serve all roles equally | PdM / PO job search has role-specific archetypes (Founder Proxy vs Executor, discovery vs delivery bias), domain signals, and lexicon that generic tools miss. Vertical depth beats horizontal breadth. PM and BA supported via generic skill_type — not the core optimization target. |
-| **Decision-first pipeline** — analyze fit before generating anything | Generate CV for every vacancy | Effort should follow a go/no-go verdict, not precede it. Don't optimize a document the user shouldn't send. |
+| **Decision-first pipeline** — analyze fit before generating anything | Generate CV for every vacancy | Effort should follow a go/no-go recommendation, not precede it. Don't optimize a document the user shouldn't send. |
 | **RSS-first workflow** — jobs are pushed to the user | Manual vacancy search | Users should *evaluate* opportunities, not spend time *finding* them. |
 | **Telegram as primary UI** | Web app / dedicated client | Zero install, already in the user's pocket, native push + inline approve/skip buttons. The interaction is decisions, not browsing. |
 | **Channel-agnostic architecture** | Telegram-only forever | Telegram is primary today (CIS/EU). PWA and WhatsApp added as adapters when needed — tools layer unchanged. |
