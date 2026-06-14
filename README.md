@@ -14,9 +14,10 @@ Job search has become needlessly hard. Employers bury their real pain inside gen
 
 ## Who it's for
 
-**Product Managers, Product Owners, Project Managers** — in active job search (passive search as secondary).
+**Primary ICP:** PdM (Product Manager) · PO (Product Owner)
+**Extended ICP:** PM (Project Manager) · BA (Business Analyst) · other non-technical roles
 
-Built for PMs specifically: fit analysis understands PM archetypes (Delivery vs Discovery, Execution vs Founder Proxy), evaluates PM-specific experience signals, and adapts CV framing to what the role actually needs.
+Core focus is PdM / PO: fit analysis understands product archetypes (Delivery vs Discovery, Execution vs Founder Proxy), evaluates product-specific experience signals, and adapts CV framing to what the role actually needs. PM, BA, and adjacent roles supported via `skill_type: generic` prompts.
 
 ---
 
@@ -113,7 +114,7 @@ flowchart TD
 
 | Decision | Alternative | Reason |
 |----------|-------------|--------|
-| **PdM / PO as ICP — not generic job seekers** | Serve all roles | PdM / PO job search has role-specific archetypes (Founder Proxy vs Executor, discovery vs delivery bias), domain signals, and lexicon that generic tools miss entirely. Vertical depth beats horizontal breadth. A tool built for everyone is optimized for no one. |
+| **PdM / PO as primary ICP** (PM, BA as extended) | Serve all roles equally | PdM / PO job search has role-specific archetypes (Founder Proxy vs Executor, discovery vs delivery bias), domain signals, and lexicon that generic tools miss. Vertical depth beats horizontal breadth. PM and BA supported via generic skill_type — not the core optimization target. |
 | **Decision-first pipeline** — analyze fit before generating anything | Generate CV for every vacancy | Effort should follow a go/no-go verdict, not precede it. Don't optimize a document the user shouldn't send. |
 | **RSS-first workflow** — jobs are pushed to the user | Manual vacancy search | Users should *evaluate* opportunities, not spend time *finding* them. |
 | **Telegram as primary UI** | Web app / dedicated client | Zero install, already in the user's pocket, native push + inline approve/skip buttons. The interaction is decisions, not browsing. |
