@@ -388,7 +388,7 @@ Inbox scan runs **inside Step 0** and populates Block 2 of the combined menu.
 > ```
 >
 > Возвращает массив: `title`, `source_url`, `file`, `raw_folder`, `seen`, `seen_path`.
-> Dedup уже сделан (`seen` = совпадение URL в `vacancies/inbox/{user_id}/*/JD.md`).
+> Dedup уже сделан: URL → поиск в `JD.md` и `JD_analysis.md`; без URL → совпадение по имени папки в `vacancies/inbox/{user_id}/`.
 > `raw_folder` → точный аргумент для `vacancy_track.py delete-inbox --folder`.
 
 1. Run `scripts/inbox_scan.py --user-id [user_id] --json`

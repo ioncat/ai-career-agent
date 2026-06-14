@@ -116,21 +116,37 @@ def _find_drops() -> list[dict]:
     return drops
 
 
-def _seen_path_for(url: str, user_id: int) -> str:
-    """If url already appears in any vacancies/inbox/{user_id}/*/JD.md, return
-    that JD.md path (relative to repo root), else empty string."""
-    if not url:
-        return ""
+def _seen_path_for(url: str, raw_folder: str, user_id: int) -> str:
+    """Check if this drop was already processed for user_id.
+
+    URL present  → scan JD.md and JD_analysis.md in every vacancy folder for URL.
+    URL absent   → folder-name match: vacancies/inbox/{user_id}/{raw_folder}/ exists?
+    Returns path (relative to repo root) of the matched file/folder, or "".
+    """
     base = _ROOT / "vacancies" / "inbox" / str(user_id)
     if not base.is_dir():
         return ""
-    for jd in base.glob("*/JD.md"):
-        try:
-            text = jd.read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            continue
-        if url in text:
-            return str(jd.relative_to(_ROOT)).replace("\\", "/")
+
+    if url:
+        for candidate in sorted(base.glob("*/*.md")):
+            if candidate.name not in ("JD.md", "JD_analysis.md"):
+                continue
+            try:
+                text = candidate.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            if url in text:
+                return str(candidate.relative_to(_ROOT)).replace("\\", "/")
+        return ""
+
+    # No URL — fall back to folder name match
+    target = base / raw_folder
+    if target.is_dir():
+        for fname in ("JD_analysis.md", "JD.md"):
+            p = target / fname
+            if p.exists():
+                return str(p.relative_to(_ROOT)).replace("\\", "/")
+        return str(target.relative_to(_ROOT)).replace("\\", "/")
     return ""
 
 
@@ -141,7 +157,7 @@ def scan(user_id: int) -> list[dict]:
         head = _read_head(path)
         title = _parse_title(head, fallback=path.stem)
         url = _parse_source(head)
-        seen_path = _seen_path_for(url, user_id)
+        seen_path = _seen_path_for(url, drop["raw_folder"], user_id)
         results.append({
             "index": idx,
             "title": title,
