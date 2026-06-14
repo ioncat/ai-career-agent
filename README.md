@@ -42,71 +42,30 @@ The leverage is your profile: onboard once, and Career Agent turns deep JD analy
 
 ## How it works
 
-> Full system flow with decision logic: [`docs/system-flow.md`](docs/system-flow.md)
+**1. JD Extraction** — automatic via RSS push, or manual (URL / JD paste in Telegram).
 
-A **job counselor**, not a CV generator. Two distinct layers of value:
+**2. Deep Analysis (Phase 1)** — employer's real pain, hidden requirements, role archetype, **VScore** (vacancy attractiveness, 8 dims).
 
-**Layer 1 — Decision support**
-Read the vacancy deeply. Understand the employer's real pain, not just the listed requirements. Give the candidate an honest answer: *is this worth your time?* If the fit is weak — say so clearly, explain why, and save them the effort. No false encouragement.
+**3. Fit Scoring (Phase 2)** — Fit × VScore matrix → verdict: `apply` · `take a chance` · `decline`. Key Barriers + Adaptation Plan. `decline` → pipeline stops, no CV wasted.
 
-**Layer 2 — Execution support**
-If the answer is yes: prepare the candidate's best possible pitch. Not a generic CV about them — a targeted story about *why they are the answer to this employer's specific problem*, told through their strongest, most relevant experience.
+**4. Objection Handling (Phase 2.5)** — if barriers exist: resolve gaps interactively before writing anything. Resolved evidence saved to PROFILE.md.
 
-The counselor is only as good as what it knows about the candidate. That's why onboarding matters: the deeper the profile, the sharper the story.
+**5. CV Draft (Phase 3, hidden)** — tailored to JD pain and Adaptation Plan.
 
----
+**6. Self-Review (Phase 3.5)** — word frequency check, tools gap, tone vs archetype. First time user sees the CV.
 
-## User Journey
+**7. Approval → CV.pdf → Telegram**
 
-New jobs are discovered **automatically** via RSS. The user is notified and only makes decisions — approve or skip.  
-Manual URL input is an option, not the default.
+**8. Cover Letter (Phase 4)** — two variants (narrative + bullets), user picks.
 
-```mermaid
-flowchart LR
-    M["services/job-monitor/\nRSS auto-discovery"] -->|"pushes new vacancy"| A
-    A["🔔 Telegram\nNew job at X — Analyze?"]
-    A -->|✅ Yes| C["Deep JD Analytics\nScore · Verdict · Barriers"]
-    C --> D["Telegram\nGenerate CV?"]
-    D -->|📄 Yes| E["AI drafts CV\n+ self-review pass"]
-    E --> F["User approves\nvia Telegram"]
-    F --> G["📎 PDF delivered"]
-    G --> H["Telegram\nCover letter?"]
-    H -->|✉️ Yes| I["Cover letter\ndelivered"]
-    A -->|❌ Skip| Z["Archived"]
-    U["Manual option\nTelegram URL / JD.md drop"] -.->|fallback| A
-```
+### Diagrams
 
-**The user's only job:** approve or skip. Everything else runs automatically.
-
----
-
-## AI Pipeline
-
-Five-phase Claude API pipeline. All static system content — `PROFILE.md` **and** every phase prompt — is prompt-cached; only the per-vacancy text (JD + prior-phase output) is charged at full rate.
-
-Phase prompts are **skill-type-specific**: each user's `PROFILE.md` carries a `skill_type` field (e.g. `pm`, `generic`) that routes all five phases to `prompts/[skill_type]/`. PM analysis understands archetypes, Founder Proxy signals, and delivery framing. Generic analysis is role-agnostic — suitable for any non-PM role.
-
-```mermaid
-flowchart TD
-    JD["JD.md"] --> P1["Phase 1 — Deep Analysis\nobjections · hidden requirements · archetype signal"]
-    PROF["PROFILE.md\n🔵 prompt cache"] --> P1
-    PROF --> P3
-
-    P1 --> VS["VScore — Vacancy Attractiveness\n8 dims: tier · seniority · domain · remote · comp…"]
-    P1 --> P2["Phase 2 — Fit Scoring\nFit × VScore matrix · Barriers · Adaptation Plan"]
-    VS --> P2
-    P2 --> QS["Quick Scan → Telegram\nFit / VScore / Verdict / Barriers / Warnings"]
-
-    QS -->|"apply / take a chance"| P3["Phase 3 — CV Draft\nhidden from user"]
-    P3 --> P35["Phase 3.5 — Self-Review\ncross-checks Adaptation Plan · shown for approval"]
-    P35 --> PDF["CV.pdf → Telegram"]
-    PDF --> P4["Phase 4 — Cover Letter → Telegram"]
-```
-
-**3-way verdict:** apply · take a chance · decline — driven by Fit × VScore matrix  
-**VScore (1–10):** vacancy attractiveness composite — company tier, seniority, market scope, domain fit, remote policy, compensation — computed in Phase 1, shown in tracker  
-**Fit Breakdown:** per-requirement ✅/⚠️/❌ table — pet-projects never equal commercial experience  
-**Archetype-aware:** JD signals Founder Proxy vs Executor → different CV framing per vacancy
+| | |
+|-|-|
+| [User Journey](docs/diagrams/user-journey.md) | RSS → Telegram → approve/skip flow |
+| [AI Pipeline](docs/diagrams/ai-pipeline.md) | 6-phase pipeline — VScore, Fit × VScore, decision gates |
+| [Architecture](docs/diagrams/architecture.md) | Service topology — career-agent · parser · pdf · job-monitor |
+| [System Flow](docs/system-flow.md) | Full decision logic end-to-end |
 
 ---
 
@@ -126,40 +85,7 @@ flowchart TD
 
 ## Architecture
 
-```mermaid
-flowchart TB
-    subgraph Inputs
-        RSS["services/job-monitor/\nwebhook push"]
-        User["User · Telegram / PWA"]
-    end
-
-    subgraph "Career Agent"
-        TG["Notification Channel\nTelegram (primary) · PWA"]
-        RT["Router\nPydanticAI"]
-        Tools["Tools\ncv_fetch · cv_analyze · cv_generate · cv_cover"]
-        LLM["LLM Client\nClaude Sonnet 4.6\nprompt caching + extended thinking"]
-        Web["Web Tracker\nFastAPI + HTMX"]
-    end
-
-    subgraph "services/"
-        JDP["jd-parser/\nURL → Markdown\nHTTP POST /parse"]
-        PDF["pdf/\nMarkdown → PDF\nHTTP POST /render"]
-    end
-
-    subgraph Storage
-        DB[("SQLite\nvacancy metadata · llm_usage")]
-        FS["Filesystem\nvacancies/ — JD · analysis · CV · cover"]
-    end
-
-    RSS --> RT
-    User --> TG --> RT
-    RT --> Tools
-    Tools --> LLM
-    Tools --> JDP
-    Tools --> PDF
-    Tools --> DB & FS
-    Web --> DB
-```
+→ [Architecture diagram](docs/diagrams/architecture.md)
 
 | Layer | Tech |
 |-------|------|
@@ -167,5 +93,4 @@ flowchart TB
 | UI | Telegram (aiogram 3.x) · Web tracker (FastAPI + HTMX) |
 | HTTP | httpx async |
 | Storage | SQLite + filesystem |
-| Config | `config/profile.yaml` · `config/llm.yaml` |
 | Deploy | Docker Compose — career-agent · services/ |
