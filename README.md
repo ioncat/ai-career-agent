@@ -42,7 +42,7 @@ The leverage is your profile: onboard once, and Career Agent turns deep JD analy
 
 ## How it works
 
-**1. JD Extraction** — automatic via RSS push, or manual (URL / JD paste in Telegram).
+**1. JD Discovery & Extraction** — automatic via RSS push, or manual (URL / JD paste in Telegram).
 
 **2. Deep Analysis (Phase 1)** — employer's real pain, hidden requirements, role archetype, **VScore** (vacancy attractiveness, 8 dims).
 
@@ -56,7 +56,7 @@ The leverage is your profile: onboard once, and Career Agent turns deep JD analy
 
 **7. Approval → CV.pdf → Telegram**
 
-**8. Cover Letter (Phase 4)** — two variants (narrative + bullets), user picks.
+**8. Cover Letter (Phase 4) → CoverLetter.pdf → Telegram**
 
 ### Diagrams
 
