@@ -192,7 +192,7 @@ def load_feeds() -> list[dict]:
 
 def load_env() -> str:
     """Load .env and return CAREER_AGENT_URL (the webhook endpoint base)."""
-    env_file = Path(__file__).parent / ".env"
+    env_file = Path(__file__).parent.parent.parent / ".env"  # project root
     if env_file.exists():
         for line in env_file.read_text(encoding="utf-8").splitlines():
             line = line.strip()
