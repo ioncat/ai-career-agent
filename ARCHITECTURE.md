@@ -199,6 +199,16 @@ vacancies/
 
 ---
 
+## Project phases
+
+| Phase | Period | Direction | Key deliverable |
+|-------|--------|-----------|-----------------|
+| 1 — Generic AI agent | pre-2026-05-31 | Generic multi-agent orchestration platform | EPICs 1–12 (see `epics-archive/`); external service deps (`knowledge-mirror-parser`, `callback-cv`, `job-board-monitor`) |
+| 2 — Focused vertical service | 2026-05-31 | Generic platform → PM/PO/PM job counselor; monorepo consolidation | ADR-01; EPICs 13–18; `services/` inside; multi-user schema |
+| 3 — Deterministic FSM | 2026-06-15 | AI agent orchestrator → Python FSM + subordinate LLM | ADR-02; EPIC-21; 4 cognitive touchpoints; weasyprint PDF |
+
+---
+
 ## Design Decisions Log
 
 ### ADR-01 — 2026-05-31: Pivot from generic agent orchestrator to focused vertical service
@@ -241,3 +251,39 @@ Three structural consequences:
 All five pipeline phases remain intact and tested. External repo dependencies eliminated. Services architecture established (`services/parser/`, `services/pdf/`, `services/job-monitor/`). Multi-user schema in place. Profile onboarding epic defined.
 
 See `docs/delivery/PIVOT-PLAN.md` for the full migration phase plan.
+
+---
+
+### ADR-02 — 2026-06-15: Deterministic FSM orchestrator replaces agent-driven pipeline
+
+**Status:** Planned (EPIC-21)
+
+**Context:**
+
+After Phase 2 established the focused pipeline and monorepo structure, the remaining waste became visible: the LLM was doing deterministic work (arithmetic, decision tables, rendering), and in local mode a reasoning agent was hand-executing glue steps — one expensive agent turn per mechanical FS/DB/menu operation.
+
+Two concrete signals:
+1. VScore composite formula and Fit×VScore recommendation matrix were being computed by the LLM in prose — pure arithmetic and `if/elif`.
+2. Step trace analysis (H-002) showed the ratio of agent turns on glue vs. cognitive work was inverted: most turns were FS/DB/menu, not analysis/generation.
+
+**Decision:**
+
+Draw and enforce the boundary. Python FSM owns the skeleton and all I/O. LLM called only for irreducible cognitive phases, returning structured JSON. Three structured calls (`P1+2`, `P3+3.5`, `P4`) + one conditional interactive exchange (`P2.5`), not a scatter of agent turns.
+
+**Control principle:** FSM is primary (owns control flow + I/O). LLM is a subordinate pure function (text → JSON judgment, no FS/DB access, no control flow decisions). *Code runs the model — not the model the code.*
+
+PDF engine also resolved: **weasyprint** (HTML/Jinja2 + CSS) replaces fpdf2 `render_md` (fragile line-by-line markdown parser, no colour emoji).
+
+**Alternatives considered:**
+
+| Alternative | Why rejected |
+|-------------|-------------|
+| Keep agent-driven glue | Every glue step costs a reasoning turn; arithmetic by LLM is error-prone |
+| Playwright for PDF | ~300MB headless-Chrome dependency; heavier in Docker/CI |
+| LLM decides branching | Violates control principle — cognitive output influences guards, never executes transitions |
+
+**Outcome (target):**
+
+4 cognitive touchpoints instead of scattered agent steps. Deterministic metrics (VScore composite, recommendation matrix, Top-15 freq, tools scan, repetition check) moved to Python. One skeleton shared by API/headless and local modes.
+
+See [EPIC-21](docs/delivery/Epics/EPIC-21-deterministic-vs-cognitive-pipeline.md) for full task breakdown + UML diagrams.

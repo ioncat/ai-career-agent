@@ -8,9 +8,27 @@
 
 ## 🔴 P0 — [EPIC-21](docs/delivery/Epics/EPIC-21-deterministic-vs-cognitive-pipeline.md) — Deterministic vs Cognitive pipeline split
 
-**Goal:** Draw the boundary — deterministic work in Python (FSM orchestrator), LLM only for irreducible cognitive phases (single structured calls). Source: `docs/discovery/hypotheses/H-002`.
+**Goal:** Draw the boundary — deterministic work in Python (FSM orchestrator), LLM only for irreducible cognitive phases. Source: `docs/discovery/hypotheses/H-002`.
 
-**Task 1 (TOMORROW 2026-06-05):** deterministic PDF templating (CV + cover templates) — replaces fragile `render_md`. Cleanest "remove from AI contour" win; independent of the rest. See EPIC-21 for full task list (blocker-ordered) + classification + target architecture.
+**Re-audited rev 2 (2026-06-15):** classification updated for VScore (composite formula + recommendation matrix → Python) and Phase 2.5 (interactive cognitive pause-state). PDF engine decided: **weasyprint**. Two older backlog items folded in (see below).
+
+**Next up:** Task 1 — deterministic PDF templating (weasyprint HTML/CSS, replaces fragile fpdf2 `render_md`); Task 0 — re-trace happy-path for an honest step baseline. Both independent, can land first. See EPIC-21 for full task list (blocker-ordered) + classification + target architecture.
+
+---
+
+## 🟡 Post-EPIC-21 — Docs & diagrams freshness review
+
+After EPIC-21 lands: audit all docs and diagrams for staleness vs. implemented FSM.
+
+- `docs/diagrams/EPIC-21-pipeline-fsm.html` — verify FSM states + sequence match final implementation
+- `ARCHITECTURE.md` — update pipeline phases table, mode comparison table (Режим 4 description changes with Task 6)
+- `CLAUDE.md` — update "Current phase" status line
+- `docs/local-app.md`, `docs/system-flow.md` — verify they reflect FSM orchestrator, not agent-driven steps
+- `README.md` — pipeline descriptions, any architecture diagrams
+- `docs/discovery/Pipeline-Evolution.md` — add entry for Phase 3 (FSM, v7+)
+- `docs/delivery/PIVOT-PLAN.md` — Phase 7 scope description may shift after FSM lands
+
+> Trigger: EPIC-21 Task 4 (FSM orchestrator) merged. Run this review before closing the EPIC.
 
 ---
 
@@ -205,41 +223,29 @@ Phase 4 (cover):     ~$0.05
 
 ---
 
-## P1 — Детерминированный pipeline: минимизировать роль агента
+## ~~P1 — Детерминированный pipeline~~ → folded into [EPIC-21](docs/delivery/Epics/EPIC-21-deterministic-vs-cognitive-pipeline.md)
 
-**Идея (2026-06-02):** Агент плохо следует инструкциям в детерминированных задачах (форматирование файлов, структура шаблонов, алгоритмические шаги). Там, где результат предсказуем — заменить агента на код.
-
-**Принцип:** Агент генерирует *контент* (текст, аргументы). Программа берёт контент и преобразует его по жёсткому шаблону — без участия агента.
-
-**Пример уже реализован:** Агент пишет `## Quick Scan` в Markdown → `cv_to_pdf.py` рендерит в PDF по фиксированному шаблону (verdict banner, dot-bar, two-column layout). Агент не управляет версткой.
-
-**Где применить:**
-- [ ] Структура `JD_analysis.md` — сделать строгий шаблон с плейсхолдерами; агент заполняет значения, скрипт собирает файл
-- [ ] Структура `[Name]_CV.md` — агент генерирует секции по фиксированным якорям (`<!-- SUMMARY -->`, `<!-- EXPERIENCE -->` и т.д.)
-- [ ] Inbox processing flow — извлечь алгоритмические шаги (dedup, move, register) в скрипт; агент только анализирует контент
-- [ ] Пересмотреть все шаги `skill/SKILL.md` — разделить: что делает агент (генерация), что делает код (файловые операции, форматирование, регистрация в DB)
-
-**Связано с:** P1 — PDF template system, EPIC-19 local execution mode
+Merged 2026-06-15. The "agent generates content, code applies fixed template" principle and its checklist (strict JD_analysis.md / CV templates, inbox-flow extraction, SKILL.md step review) are now EPIC-21 Tasks 1–4 + 6.
 
 ---
 
-## P1 — PDF template system (шаблонизатор)
+## ~~P1 — PDF template system~~ → = [EPIC-21](docs/delivery/Epics/EPIC-21-deterministic-vs-cognitive-pipeline.md) Task 1
 
-**Направление (2026-06-02):** Отказаться от fpdf2 + ручного рендеринга. Перейти на HTML-шаблоны, конвертируемые в PDF скриптом — без участия агента.
+Merged 2026-06-15. Engine decision resolved: **weasyprint** (HTML/Jinja2 + CSS → PDF). playwright rejected (~300MB headless-Chrome dependency, heavier in Docker/CI). Drops fpdf2 (no colour emoji, manual spacing). Full task spec in EPIC-21.
 
-**Принцип:**
-- Агент генерирует контент (текст, данные)
-- Скрипт подставляет данные в HTML-шаблон
-- Скрипт конвертирует HTML → PDF (weasyprint или playwright)
-- Emoji, отступы, цвета — полностью в CSS, не в коде рендерера
+---
 
-**Почему:** fpdf2 не поддерживает emoji нормально, сложное форматирование и межблочные отступы требуют ручного управления. Попытка добавить emoji через seguisym.ttf — работает, но только ч/б.
+## ⚠️ P1 — services/job-monitor: sync with original repo before use
 
-- [ ] Выбрать рендерер: weasyprint vs playwright (headless Chrome)
-- [ ] Создать HTML-шаблон для JD_analysis (Quick Scan, Fit Breakdown, Self-Review)
-- [ ] Создать HTML-шаблон для CV
-- [ ] Скрипт: принимает .md / JSON → рендерит HTML → сохраняет PDF
-- [ ] Документировать в `docs/discovery/pdf-design-system.md`
+The copy in `services/job-monitor/` was made from the external `job-board-monitor` repo (EPIC-16, 2026-06-01). The original external repo received changes **after** that copy was taken.
+
+**Before using or modifying `services/job-monitor/`:** diff against the original repo and cherry-pick any relevant fixes or improvements. Do not assume the copy is current.
+
+**What to check:**
+- Original repo: `E:\My files\0 My_Dev\my_prj\job-board-monitor\`
+- [ ] Diff `services/job-monitor/monitor.py` + `feeds.json` against original
+- [ ] Decide: cherry-pick upstream changes, or note intentional divergence
+- [ ] Document outcome here
 
 ---
 

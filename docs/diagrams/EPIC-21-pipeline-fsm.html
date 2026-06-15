@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EPIC-21 — Pipeline Control Architecture (FSM ↔ LLM)</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --border: #2a2f3a;
+    --text: #e6e8ec;
+    --muted: #9aa3b2;
+    --cognitive: #a78bfa;
+    --control: #2dd4bf;
+    --pause: #fbbf24;
+    --accent: #60a5fa;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.55 -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: 32px 24px 64px;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  h2 { font-size: 18px; margin: 40px 0 8px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .principle {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 0 0 8px;
+  }
+  .principle b { color: var(--accent); }
+  code { background: #232733; padding: 1px 6px; border-radius: 4px; font-size: 13px; }
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 18px;
+    margin: 16px 0 8px; font-size: 13.5px; color: var(--muted);
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .dot { width: 13px; height: 13px; border-radius: 3px; display: inline-block; }
+  .diagram {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    margin-top: 12px;
+    overflow-x: auto;
+  }
+  .note { color: var(--muted); font-size: 13px; margin-top: 8px; }
+  footer { color: var(--muted); font-size: 12.5px; margin-top: 48px; border-top: 1px solid var(--border); padding-top: 12px; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>EPIC-21 — Pipeline Control Architecture</h1>
+  <p class="sub">How the deterministic skeleton and the cognitive model relate. Companion to
+  <code>docs/delivery/Epics/EPIC-21-deterministic-vs-cognitive-pipeline.md</code>.</p>
+
+  <div class="principle">
+    <b>Control principle.</b> The <b>FSM is primary</b> — it owns the control flow and all I/O.
+    The <b>LLM is a subordinate pure function</b>: text-in → structured JSON judgment-out, with no
+    access to the filesystem, the DB, or the decision of "what runs next".
+    Cognitive output <b>influences</b> branching (data-dependent guards) but never <b>executes</b> a
+    transition. <b>Code runs the model — not the model the code.</b>
+    <br><br>
+    Local-mode caveat: in Claude Code the agent is an unavoidable outer trigger (reasoning floor
+    cannot be zeroed). The goal (Task 6) is to make that agent a thin trigger that delegates to the
+    FSM — not an orchestrator.
+  </div>
+
+  <div class="legend">
+    <span><i class="dot" style="background:var(--cognitive)"></i> Cognitive state — FSM invokes the LLM here</span>
+    <span><i class="dot" style="background:var(--control)"></i> Deterministic control / compute — pure FSM (Python)</span>
+    <span><i class="dot" style="background:var(--pause)"></i> Interactive pause-state — FSM awaits the user</span>
+  </div>
+
+  <h2>View 1 — State Machine (the FSM we build · Task 4)</h2>
+  <div class="diagram">
+<pre class="mermaid">
+stateDiagram-v2
+    direction TB
+    [*] --> Trigger
+    Trigger : Trigger\n(user runs /analyze — entry only)
+
+    Trigger --> Analyze : FSM starts the run
+
+    Analyze : P1+2 — Analyze &amp; Fit\n— LLM → JSON {analysis, 8 VScore dims, fit, barriers, adaptation}\n— then Python: VScore composite · recommendation matrix\n· render Quick Scan · save JD_analysis.md · DB write
+
+    Analyze --> BarrierGate
+    state BarrierGate <<choice>>
+    BarrierGate --> Objections : [barriers ≠ none\nAND not batch]
+    BarrierGate --> CVGate : [no barriers OR batch]
+
+    Objections : P2.5 — Objection Handling (INTERACTIVE)\n— present barriers → await user → classify resolved/gap\n— then Python persist: PROFILE.md + JD_analysis.md
+    Objections --> CVGate
+
+    state CVGate <<choice>>
+    CVGate --> Draft : user «Генерируем CV?» = yes
+    CVGate --> [*] : decline / stop
+
+    Draft : P3+3.5 — Draft &amp; Review\n— Python precompute: Top-15 freq · tools scan · repetition\n— LLM → JSON {cv_md, review}\n— then Python: weasyprint PDF · save · DB
+
+    Draft --> CoverGate
+    state CoverGate <<choice>>
+    CoverGate --> Cover : user «Переходим к cover?» = yes
+    CoverGate --> [*] : stop
+
+    Cover : P4 — Cover\n— LLM → JSON {cover_md}\n— then Python: save · DB
+    Cover --> [*]
+
+    classDef cognitive fill:#2b2347,stroke:#a78bfa,color:#e9e3ff;
+    classDef control fill:#10302c,stroke:#2dd4bf,color:#c8fff5;
+    classDef pause fill:#3a2f12,stroke:#fbbf24,color:#ffe9b3;
+
+    class Analyze,Draft,Cover cognitive
+    class Objections pause
+    class Trigger control
+</pre>
+  </div>
+  <p class="note">Guards in <code>[…]</code> are pure FSM <code>if</code> checks on the JSON the LLM
+  returned. Every phase state has a cognitive core (LLM call) wrapped in deterministic Python steps.
+  <code>P2.5</code> is the only multi-turn state — it pauses for the user and is skipped in batch /
+  headless contexts.</p>
+
+  <h2>View 2 — Sequence (control inversion · who calls whom)</h2>
+  <div class="diagram">
+<pre class="mermaid">
+sequenceDiagram
+    actor U as User
+    participant FSM as FSM (orchestrator)
+    participant LLM as LLM (cognitive fn)
+    participant SVC as Services · PDF / DB / FS
+
+    U->>FSM: /analyze  (trigger only)
+    activate FSM
+    FSM->>LLM: P1+2 prompt (+ JSON schema)
+    LLM-->>FSM: JSON {analysis, VScore dims, fit, barriers}
+    FSM->>FSM: compute VScore + recommendation (deterministic)
+    FSM->>SVC: save JD_analysis.md · DB write
+    FSM-->>U: Quick Scan
+
+    opt barriers ≠ none  (interactive pause)
+        FSM-->>U: present barriers
+        U->>FSM: response
+        FSM->>LLM: classify resolved / gap
+        LLM-->>FSM: classification
+        FSM->>SVC: persist PROFILE.md · JD_analysis.md
+    end
+
+    FSM-->>U: «Генерируем CV?»
+    U->>FSM: yes
+    FSM->>FSM: precompute metrics (Top-15 · tools · repetition)
+    FSM->>LLM: P3+3.5 prompt (+ metrics)
+    LLM-->>FSM: JSON {cv_md, review}
+    FSM->>SVC: weasyprint PDF · save · DB
+    FSM-->>U: review + CV · «cover?»
+    U->>FSM: yes
+    FSM->>LLM: P4 prompt
+    LLM-->>FSM: JSON {cover_md}
+    FSM->>SVC: save · DB
+    deactivate FSM
+</pre>
+  </div>
+  <p class="note">Every solid arrow into <code>LLM</code> and <code>SVC</code> originates from
+  <code>FSM</code>. The LLM only ever responds (dashed returns) — it initiates nothing. The User is
+  an external actor the FSM <em>awaits</em>, not a controller.</p>
+
+  <footer>
+    Notation: UML (State Machine + Sequence), rendered via Mermaid.
+    BPMN was rejected — see EPIC-21 §notation rationale. Diagram source is editable inline in this file.
+  </footer>
+
+</div>
+
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    securityLevel: 'loose',
+    themeVariables: { fontFamily: 'Segoe UI, Roboto, sans-serif' }
+  });
+</script>
+</body>
+</html>

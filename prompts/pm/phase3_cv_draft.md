@@ -39,6 +39,8 @@ User will provide:
 18. **NEVER use plural forms for things built or owned: no "systems", "portals", "platforms".** Name individual items specifically (singular each), or use "product" / "product suite" as a collective. Exception: "products" is allowed only when referring to multiple distinct products in context.
 19. **NEVER use third-person verbs anywhere in the CV** — no "Understands", "Knows", "Applies", "Works", "Brings", "Has". CV language = headline-style (no subject) or past-tense action verbs. Applies to Summary, bullets, and all prose.
 20. **CERTIFICATIONS: include only "Certified AI-Empowered SAFe® Product Owner/Product Manager" by default.** Add others only when directly relevant to the specific vacancy.
+21. **NPS/CSAT — context-dependent.** For technical/platform/AI roles: NPS and CSAT are CX/support metrics — deprioritize or remove; use error reduction %, automation %, delivery velocity instead. Keep for: CX-focused PM, growth PM, customer-success-adjacent roles.
+22. **Years of experience — count ONLY "Product Owner"-titled roles.** Default summary = "Product Owner with 5+ years…". PO-titled roles as of 2026-06: InsulaLabs (5m) + Marketplace PO (14m) + HostiServer PO (46m) = ~65m ≈ 5+ years. Project Manager title ≠ product years — never fold it in. Recompute only if a new PO-titled role is added.
 
 ---
 

@@ -37,6 +37,7 @@ Most applicants are generic PMs. The HM's first screening question is: **"Is thi
 ## Rules (NON-NEGOTIABLE)
 
 - **Short** — greeting + 3 bullets + closing line + name. Nothing more.
+- **No bold markdown** — plain prose only. Cover is a personal message, not a formatted document. No `**bold**` anywhere.
 - **No formalism** — no "I am pleased to apply", no "Dear Hiring Manager", no narrative preamble
 - **Focus on strengths only** — do NOT disclose gaps. Gaps are for interview, not cover.
 - **Live, natural tone** — professional but human; not academic, not corporate

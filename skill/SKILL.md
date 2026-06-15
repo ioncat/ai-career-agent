@@ -22,10 +22,10 @@ description: >
 2. Default if not set: `en`
 3. Apply to ALL output: user messages, analysis, internal sections — everything except CV/cover
 
-- **CV language** = vacancy language (English JD → English CV, Ukrainian JD → Ukrainian CV)
-- **Cover language** = same as paired CV
+- **CV language** — default = JD language (English JD → English CV, Ukrainian JD → Ukrainian CV). Final choice = user (pre-flight ask before Phase 3). User can override the default.
+- **Cover language** = same as the approved CV language.
 
-These two are determined by JD language, NOT by user language setting — always.
+Default is derived from JD language, not from user language setting. But user always confirms or changes before CV is generated.
 
 ---
 
@@ -51,8 +51,8 @@ Phase 1 + Phase 2  [run immediately on JD input, no confirmation needed]
   ↓ [user confirms]
 
 Pre-flight (ask once, before Phase 3):
-  → CV language (skip if JD is English)
-  → Name variant (from PROFILE.md → Name variants section)
+  → CV language: ask only if JD ≠ English (English JD → English CV, obvious — skip)
+  → Name variant: ask only if PROFILE.md → ## Name variants has more than one entry; single variant → use automatically, no ask
 
 Phase 3: CV Draft          [NOT shown to user — internal]
 Phase 3.5: Self-Review     [show to user, ask approval]
@@ -243,26 +243,43 @@ Same service renders **CVs and covers** — `render_md` is cover-aware (CV heade
 
 ## Name Selection (before Phase 3)
 
-- Read active user PROFILE.md (via `skill/active_user` → `skill/users.yaml` → `skill/users/[id]/PROFILE.md`) → `## Name variants` section
-- Ask using numbered format:
-  ```
-  Какое имя использовать?
-    [1] [informal variant]
-    [2] [formal variant]
-  ```
-- If JD = English → informal variant (Alex Bondarenko)
-- If JD = Ukrainian/Russian → formal transliteration (Oleksii Bondarenko) or Cyrillic
+1. Read PROFILE.md → `## Name variants` section. Count entries.
+2. **Single variant** → use automatically, no ask.
+3. **Multiple variants** → ask user to choose.
 
-**If JD language ≠ English — ask language + name together (numbered format):**
+**Decision matrix:**
 
+| JD language | Name variants | Pre-flight ask |
+|-------------|---------------|----------------|
+| English | 1 | Nothing — proceed directly |
+| English | Multiple | Name only |
+| Non-English | 1 | Language only |
+| Non-English | Multiple | Language + name together |
+
+**Name-only ask (English JD, multiple variants):**
+```
+Какое имя использовать?
+  [1] [variant 1]
+  [2] [variant 2]
+```
+
+**Language + name together (non-English JD, multiple variants):**
 ```
 На каком языке готовить CV?
-  [1] English — [English name]
-  [2] [JD language] — [Cyrillic name]
-  [3] Оба — English: [English name] + [JD language]: [Cyrillic name]
+  [1] English — [English name variant]
+  [2] [JD language] — [local name variant]
+  [3] Оба — English: [English name] + [JD language]: [local name]
 ```
 
-Option 3 → two CVs + two covers generated sequentially.
+**Language only (non-English JD, single variant):**
+```
+На каком языке готовить CV?
+  [1] English
+  [2] [JD language]
+  [3] Оба
+```
+
+Option "Оба" → two CVs + two covers generated sequentially.
 
 ---
 
@@ -426,13 +443,15 @@ Inbox scan runs **inside Step 0** and populates Block 2 of the combined menu.
 
 Run **Phase 1+2 silently** for every selected vacancy:
 - **Dedup:** use `seen`/`seen_path` from `inbox_scan.py` output (no manual grep)
-  - `seen: true` → skip this item silently; note as `♻️ уже обработана` in Ключевой gap column of batch table
-  - `seen: false` → proceed
-- Register each in DB via `vacancy_track.py upsert --title "Role — Company"` (full format, not just role name)
+  - `seen: true` → **do NOT upsert** (vacancy already registered — creating a duplicate is wrong). Note as `♻️ уже обработана` in Ключевой gap column. Skip analysis entirely.
+  - `seen: false` → proceed with full pipeline below
+- Register in DB: `vacancy_track.py upsert --title "Role — Company"` (full format, not just role name)
+- Run Phase 1+2
 - Save `JD_analysis.md` to `vacancies/inbox/[user_id]/[Role — Company]/`
-- Update DB status → `analyzed`
+- Update DB: `vacancy_track.py update --id $ID --status analyzed --path ...`
+- Save p1+p2 JSON: `vacancy_track.py update-json --id $ID --phase p1 ...` and `--phase p2 ...`
 
-After all Phase 1+2 complete — show **consolidated table**:
+⚠️ **All DB writes must complete before table is shown.** The user checks the tracker while thinking — it must already reflect the results. Table = confirmation that tracker is current, not a preview.
 
 ```
 📊 Batch анализ — N вакансий [Локально]
@@ -478,7 +497,7 @@ Run once per processed raw folder (exact name as it appeared in `inbox_manual/`)
 
 ---
 
-### Sequential Mode (1–3 vacancies)
+### Sequential Mode (1–2 vacancies)
 
 For each inbox item:
 
@@ -526,7 +545,7 @@ For each inbox item:
 
    i. On success → delete raw staging folder: `python scripts/vacancy_track.py delete-inbox --folder "RAW_FOLDER_NAME"`
 
-   h. On error → leave in inbox, report, continue next.
+   j. On error → leave in inbox, report, continue next.
 
 6. After all processed → "Продолжить с новой вакансией или завершить?"
 
@@ -614,6 +633,8 @@ Vacancy folder = parent dir of `markdown_path` from DB record.
 
 **Entry point: `/analyze`** — always use this command to start.
 
+**Per-user overrides:** after loading base `skill/SKILL.md`, also load `skill/users/[id]/SKILL.md` if the file exists. Personal rules (language scope, exclusions) live there and extend the base mechanics.
+
 | Command | Action |
 |---------|--------|
 | `/analyze` | **mode** → inbox → active user → load → start |
@@ -633,7 +654,7 @@ wrong profile may be loaded.
 |--|------------------|-------------|
 | Trigger | `/analyze` or natural language | RSS auto-discovery |
 | Profile | `skill/users/[id]/PROFILE.md` | DB (after onboarding) |
-| DB writes | No | Yes |
+| DB writes | Yes — via scripts/vacancy_track.py | Yes |
 | PDF | Direct subprocess | CVAdapter → HTTP |
 | Multi-user | Yes — `users.yaml` + `active_user` + `/analyze -u` | Yes — DB |
 | Use when | Quick analysis, no infra needed | Full production pipeline |

@@ -2,23 +2,39 @@
 
 **Status:** 📋 Planned
 **Priority:** P0
-**Last updated:** 2026-06-04
+**Last updated:** 2026-06-15 (rev 2 — re-audited against current code; see Revision log)
 **Source:** `docs/discovery/hypotheses/H-002-pipeline-optimization-cognitive_vs_determined.md`
+
+---
+
+## Revision log
+
+- **rev 2 (2026-06-15):** Re-audited against live code after VScore (06-14) and Phase 2.5 (06-05) landed. Changes:
+  - Phase 2.5 Objection Handling added to classification as **interactive cognitive** (not a single structured call).
+  - VScore composite formula + Fit×VScore recommendation matrix added to deterministic list (Task 3) — currently computed by the LLM by hand (arithmetic + decision table).
+  - Headline "49 steps" retired — the H-002 trace is stale/atypical (excludes Phase 4, predates inbox_scan collapse, includes one-off feedback edits). Cognitive touchpoints recounted: see Target architecture.
+  - PDF engine decided: **weasyprint** (HTML→PDF). Three overlapping backlog items merged into this EPIC (see Backlog consolidation).
+  - Scope paths corrected (`.claude/commands/analyze.md` → skill command).
+- **rev 1 (2026-06-04):** Original, from H-002.
 
 ---
 
 ## Problem
 
-The `/analyze` → cover pipeline is ~49 discrete actions. Only **~6 are cognitive** (Phase 1, 2, 3, 3.5, 4). The other **~43 are deterministic glue** (FS, DB, dedup, menu, mkdir, copy, cleanup, PDF render).
-
-Two waste sources:
+The `/analyze` → cover pipeline interleaves a handful of cognitive phases with a large amount of deterministic glue. Two waste sources:
 
 1. **Cognitive agent executes deterministic glue.** In local mode Claude Code (a reasoning agent) hand-clicks every mechanical step. Each glue step = an agent turn (read context → decide → tool-call → parse). The expensive thinking model does work an `if` should do.
-2. **LLM does work that rules/code could do, inside cognitive phases.** Phase 3.5 currently asks the model to compute Top-15 word frequency, scan a tools registry, and detect repetition — all pure Python. Phase 1 extracts `Role — Company` and detects JD language — regex/lib jobs.
+2. **LLM does work that rules/code could do, inside cognitive phases.** Examples currently in prompts:
+   - Phase 1 §1.7 — the LLM computes the **VScore composite formula** (`round((company_tier/4*12 + …)/10, 1)`) and `domain_score = max(1, interest+longevity)` by hand. Pure arithmetic.
+   - Phase 2 / SKILL.md — the LLM applies the **Fit×VScore recommendation matrix** (decision table) by reasoning. Pure `if/elif`.
+   - Phase 3.5 — the LLM computes Top-15 word frequency, scans a tools registry, detects repetition. Pure Python (`Counter`, dict-match, n-gram).
+   - Phase 1 §1.0 — `Role`/`Company` extraction and JD language detection. Regex/lib jobs.
 
-Plus: ad-hoc generative rendering is fragile. `services/pdf/render.py` `render_md()` is line-by-line parsing → two layout bugs surfaced in one session (cover overflow, contacts misparse).
+Plus: ad-hoc generative rendering is fragile. `services/pdf/render.py` `render_md()` is line-by-line markdown parsing → layout bugs surfaced repeatedly (cover overflow, contacts misparse). fpdf2 also can't render colour emoji.
 
-Result: high latency (agent reasoning + redundant LLM), `Python→AI→Python→AI` flip-flops, unpredictable output.
+Result: high latency (agent reasoning + redundant LLM), `Python→AI→Python→AI` flip-flops, arithmetic done by a language model (error-prone), unpredictable output.
+
+> **Note on the H-002 trace:** the 49-step log in H-002 is a single 2026-06-04 run and is **not** a reliable baseline. It excludes Phase 4 (stops at "Переходим к cover?"), predates the `inbox_scan.py` collapse of manual Glob/Grep (steps 8–10), predates VScore and Phase 2.5, and counts one-off feedback edits (steps 26–31) as pipeline. **Re-trace the current happy-path before quoting any step count** (Task 0).
 
 ---
 
@@ -27,7 +43,7 @@ Result: high latency (agent reasoning + redundant LLM), `Python→AI→Python→
 **Draw and enforce the boundary: deterministic work in Python, cognitive work in the LLM — called only where irreducible.**
 
 - Deterministic skeleton = a Python orchestrator (FSM) that owns all I/O + rule/template/metric steps.
-- LLM invoked only for the irreducible cognitive phases, as **single structured calls returning JSON** (not agentic multi-step loops).
+- LLM invoked only for irreducible cognitive work, as **structured calls returning JSON** wherever the step is single-shot — and as a **bounded interactive exchange** only where genuine dialogue is required (Phase 2.5).
 - One skeleton, both modes: **API/headless** → orchestrator runs without an agent; **Local** → Claude Code calls the same scripts thinly instead of hand-doing steps.
 
 ---
@@ -38,39 +54,45 @@ Result: high latency (agent reasoning + redundant LLM), `Python→AI→Python→
 |---|---|---|
 | Orchestrator | the agent (reasoning ALWAYS present) | Python (0 reasoning) |
 | Glue (FS/DB/menu) | agent turns (can only be *thinned*) | pure code |
-| LLM calls | agent itself = LLM | only on cognitive phases |
+| LLM calls | agent itself = LLM (continuous reasoning, no discrete "calls") | discrete calls only on cognitive phases |
+| "Merge calls" benefit (Task 5) | **n/a** — local reasons continuously; nothing to merge | real — fewer round-trips |
 | Reasoning floor | **cannot be removed** | removed for glue |
 
-**Consequence:** the full deterministic win lands in **API mode**. Local mode can only *thin* the agent (delegate to scripts), never zero its reasoning loop. The skeleton must be shared so local benefits too.
+**Consequence:** the full deterministic win lands in **API mode**. Local mode can only *thin* the agent (delegate to scripts), never zero its reasoning loop. Task 5 (merge calls) is **API-only**; Task 6 (local delegates to scripts) is the only local lever. The skeleton is shared so local benefits where it can.
 
 ---
 
-## Classification (H-002 framework applied)
+## Classification (H-002 framework applied, re-audited rev 2)
 
 ### 🟢 Deterministic — Python, never AI
-| Step | Mechanism |
-|------|-----------|
-| inbox scan, dedup (URL grep) | `scripts/inbox_scan.py` (done) |
-| FS: mkdir / copy JD / write / cleanup | os/pathlib |
-| DB: upsert / update / status / delete-inbox | `scripts/vacancy_track.py` (done) |
-| mode / profile / user resolution | config + FSM |
-| Step 0 menu, inbox menu rendering | string templates |
-| **PDF render (CV + cover)** | **fixed template (Task 1)** |
-| Quick Scan rendering | render from phase JSON |
-| `Role — Company` extraction (1.0 header) | regex/parser |
-| JD language detection (en/uk/ru) | `langdetect` / heuristic |
-| Top-15 frequency check (3.5) | `collections.Counter` |
-| Tools & Technologies scan (3.5) | dict match over registry |
-| Repetition check (3.5) | n-gram frequency |
+| Step | Mechanism | State |
+|------|-----------|-------|
+| inbox scan, dedup (URL + folder fallback) | `scripts/inbox_scan.py` | ✅ done |
+| DB: upsert / update / status / delete-inbox | `scripts/vacancy_track.py` | ✅ done |
+| FS: mkdir / copy JD / write / cleanup | os/pathlib | ⏳ agent-driven |
+| mode / profile / user resolution | config + FSM | ⏳ agent-driven |
+| Step 0 menu, inbox menu rendering | string templates | ⏳ agent-driven |
+| **PDF render (CV + cover)** | **weasyprint HTML template (Task 1)** | ⏳ fpdf2 `render_md` |
+| Quick Scan rendering | render from phase JSON | ⏳ agent-driven |
+| `Role — Company` extraction (1.0 header) | regex/parser | ⏳ in prompt |
+| JD language detection (en/uk/ru) | `langdetect` / heuristic | ⏳ in prompt |
+| **VScore composite formula (1.7)** | **arithmetic from 8 LLM dim-scores** | ⏳ **LLM does it by hand** |
+| **Fit×VScore recommendation matrix** | **decision table from fit + blockers + vscore** | ⏳ **LLM does it by hand** |
+| Top-15 frequency check (3.5) | `collections.Counter` | ⏳ in prompt |
+| Tools & Technologies scan (3.5) | dict match over registry | ⏳ in prompt |
+| Repetition check (3.5) | n-gram frequency | ⏳ in prompt |
 
-### 🔴 Cognitive — LLM (API or local), irreducible
-| Phase | Why irreducible |
-|-------|-----------------|
-| Phase 1 — JD analysis | interpretation (pain, archetype, culture) |
-| Phase 2 — fit assessment | judgment + barriers + adaptation reasoning |
-| Phase 3 — CV draft | targeted generation |
-| Phase 3.5 — self-review **verdict** | judgment what to cut/strengthen (metrics → Python; only the verdict stays LLM) |
-| Phase 4 — cover | generation |
+### 🔴 Cognitive — LLM, irreducible
+| Phase | Type | Why irreducible |
+|-------|------|-----------------|
+| Phase 1 — JD analysis | structured call | interpretation (pain, archetype, culture); emits 8 VScore **dim-scores** (judgment) — composite is Python |
+| Phase 2 — fit assessment | structured call (merged with P1) | judgment + barriers + adaptation; emits fit + barrier presence — recommendation matrix is Python |
+| **Phase 2.5 — objection handling** | **interactive (multi-turn)** | present barriers → **wait for candidate** → classify resolved/gap → persist. Cannot be a single call. Conditional (only when Key Barriers ≠ нет) and skipped in batch mode. |
+| Phase 3 — CV draft | structured call | targeted generation |
+| Phase 3.5 — self-review verdict | structured call (merged with P3) | judgment what to cut/strengthen (metrics → Python; only the verdict stays LLM) |
+| Phase 4 — cover | structured call | generation |
+
+**Cognitive touchpoints: 4** — three structured JSON calls (`P1+2`, `P3+3.5`, `P4`) + one bounded interactive exchange (`P2.5`, conditional).
 
 ---
 
@@ -78,14 +100,35 @@ Result: high latency (agent reasoning + redundant LLM), `Python→AI→Python→
 
 ```
 Python orchestrator (FSM) — owns skeleton + all I/O + deterministic checks
-   └─ calls LLM ONLY on cognitive phases, as single structured calls:
-        call_1 → Phase 1+2  → JSON {analysis, fit, barriers, quick_scan...}
-        call_2 → Phase 3+3.5 → JSON {cv_md, review}   (Top-15/tools/repetition computed in Python BEFORE the call, passed as context)
-        call_3 → Phase 4    → {cover_md}
-   └─ everything else (Quick Scan render, PDF, DB, files, menu) = Python
+   ├─ call_1 → Phase 1+2 → JSON {analysis, 8 vscore dims, fit, barriers, adaptation...}
+   │     └─ Python post-step: compute vscore composite + recommendation matrix + Quick Scan render
+   ├─ [branch] Key Barriers ≠ нет AND not batch mode:
+   │     pause-state → Phase 2.5 interactive exchange (present → await user → classify)
+   │        └─ Python: persist resolved → PROFILE.md + JD_analysis.md
+   ├─ call_2 → Phase 3+3.5 → JSON {cv_md, review}
+   │     └─ Top-15 / tools-scan / repetition computed in Python BEFORE the call, passed as context
+   └─ call_3 → Phase 4 → {cover_md}
+   └─ everything else (vscore, recommendation, Quick Scan, PDF, DB, files, menu) = Python
 ```
 
-3 cognitive calls instead of a scatter of agent steps → kills `Python→AI→Python→AI` flip-flop.
+**Phase 2.5 is a pause-state, not a synchronous call.** The FSM must model "await user response" between *present barriers* and *classify*. In Telegram this is natural (async messages). In pure headless/batch there is no interactive user → P2.5 is **skipped** (batch already skips it; headless single-vacancy must decide a default: skip + flag barriers honestly).
+
+3 structured calls + 1 conditional interactive exchange instead of a scatter of agent steps → kills the `Python→AI→Python→AI` flip-flop for the deterministic parts.
+
+---
+
+## Diagram & notation rationale
+
+**Visual:** [`docs/diagrams/EPIC-21-pipeline-fsm.html`](../../diagrams/EPIC-21-pipeline-fsm.html) — standalone HTML (open in a browser). Two complementary UML views rendered via Mermaid:
+1. **State Machine** — the FSM this EPIC builds (Task 4): states, guards, conditional Phase 2.5 pause-state.
+2. **Sequence** — the control inversion: FSM originates every call; the LLM only responds; the user is an awaited actor.
+
+**Why UML, not BPMN:**
+- We are literally building a state machine (Task 4). UML State Machine maps 1:1 to the code — states = states, guards = `if`, entry-actions = LLM call / Python compute, pause-state = `await user`. BPMN models a business process, not a state machine — it would describe the flow but not the structure we implement.
+- BPMN's strengths (cross-org actor pools, message/timer events, transactions/compensation) are irrelevant here: one orchestrator, one LLM, one user, services. The single overlap — a human task for Phase 2.5 — is expressed cleanly in UML as a pause-state.
+- Consumers of this EPIC are developers implementing the FSM; UML (state + sequence) is developer-facing, BPMN reads as analyst-facing.
+
+**Control principle the diagram encodes:** the FSM is primary and owns control flow + I/O; the LLM is a subordinate pure function (text → JSON), with no FS/DB access and no say in what runs next. Cognitive output *influences* branching (data-dependent guards) but never *executes* a transition. Code runs the model, not the model the code.
 
 ---
 
@@ -101,21 +144,25 @@ So that the process is fast, predictable, cheap, and error-free — especially i
 
 ## Acceptance Criteria
 
-**Given** the pipeline runs end-to-end (analyze → CV → cover)
-**When** a deterministic step executes (render, dedup, DB, metrics, title/lang)
+**Given** the pipeline runs end-to-end (analyze → [objections] → CV → cover)
+**When** a deterministic step executes (render, dedup, DB, metrics, title/lang, **vscore composite, recommendation matrix**)
 **Then** it runs in Python with no LLM call
 
-**Given** a cognitive phase runs
+**Given** a single-shot cognitive phase runs (P1+2, P3+3.5, P4)
 **When** the LLM is called
 **Then** it is a single structured call returning JSON — no agentic multi-step loop for that phase
 
+**Given** Phase 2.5 runs (barriers present, interactive surface)
+**When** the candidate is asked about barriers
+**Then** the FSM holds a pause-state awaiting input — and in batch/headless contexts P2.5 is skipped, not faked
+
 **Given** API/headless mode
 **When** the full pipeline runs
-**Then** no agent reasoning is spent on glue — only the 3 cognitive calls hit the model
+**Then** no agent reasoning is spent on glue — only the cognitive touchpoints hit the model
 
 **Given** CV or cover rendering
 **When** PDF is produced
-**Then** layout is identical every run, no overflow/misparse (fixed template)
+**Then** layout is identical every run, no overflow/misparse, colour emoji supported (weasyprint HTML template)
 
 ---
 
@@ -123,22 +170,33 @@ So that the process is fast, predictable, cheap, and error-free — especially i
 
 | # | Task | Severity | Depends on |
 |---|------|----------|-----------|
-| 1 | **Deterministic PDF templating** — CV-template + cover-template (HTML/Jinja2 + headless renderer, or structured fpdf2). Content slots in; no markdown line-shape guessing. Replaces `render_md`. | 🔴 BLOCKER | — |
-| 2 | **Structured JSON contracts per cognitive phase** (Phase 1+2, Phase 3+3.5, Phase 4) — Pydantic models in `contracts/`. LLM returns JSON; orchestrator renders. | 🔴 BLOCKER | — |
-| 3 | **Move deterministic metrics to Python** — Top-15 freq, Tools registry scan, repetition check, `Role — Company` extraction, JD language detection, Quick Scan render. | 🟠 | Task 2 |
-| 4 | **Python orchestrator (FSM)** — drives the skeleton, calls LLM only on cognitive phases. Shared local + API. | 🟠 | Task 2 |
-| 5 | **Merge cognitive calls** — Phase 1+2 = one call, Phase 3+3.5 = one call (metrics pre-computed, passed in). Reduce flip-flops. | 🟡 | Tasks 2, 4 |
-| 6 | **Local mode delegates to orchestrator/scripts** — Claude Code calls scripts thinly instead of hand-doing glue. | 🟡 | Task 4 |
-| 7 | **Measure latency + cost** before/after (per-phase timing already in ClaudeProvider; add orchestrator timing). | 🟢 | Tasks 4, 5 |
+| 0 | **Re-trace current happy-path** — honest step inventory on today's pipeline (inbox_scan collapsed, Phase 4 included, Phase 2.5 conditional). Replaces the stale H-002 49-step count. Output: corrected baseline table. | 🟠 | — |
+| 1 | **Deterministic PDF templating (weasyprint)** — CV-template + cover-template (Jinja2 HTML + CSS → weasyprint). Content slots in; no markdown line-shape guessing. Replaces fpdf2 `render_md`. Emoji/colour/spacing all in CSS. | 🔴 BLOCKER | — |
+| 2 | **Structured JSON contracts per cognitive phase** (Phase 1+2, Phase 3+3.5, Phase 4) — Pydantic models in `contracts/`. LLM returns JSON; orchestrator renders. P1+2 schema includes 8 vscore dim-scores, fit, barrier presence (NOT the composite or recommendation — those are Python). | 🔴 BLOCKER | — |
+| 3 | **Move deterministic metrics to Python** — VScore composite formula, Fit×VScore recommendation matrix, Top-15 freq, Tools registry scan, repetition check, `Role — Company` extraction, JD language detection, Quick Scan render. Strip these instructions from prompts. | 🟠 | Task 2 |
+| 4 | **Python orchestrator (FSM)** — drives the skeleton, calls LLM only on cognitive phases, models Phase 2.5 as a conditional pause-state. Shared local + API. | 🟠 | Task 2 |
+| 5 | **Merge cognitive calls (API only)** — Phase 1+2 = one call, Phase 3+3.5 = one call (metrics pre-computed, passed in). Reduce flip-flops. No-op for local mode. | 🟡 | Tasks 2, 4 |
+| 6 | **Local mode delegates to orchestrator/scripts** — Claude Code calls scripts thinly instead of hand-doing glue (vscore, recommendation, render, Quick Scan). | 🟡 | Task 4 |
+| 7 | **Measure latency + cost** before/after (per-phase timing in ClaudeProvider; add orchestrator timing). | 🟢 | Tasks 4, 5 |
 
-> **Task 1 = tomorrow's priority** (2026-06-05) and the cleanest "remove from AI contour" win. Independent of the rest — can land first.
+> **Task 1 = cleanest "remove from AI contour" win.** Independent of the rest — can land first.
+> **Task 0** should run alongside Task 1 to give honest before/after numbers for Task 7.
 
 ---
 
-## Top findings (H-002 deliverables)
+## Backlog consolidation (rev 2)
 
-**Top-5 remove from AI contour:** PDF render · Top-15 freq · Tools scan · repetition check · title-extraction + language-detection.
-**Top-5 unjustified agent use (local):** the entire glue block (log steps 1–17, 20–23, 42–48) executed by a reasoning agent.
+This EPIC is the **single source of truth** for the deterministic/cognitive split. Two older BACKLOG entries describing the same theme are folded in and should be removed from BACKLOG (replaced by a pointer to this EPIC):
+
+- `P1 — Детерминированный pipeline: минимизировать роль агента` (2026-06-02) → its checklist (strict JD_analysis.md / CV templates, inbox script, SKILL.md step review) maps to Tasks 1–4 + 6.
+- `P1 — PDF template system` (2026-06-02) → **= Task 1**. Engine decision resolved: **weasyprint** (was "weasyprint vs playwright"). playwright rejected: ~300MB headless-Chrome dependency, heavier in Docker/CI.
+
+---
+
+## Top findings (H-002 deliverables, rev 2)
+
+**Top remove-from-AI-contour:** PDF render · **VScore composite** · **recommendation matrix** · Top-15 freq · Tools scan · repetition check · title-extraction + language-detection.
+**Top unjustified agent use (local):** the entire glue block executed by a reasoning agent.
 **Top latency sinks (keep AI, optimize):** Phase 3 CV generation · Phase 1+2 (extended thinking) · Phase 4 — optimize via single structured call, JSON output, PROFILE caching (done).
 
 ---
@@ -148,12 +206,12 @@ So that the process is fast, predictable, cheap, and error-free — especially i
 ### Code (new / changed)
 | File | Change |
 |------|--------|
-| `services/pdf/` | template-based renderer (CV + cover templates) — Task 1 |
-| `contracts/` | phase JSON models (analysis, fit, cv, review, cover) — Task 2 |
-| `tools/` or `core/` | Python metrics module (freq, tools, repetition, title, lang) — Task 3 |
-| `core/` | orchestrator FSM — Task 4 |
-| `prompts/pm/`, `prompts/generic/` | phases emit JSON; drop in-prompt Top-15/tools/repetition instructions (moved to code) — Tasks 2,3 |
-| `skill/SKILL.md`, `.claude/commands/analyze.md` | local mode delegates to orchestrator — Task 6 |
+| `services/pdf/` | weasyprint template renderer (CV + cover Jinja2/CSS templates); replace `render_md` — Task 1 |
+| `contracts/` | phase JSON models (analysis+fit, cv+review, cover) — Task 2 |
+| `tools/` or `core/` | Python metrics module (vscore composite, recommendation matrix, freq, tools, repetition, title, lang) — Task 3 |
+| `core/` | orchestrator FSM (with Phase 2.5 pause-state) — Task 4 |
+| `prompts/pm/`, `prompts/generic/` | phases emit JSON; drop in-prompt vscore-composite, recommendation-matrix, Top-15/tools/repetition instructions (moved to code) — Tasks 2,3 |
+| `skill/SKILL.md`, skill `/analyze` command | local mode delegates to orchestrator; recommendation-matrix prose → "computed by Python" — Task 6 |
 
 ### Out of scope
 - Onboarding interview (genuinely cognitive — stays LLM)
@@ -163,11 +221,13 @@ So that the process is fast, predictable, cheap, and error-free — especially i
 ---
 
 ## Dependencies
-- EPIC-14 (services/pdf) — base renderer exists ✅ (Task 1 replaces its `render_md`)
-- Today's fixes: `render_md` cover-aware, contacts standardized, docs → service-only (groundwork)
+- EPIC-14 (services/pdf) — base renderer exists ✅ (Task 1 replaces its `render_md`, swaps fpdf2 → weasyprint)
+- VScore + recommendation matrix (2026-06-14) — Tasks 2/3 must consume their JSON contract
+- Phase 2.5 Objection Handling (2026-06-05) — Task 4 must model it as a pause-state
 
 ---
 
 ## Notes
-- `H-002` workflow log is slightly stale: step 44 shows deprecated `cv_to_pdf.py` (removed 2026-06-04); steps 29–31 are one-off feedback edits, not pipeline.
+- `H-002` workflow log is stale (see Problem note + Task 0). Step 44 shows deprecated `cv_to_pdf.py` (removed 2026-06-04); steps 8–10 predate `inbox_scan.py`; steps 26–31 are one-off feedback edits; Phase 4 + Phase 2.5 + VScore absent.
 - H-002 covers only the `/analyze` happy path — extend classification to onboarding/Telegram when those are touched.
+- weasyprint needs system libs (pango/cairo) — verify Docker base image includes them before Task 1 lands.
