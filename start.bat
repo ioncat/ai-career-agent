@@ -14,13 +14,12 @@ start /D "%ROOT%" "Web Tracker :8080" cmd /k ".venv\Scripts\activate && uvicorn 
 start /D "%ROOT%" "Job Monitor (RSS)" cmd /k ".venv\Scripts\activate && python services\job-monitor\monitor.py"
 
 :: ── PDF render service (needed for CV → PDF) ─────────────────────────────────
-:: Requires: pip install weasyprint markdown jinja2 (+ apt/brew pango cairo on non-Windows)
-:: start /D "%ROOT%\services\pdf" "PDF Service :8002" cmd /k "..\..\venv\Scripts\activate && uvicorn app:app --port 8002"
+start /D "%ROOT%\services\pdf" "PDF Service :8002" cmd /k "..\..\.venv\Scripts\activate && uvicorn app:app --port 8002"
 
 :: ── JD parser (needed for URL → Markdown) ────────────────────────────────────
-:: start /D "%ROOT%\services\parser" "JD Parser :8001" cmd /k "..\..\venv\Scripts\activate && uvicorn app:app --port 8001"
+start /D "%ROOT%\services\parser" "JD Parser :8001" cmd /k "..\..\.venv\Scripts\activate && uvicorn app:app --port 8001"
 
 echo.
-echo Opened 3 windows: Bot, Web Tracker, Job Monitor
+echo Opened 5 windows: Bot, Web Tracker, Job Monitor, PDF Service, JD Parser
 echo Web Tracker: http://localhost:8080
 pause
