@@ -1,0 +1,37 @@
+[
+  {
+    "name": "DOU | Product Manager",
+    "url": "https://jobs.dou.ua/vacancies/feeds/?remote&category=Product%20Manager",
+    "user_ids": ["CAREER_AGENT_USER_1"]
+  },
+  {
+    "name": "DOU | Project Manager",
+    "url": "https://jobs.dou.ua/vacancies/feeds/?remote&category=Project%20Manager",
+    "user_ids": ["CAREER_AGENT_USER_1"]
+  },
+  {
+    "name": "Djinni | Product Manager / Owner",
+    "url": "https://djinni.co/jobs/rss/?employment=remote&search_type=basic-search&primary_keyword=Product+Manager&primary_keyword=Product+Owner",
+    "user_ids": ["CAREER_AGENT_USER_1"]
+  },
+  {
+    "name": "DOU | Assistant",
+    "url": "https://jobs.dou.ua/vacancies/feeds/?remote&category=Assistant",
+    "user_ids": ["CAREER_AGENT_USER_2"]
+  },
+  {
+    "name": "Djinni | Personal",
+    "url": "https://djinni.co/jobs/rss/?all_keywords=Personal&search_type=basic-search&employment=remote",
+    "user_ids": ["CAREER_AGENT_USER_2"]
+  },
+  {
+    "name": "Djinni | Assistant",
+    "url": "https://djinni.co/jobs/rss/?all_keywords=Assistant&search_type=title-only&exclude_keywords=develop&employment=remote",
+    "user_ids": ["CAREER_AGENT_USER_2"]
+  },
+  {
+    "name": "Djinni | Executive-Assistant",
+    "url": "https://djinni.co/jobs/rss/?all_keywords=+Executive+Assistant&search_type=full-text&exclude_keywords=develop+engineer+python&employment=remote",
+    "user_ids": ["CAREER_AGENT_USER_2"]
+  }
+]
