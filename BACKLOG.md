@@ -235,17 +235,28 @@ Merged 2026-06-15. Engine decision resolved: **weasyprint** (HTML/Jinja2 + CSS �
 
 ---
 
-## ⚠️ P1 — services/job-monitor: sync with original repo before use
+## ✅ services/job-monitor — divergence from original is intentional (2026-06-15)
 
-The copy in `services/job-monitor/` was made from the external `job-board-monitor` repo (EPIC-16, 2026-06-01). The original external repo received changes **after** that copy was taken.
+Our `services/job-monitor/monitor.py` was redesigned during EPIC-16 and is **more advanced** than the original `job-board-monitor` repo.
 
-**Before using or modifying `services/job-monitor/`:** diff against the original repo and cherry-pick any relevant fixes or improvements. Do not assume the copy is current.
+**Key difference:**
+- Original (`E:\My files\0 My_Dev\my_prj\job-board-monitor\`) — pushes vacancies directly to **Telegram** (TELEGRAM_TOKEN + chat_id recipients)
+- Ours (`services/job-monitor/`) — pushes vacancies to **career-agent webhook** (`POST {CAREER_AGENT_URL}/api/new-vacancy`) using career-agent integer `user_ids`
 
-**What to check:**
-- Original repo: `E:\My files\0 My_Dev\my_prj\job-board-monitor\`
-- [ ] Diff `services/job-monitor/monitor.py` + `feeds.json` against original
-- [ ] Decide: cherry-pick upstream changes, or note intentional divergence
-- [ ] Document outcome here
+Do not sync from original — the delivery model is fundamentally different.
+
+**One-time import of existing seen_jobs.json** (vacancies already delivered by original bot):
+```bash
+python scripts/import_seen_jobs.py --today --dry-run   # preview
+python scripts/import_seen_jobs.py --today             # import today's entries
+python scripts/import_seen_jobs.py                     # import all 830 entries
+```
+Status inserted: `new` — visible in tracker, not auto-processed by rss_watcher.
+
+**To activate ongoing RSS automation:**
+1. Create `services/job-monitor/feeds.json` from `feeds.example.json`
+2. Set `CAREER_AGENT_USER_1=1` in `.env`
+3. `docker compose up` — job-monitor will POST new vacancies to web-tracker webhook
 
 ---
 

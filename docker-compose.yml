@@ -85,7 +85,7 @@ services:
       DB_PATH: /app/db/agent.db
       VACANCIES_PATH: /app/vacancies
     volumes:
-      - ./db:/app/db:ro                     # read-only — tracker never writes
+      - ./db:/app/db                         # shared with career-agent; POST /api/new-vacancy writes here
       - ./vacancies:/app/vacancies:ro
     depends_on:
       - career-agent
