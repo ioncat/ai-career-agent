@@ -1,6 +1,6 @@
 # career-agent — Backlog
 
-> Last updated: 2026-06-14
+> Last updated: 2026-06-15
 > Epic format: post-pivot epics (13+) live in `docs/delivery/epics/`. This file = priority tracker + status overview.
 > Pre-pivot epics (1–12): `docs/delivery/epics-archive/EPIC-01-12-pre-pivot.md`
 
@@ -12,7 +12,9 @@
 
 **Re-audited rev 2 (2026-06-15):** classification updated for VScore (composite formula + recommendation matrix → Python) and Phase 2.5 (interactive cognitive pause-state). PDF engine decided: **weasyprint**. Two older backlog items folded in (see below).
 
-**Next up:** Task 1 — deterministic PDF templating (weasyprint HTML/CSS, replaces fragile fpdf2 `render_md`); Task 0 — re-trace happy-path for an honest step baseline. Both independent, can land first. See EPIC-21 for full task list (blocker-ordered) + classification + target architecture.
+**Task 1 (weasyprint PDF) — ✅ Done (2026-06-15).** `services/pdf/render.py` rewritten: 520-line fpdf2 parser → 50-line weasyprint pipeline. Jinja2 A4 template, font-face CSS, interface preserved. Docker system libs added.
+
+**Next up:** Task 2 — Pydantic JSON contracts for cognitive phases (P1+2, P3+3.5, P4) in `contracts/`. Task 0 — re-trace happy-path step count (H-002 baseline stale). See EPIC-21 for full task list.
 
 ---
 
@@ -232,6 +234,26 @@ Merged 2026-06-15. The "agent generates content, code applies fixed template" pr
 ## ~~P1 — PDF template system~~ → = [EPIC-21](docs/delivery/Epics/EPIC-21-deterministic-vs-cognitive-pipeline.md) Task 1
 
 Merged 2026-06-15. Engine decision resolved: **weasyprint** (HTML/Jinja2 + CSS → PDF). playwright rejected (~300MB headless-Chrome dependency, heavier in Docker/CI). Drops fpdf2 (no colour emoji, manual spacing). Full task spec in EPIC-21.
+
+---
+
+## 🟡 start.vbs — fix split-pane layout (tomorrow)
+
+Windows Terminal split-pane layout needs tuning: 5 tabs opened instead of split panes.
+Target: Bot (left 60%), Tracker + Monitor + PDF + Parser stacked right.
+Individual `run_*.bat` files work as a workaround until fixed.
+
+---
+
+## ✅ RSS automation + local startup (2026-06-15)
+
+- `scripts/import_seen_jobs.py` — imports seen_jobs.json → DB (`--today`, `--dry-run`); status="new"
+- `services/job-monitor/feeds.json` — 7 feeds migrated from original job-board-monitor
+- `services/job-monitor/monitor.py` — fixed .env path (was looking in services/job-monitor/, now project root)
+- `docker-compose.yml` — removed `:ro` from web-tracker DB volume
+- `run_*.bat` — individual bat files for each service (debugging)
+- `start.vbs` — Windows Terminal launcher (split-pane, WIP)
+- DB: user_id=1 (Alex, chat_id=319987251), user_id=2 (Maria, chat_id=637454887) — telegram_chat_ids set
 
 ---
 

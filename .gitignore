@@ -66,6 +66,10 @@ fonts/
 # Windows OS junk
 *.lnk
 
+# Local startup scripts — machine-specific paths, not for repo
+*.bat
+*.vbs
+
 # Claude Code local config (launch settings, not project config)
 .claude/launch.json
 
