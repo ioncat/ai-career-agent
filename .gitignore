@@ -43,6 +43,8 @@ config/profile.yaml
 vacancies/
 # runtime file from job-board-monitor / emit_vacancy.py
 seen_jobs.json
+# job-monitor lock file (runtime, prevents double-start)
+services/job-monitor/monitor.lock
 # SQLite runtime DB and backups — not versioned
 *.db
 *.sqlite
