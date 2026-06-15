@@ -137,9 +137,10 @@ def _seen_path_for(url: str, raw_folder: str, user_id: int) -> str:
                 continue
             if url in text:
                 return str(candidate.relative_to(_ROOT)).replace("\\", "/")
-        return ""
+        # URL present but no match — still try folder-name fallback
+        # (same vacancy may be listed on multiple job boards with different URLs)
 
-    # No URL — fall back to folder name match
+    # Folder-name fallback: vacancies/inbox/{user_id}/{raw_folder}/ exists?
     target = base / raw_folder
     if target.is_dir():
         for fname in ("JD_analysis.md", "JD.md"):
