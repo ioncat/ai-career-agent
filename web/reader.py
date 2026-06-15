@@ -56,6 +56,7 @@ class VacancyView:
     applied: bool = False   # True if CV was submitted to this vacancy
     starred: bool = False   # True if marked as favourite
     vacancy_score: str = "—"  # "7.2" or "—" — attractiveness score from p1
+    user_id: int | None = None
 
     # ── Derived properties ────────────────────────────────────────────────────
 
@@ -133,6 +134,7 @@ def build_vacancy_view(row: object, candidate_name: str = "Candidate") -> Vacanc
     db_analysis_json: str | None = row["analysis_json"] if "analysis_json" in row.keys() else None  # type: ignore[index]
     db_applied: bool = bool(row["applied"]) if "applied" in row.keys() else False  # type: ignore[index]
     db_starred: bool = bool(row["starred"]) if "starred" in row.keys() else False  # type: ignore[index]
+    db_user_id: int | None = row["user_id"] if "user_id" in row.keys() else None  # type: ignore[index]
 
     date = created_at[:10]  # "YYYY-MM-DD"
 
@@ -221,6 +223,7 @@ def build_vacancy_view(row: object, candidate_name: str = "Candidate") -> Vacanc
         applied=db_applied,
         starred=db_starred,
         vacancy_score=vacancy_score_str,
+        user_id=db_user_id,
     )
 
 

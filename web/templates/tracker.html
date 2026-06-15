@@ -78,6 +78,7 @@ tr:hover:not(.date-sep) td{background:#fafafa}
 .star-btn{cursor:pointer;font-size:15px;background:none;border:none;padding:0;color:#d1d5db;line-height:1}
 .star-btn:hover{color:#f59e0b}
 tr[data-starred="1"] .star-btn{color:#f59e0b}
+.grp-count{margin-left:8px;color:#9ca3af;font-weight:400;font-size:11px}
 </style>
 </head>
 <body>
@@ -149,11 +150,11 @@ tr[data-starred="1"] .star-btn{color:#f59e0b}
   {% for v in vacancies %}
     {% if v.date != ns.last_date %}
     <tr class="date-sep" data-group-date="{{ v.date }}">
-      <td colspan="13"><span class="grp-icon" data-type="date" data-date="{{ v.date }}">▼</span>{{ v.date }}</td>
+      <td colspan="13"><span class="grp-icon" data-type="date" data-date="{{ v.date }}">▼</span>{{ v.date }}<span class="grp-count" data-date="{{ v.date }}"></span></td>
     </tr>
     {% set ns.last_date = v.date %}
     {% endif %}
-    <tr class="{{ v.rec_class }}" data-idx="{{ v.id }}" data-site="{{ v.site or '' }}" data-date="{{ v.date }}" data-applied="{{ '1' if v.applied else '0' }}" data-starred="{{ '1' if v.starred else '0' }}">
+    <tr class="{{ v.rec_class }}" data-idx="{{ v.id }}" data-site="{{ v.site or '' }}" data-date="{{ v.date }}" data-applied="{{ '1' if v.applied else '0' }}" data-starred="{{ '1' if v.starred else '0' }}" data-user="{{ v.user_id or '' }}">
       <td class="num">{{ v.id }}<span class="expand-btn" data-expand="{{ v.id }}" title="Показать анализ">▶</span></td>
       <td style="text-align:center"><button class="star-btn" data-id="{{ v.id }}" onclick="toggleStarred(this)" title="Избранное">{{ '★' if v.starred else '☆' }}</button></td>
       <td class="vname"><span class="site-chip site-{{ v.site or 'other' }}">{{ v.site_display }}</span><a href="{{ v.url }}" target="_blank" rel="noopener">{{ v.title }}</a></td>
@@ -181,6 +182,9 @@ tr[data-starred="1"] .star-btn{color:#f59e0b}
 <p class="updated">Всего: {{ total }} вакансий · <a href="/stats/barriers" target="_blank" style="color:#5b21b6;text-decoration:none;font-size:11px">📊 Анализ барьеров</a></p>
 </div>
 <script>
+// ── User map (id → name) ─────────────────────────────────────────────────────
+const USERS = { {% for u in users %}"{{ u.id }}": "{{ (u.name or ('User ' ~ u.id)) | e }}"{% if not loop.last %}, {% endif %}{% endfor %} };
+
 // ── Group state ──────────────────────────────────────────────────────────────
 const dateState = {}; // date → true (collapsed)
 let   sortActive = false;
@@ -211,6 +215,22 @@ function applyViz() {
     const exp = document.querySelector(`tr[data-for="${row.dataset.idx}"]`);
     if (exp && !show) exp.style.display = 'none';
     if (show) visible++;
+  });
+
+  // Per-date per-user counts (respects filters, ignores collapsed state)
+  const grpCounts = {};
+  mainRows.forEach(row => {
+    if (rowMatchesFilter(row)) {
+      const d = row.dataset.date;
+      const uid = row.dataset.user || '';
+      if (!grpCounts[d]) grpCounts[d] = {};
+      grpCounts[d][uid] = (grpCounts[d][uid] || 0) + 1;
+    }
+  });
+  document.querySelectorAll('.grp-count[data-date]').forEach(el => {
+    const counts = grpCounts[el.dataset.date] || {};
+    const parts = Object.entries(counts).map(([uid, n]) => (USERS[uid] || ('User ' + uid)) + ': ' + n);
+    el.textContent = parts.length ? ' · ' + parts.join(' · ') : '';
   });
 
   if (!sortActive) {
