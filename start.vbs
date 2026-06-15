@@ -28,13 +28,14 @@ WriteBat tmp & "\ca_parser.bat",  "Parser :8001",      root & "\services\parser"
 wtExe = shell.ExpandEnvironmentStrings("%LOCALAPPDATA%") & "\Microsoft\WindowsApps\wt.exe"
 
 If fso.FileExists(wtExe) Then
-    shell.Run "wt" _
-        & " cmd /k """ & tmp & "\ca_bot.bat""" _
-        & " ; new-tab cmd /k """ & tmp & "\ca_tracker.bat""" _
-        & " ; new-tab cmd /k """ & tmp & "\ca_monitor.bat""" _
-        & " ; new-tab cmd /k """ & tmp & "\ca_pdf.bat""" _
-        & " ; new-tab cmd /k """ & tmp & "\ca_parser.bat""" _
-        , 1, False
+    ' Bot fills left half; Tracker/Monitor/PDF/Parser stacked on the right
+    Dim wtCmd
+    wtCmd = "wt cmd /k """ & tmp & "\ca_bot.bat"""
+    wtCmd = wtCmd & " ; split-pane -V --size 0.4 cmd /k """ & tmp & "\ca_tracker.bat"""
+    wtCmd = wtCmd & " ; split-pane -H cmd /k """ & tmp & "\ca_monitor.bat"""
+    wtCmd = wtCmd & " ; split-pane -H cmd /k """ & tmp & "\ca_pdf.bat"""
+    wtCmd = wtCmd & " ; split-pane -H cmd /k """ & tmp & "\ca_parser.bat"""
+    shell.Run wtCmd, 1, False
 Else
     shell.Run "cmd /k """ & tmp & "\ca_bot.bat"""
     WScript.Sleep 400
