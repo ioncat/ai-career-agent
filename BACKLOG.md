@@ -237,11 +237,22 @@ Merged 2026-06-15. Engine decision resolved: **weasyprint** (HTML/Jinja2 + CSS �
 
 ---
 
-## 🟡 start.vbs — fix split-pane layout (tomorrow)
+## 🟡 Docker deploy on VM — next session
 
-Windows Terminal split-pane layout needs tuning: 5 tabs opened instead of split panes.
-Target: Bot (left 60%), Tracker + Monitor + PDF + Parser stacked right.
-Individual `run_*.bat` files work as a workaround until fixed.
+`docker-compose.yml` готов (5 сервисов). WeasyPrint требует GTK — только в Docker (Linux контейнер).
+
+**Plan:**
+1. На VM: `git pull && docker compose up --build`
+2. Порты биндятся на `0.0.0.0` — доступно по IP виртуалки
+3. Из Windows: `http://VM_IP:8080` (трекер), бот через Telegram
+
+**launcher.py** — локальный запуск без Docker (все 5 сервисов в одном окне, sequential start, Ctrl+C убивает всё). PDF сервис на Windows без GTK не работает — только через Docker.
+
+---
+
+## ✅ start.vbs → launcher.py (2026-06-16)
+
+Заменён на `launcher.py` — Python-оркестратор в одном CMD окне.
 
 ---
 
