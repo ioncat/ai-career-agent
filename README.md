@@ -2,6 +2,8 @@
 
 **AI job search counselor for PdM · PO**
 
+> **Status: active development** — core pipeline live, new features added regularly.
+
 Reads vacancies deeply, scores honest fit, and generates targeted CVs — so candidates apply to the right roles and win them.
 
 ---
