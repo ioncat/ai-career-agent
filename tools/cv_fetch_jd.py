@@ -71,9 +71,9 @@ async def cv_fetch_jd(ctx: RunContext[AgentDeps], url: str) -> str:
 
     # ── Build filesystem path ─────────────────────────────────────────────────
     site = _detect_site(url)
-    slug = _url_slug(url)
+    folder_name = _safe_folder_name(doc.title) if doc.title else _url_slug(url)
 
-    vacancy_dir = ctx.deps.vacancies_path / "inbox" / str(ctx.deps.user_id) / slug
+    vacancy_dir = ctx.deps.vacancies_path / "inbox" / str(ctx.deps.user_id) / folder_name
     vacancy_dir.mkdir(parents=True, exist_ok=True)
     jd_path = vacancy_dir / "JD.md"
 
@@ -135,11 +135,22 @@ def _detect_site(url: str) -> str:
     return "other"
 
 
+def _safe_folder_name(title: str) -> str:
+    """Convert parsed JD title to a filesystem-safe folder name.
+
+    Keeps spaces, dashes, dots, Cyrillic/Latin letters — removes only characters
+    forbidden on Windows filesystems (< > : " / \\ | ? *) and trims to 80 chars.
+    Falls back to 'vacancy' if result is empty.
+    """
+    safe = re.sub(r'[<>:"/\\|?*]', "", title)
+    safe = safe.strip(". ").strip()
+    return (safe or "vacancy")[:80]
+
+
 def _url_slug(url: str) -> str:
-    """Extract a filesystem-safe slug from the URL path."""
+    """Extract a filesystem-safe slug from the URL path (fallback when title unavailable)."""
     path = urlparse(url).path.rstrip("/")
     last_segment = path.split("/")[-1] if path else "vacancy"
-    # Keep alphanumeric + hyphens, collapse anything else to hyphen, limit length
     slug = re.sub(r"[^a-z0-9-]", "-", last_segment.lower())
     slug = re.sub(r"-{2,}", "-", slug).strip("-")
     return (slug or "vacancy")[:60]
