@@ -92,7 +92,7 @@ class RSSWatcher:
                 log.error("RSSWatcher: unexpected error in poll loop: %s", exc)
 
     async def _poll_once(self) -> None:
-        """Query DB for queued vacancies and process each."""
+        """Query DB for queued vacancies and process all concurrently."""
         rows = await database.list_vacancies(
             status="queued",
             user_id=self._deps.user_id,
@@ -101,13 +101,19 @@ class RSSWatcher:
             return
 
         log.info("RSSWatcher: %d queued vacancy(s) found", len(rows))
+
+        # Claim all first (sequential — avoid double-processing races)
         for row in rows:
-            url = row["url"]
-            vacancy_id = row["id"]
-            rss_title = row["title"] or ""
-            # Claim the vacancy immediately to avoid double-processing
-            await database.update_vacancy_status(vacancy_id, "fetching")
-            await self._process(url, rss_title=rss_title)
+            await database.update_vacancy_status(row["id"], "fetching")
+
+        # Notify + fetch all concurrently
+        results = await asyncio.gather(
+            *[self._process(row["url"], rss_title=row["title"] or "") for row in rows],
+            return_exceptions=True,
+        )
+        for row, exc in zip(rows, results):
+            if isinstance(exc, Exception):
+                log.error("RSSWatcher: failed %s: %s", row["url"], exc)
 
     @staticmethod
     def _source_label(url: str) -> str:
