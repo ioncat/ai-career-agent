@@ -12,6 +12,7 @@ import re
 from collections import Counter
 from contextlib import asynccontextmanager
 from pathlib import Path
+from urllib.parse import urlparse
 
 import markdown as md_lib
 from fastapi import FastAPI, HTTPException, Request
@@ -97,6 +98,17 @@ async def api_users():
     return [dict(row) for row in rows]
 
 
+def _site_from_url(url: str) -> str | None:
+    netloc = urlparse(url).netloc.lower()
+    if "djinni" in netloc:
+        return "djinni"
+    if "dou.ua" in netloc:
+        return "dou"
+    if "linkedin" in netloc:
+        return "linkedin"
+    return None
+
+
 class NewVacancyRequest(BaseModel):
     url: str
     title: str | None = None
@@ -119,6 +131,7 @@ async def api_new_vacancy(req: NewVacancyRequest):
         vacancy_id = await database.insert_vacancy(
             url=req.url,
             title=req.title,
+            site=_site_from_url(req.url),
             user_id=req.user_id,
             status="queued",
             published_at=req.published_at,
