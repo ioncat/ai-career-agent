@@ -58,18 +58,47 @@ CHECK_TIMEOUT: int = DEFAULT_CONFIG["check_timeout_seconds"]
 SALARY_RE = re.compile(r"\$\s*\d{1,5}(?:\s*[–—\-]\s*\d{1,5})?")
 
 
+def _pid_alive(pid: int) -> bool:
+    try:
+        import psutil
+        return psutil.pid_exists(pid)
+    except ImportError:
+        pass
+    # Windows fallback via ctypes
+    try:
+        import ctypes
+        handle = ctypes.windll.kernel32.OpenProcess(0x1000, False, pid)
+        if handle == 0:
+            return False
+        ctypes.windll.kernel32.CloseHandle(handle)
+        return True
+    except Exception:
+        pass
+    # POSIX fallback
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except Exception:
+        return True
+
+
 def acquire_lock() -> None:
-    """Exit if another instance is already running."""
+    """Exit if another instance is already running. Auto-cleans stale locks."""
     if LOCK_FILE.exists():
-        pid = LOCK_FILE.read_text().strip()
+        pid_str = LOCK_FILE.read_text().strip()
         try:
-            import psutil
-            if psutil.pid_exists(int(pid)):
+            pid = int(pid_str)
+            if _pid_alive(pid):
                 print(f"ERROR: another instance already running (PID {pid}). Exiting.")
                 sys.exit(1)
-        except ImportError:
-            print(f"ERROR: lock file exists (PID {pid}). If no other instance runs, delete monitor.lock and retry.")
-            sys.exit(1)
+            print(f"Stale lock (PID {pid} dead) — removing and continuing.")
+            LOCK_FILE.unlink()
+        except ValueError:
+            LOCK_FILE.unlink()
     LOCK_FILE.write_text(str(os.getpid()))
 
 
