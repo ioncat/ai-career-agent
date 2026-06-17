@@ -102,6 +102,7 @@ class NewVacancyRequest(BaseModel):
     title: str | None = None
     feed_name: str | None = None
     user_id: int | None = None
+    published_at: str | None = None
 
 
 @app.post("/api/new-vacancy", status_code=201)
@@ -120,6 +121,7 @@ async def api_new_vacancy(req: NewVacancyRequest):
             title=req.title,
             user_id=req.user_id,
             status="queued",
+            published_at=req.published_at,
         )
     except Exception as exc:
         if "UNIQUE" in str(exc).upper():

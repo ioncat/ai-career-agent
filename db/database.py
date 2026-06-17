@@ -114,6 +114,8 @@ async def init_db() -> None:
             "ALTER TABLE vacancies ADD COLUMN applied INTEGER NOT NULL DEFAULT 0",
             # Starred/favourite flag
             "ALTER TABLE vacancies ADD COLUMN starred INTEGER NOT NULL DEFAULT 0",
+            # RSS publication date (ISO 8601 UTC, from job-monitor pubDate)
+            "ALTER TABLE vacancies ADD COLUMN published_at TEXT",
         ]:
             try:
                 await db.execute(migration)
@@ -272,6 +274,7 @@ async def insert_vacancy(
     markdown_path: str | None = None,
     user_id: int | None = None,
     status: str | None = None,
+    published_at: str | None = None,
 ) -> int:
     """Insert new vacancy. Returns new row id.
 
@@ -279,6 +282,7 @@ async def insert_vacancy(
     site is auto-inferred from URL hostname when not provided.
     user_id: optional FK to users table. NULL = legacy/unscoped (treated as user_id=1).
     status: if provided, sets initial status (e.g. 'queued' for webhook-created vacancies).
+    published_at: ISO 8601 UTC string from RSS pubDate (nullable).
     Raises sqlite3.IntegrityError if normalised URL already exists — caller should handle.
     """
     canonical_url = normalize_url(url)
@@ -287,18 +291,18 @@ async def insert_vacancy(
         if status is not None:
             cursor = await db.execute(
                 """
-                INSERT INTO vacancies (url, title, site, markdown_path, user_id, status)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO vacancies (url, title, site, markdown_path, user_id, status, published_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (canonical_url, title, resolved_site, markdown_path, user_id, status),
+                (canonical_url, title, resolved_site, markdown_path, user_id, status, published_at),
             )
         else:
             cursor = await db.execute(
                 """
-                INSERT INTO vacancies (url, title, site, markdown_path, user_id)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO vacancies (url, title, site, markdown_path, user_id, published_at)
+                VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                (canonical_url, title, resolved_site, markdown_path, user_id),
+                (canonical_url, title, resolved_site, markdown_path, user_id, published_at),
             )
         await db.commit()
         return cursor.lastrowid  # type: ignore[return-value]

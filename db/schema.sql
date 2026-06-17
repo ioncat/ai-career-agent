@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS vacancies (
                                           --  "p2":{fit_score,recommendation,category,key_barriers[],hidden_risks[],warnings[],salary,fit_dimensions{}},
                                           --  "p3":{name_variant,cv_language,changes_count},
                                           --  "p4":{cover_language}}
+    published_at  TEXT,                   -- ISO 8601 UTC — when vacancy was published on job board (from RSS pubDate)
     applied       INTEGER NOT NULL DEFAULT 0,
                                           -- 1 = CV was submitted to this vacancy, 0 = not yet
     starred       INTEGER NOT NULL DEFAULT 0,
