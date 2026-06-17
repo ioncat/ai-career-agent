@@ -349,18 +349,80 @@ class ClaudeProvider:
         )
 
 
-# ── OllamaProvider (stub) ─────────────────────────────────────────────────────
+# ── OllamaProvider ───────────────────────────────────────────────────────────
 
 
 class OllamaProvider:
-    """Stub LLM provider. Raises LLMUnavailableError on every call.
+    """Local Ollama LLM provider via httpx POST /api/chat.
 
-    Exists as a placeholder for local dev without an Anthropic API key.
-    Rule: never silently succeed — the caller must handle the error and
-    notify the user that Claude is required.
+    Implements the same LLMClient interface as ClaudeProvider.
+    PROFILE.md + task system prompt are combined into a single system message
+    (Ollama does not support prompt caching).
+
+    Args:
+        base_url:   Ollama server base URL, e.g. "http://localhost:11434".
+        model:      Model tag, e.g. "qwen2.5:32b" or "llama3.3:70b".
+        profile_md: Full text content of PROFILE.md — prepended to every system prompt.
+        max_tokens: Max tokens for completion (passed as num_predict to Ollama).
     """
 
-    async def complete(self, user: str, *, system: str | None = None) -> str:
-        raise LLMUnavailableError(
-            "OllamaProvider is a stub — configure ANTHROPIC_API_KEY and use ClaudeProvider."
+    def __init__(
+        self,
+        base_url: str,
+        model: str,
+        profile_md: str,
+        max_tokens: int = 4096,
+    ) -> None:
+        self._base_url = base_url.rstrip("/")
+        self._model = model
+        self._profile_md = profile_md
+        self._max_tokens = max_tokens
+
+    async def complete(self, user: str, *, system: str | None = None, **_kwargs) -> str:
+        """Call Ollama /api/chat. system and user mirror ClaudeProvider.complete()."""
+        import httpx
+
+        sys_parts = [self._profile_md]
+        if system:
+            sys_parts.append(system)
+        system_content = "\n\n".join(sys_parts)
+
+        payload = {
+            "model": self._model,
+            "messages": [
+                {"role": "system", "content": system_content},
+                {"role": "user", "content": user},
+            ],
+            "stream": False,
+            "options": {"num_predict": self._max_tokens},
+        }
+
+        t0 = time.monotonic()
+        async with httpx.AsyncClient(timeout=300.0) as client:
+            try:
+                resp = await client.post(f"{self._base_url}/api/chat", json=payload)
+                resp.raise_for_status()
+            except httpx.ConnectError as exc:
+                raise LLMUnavailableError(
+                    f"Ollama unreachable at {self._base_url}: {exc}"
+                ) from exc
+            except httpx.HTTPStatusError as exc:
+                raise LLMError(
+                    f"Ollama HTTP {exc.response.status_code}: {exc.response.text[:200]}"
+                ) from exc
+
+        elapsed = time.monotonic() - t0
+        data = resp.json()
+        text = (data.get("message") or {}).get("content") or ""
+        if not text:
+            raise LLMError("Ollama returned empty response")
+
+        log.info(
+            "OllamaProvider: model=%s elapsed=%.1fs in=~%d out=%d chars",
+            self._model, elapsed, len(user) + len(system_content), len(text),
         )
+        return text
+
+    @property
+    def model(self) -> str:
+        return self._model

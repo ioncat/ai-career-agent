@@ -26,7 +26,7 @@ from adapters.parser_adapter import ParserAdapter
 from core.deps import AgentDeps
 from core.rss_watcher import RSSWatcher
 from core.settings import ConfigError, load_settings
-from core.llm_client import ClaudeProvider
+from core.llm_client import ClaudeProvider, OllamaProvider
 from core.tool_registry import ToolRegistry
 from core.router import Router
 from core.telegram import TelegramBot
@@ -134,15 +134,25 @@ async def main() -> None:
     else:
         log.info("Profile loaded from DB for user_id=%d (%d chars)", default_user_id, len(profile_md))
 
-    llm = ClaudeProvider(
-        api_key=settings.anthropic_api_key,
-        model=settings.llm_model,
-        profile_md=profile_md,
-        max_tokens=settings.max_tokens,
-        testing_mode=(settings.agent_mode == "testing"),
-    )
-    if settings.agent_mode == "testing":
-        log.warning("AGENT_MODE=testing — Claude API calls require confirmation before each request")
+    if settings.llm_provider == "ollama":
+        llm = OllamaProvider(
+            base_url=settings.ollama_base_url,
+            model=settings.ollama_model,
+            profile_md=profile_md,
+            max_tokens=settings.max_tokens,
+        )
+        log.info("LLM provider: Ollama — model=%s base_url=%s", settings.ollama_model, settings.ollama_base_url)
+    else:
+        llm = ClaudeProvider(
+            api_key=settings.anthropic_api_key,
+            model=settings.llm_model,
+            profile_md=profile_md,
+            max_tokens=settings.max_tokens,
+            testing_mode=(settings.agent_mode == "testing"),
+        )
+        if settings.agent_mode == "testing":
+            log.warning("AGENT_MODE=testing — Claude API calls require confirmation before each request")
+        log.info("LLM provider: Claude — model=%s", settings.llm_model)
 
     # ── 4. Tools + deps ──────────────────────────────────────────────────────
     settings.vacancies_path.mkdir(parents=True, exist_ok=True)

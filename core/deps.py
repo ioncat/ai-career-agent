@@ -18,7 +18,7 @@ from pathlib import Path
 
 from adapters.cv_adapter import CVAdapter
 from adapters.parser_adapter import ParserAdapter
-from core.llm_client import ClaudeProvider
+from core.llm_client import ClaudeProvider, OllamaProvider
 
 
 @dataclass
@@ -27,7 +27,7 @@ class AgentDeps:
 
     Attributes:
         parser_adapter: Async HTTP client for jd-parser service (URL → Markdown).
-        llm:            ClaudeProvider for direct completions (CV phase tools).
+        llm:            LLM provider for completions — ClaudeProvider or OllamaProvider.
         vacancies_path: Root directory for vacancy filesystem storage.
         candidate_name: Full name used in CV filenames (e.g. "Oleksii_Bondarenko").
         cv_adapter:     Subprocess wrapper for cv_to_pdf.py in callback-cv repo.
@@ -35,7 +35,7 @@ class AgentDeps:
         skill_type:     Routes ALL pipeline phases to prompts/[skill_type]/ (e.g. 'pm', 'generic').
     """
     parser_adapter: ParserAdapter
-    llm: ClaudeProvider
+    llm: ClaudeProvider | OllamaProvider
     vacancies_path: Path
     candidate_name: str
     cv_adapter: CVAdapter
