@@ -14,6 +14,7 @@ class ParsedDocument(BaseModel):
     title: str
     markdown: str
     source_url: str
+    company: str | None = None  # employer name — extracted by parser, None if unavailable
 
     @property
     def is_empty(self) -> bool:

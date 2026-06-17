@@ -95,6 +95,7 @@ async def test_fetch_jd_saves_file(tmp_path):
     with patch("tools.cv_fetch_jd.database") as mock_db:
         mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
         mock_db.insert_vacancy = AsyncMock(return_value=42)
+        mock_db.update_vacancy_fields = AsyncMock()
 
         result = await cv_fetch_jd(ctx, "https://djinni.co/jobs/123-backend/")
 
@@ -120,15 +121,16 @@ async def test_fetch_jd_correct_folder_structure(tmp_path):
     with patch("tools.cv_fetch_jd.database") as mock_db:
         mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
         mock_db.insert_vacancy = AsyncMock(return_value=1)
+        mock_db.update_vacancy_fields = AsyncMock()
 
         await cv_fetch_jd(ctx, "https://djinni.co/jobs/123-backend/")
 
     saved = list(ctx.deps.vacancies_path.rglob("JD.md"))
     path_parts = saved[0].parts
-    # path: vacancies/inbox/{user_id}/{slug}/JD.md
-    assert "inbox" in path_parts    # system inbox
+    # path: vacancies/inbox/{user_id}/{id} — {title}/JD.md
+    assert "inbox" in path_parts
     assert "1" in path_parts        # user_id segment
-    assert "123-backend" in path_parts
+    assert any("Backend Dev" in p for p in path_parts)  # title in folder name
 
 
 @pytest.mark.asyncio
@@ -141,6 +143,7 @@ async def test_fetch_jd_calls_db_insert(tmp_path):
     with patch("tools.cv_fetch_jd.database") as mock_db:
         mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
         mock_db.insert_vacancy = AsyncMock(return_value=5)
+        mock_db.update_vacancy_fields = AsyncMock()
 
         await cv_fetch_jd(ctx, "https://djinni.co/jobs/456-python/")
 
@@ -225,6 +228,7 @@ async def test_fetch_jd_path_scoped_to_user_id(tmp_path):
     with patch("tools.cv_fetch_jd.database") as mock_db:
         mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
         mock_db.insert_vacancy = AsyncMock(return_value=10)
+        mock_db.update_vacancy_fields = AsyncMock()
 
         await cv_fetch_jd(ctx, "https://djinni.co/jobs/777-senior/")
 
@@ -247,6 +251,7 @@ async def test_fetch_jd_passes_user_id_to_db(tmp_path):
     with patch("tools.cv_fetch_jd.database") as mock_db:
         mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
         mock_db.insert_vacancy = AsyncMock(return_value=99)
+        mock_db.update_vacancy_fields = AsyncMock()
 
         await cv_fetch_jd(ctx, "https://djinni.co/jobs/999-test/")
 
