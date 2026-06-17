@@ -48,15 +48,14 @@ async def cv_fetch_jd(ctx: RunContext[AgentDeps], url: str) -> str:
 
     # ── Duplicate check ───────────────────────────────────────────────────────
     existing = await database.get_vacancy_by_url(url)
-    if existing and existing["status"] != "queued":
+    if existing and existing["status"] not in ("queued", "fetching"):
         log.info("cv_fetch_jd: vacancy already in DB id=%d status=%s", existing["id"], existing["status"])
         return (
             f"ℹ️ Вакансия уже в базе.\n"
             f"<b>{existing['title'] or 'Без названия'}</b>\n"
-            f"Путь: <code>{existing['markdown_path']}</code>\n"
             f"Статус: {existing['status']}"
         )
-    # status='queued' → webhook pre-created the record; continue to fetch and fill it
+    # status='queued'/'fetching' → continue to fetch and fill it
 
     # ── Fetch via jd-parser ───────────────────────────────────────────────────
     t0 = time.monotonic()
@@ -86,7 +85,7 @@ async def cv_fetch_jd(ctx: RunContext[AgentDeps], url: str) -> str:
 
     # ── Insert or update DB record ────────────────────────────────────────────
     markdown_path = str(jd_path)
-    if existing and existing["status"] == "queued":
+    if existing and existing["status"] in ("queued", "fetching"):
         # Webhook pre-created the vacancy — update fields, then mark fetched
         vacancy_id = existing["id"]
         await database.update_vacancy_fields(
@@ -95,7 +94,7 @@ async def cv_fetch_jd(ctx: RunContext[AgentDeps], url: str) -> str:
             site=site,
             markdown_path=markdown_path,
         )
-        log.info("cv_fetch_jd: updated queued vacancy_id=%d", vacancy_id)
+        log.info("cv_fetch_jd: updated vacancy_id=%d (was %s)", vacancy_id, existing["status"])
     else:
         try:
             vacancy_id = await database.insert_vacancy(

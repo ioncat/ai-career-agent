@@ -4,16 +4,19 @@ tests/test_rss_watcher.py — tests for core/rss_watcher.py.
 New behaviour (EPIC-16): RSSWatcher polls DB for status='queued' vacancies
 instead of polling seen_jobs.json file.
 
+Notification design: Telegram message is sent FIRST (before cv_fetch_jd),
+so users get notified immediately regardless of parser availability.
+
 Mocks: database.list_vacancies, database.update_vacancy_status,
        cv_fetch_jd, telegram_bot.send_message.
 No real network, Telegram, or DB needed.
 """
 
-from unittest.mock import AsyncMock, MagicMock, call, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from core.rss_watcher import RSSWatcher
+from core.rss_watcher import RSSWatcher, _extract_salary
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -27,10 +30,15 @@ def _make_watcher(poll_interval: int = 1) -> tuple[RSSWatcher, MagicMock]:
     return watcher, bot
 
 
-def _make_row(vacancy_id: int, url: str, status: str = "queued") -> MagicMock:
+def _make_row(
+    vacancy_id: int,
+    url: str,
+    status: str = "queued",
+    title: str = "",
+) -> MagicMock:
     row = MagicMock()
     row.__getitem__ = lambda self, key: {
-        "id": vacancy_id, "url": url, "status": status,
+        "id": vacancy_id, "url": url, "status": status, "title": title,
     }[key]
     return row
 
@@ -40,6 +48,21 @@ def _mock_db(queued_rows: list) -> MagicMock:
     db.list_vacancies = AsyncMock(return_value=queued_rows)
     db.update_vacancy_status = AsyncMock()
     return db
+
+
+# ── _extract_salary ────────────────────────────────────────────────────────────
+
+def test_extract_salary_djinni_range():
+    assert _extract_salary("Product Manager в Company, $2000–3200, відда...") == "$2000–3200"
+
+def test_extract_salary_dou_single():
+    assert _extract_salary("Business Analyst, до $1700, Київ") == "$1700"
+
+def test_extract_salary_no_salary():
+    assert _extract_salary("Product Manager в Company") == ""
+
+def test_extract_salary_with_spaces():
+    assert _extract_salary("PM, $2 000–3 500, remote") == "$2000–3500"
 
 
 # ── start / stop ──────────────────────────────────────────────────────────────
@@ -73,11 +96,9 @@ async def test_watcher_start_logs_interval():
 @pytest.mark.asyncio
 async def test_poll_once_triggers_fetch_for_queued_vacancy():
     watcher, bot = _make_watcher()
-    row = _make_row(42, "https://djinni.co/jobs/42/")
+    row = _make_row(42, "https://djinni.co/jobs/42/", title="Product Manager в Acme")
     mock_db = _mock_db([row])
-
-    fetch_result = "✅ Вакансия сохранена! Backend Dev"
-    mock_fetch = AsyncMock(return_value=fetch_result)
+    mock_fetch = AsyncMock(return_value="✅ Вакансия сохранена!")
 
     with patch("core.rss_watcher.database", mock_db):
         with patch("tools.cv_fetch_jd.cv_fetch_jd", mock_fetch):
@@ -85,11 +106,11 @@ async def test_poll_once_triggers_fetch_for_queued_vacancy():
 
     # status updated to 'fetching' before processing
     mock_db.update_vacancy_status.assert_awaited_once_with(42, "fetching")
-    # telegram notified
+    # telegram notified (notification sent first, before fetch)
     bot.send_message.assert_awaited_once()
     msg = bot.send_message.call_args[0][0]
-    assert "Новая вакансия из RSS" in msg
-    assert fetch_result in msg
+    assert "Новая вакансия" in msg
+    assert "djinni.co" in msg.lower()
 
 
 @pytest.mark.asyncio
@@ -108,8 +129,8 @@ async def test_poll_once_skips_when_no_queued():
 async def test_poll_once_processes_multiple_vacancies():
     watcher, bot = _make_watcher()
     rows = [
-        _make_row(1, "https://djinni.co/jobs/1/"),
-        _make_row(2, "https://dou.ua/jobs/2/"),
+        _make_row(1, "https://djinni.co/jobs/1/", title="PM at Company A"),
+        _make_row(2, "https://dou.ua/jobs/2/", title="PO at Company B, $2000"),
     ]
     mock_db = _mock_db(rows)
     mock_fetch = AsyncMock(return_value="✅ Done")
@@ -134,25 +155,32 @@ async def test_poll_once_queries_for_user_id():
     mock_db.list_vacancies.assert_awaited_once_with(status="queued", user_id=1)
 
 
-# ── _process — error handling ─────────────────────────────────────────────────
+# ── _process — notification sent first, then parse ───────────────────────────
 
 @pytest.mark.asyncio
-async def test_process_fetch_error_sends_warning():
+async def test_process_sends_notification_before_fetch():
+    """Telegram notification must fire before cv_fetch_jd is called."""
     watcher, bot = _make_watcher()
-    url = "https://djinni.co/jobs/bad/"
+    url = "https://djinni.co/jobs/1/"
+    call_order: list[str] = []
 
-    mock_fetch = AsyncMock(side_effect=Exception("Parser connection refused"))
-    with patch("tools.cv_fetch_jd.cv_fetch_jd", mock_fetch):
+    async def track_notify(msg: str) -> None:
+        call_order.append("notify")
+
+    async def track_fetch(ctx, url: str) -> str:
+        call_order.append("fetch")
+        return "✅ Fetched!"
+
+    bot.send_message.side_effect = track_notify
+    with patch("tools.cv_fetch_jd.cv_fetch_jd", track_fetch):
         await watcher._process(url)
 
-    bot.send_message.assert_awaited_once()
-    msg = bot.send_message.call_args[0][0]
-    assert "⚠️" in msg
-    assert "ошибка" in msg.lower()
+    assert call_order == ["notify", "fetch"], "Notification must precede fetch"
 
 
 @pytest.mark.asyncio
 async def test_process_sends_result_to_telegram():
+    """Notification includes source label and URL."""
     watcher, bot = _make_watcher()
     url = "https://djinni.co/jobs/1/"
     mock_fetch = AsyncMock(return_value="✅ Backend Dev сохранена!")
@@ -162,5 +190,73 @@ async def test_process_sends_result_to_telegram():
 
     bot.send_message.assert_awaited_once()
     msg = bot.send_message.call_args[0][0]
-    assert "Новая вакансия из RSS" in msg
-    assert "✅ Backend Dev сохранена!" in msg
+    assert "Новая вакансия" in msg
+    assert "Djinni" in msg
+
+
+@pytest.mark.asyncio
+async def test_process_fetch_error_still_notifies():
+    """Notification is sent even when cv_fetch_jd raises. No error message to user."""
+    watcher, bot = _make_watcher()
+    url = "https://djinni.co/jobs/bad/"
+    mock_fetch = AsyncMock(side_effect=Exception("Parser connection refused"))
+
+    with patch("tools.cv_fetch_jd.cv_fetch_jd", mock_fetch):
+        await watcher._process(url)
+
+    # Notification was still sent
+    bot.send_message.assert_awaited_once()
+    msg = bot.send_message.call_args[0][0]
+    assert "Новая вакансия" in msg
+    # No error surfaced to user
+    assert "⚠️" not in msg
+    assert "ошибка" not in msg.lower()
+
+
+@pytest.mark.asyncio
+async def test_process_extracts_salary_from_rss_title():
+    """Salary is extracted and shown in notification when present in rss_title."""
+    watcher, bot = _make_watcher()
+    url = "https://dou.ua/jobs/1/"
+    rss_title = "Product Manager в Company, $2000–3000, відда..."
+
+    with patch("tools.cv_fetch_jd.cv_fetch_jd", AsyncMock()):
+        await watcher._process(url, rss_title=rss_title)
+
+    msg = bot.send_message.call_args[0][0]
+    assert "💰" in msg
+    assert "$2000" in msg
+    assert "📌" in msg
+
+
+@pytest.mark.asyncio
+async def test_process_no_salary_when_absent():
+    """No salary line in notification when rss_title has no salary."""
+    watcher, bot = _make_watcher()
+    url = "https://djinni.co/jobs/1/"
+    rss_title = "Product Manager at Big Corp"
+
+    with patch("tools.cv_fetch_jd.cv_fetch_jd", AsyncMock()):
+        await watcher._process(url, rss_title=rss_title)
+
+    msg = bot.send_message.call_args[0][0]
+    assert "💰" not in msg
+    assert "📌" in msg
+
+
+@pytest.mark.asyncio
+async def test_process_source_label_dou():
+    watcher, bot = _make_watcher()
+    with patch("tools.cv_fetch_jd.cv_fetch_jd", AsyncMock()):
+        await watcher._process("https://dou.ua/jobs/123/")
+    msg = bot.send_message.call_args[0][0]
+    assert "DOU.ua" in msg
+
+
+@pytest.mark.asyncio
+async def test_process_source_label_djinni():
+    watcher, bot = _make_watcher()
+    with patch("tools.cv_fetch_jd.cv_fetch_jd", AsyncMock()):
+        await watcher._process("https://djinni.co/jobs/123/")
+    msg = bot.send_message.call_args[0][0]
+    assert "Djinni" in msg
