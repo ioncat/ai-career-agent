@@ -19,7 +19,8 @@ import os
 import re
 import sys
 import xml.etree.ElementTree as ET
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
@@ -343,6 +344,17 @@ def save_state(state: dict) -> None:
         log.error("Failed to save state: %s", e)
 
 
+def _parse_pub_date(pub_date: str) -> str | None:
+    """Parse RFC 2822 pubDate to ISO 8601 UTC string. Returns None on failure."""
+    if not pub_date:
+        return None
+    try:
+        dt = parsedate_to_datetime(pub_date)
+        return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+    except Exception:
+        return None
+
+
 async def post_to_career_agent(
     session: aiohttp.ClientSession,
     career_agent_url: str,
@@ -350,6 +362,7 @@ async def post_to_career_agent(
     title: str,
     feed_name: str,
     user_id: int,
+    pub_date: str = "",
 ) -> None:
     """POST new vacancy to career-agent webhook endpoint.
 
@@ -358,6 +371,9 @@ async def post_to_career_agent(
     """
     endpoint = f"{career_agent_url.rstrip('/')}/api/new-vacancy"
     payload = {"url": url, "title": title, "feed_name": feed_name, "user_id": user_id}
+    published_at = _parse_pub_date(pub_date)
+    if published_at:
+        payload["published_at"] = published_at
     async with session.post(endpoint, json=payload) as resp:
         if resp.status == 409:
             log.info("[WEBHOOK] %s already known by career-agent — marking sent", url)
@@ -406,7 +422,7 @@ async def deliver_one(
     delivery["last_attempt"] = now.isoformat(timespec="seconds")
 
     try:
-        await post_to_career_agent(session, career_agent_url, link, j["title"], feed_name, user_id)
+        await post_to_career_agent(session, career_agent_url, link, j["title"], feed_name, user_id, j.get("pubDate", ""))
         delivery["status"] = "sent"
         delivery["last_error"] = None
         return True
