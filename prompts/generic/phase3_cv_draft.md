@@ -37,31 +37,53 @@ User will provide:
 
 ## CV Structure
 
-```
-[Selected Name]
-[Professional headline — candidate's actual role, from PROFILE.md]
-[Email](mailto:[email])   ← read from PROFILE.md → contact section
+Output valid markdown exactly as shown below. Do NOT substitute `•` for `-`. Do NOT omit `#`/`##`/`###` prefixes. Do NOT skip blank lines before lists.
 
-SUMMARY
+```markdown
+# [Selected Name]
+[Professional headline — candidate's actual role, from PROFILE.md]  
+[contacts — read from PROFILE.md → contact section]
+
+---
+
+## SUMMARY
+
 [2 paragraphs max. Tailored to this vacancy's pain and requirements.]
 
-EXPERIENCE
+---
 
-[Role Title — exact as in employment records]
+## EXPERIENCE
+
+### [Role Title — exact as in employment records]
 [Company | Dates]
+
 [1–2 paragraphs: what was done, key context — tailored to this vacancy]
+
 Key results:
-• [Concrete outcome or metric]
-• [Concrete outcome or metric]
+
+- [Concrete outcome or metric]
+- [Concrete outcome or metric]
+
+---
 
 [...repeat for all roles, reverse chronological...]
 
-SKILLS                           ← include if relevant to this role type
-[Grouped list of relevant hard and soft skills from PROFILE.md]
+## SKILLS
 
-CERTIFICATIONS                   ← include only if directly relevant; omit otherwise
-[Only real, verifiable — read from PROFILE.md]
+[Grouped list of relevant hard and soft skills from PROFILE.md — include if relevant to this role type]
+
+## CERTIFICATIONS
+
+[Only real, verifiable — read from PROFILE.md. Include only if directly relevant; omit otherwise]
 ```
+
+**Formatting rules (mandatory):**
+- `# Name` — H1 for candidate name (one per CV)
+- `[Headline]  ` — **two trailing spaces** after headline → line break before contacts
+- `## SECTION` — H2 for SUMMARY / EXPERIENCE / SKILLS / CERTIFICATIONS
+- `### Role Title` — H3 for each job role title
+- `Key results:` followed by **blank line**, then `- item` list (NOT `•`)
+- `---` between each job entry
 
 **Headline:** use candidate's professional title as stated in PROFILE.md. Adjust only if role clearly targets a different function (e.g. candidate is EA/PA applying to Operations role → "Operations & Administrative Professional").
 
