@@ -404,7 +404,7 @@ async def update_vacancy_warnings(vacancy_id: int, warnings: str) -> None:
 
 async def update_vacancy_status(vacancy_id: int, status: str) -> None:
     """Update vacancy status and bump updated_at."""
-    log.info("DB: vacancy #%d status → %s", vacancy_id, status)
+    log.info("DB: vacancy #%d status -> %s", vacancy_id, status)
     async with get_db() as db:
         await db.execute(
             """

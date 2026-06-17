@@ -67,11 +67,14 @@ def _pid_alive(pid: int) -> bool:
     # Windows fallback via ctypes
     try:
         import ctypes
+        STILL_ACTIVE = 259
         handle = ctypes.windll.kernel32.OpenProcess(0x1000, False, pid)
         if handle == 0:
             return False
+        exit_code = ctypes.c_ulong(0)
+        ctypes.windll.kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code))
         ctypes.windll.kernel32.CloseHandle(handle)
-        return True
+        return exit_code.value == STILL_ACTIVE
     except Exception:
         pass
     # POSIX fallback
@@ -406,7 +409,6 @@ async def deliver_one(
         await post_to_career_agent(session, career_agent_url, link, j["title"], feed_name, user_id)
         delivery["status"] = "sent"
         delivery["last_error"] = None
-        log.info("[WEBHOOK] user=%d ← %s → OK", user_id, j["title"][:80])
         return True
     except Exception as e:
         err = str(e)[:300]
@@ -500,14 +502,15 @@ async def check_feed(
 
     notified = 0
     for j in new_jobs:
-        log.info("[%s] NEW: %s", feed["name"], j["title"])
-        log.info("  %s", j["link"])
         results = await asyncio.gather(
             *[deliver_one(session, j["link"], j, feed["name"], uid, career_agent_url, state, now)
               for uid in feed["user_ids"]],
             return_exceptions=True,
         )
-        if any(r is True for r in results):
+        sent = [feed["user_ids"][i] for i, r in enumerate(results) if r is True]
+        status = f"-> {sent} OK" if sent else "-> FAIL"
+        log.info("[%s] NEW: %s | %s | %s", feed["name"], j["title"], j["link"], status)
+        if sent:
             notified += 1
     return notified
 

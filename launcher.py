@@ -21,13 +21,16 @@ PY = str(ROOT / ".venv" / "Scripts" / "python.exe")
 LOGS_DIR = ROOT / "logs"
 LOGS_DIR.mkdir(exist_ok=True)
 
+_ENV = os.environ.copy()
+_ENV["PYTHONIOENCODING"] = "utf-8"
+
 # Lines containing these tokens are always shown in terminal (all services).
 _CRITICAL_TOKENS = ("ERROR", "CRITICAL", "Traceback", "Exception", "exited unexpectedly")
 
 SERVICES = [
     {
         "name": "Tracker  :8080",
-        "cmd": [PY, "-m", "uvicorn", "web.api:app", "--port", "8080", "--reload"],
+        "cmd": [PY, "-m", "uvicorn", "web.api:app", "--port", "8080"],
         "cwd": ROOT,
         "ready": "Application startup complete",
         "log": "tracker.log",
@@ -111,6 +114,7 @@ def start(svc: dict) -> subprocess.Popen:
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+        env=_ENV,
     )
     with _lock:
         processes.append(proc)
@@ -137,9 +141,14 @@ def shutdown(*_):
     with _lock:
         for p in processes:
             try:
-                p.terminate()
+                # CTRL_BREAK_EVENT allows Python finally/atexit to run (releases locks etc.)
+                p.send_signal(signal.CTRL_BREAK_EVENT)
             except Exception:
-                pass
+                try:
+                    p.terminate()
+                except Exception:
+                    pass
+    time.sleep(2)
     sys.exit(0)
 
 
@@ -157,11 +166,17 @@ print("\n" + "=" * 50)
 print("  All services running.  Ctrl+C to stop.")
 print("=" * 50 + "\n")
 
+reported_dead: set[int] = set()
+
 try:
     while True:
         time.sleep(2)
-        dead = [p for p in processes if p.poll() is not None]
-        if dead:
-            print(f"[!] {len(dead)} service(s) exited unexpectedly", flush=True)
+        for svc, proc in zip(SERVICES, processes):
+            if proc.pid in reported_dead:
+                continue
+            rc = proc.poll()
+            if rc is not None:
+                print(f"[!] [{svc['name'].strip()}] exited (code {rc})", flush=True)
+                reported_dead.add(proc.pid)
 except KeyboardInterrupt:
     shutdown()
