@@ -9,6 +9,7 @@ Run:
 """
 
 import logging
+import re
 from urllib.parse import urlparse
 
 import html2text
@@ -34,6 +35,7 @@ class ParsedDocument(BaseModel):
     title: str
     markdown: str
     source_url: str
+    company: str | None = None
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -56,7 +58,32 @@ def _to_markdown(html_str: str) -> str:
     return h.handle(html_str)
 
 
-def _parse_html(html: str, url: str, site_key: str | None) -> tuple[str, str]:
+def _extract_company(url: str, soup: BeautifulSoup, site_key: str | None, title: str) -> str | None:
+    """Extract employer/company name from page. Returns None if unavailable."""
+    # DOU: company slug always present in URL path /companies/{slug}/vacancies/...
+    if site_key == "jobs.dou.ua":
+        m = re.search(r"/companies/([^/]+)/", url)
+        if m:
+            return m.group(1).replace("-", " ").title()
+
+    # Djinni: page <title> is typically "Job Title — Company | Джинні"
+    if site_key == "djinni.co":
+        title_tag = soup.find("title")
+        if title_tag:
+            page_title = title_tag.get_text(strip=True)
+            # Strip "| Джинні" / "| Djinni" suffix
+            page_title = re.sub(r"\s*\|\s*(Джинні|Djinni)\s*$", "", page_title, flags=re.IGNORECASE).strip()
+            # If page title starts with job title, the remainder is the company
+            if title and page_title.lower().startswith(title.lower()):
+                rest = page_title[len(title):].strip()
+                rest = re.sub(r"^[\s\-—|]+", "", rest).strip()
+                if rest:
+                    return rest
+
+    return None
+
+
+def _parse_html(html: str, url: str, site_key: str | None) -> tuple[str, str, str | None]:
     soup = BeautifulSoup(html, "lxml")
 
     h1 = soup.find("h1")
@@ -66,6 +93,8 @@ def _parse_html(html: str, url: str, site_key: str | None) -> tuple[str, str]:
         else title_tag.get_text(strip=True) if title_tag
         else "Untitled"
     )
+
+    company = _extract_company(url, soup, site_key, title)
 
     if site_key and site_key in SITES:
         cfg = SITES[site_key]
@@ -85,7 +114,7 @@ def _parse_html(html: str, url: str, site_key: str | None) -> tuple[str, str]:
                 el.decompose()
 
     markdown = _to_markdown(str(content)).strip()
-    return title, markdown
+    return title, markdown, company
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
@@ -106,7 +135,7 @@ def parse(req: ParseRequest) -> ParsedDocument:
         )
 
     site_key = _match_site_key(req.url)
-    title, markdown = _parse_html(resp.text, req.url, site_key)
+    title, markdown, company = _parse_html(resp.text, req.url, site_key)
 
     if not markdown:
         raise HTTPException(
@@ -114,4 +143,4 @@ def parse(req: ParseRequest) -> ParsedDocument:
             detail={"error": "parse_failed", "url": req.url},
         )
 
-    return ParsedDocument(title=title, markdown=markdown, source_url=req.url)
+    return ParsedDocument(title=title, markdown=markdown, source_url=req.url, company=company)

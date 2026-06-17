@@ -16,10 +16,7 @@ Usage (by PydanticAI Agent, not called directly):
 
 import logging
 import re
-import sqlite3
 import time
-from datetime import datetime
-from pathlib import Path
 from urllib.parse import urlparse
 
 from pydantic_ai import RunContext
@@ -69,9 +66,34 @@ async def cv_fetch_jd(ctx: RunContext[AgentDeps], url: str) -> str:
     if doc.is_empty:
         return "⚠️ Страница получена, но не удалось извлечь текст. Попробуй другой URL."
 
-    # ── Build filesystem path ─────────────────────────────────────────────────
     site = _detect_site(url)
-    folder_name = _safe_folder_name(doc.title) if doc.title else _url_slug(url)
+
+    # ── Get vacancy_id before folder creation (needed for folder name) ────────
+    if existing and existing["status"] in ("queued", "fetching"):
+        vacancy_id = existing["id"]
+        log.info("cv_fetch_jd: updating queued vacancy_id=%d", vacancy_id)
+    else:
+        try:
+            vacancy_id = await database.insert_vacancy(
+                url=url,
+                title=doc.title,
+                site=site,
+                user_id=ctx.deps.user_id,
+            )
+        except Exception as exc:
+            log.warning("cv_fetch_jd: insert failed (%s), fetching existing", exc)
+            existing = await database.get_vacancy_by_url(url)
+            vacancy_id = existing["id"] if existing else None
+
+    # ── Build filesystem path ─────────────────────────────────────────────────
+    company = doc.company
+    if company and doc.title and company.lower() not in doc.title.lower():
+        display_name = f"{doc.title} — {company}"
+    else:
+        display_name = doc.title or _url_slug(url)
+
+    id_prefix = f"{vacancy_id} — " if vacancy_id else ""
+    folder_name = _safe_folder_name(f"{id_prefix}{display_name}")
 
     vacancy_dir = ctx.deps.vacancies_path / "inbox" / str(ctx.deps.user_id) / folder_name
     vacancy_dir.mkdir(parents=True, exist_ok=True)
@@ -83,34 +105,16 @@ async def cv_fetch_jd(ctx: RunContext[AgentDeps], url: str) -> str:
     )
     log.info("cv_fetch_jd: saved JD.md → %s", jd_path)
 
-    # ── Insert or update DB record ────────────────────────────────────────────
+    # ── Update DB with final path and parsed fields ───────────────────────────
     markdown_path = str(jd_path)
     if existing and existing["status"] in ("queued", "fetching"):
-        # Webhook pre-created the vacancy — update fields, then mark fetched
-        vacancy_id = existing["id"]
         await database.update_vacancy_fields(
-            vacancy_id,
-            title=doc.title,
-            site=site,
-            markdown_path=markdown_path,
+            vacancy_id, title=doc.title, site=site, markdown_path=markdown_path,
         )
-        log.info("cv_fetch_jd: updated vacancy_id=%d (was %s)", vacancy_id, existing["status"])
     else:
-        try:
-            vacancy_id = await database.insert_vacancy(
-                url=url,
-                title=doc.title,
-                site=site,
-                markdown_path=markdown_path,
-                user_id=ctx.deps.user_id,
-            )
-        except Exception as exc:
-            # Concurrent insert race — fetch existing
-            log.warning("cv_fetch_jd: insert failed (%s), fetching existing", exc)
-            existing = await database.get_vacancy_by_url(url)
-            vacancy_id = existing["id"] if existing else None
+        await database.update_vacancy_fields(vacancy_id, markdown_path=markdown_path)
 
-    log.info("cv_fetch_jd: vacancy_id=%s title=%r", vacancy_id, doc.title)
+    log.info("cv_fetch_jd: vacancy_id=%s title=%r company=%r", vacancy_id, doc.title, company)
 
     return (
         f"✅ Вакансия сохранена!\n\n"
