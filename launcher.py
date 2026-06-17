@@ -2,6 +2,9 @@
 Career Agent — single-window launcher.
 Starts all services sequentially, waits for each to report ready before starting next.
 Ctrl+C stops everything.
+
+Terminal shows: ERROR/CRITICAL from all services + full job-monitor output.
+Full logs written per-service to logs/<name>.log.
 """
 
 import subprocess
@@ -10,10 +13,16 @@ import threading
 import signal
 import time
 import os
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 ROOT = Path(__file__).parent
 PY = str(ROOT / ".venv" / "Scripts" / "python.exe")
+LOGS_DIR = ROOT / "logs"
+LOGS_DIR.mkdir(exist_ok=True)
+
+# Lines containing these tokens are always shown in terminal (all services).
+_CRITICAL_TOKENS = ("ERROR", "CRITICAL", "Traceback", "Exception", "exited unexpectedly")
 
 SERVICES = [
     {
@@ -21,30 +30,40 @@ SERVICES = [
         "cmd": [PY, "-m", "uvicorn", "web.api:app", "--port", "8080", "--reload"],
         "cwd": ROOT,
         "ready": "Application startup complete",
+        "log": "tracker.log",
+        "verbose": False,
     },
     {
         "name": "PDF      :8002",
         "cmd": [PY, "-m", "uvicorn", "app:app", "--port", "8002"],
         "cwd": ROOT / "services" / "pdf",
         "ready": "Application startup complete",
+        "log": "pdf.log",
+        "verbose": False,
     },
     {
         "name": "Parser   :8001",
         "cmd": [PY, "-m", "uvicorn", "app:app", "--port", "8001"],
         "cwd": ROOT / "services" / "parser",
         "ready": "Application startup complete",
+        "log": "parser.log",
+        "verbose": False,
     },
     {
         "name": "Monitor",
         "cmd": [PY, str(ROOT / "services" / "job-monitor" / "monitor.py")],
         "cwd": ROOT,
         "ready": "Watching for new listings",
+        "log": "monitor.log",
+        "verbose": True,  # all monitor output → terminal
     },
     {
         "name": "Bot",
         "cmd": [PY, str(ROOT / "agent.py")],
         "cwd": ROOT,
         "ready": "career-agent starting",
+        "log": "bot.log",
+        "verbose": False,
     },
 ]
 
@@ -52,10 +71,34 @@ processes: list[subprocess.Popen] = []
 _lock = threading.Lock()
 
 
-def stream(proc: subprocess.Popen, label: str, ready_event: threading.Event | None, ready_signal: str | None) -> None:
+def _make_file_logger(log_name: str) -> RotatingFileHandler:
+    handler = RotatingFileHandler(
+        LOGS_DIR / log_name, maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"
+    )
+    return handler
+
+
+def _should_print(line: str, verbose: bool) -> bool:
+    if verbose:
+        return True
+    return any(tok in line for tok in _CRITICAL_TOKENS)
+
+
+def stream(
+    proc: subprocess.Popen,
+    label: str,
+    ready_event: threading.Event | None,
+    ready_signal: str | None,
+    log_name: str,
+    verbose: bool,
+) -> None:
+    handler = _make_file_logger(log_name)
     for raw in iter(proc.stdout.readline, b""):
         line = raw.decode("utf-8", errors="replace").rstrip()
-        print(f"  [{label}] {line}", flush=True)
+        handler.stream.write(f"[{label}] {line}\n")
+        handler.stream.flush()
+        if _should_print(line, verbose):
+            print(f"  [{label}] {line}", flush=True)
         if ready_event and not ready_event.is_set() and ready_signal and ready_signal in line:
             ready_event.set()
 
@@ -73,7 +116,11 @@ def start(svc: dict) -> subprocess.Popen:
         processes.append(proc)
 
     ready_event = threading.Event() if svc["ready"] else None
-    t = threading.Thread(target=stream, args=(proc, label, ready_event, svc["ready"]), daemon=True)
+    t = threading.Thread(
+        target=stream,
+        args=(proc, label, ready_event, svc["ready"], svc["log"], svc["verbose"]),
+        daemon=True,
+    )
     t.start()
 
     if ready_event:
