@@ -45,8 +45,17 @@ def test_claude_provider_satisfies_protocol():
     assert isinstance(provider, LLMClient)
 
 
+FAKE_OLLAMA_URL = "http://localhost:11434"
+FAKE_OLLAMA_MODEL = "qwen2.5:32b"
+
+
+def _make_ollama(**kwargs) -> OllamaProvider:
+    defaults = dict(base_url=FAKE_OLLAMA_URL, model=FAKE_OLLAMA_MODEL, profile_md=FAKE_PROFILE)
+    return OllamaProvider(**(defaults | kwargs))
+
+
 def test_ollama_provider_satisfies_protocol():
-    assert isinstance(OllamaProvider(), LLMClient)
+    assert isinstance(_make_ollama(), LLMClient)
 
 
 # ── ClaudeProvider — happy path ───────────────────────────────────────────────
@@ -162,12 +171,61 @@ async def test_empty_content_raises_llm_error():
 # ── OllamaProvider ────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_ollama_raises_llm_unavailable():
-    with pytest.raises(LLMUnavailableError, match="stub"):
-        await OllamaProvider().complete("test")
+async def test_ollama_complete_returns_text():
+    provider = _make_ollama()
+    fake_resp = MagicMock()
+    fake_resp.json.return_value = {"message": {"content": "Analysis result"}}
+    fake_resp.raise_for_status = MagicMock()
+
+    with patch("httpx.AsyncClient") as mock_client_cls:
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.post = AsyncMock(return_value=fake_resp)
+        mock_client_cls.return_value = mock_client
+
+        result = await provider.complete("Analyse this JD", system="Phase 1 prompt")
+
+    assert result == "Analysis result"
+    payload = mock_client.post.call_args.kwargs["json"]
+    assert payload["model"] == FAKE_OLLAMA_MODEL
+    assert payload["stream"] is False
+    messages = payload["messages"]
+    assert messages[0]["role"] == "system"
+    assert FAKE_PROFILE in messages[0]["content"]
+    assert "Phase 1 prompt" in messages[0]["content"]
+    assert messages[1] == {"role": "user", "content": "Analyse this JD"}
 
 
 @pytest.mark.asyncio
-async def test_ollama_raises_with_system():
-    with pytest.raises(LLMUnavailableError):
-        await OllamaProvider().complete("test", system="phase1")
+async def test_ollama_connect_error_raises_unavailable():
+    import httpx
+    provider = _make_ollama()
+
+    with patch("httpx.AsyncClient") as mock_client_cls:
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.post = AsyncMock(side_effect=httpx.ConnectError("refused"))
+        mock_client_cls.return_value = mock_client
+
+        with pytest.raises(LLMUnavailableError, match="unreachable"):
+            await provider.complete("test")
+
+
+@pytest.mark.asyncio
+async def test_ollama_empty_response_raises_llm_error():
+    provider = _make_ollama()
+    fake_resp = MagicMock()
+    fake_resp.json.return_value = {"message": {"content": ""}}
+    fake_resp.raise_for_status = MagicMock()
+
+    with patch("httpx.AsyncClient") as mock_client_cls:
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.post = AsyncMock(return_value=fake_resp)
+        mock_client_cls.return_value = mock_client
+
+        with pytest.raises(LLMError, match="empty"):
+            await provider.complete("test")
