@@ -58,32 +58,54 @@ User will provide:
 
 ## CV Structure
 
-```
-[Selected Name]
-[Headline]
-[contacts line from PROFILE.md → ## Contacts — copy verbatim]
+Output valid markdown exactly as shown below. Do NOT substitute `•` for `-`. Do NOT omit `#`/`##`/`###` prefixes. Do NOT skip blank lines before lists.
 
-> **Contacts line: copy verbatim from PROFILE.md → ## Contacts.** Never add GitHub here (see rule 14). Same line for English and Ukrainian CVs.
+```markdown
+# [Selected Name]
+[Headline]  
+[contacts line — copy verbatim from PROFILE.md → ## Contacts]
 
-SUMMARY
+---
+
+## SUMMARY
+
 [2 paragraphs max. Full-arc positioning tailored to this vacancy.]
 [AI tooling paragraph — include when vacancy has AI/product/digital signal; omit if vacancy is for AI product owner]
 
-EXPERIENCE
+---
 
-[Role Title — exact as in employment records]
+## EXPERIENCE
+
+### [Role Title — exact as in employment records]
 [Company | Dates]
+
 [1–2 paragraphs: what was done, key decisions, context — tailored to this vacancy's pain]
+
 Key results:
-• [Metric/outcome]
-• [Metric/outcome]
+
+- [Metric/outcome]
+- [Metric/outcome]
+
+---
 
 [...repeat for all roles, reverse chronological, default cutoff 2017...]
 
-CERTIFICATIONS
+---
+
+## CERTIFICATIONS
+
 Certified AI-Empowered SAFe® Product Owner/Product Manager
 [Add AI certs only if vacancy explicitly focuses on AI product ownership]
 ```
+
+**Formatting rules (mandatory):**
+- `# Name` — H1 for candidate name (one per CV)
+- `[Headline]  ` — **two trailing spaces** after headline → line break before contacts
+- `## SECTION` — H2 for SUMMARY / EXPERIENCE / CERTIFICATIONS
+- `### Role Title` — H3 for each job role title
+- `Key results:` followed by **blank line**, then `- item` list (NOT `•`)
+- `---` between each job entry (rule 17)
+- Contacts: copy verbatim from PROFILE.md → `## Contacts`. Never add GitHub (rule 14).
 
 **Headline options:**
 - Default: `Product Owner / Product Manager`
