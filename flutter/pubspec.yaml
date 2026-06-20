@@ -23,8 +23,8 @@ dependencies:
   # Markdown rendering
   flutter_markdown: ^0.7.6
 
-  # Desktop notifications
-  flutter_local_notifications: ^18.0.1
+  # Desktop notifications (Windows/macOS/Linux)
+  local_notifier: ^0.1.6
 
   # Date formatting
   intl: ^0.20.2
