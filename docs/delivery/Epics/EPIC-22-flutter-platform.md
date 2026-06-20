@@ -82,7 +82,7 @@ So that I spend time only on decision-making and CV review, not on triggering pi
 | A4 | `asyncio.Semaphore(RSS_CONCURRENCY)` in RSSWatcher; guards cv_fetch_jd after notification | ✅ Done | 2026-06-20 |
 | A5a | Web Push: `POST /api/push/subscribe` + `send_push()` utility — for future web/mobile target | 🟡 Next | — |
 | A5b | Desktop notification: Flutter polls `GET /api/vacancies?status=analyzed&since=X` → `flutter_local_notifications` fires system tray alert — Flutter-side only, no new backend endpoint | 🟡 Next | B3 |
-| A6 | Logic test on `gemma4:31b-cloud` — validate full data flow (fetch→P1→P2→notify), free | 🟢 Planned | — |
+| A6 | ~~Logic test on gemma4:31b-cloud~~ → **absorbed by B4** (auto-pipeline orchestrator test covers this) | ➡️ → B4 | B4 |
 | A7 | Quality run Haiku P1 + Haiku P2 — both phases confirmed as production choice | ✅ Done | 2026-06-20 |
 
 **A5a note:** Web Push requires HTTPS — not needed for Desktop MVP. Implement now (small, reusable) to unblock future web/mobile target.
