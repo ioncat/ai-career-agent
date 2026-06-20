@@ -117,6 +117,30 @@ class RSSWatcher:
             if isinstance(exc, Exception):
                 log.error("RSSWatcher: failed %s: %s", row["url"], exc)
 
+    async def _push_result(self, vacancy_id: int) -> None:
+        """Send Web Push notification with fit result after Phase 1+2 completes."""
+        from contracts.pipeline import AnalysisJson
+        from core.push import send_push
+
+        try:
+            row = await database.get_vacancy_by_id(vacancy_id)
+            if not row:
+                return
+            aj_str = row["analysis_json"] if "analysis_json" in row.keys() else None
+            aj = AnalysisJson.model_validate_json(aj_str or "{}")
+            if not aj.p2:
+                return
+            title = row["title"] or f"Vacancy #{vacancy_id}"
+            fit   = aj.p2.fit_score
+            label = aj.p2.recommendation_label
+            await send_push(
+                user_id=self._deps.user_id,
+                title=f"✅ {title}",
+                body=f"Fit {fit}/10 · {label}",
+            )
+        except Exception as exc:
+            log.warning("RSSWatcher: push failed for v#%d: %s", vacancy_id, exc)
+
     @staticmethod
     def _source_label(url: str) -> str:
         from urllib.parse import urlparse
@@ -130,12 +154,14 @@ class RSSWatcher:
         return netloc
 
     async def _process(self, url: str, rss_title: str = "") -> None:
-        """Notify Telegram immediately, then fetch/parse the JD in background.
+        """Notify Telegram immediately, then fetch JD + run Phase 1+2 in background.
 
-        Notification is always sent first — independent of parser availability.
-        Parse failures are logged but not surfaced to the user (they already have the URL).
+        Notification fires first — user sees vacancy before parsing starts.
+        Under semaphore: fetch JD → Phase 1+2 analysis → save analysis_json → Web Push.
+        Any failure is logged but does not crash the poll loop.
         """
-        from tools.cv_fetch_jd import cv_fetch_jd  # local import to avoid circular
+        from tools.cv_analyze import cv_analyze  # local import to avoid circular
+        from tools.cv_fetch_jd import fetch_jd
 
         source = self._source_label(url)
         display = rss_title or url
@@ -150,11 +176,27 @@ class RSSWatcher:
             f'📌 <a href="{url}">{display}</a>'
         )
 
-        # Parse JD — semaphore limits concurrent parser+LLM calls
+        # Fetch + Analyze — semaphore limits concurrent parser+LLM load
         log.info("RSSWatcher: fetching JD - %s", url)
         ctx = _Ctx(deps=self._deps)
         async with self._sem:
+            # Step 1: fetch JD → vacancy_id
             try:
-                await cv_fetch_jd(ctx, url)  # type: ignore[arg-type]
+                vacancy_id = await fetch_jd(self._deps, url)
             except Exception as exc:
-                log.error("RSSWatcher: failed to fetch JD %s: %s", url, exc)
+                log.error("RSSWatcher: fetch failed %s: %s", url, exc)
+                return
+
+            # Step 2: Phase 1+2 analysis → saves JD_analysis.md + analysis_json
+            try:
+                await cv_analyze(ctx, vacancy_id)  # type: ignore[arg-type]
+                log.info("RSSWatcher: analysis done — vacancy_id=%d", vacancy_id)
+            except Exception as exc:
+                log.error("RSSWatcher: analysis failed v#%d: %s", vacancy_id, exc)
+                return
+
+            # Step 3: Web Push with fit result (non-fatal if push fails)
+            try:
+                await self._push_result(vacancy_id)
+            except Exception as exc:
+                log.warning("RSSWatcher: push_result error v#%d: %s", vacancy_id, exc)
