@@ -455,11 +455,14 @@ async def list_vacancies(
     status: str | None = None,
     user_id: int | None = None,
     limit: int = 50,
+    since: str | None = None,
 ) -> list[aiosqlite.Row]:
     """Return vacancies ordered by created_at desc. Optionally filter by status and/or user_id.
 
     user_id=None → return all users (admin/unfiltered view).
     user_id=N    → return only vacancies belonging to that user.
+    since: ISO 8601 datetime string — return only rows where updated_at >= since.
+           Used by Flutter polling (A5b): GET /api/vacancies?status=analyzed&since=X.
     """
     async with get_db() as db:
         conditions: list[str] = []
@@ -471,6 +474,9 @@ async def list_vacancies(
         if user_id is not None:
             conditions.append("user_id = ?")
             params.append(user_id)
+        if since is not None:
+            conditions.append("updated_at >= ?")
+            params.append(since)
 
         where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
         params.append(limit)

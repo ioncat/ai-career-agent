@@ -26,6 +26,7 @@ try:
 except ImportError:
     pass
 
+from contracts.pipeline import AnalysisJson
 from db import database
 from web.reader import build_vacancy_view
 
@@ -41,7 +42,9 @@ _TEMPLATES.env.filters["markdown"] = lambda text: md_lib.markdown(
 )
 
 
-_VAPID_PUBLIC_KEY = os.getenv("VAPID_PUBLIC_KEY", "")
+# Read at request time (not import time) so test fixtures can set env vars reliably.
+def _vapid_public_key() -> str:
+    return os.getenv("VAPID_PUBLIC_KEY", "")
 
 
 @asynccontextmanager
@@ -90,14 +93,53 @@ async def tracker_page(
     )
 
 
+def _parse_analysis_summary(analysis_json_str: str | None) -> dict:
+    """Extract list-card fields from analysis_json for GET /api/vacancies response.
+
+    Flutter vacancy list cards need: fit_score, recommendation, recommendation_label,
+    vacancy_score, key_barriers, warnings. These live in p2/p1 of analysis_json.
+    Returns partial dict — missing keys absent when phase not yet run.
+    """
+    if not analysis_json_str:
+        return {}
+    try:
+        aj = AnalysisJson.model_validate_json(analysis_json_str)
+    except Exception:
+        return {}
+    out: dict = {}
+    if aj.p2:
+        out["fit_score"] = aj.p2.fit_score
+        out["recommendation"] = aj.p2.recommendation
+        out["recommendation_label"] = aj.p2.recommendation_label
+        out["key_barriers"] = aj.p2.key_barriers
+        out["warnings"] = aj.p2.warnings
+    if aj.p1:
+        out["vacancy_score"] = aj.p1.vacancy_score
+        out["primary_archetype"] = aj.p1.primary_archetype
+    return out
+
+
 @app.get("/api/vacancies")
 async def api_vacancies(
     status: str | None = None,
     user_id: int | None = None,
+    since: str | None = None,
     limit: int = 200,
 ):
-    rows = await database.list_vacancies(status=status, user_id=user_id, limit=limit)
-    return [dict(row) for row in rows]
+    """List vacancies with parsed analysis fields for Flutter list cards.
+
+    since: ISO 8601 datetime (e.g. 2026-06-20T12:00:00) — returns only rows
+           updated after this timestamp. Used by Flutter polling (A5b).
+    """
+    rows = await database.list_vacancies(status=status, user_id=user_id, since=since, limit=limit)
+    result = []
+    for row in rows:
+        item = dict(row)
+        item["applied"] = bool(item.get("applied"))
+        item["starred"] = bool(item.get("starred"))
+        item.update(_parse_analysis_summary(item.pop("analysis_json", None)))
+        result.append(item)
+    return result
 
 
 @app.get("/api/users")
@@ -292,9 +334,63 @@ async def api_push_unsubscribe(endpoint: str):
 @app.get("/api/push/vapid-public-key")
 async def api_vapid_public_key():
     """Return VAPID public key for browser PushManager.subscribe() applicationServerKey."""
-    if not _VAPID_PUBLIC_KEY:
+    key = _vapid_public_key()
+    if not key:
         raise HTTPException(status_code=503, detail="Web Push not configured — set VAPID_PUBLIC_KEY")
-    return {"publicKey": _VAPID_PUBLIC_KEY}
+    return {"publicKey": key}
+
+
+@app.get("/api/vacancies/{vacancy_id}/analysis")
+async def api_vacancy_analysis(vacancy_id: int):
+    """Return full AnalysisJson for a vacancy (Flutter detail screen).
+
+    Parses vacancies.analysis_json into structured Pydantic model.
+    Returns empty object {} when analysis not yet run (phase keys absent).
+    404 when vacancy_id not found.
+    """
+    row = await database.get_vacancy_by_id(vacancy_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Vacancy not found")
+    aj_str = row["analysis_json"] if "analysis_json" in row.keys() else None
+    try:
+        aj = AnalysisJson.model_validate_json(aj_str or "{}")
+    except Exception:
+        aj = AnalysisJson()
+    return aj.model_dump(exclude_none=True)
+
+
+@app.get("/api/vacancies/{vacancy_id}/cv")
+async def api_vacancy_cv(vacancy_id: int):
+    """Return CV and cover markdown for a vacancy (Flutter CV preview + PDF download trigger).
+
+    Searches vacancy folder for *_CV.md and Cover.md files.
+    markdown_path column points to JD.md; CV/Cover files are siblings in the same folder.
+    Returns {"cv_md": "...", "cover_md": "..."} — missing keys absent if not yet generated.
+    404 when vacancy_id not found.
+    """
+    row = await database.get_vacancy_by_id(vacancy_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Vacancy not found")
+
+    md_path = row["markdown_path"] if "markdown_path" in row.keys() else None
+    if not md_path:
+        return {}
+
+    folder = (_PROJECT_ROOT / md_path).parent
+    if not folder.exists():
+        return {}
+
+    result: dict = {}
+
+    cv_files = sorted(folder.glob("*_CV.md"))
+    if cv_files:
+        result["cv_md"] = cv_files[-1].read_text(encoding="utf-8")
+
+    cover = folder / "Cover.md"
+    if cover.exists():
+        result["cover_md"] = cover.read_text(encoding="utf-8")
+
+    return result
 
 
 @app.get("/api/vacancies/{vacancy_id}")
