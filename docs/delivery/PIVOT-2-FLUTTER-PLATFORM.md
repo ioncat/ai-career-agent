@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-20
 **Status:** Active — Architecture decided, sequencing confirmed
-**Scope:** Full UI migration to Flutter Web; Telegram removed entirely; pipeline structuring (JSON contracts + deterministic split)
+**Scope:** Flutter Windows Desktop as primary target; Telegram removed entirely; pipeline structuring (JSON contracts + deterministic split)
 
 ---
 
@@ -11,7 +11,7 @@
 Original pivot (2026-05-31) established Career Agent as a focused vertical service for PdM/PO/PM job search, with Telegram as primary UI. After running the pipeline end-to-end and testing models, three facts became clear:
 
 1. **Telegram is removed entirely.** Friction-heavy for interactive use, splits attention between two clients, no competitive advantage. Flutter = the only client.
-2. **Flutter Web first, mobile later.** All logic and UX on Flutter Web. Mobile = repackage when needed — no code rewrite, no App Store overhead now. Web Push API handles browser notifications.
+2. **Flutter Windows Desktop first, Web/Mobile later.** Same Flutter codebase runs on all targets — Desktop is `flutter build windows`, no code rewrite. Desktop chosen because: no HTTPS requirement, no hosting, FastAPI runs localhost, system tray notifications via `flutter_local_notifications`. Web Push implemented in parallel (A5) for future web/mobile use.
 3. **Pipeline must emit JSON, not markdown blobs.** LLM output fed to UI requires structured data. Prerequisite for EPIC-21 (deterministic/cognitive split).
 
 ---
@@ -376,4 +376,11 @@ Tested on vacancy #120 (Product Owner — iSpeedtoLead, $1800–4500, remote). S
 
 - [ ] Flutter experience level — affects Phase C estimation
 - [ ] Auth model in Flutter app (no auth on current web tracker)
-- [ ] Web Push: HTTPS required — hosting decision needed before Phase A item 5
+- [ ] Web Push: HTTPS required — needed only for web/mobile target (not Desktop). Deferred until after Desktop MVP.
+
+## Platform Decision Log
+
+| Date | Decision |
+|------|---------|
+| 2026-06-20 | Telegram removed entirely — Flutter = sole client |
+| 2026-06-20 | Flutter Web first → revised to **Flutter Windows Desktop first**. Same codebase, `flutter build windows`. No HTTPS/hosting required. Web Push kept (A5) for future web/mobile target. Desktop uses polling + `flutter_local_notifications` for system tray. Web/Mobile = port later, no rewrite.
