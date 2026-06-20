@@ -1,17 +1,18 @@
 """
-tools/cv_fetch_jd.py — fetch and save a job description from a URL.
+tools/cv_fetch_jd — fetch and save a job description from a URL.
 
 Pipeline step 0: URL → jd-parser → JD.md on disk + vacancy row in SQLite.
 
-Tool registered in agent.py via ToolRegistry.
-Receives shared dependencies via RunContext[AgentDeps].
+Public API:
+  fetch_jd(deps, url) -> int          — core logic; returns vacancy_id; raises FetchError
+  cv_fetch_jd(ctx, url) -> str        — PydanticAI tool wrapper (formats result for agent)
+
+fetch_jd() is called by:
+  - cv_fetch_jd (PydanticAI tool, via agent)
+  - auto-pipeline orchestrator (RSS watcher, no agent involved)
 
 Folder layout:
-    vacancies/inbox/{user_id}/{slug}/JD.md   ← staging area until analyzed
-    vacancies/{user_id}/{Role — Company}/     ← final location after analysis
-
-Usage (by PydanticAI Agent, not called directly):
-    # user sends URL → router calls this tool automatically
+    vacancies/inbox/{user_id}/{id} — {role} — {company}/JD.md
 """
 
 import logging
@@ -28,6 +29,107 @@ from db import database
 log = logging.getLogger(__name__)
 
 
+class FetchError(Exception):
+    """JD fetch failed — network, parser, or filesystem error."""
+
+
+async def fetch_jd(deps: AgentDeps, url: str) -> int:
+    """Fetch JD from URL, save to disk + DB. Returns vacancy_id.
+
+    If URL already in DB (status not queued/fetching), returns its id immediately
+    — no re-fetch. Callers (auto-pipeline) can still run analysis on it.
+
+    If URL is queued or not in DB, fetches from jd-parser, saves JD.md,
+    updates vacancy record.
+
+    Args:
+        deps: AgentDeps (user_id, parser_adapter, vacancies_path).
+        url:  Full job posting URL.
+
+    Returns:
+        vacancy_id (int) — existing or newly inserted.
+
+    Raises:
+        FetchError: Parser failure, empty page, or filesystem error.
+    """
+    url = url.strip()
+    log.info("fetch_jd: url=%r", url)
+
+    # ── Duplicate / queued check ──────────────────────────────────────────────
+    existing = await database.get_vacancy_by_url(url)
+    if existing and existing["status"] not in ("queued", "fetching"):
+        log.info("fetch_jd: already in DB id=%d status=%s", existing["id"], existing["status"])
+        return existing["id"]
+
+    # ── Fetch via jd-parser ───────────────────────────────────────────────────
+    t0 = time.monotonic()
+    try:
+        doc = await deps.parser_adapter.fetch_markdown(url)
+        log.info("fetch_jd: fetch done — %.1fs title=%r", time.monotonic() - t0, doc.title)
+    except ParserError as exc:
+        log.error("fetch_jd: ParserError after %.1fs: %s", time.monotonic() - t0, exc)
+        raise FetchError(f"Не удалось получить вакансию:\n{exc}") from exc
+
+    if doc.is_empty:
+        raise FetchError("Страница получена, но не удалось извлечь текст. Попробуй другой URL.")
+
+    site = _detect_site(url)
+
+    # ── Get or create vacancy_id ──────────────────────────────────────────────
+    if existing and existing["status"] in ("queued", "fetching"):
+        vacancy_id = existing["id"]
+        log.info("fetch_jd: updating queued vacancy_id=%d", vacancy_id)
+    else:
+        try:
+            vacancy_id = await database.insert_vacancy(
+                url=url,
+                title=doc.title,
+                site=site,
+                user_id=deps.user_id,
+            )
+        except Exception as exc:
+            log.warning("fetch_jd: insert failed (%s), refetching existing", exc)
+            row = await database.get_vacancy_by_url(url)
+            if not row:
+                raise FetchError(f"Не удалось сохранить вакансию в БД: {exc}") from exc
+            vacancy_id = row["id"]
+
+    # ── Build filesystem path ─────────────────────────────────────────────────
+    company = doc.company
+    if company and doc.title and company.lower() not in doc.title.lower():
+        display_name = f"{doc.title} — {company}"
+    else:
+        display_name = doc.title or _url_slug(url)
+
+    id_prefix = f"{vacancy_id} — " if vacancy_id else ""
+    folder_name = _safe_folder_name(f"{id_prefix}{display_name}")
+
+    vacancy_dir = deps.vacancies_path / "inbox" / str(deps.user_id) / folder_name
+    try:
+        vacancy_dir.mkdir(parents=True, exist_ok=True)
+        jd_path = vacancy_dir / "JD.md"
+        jd_path.write_text(
+            f"# {doc.title}\n\nSource: {doc.source_url}\n\n---\n\n{doc.markdown}",
+            encoding="utf-8",
+        )
+    except OSError as exc:
+        raise FetchError(f"Не удалось записать JD.md: {exc}") from exc
+
+    log.info("fetch_jd: saved JD.md → %s", jd_path)
+
+    # ── Update DB with final path and parsed fields ───────────────────────────
+    markdown_path = str(jd_path)
+    if existing and existing["status"] in ("queued", "fetching"):
+        await database.update_vacancy_fields(
+            vacancy_id, title=doc.title, site=site, markdown_path=markdown_path,
+        )
+    else:
+        await database.update_vacancy_fields(vacancy_id, markdown_path=markdown_path)
+
+    log.info("fetch_jd: done vacancy_id=%d title=%r", vacancy_id, doc.title)
+    return vacancy_id
+
+
 async def cv_fetch_jd(ctx: RunContext[AgentDeps], url: str) -> str:
     """Fetch and parse a job description from a Djinni, DOU, or LinkedIn URL.
 
@@ -41,86 +143,36 @@ async def cv_fetch_jd(ctx: RunContext[AgentDeps], url: str) -> str:
         Confirmation message with vacancy title and saved path.
     """
     url = url.strip()
-    log.info("cv_fetch_jd: url=%r", url)
 
-    # ── Duplicate check ───────────────────────────────────────────────────────
+    # ── Show "already in DB" message without re-fetching ─────────────────────
     existing = await database.get_vacancy_by_url(url)
     if existing and existing["status"] not in ("queued", "fetching"):
-        log.info("cv_fetch_jd: vacancy already in DB id=%d status=%s", existing["id"], existing["status"])
+        log.info(
+            "cv_fetch_jd: already in DB id=%d status=%s",
+            existing["id"], existing["status"],
+        )
         return (
             f"ℹ️ Вакансия уже в базе.\n"
             f"<b>{existing['title'] or 'Без названия'}</b>\n"
             f"Статус: {existing['status']}"
         )
-    # status='queued'/'fetching' → continue to fetch and fill it
 
-    # ── Fetch via jd-parser ───────────────────────────────────────────────────
-    t0 = time.monotonic()
+    # ── Fetch ─────────────────────────────────────────────────────────────────
     try:
-        doc = await ctx.deps.parser_adapter.fetch_markdown(url)
-        log.info("cv_fetch_jd: fetch done — elapsed=%.1fs title=%r", time.monotonic() - t0, doc.title)
-    except ParserError as exc:
-        log.error("cv_fetch_jd: ParserError after %.1fs: %s", time.monotonic() - t0, exc)
-        return f"⚠️ Не удалось получить вакансию:\n{exc}"
+        vacancy_id = await fetch_jd(ctx.deps, url)
+    except FetchError as exc:
+        return f"⚠️ {exc}"
 
-    if doc.is_empty:
-        return "⚠️ Страница получена, но не удалось извлечь текст. Попробуй другой URL."
-
-    site = _detect_site(url)
-
-    # ── Get vacancy_id before folder creation (needed for folder name) ────────
-    if existing and existing["status"] in ("queued", "fetching"):
-        vacancy_id = existing["id"]
-        log.info("cv_fetch_jd: updating queued vacancy_id=%d", vacancy_id)
-    else:
-        try:
-            vacancy_id = await database.insert_vacancy(
-                url=url,
-                title=doc.title,
-                site=site,
-                user_id=ctx.deps.user_id,
-            )
-        except Exception as exc:
-            log.warning("cv_fetch_jd: insert failed (%s), fetching existing", exc)
-            existing = await database.get_vacancy_by_url(url)
-            vacancy_id = existing["id"] if existing else None
-
-    # ── Build filesystem path ─────────────────────────────────────────────────
-    company = doc.company
-    if company and doc.title and company.lower() not in doc.title.lower():
-        display_name = f"{doc.title} — {company}"
-    else:
-        display_name = doc.title or _url_slug(url)
-
-    id_prefix = f"{vacancy_id} — " if vacancy_id else ""
-    folder_name = _safe_folder_name(f"{id_prefix}{display_name}")
-
-    vacancy_dir = ctx.deps.vacancies_path / "inbox" / str(ctx.deps.user_id) / folder_name
-    vacancy_dir.mkdir(parents=True, exist_ok=True)
-    jd_path = vacancy_dir / "JD.md"
-
-    jd_path.write_text(
-        f"# {doc.title}\n\nSource: {doc.source_url}\n\n---\n\n{doc.markdown}",
-        encoding="utf-8",
-    )
-    log.info("cv_fetch_jd: saved JD.md → %s", jd_path)
-
-    # ── Update DB with final path and parsed fields ───────────────────────────
-    markdown_path = str(jd_path)
-    if existing and existing["status"] in ("queued", "fetching"):
-        await database.update_vacancy_fields(
-            vacancy_id, title=doc.title, site=site, markdown_path=markdown_path,
-        )
-    else:
-        await database.update_vacancy_fields(vacancy_id, markdown_path=markdown_path)
-
-    log.info("cv_fetch_jd: vacancy_id=%s title=%r company=%r", vacancy_id, doc.title, company)
+    # ── Format success message ────────────────────────────────────────────────
+    vacancy = await database.get_vacancy_by_id(vacancy_id)
+    if not vacancy:
+        return f"✅ Вакансия #{vacancy_id} сохранена."
 
     return (
         f"✅ Вакансия сохранена!\n\n"
-        f"<b>{doc.title}</b>\n"
-        f"Сайт: {site} · ID: {vacancy_id}\n"
-        f"Файл: <code>{jd_path}</code>\n\n"
+        f"<b>{vacancy['title'] or 'Без названия'}</b>\n"
+        f"Сайт: {vacancy['site'] or '?'} · ID: {vacancy_id}\n"
+        f"Файл: <code>{vacancy['markdown_path'] or '?'}</code>\n\n"
         f"Запускаем анализ?"
     )
 

@@ -12,19 +12,26 @@ import pytest
 
 from adapters.parser_adapter import ParserError
 from contracts.parsed_document import ParsedDocument
-from tools.cv_fetch_jd import _detect_site, _url_slug, cv_fetch_jd
+from tools.cv_fetch_jd import FetchError, _detect_site, _url_slug, cv_fetch_jd, fetch_jd
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _make_ctx(tmp_path: Path, parser_adapter=None, user_id: int = 1) -> MagicMock:
-    """Build a mock RunContext[AgentDeps]."""
+def _make_deps(tmp_path: Path, parser_adapter=None, user_id: int = 1) -> MagicMock:
+    """Build a mock AgentDeps."""
     if parser_adapter is None:
         parser_adapter = AsyncMock()
+    deps = MagicMock()
+    deps.parser_adapter = parser_adapter
+    deps.vacancies_path = tmp_path / "vacancies"
+    deps.user_id = user_id
+    return deps
+
+
+def _make_ctx(tmp_path: Path, parser_adapter=None, user_id: int = 1) -> MagicMock:
+    """Build a mock RunContext[AgentDeps]."""
     ctx = MagicMock()
-    ctx.deps.parser_adapter = parser_adapter
-    ctx.deps.vacancies_path = tmp_path / "vacancies"
-    ctx.deps.user_id = user_id
+    ctx.deps = _make_deps(tmp_path, parser_adapter, user_id)
     return ctx
 
 
@@ -34,6 +41,25 @@ def _make_doc(title="Backend Dev", markdown="## Job\nGreat role.") -> ParsedDocu
         markdown=markdown,
         source_url="https://djinni.co/jobs/123-backend/",
     )
+
+
+def _vacancy_row(
+    vacancy_id: int = 42,
+    title: str = "Backend Dev",
+    site: str = "djinni",
+    markdown_path: str = "/vacancies/inbox/1/42 — Backend Dev/JD.md",
+    status: str = "fetched",
+) -> MagicMock:
+    row = MagicMock()
+    data = {
+        "id": vacancy_id,
+        "title": title,
+        "site": site,
+        "markdown_path": markdown_path,
+        "status": status,
+    }
+    row.__getitem__ = lambda self, key: data[key]
+    return row
 
 
 # ── _detect_site ──────────────────────────────────────────────────────────────
@@ -68,7 +94,6 @@ def test_url_slug_strips_trailing_slash():
 
 def test_url_slug_sanitizes_chars():
     slug = _url_slug("https://example.com/jobs/My Job (2024)/")
-    # spaces/parens → hyphens, consecutive hyphens collapsed, trailing stripped
     assert slug == "my-job-2024"
 
 
@@ -83,10 +108,113 @@ def test_url_slug_empty_path():
     assert slug == "vacancy"
 
 
-# ── cv_fetch_jd — happy path ──────────────────────────────────────────────────
+# ── fetch_jd — direct call (auto-pipeline path) ───────────────────────────────
 
 @pytest.mark.asyncio
-async def test_fetch_jd_saves_file(tmp_path):
+async def test_fetch_jd_returns_vacancy_id(tmp_path):
+    doc = _make_doc()
+    parser = AsyncMock()
+    parser.fetch_markdown = AsyncMock(return_value=doc)
+    deps = _make_deps(tmp_path, parser)
+
+    with patch("tools.cv_fetch_jd.database") as mock_db:
+        mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
+        mock_db.insert_vacancy = AsyncMock(return_value=77)
+        mock_db.update_vacancy_fields = AsyncMock()
+
+        result = await fetch_jd(deps, "https://djinni.co/jobs/123/")
+
+    assert result == 77
+
+
+@pytest.mark.asyncio
+async def test_fetch_jd_returns_existing_id_for_duplicate(tmp_path):
+    deps = _make_deps(tmp_path)
+    existing = _vacancy_row(vacancy_id=55, status="analyzed")
+
+    with patch("tools.cv_fetch_jd.database") as mock_db:
+        mock_db.get_vacancy_by_url = AsyncMock(return_value=existing)
+
+        result = await fetch_jd(deps, "https://djinni.co/jobs/999/")
+
+    assert result == 55
+    deps.parser_adapter.fetch_markdown.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_fetch_jd_raises_on_parser_error(tmp_path):
+    parser = AsyncMock()
+    parser.fetch_markdown = AsyncMock(
+        side_effect=ParserError("server error", url="https://djinni.co/jobs/1/", status_code=503)
+    )
+    deps = _make_deps(tmp_path, parser)
+
+    with patch("tools.cv_fetch_jd.database") as mock_db:
+        mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
+
+        with pytest.raises(FetchError, match="server error"):
+            await fetch_jd(deps, "https://djinni.co/jobs/1/")
+
+
+@pytest.mark.asyncio
+async def test_fetch_jd_raises_on_empty_markdown(tmp_path):
+    doc = ParsedDocument(title="Job", markdown="   ", source_url="https://djinni.co/jobs/1/")
+    parser = AsyncMock()
+    parser.fetch_markdown = AsyncMock(return_value=doc)
+    deps = _make_deps(tmp_path, parser)
+
+    with patch("tools.cv_fetch_jd.database") as mock_db:
+        mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
+
+        with pytest.raises(FetchError, match="извлечь текст"):
+            await fetch_jd(deps, "https://djinni.co/jobs/1/")
+
+
+@pytest.mark.asyncio
+async def test_fetch_jd_writes_jd_md(tmp_path):
+    doc = _make_doc(title="Python Dev", markdown="## Details\nExcellent.")
+    parser = AsyncMock()
+    parser.fetch_markdown = AsyncMock(return_value=doc)
+    deps = _make_deps(tmp_path, parser)
+
+    with patch("tools.cv_fetch_jd.database") as mock_db:
+        mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
+        mock_db.insert_vacancy = AsyncMock(return_value=5)
+        mock_db.update_vacancy_fields = AsyncMock()
+
+        await fetch_jd(deps, "https://djinni.co/jobs/456/")
+
+    saved = list(deps.vacancies_path.rglob("JD.md"))
+    assert len(saved) == 1
+    content = saved[0].read_text()
+    assert "Python Dev" in content
+    assert "Excellent." in content
+
+
+@pytest.mark.asyncio
+async def test_fetch_jd_processes_queued_vacancy(tmp_path):
+    doc = _make_doc(title="Queued PM Role")
+    parser = AsyncMock()
+    parser.fetch_markdown = AsyncMock(return_value=doc)
+    deps = _make_deps(tmp_path, parser)
+
+    queued = _vacancy_row(vacancy_id=55, status="queued")
+
+    with patch("tools.cv_fetch_jd.database") as mock_db:
+        mock_db.get_vacancy_by_url = AsyncMock(return_value=queued)
+        mock_db.update_vacancy_fields = AsyncMock()
+
+        result = await fetch_jd(deps, "https://djinni.co/jobs/555/")
+
+    assert result == 55
+    mock_db.insert_vacancy.assert_not_called()
+    mock_db.update_vacancy_fields.assert_awaited_once()
+
+
+# ── cv_fetch_jd — PydanticAI tool (string return) ────────────────────────────
+
+@pytest.mark.asyncio
+async def test_cv_fetch_jd_happy_path_returns_string(tmp_path):
     doc = _make_doc()
     parser = AsyncMock()
     parser.fetch_markdown = AsyncMock(return_value=doc)
@@ -96,6 +224,9 @@ async def test_fetch_jd_saves_file(tmp_path):
         mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
         mock_db.insert_vacancy = AsyncMock(return_value=42)
         mock_db.update_vacancy_fields = AsyncMock()
+        mock_db.get_vacancy_by_id = AsyncMock(
+            return_value=_vacancy_row(vacancy_id=42, title="Backend Dev")
+        )
 
         result = await cv_fetch_jd(ctx, "https://djinni.co/jobs/123-backend/")
 
@@ -103,16 +234,9 @@ async def test_fetch_jd_saves_file(tmp_path):
     assert "Backend Dev" in result
     assert "42" in result
 
-    # File actually written
-    saved = list(ctx.deps.vacancies_path.rglob("JD.md"))
-    assert len(saved) == 1
-    content = saved[0].read_text()
-    assert "Backend Dev" in content
-    assert "Great role." in content
-
 
 @pytest.mark.asyncio
-async def test_fetch_jd_correct_folder_structure(tmp_path):
+async def test_cv_fetch_jd_saves_file(tmp_path):
     doc = _make_doc()
     parser = AsyncMock()
     parser.fetch_markdown = AsyncMock(return_value=doc)
@@ -122,19 +246,45 @@ async def test_fetch_jd_correct_folder_structure(tmp_path):
         mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
         mock_db.insert_vacancy = AsyncMock(return_value=1)
         mock_db.update_vacancy_fields = AsyncMock()
+        mock_db.get_vacancy_by_id = AsyncMock(
+            return_value=_vacancy_row(vacancy_id=1, title="Backend Dev")
+        )
+
+        await cv_fetch_jd(ctx, "https://djinni.co/jobs/123-backend/")
+
+    saved = list(ctx.deps.vacancies_path.rglob("JD.md"))
+    assert len(saved) == 1
+    content = saved[0].read_text()
+    assert "Backend Dev" in content
+    assert "Great role." in content
+
+
+@pytest.mark.asyncio
+async def test_cv_fetch_jd_correct_folder_structure(tmp_path):
+    doc = _make_doc()
+    parser = AsyncMock()
+    parser.fetch_markdown = AsyncMock(return_value=doc)
+    ctx = _make_ctx(tmp_path, parser)
+
+    with patch("tools.cv_fetch_jd.database") as mock_db:
+        mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
+        mock_db.insert_vacancy = AsyncMock(return_value=1)
+        mock_db.update_vacancy_fields = AsyncMock()
+        mock_db.get_vacancy_by_id = AsyncMock(
+            return_value=_vacancy_row(vacancy_id=1, title="Backend Dev")
+        )
 
         await cv_fetch_jd(ctx, "https://djinni.co/jobs/123-backend/")
 
     saved = list(ctx.deps.vacancies_path.rglob("JD.md"))
     path_parts = saved[0].parts
-    # path: vacancies/inbox/{user_id}/{id} — {title}/JD.md
     assert "inbox" in path_parts
-    assert "1" in path_parts        # user_id segment
-    assert any("Backend Dev" in p for p in path_parts)  # title in folder name
+    assert "1" in path_parts
+    assert any("Backend Dev" in p for p in path_parts)
 
 
 @pytest.mark.asyncio
-async def test_fetch_jd_calls_db_insert(tmp_path):
+async def test_cv_fetch_jd_calls_db_insert(tmp_path):
     doc = _make_doc(title="Python Dev")
     parser = AsyncMock()
     parser.fetch_markdown = AsyncMock(return_value=doc)
@@ -144,6 +294,9 @@ async def test_fetch_jd_calls_db_insert(tmp_path):
         mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
         mock_db.insert_vacancy = AsyncMock(return_value=5)
         mock_db.update_vacancy_fields = AsyncMock()
+        mock_db.get_vacancy_by_id = AsyncMock(
+            return_value=_vacancy_row(vacancy_id=5, title="Python Dev")
+        )
 
         await cv_fetch_jd(ctx, "https://djinni.co/jobs/456-python/")
 
@@ -155,21 +308,13 @@ async def test_fetch_jd_calls_db_insert(tmp_path):
     assert call_kwargs["user_id"] == 1
 
 
-# ── cv_fetch_jd — duplicate URL ───────────────────────────────────────────────
-
 @pytest.mark.asyncio
-async def test_fetch_jd_duplicate_returns_existing(tmp_path):
+async def test_cv_fetch_jd_duplicate_returns_info_string(tmp_path):
     ctx = _make_ctx(tmp_path)
-    existing_row = MagicMock()
-    existing_row.__getitem__ = lambda self, key: {
-        "id": 7,
-        "title": "Existing Job",
-        "markdown_path": "/vacancies/djinni/2026-05/old/JD.md",
-        "status": "analyzed",
-    }[key]
+    existing = _vacancy_row(vacancy_id=7, title="Existing Job", status="analyzed")
 
     with patch("tools.cv_fetch_jd.database") as mock_db:
-        mock_db.get_vacancy_by_url = AsyncMock(return_value=existing_row)
+        mock_db.get_vacancy_by_url = AsyncMock(return_value=existing)
 
         result = await cv_fetch_jd(ctx, "https://djinni.co/jobs/123/")
 
@@ -178,10 +323,8 @@ async def test_fetch_jd_duplicate_returns_existing(tmp_path):
     ctx.deps.parser_adapter.fetch_markdown.assert_not_called()
 
 
-# ── cv_fetch_jd — parser error ──────────────────────────────────────────────
-
 @pytest.mark.asyncio
-async def test_fetch_jd_parser_error_returns_message(tmp_path):
+async def test_cv_fetch_jd_parser_error_returns_warning(tmp_path):
     parser = AsyncMock()
     parser.fetch_markdown = AsyncMock(
         side_effect=ParserError("fetch failed", url="https://djinni.co/jobs/999/", status_code=503)
@@ -197,10 +340,8 @@ async def test_fetch_jd_parser_error_returns_message(tmp_path):
     assert "fetch failed" in result
 
 
-# ── cv_fetch_jd — empty markdown ─────────────────────────────────────────────
-
 @pytest.mark.asyncio
-async def test_fetch_jd_empty_markdown_returns_warning(tmp_path):
+async def test_cv_fetch_jd_empty_markdown_returns_warning(tmp_path):
     doc = ParsedDocument(title="Job", markdown="   ", source_url="https://djinni.co/jobs/1/")
     parser = AsyncMock()
     parser.fetch_markdown = AsyncMock(return_value=doc)
@@ -215,11 +356,8 @@ async def test_fetch_jd_empty_markdown_returns_warning(tmp_path):
     assert "извлечь текст" in result
 
 
-# ── cv_fetch_jd — user-scoped filesystem path ─────────────────────────────────
-
 @pytest.mark.asyncio
-async def test_fetch_jd_path_scoped_to_user_id(tmp_path):
-    """Vacancy folder must be under vacancies/{user_id}/..."""
+async def test_cv_fetch_jd_path_scoped_to_user_id(tmp_path):
     doc = _make_doc()
     parser = AsyncMock()
     parser.fetch_markdown = AsyncMock(return_value=doc)
@@ -229,20 +367,21 @@ async def test_fetch_jd_path_scoped_to_user_id(tmp_path):
         mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
         mock_db.insert_vacancy = AsyncMock(return_value=10)
         mock_db.update_vacancy_fields = AsyncMock()
+        mock_db.get_vacancy_by_id = AsyncMock(
+            return_value=_vacancy_row(vacancy_id=10, title="Backend Dev")
+        )
 
         await cv_fetch_jd(ctx, "https://djinni.co/jobs/777-senior/")
 
     saved = list(ctx.deps.vacancies_path.rglob("JD.md"))
     assert len(saved) == 1
-    # path: inbox/{user_id}/{slug}/JD.md — first part is "inbox", second is user_id
     relative = saved[0].relative_to(ctx.deps.vacancies_path)
     assert relative.parts[0] == "inbox"
     assert relative.parts[1] == "7"
 
 
 @pytest.mark.asyncio
-async def test_fetch_jd_passes_user_id_to_db(tmp_path):
-    """insert_vacancy must receive user_id from AgentDeps."""
+async def test_cv_fetch_jd_passes_user_id_to_db(tmp_path):
     doc = _make_doc()
     parser = AsyncMock()
     parser.fetch_markdown = AsyncMock(return_value=doc)
@@ -252,6 +391,9 @@ async def test_fetch_jd_passes_user_id_to_db(tmp_path):
         mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
         mock_db.insert_vacancy = AsyncMock(return_value=99)
         mock_db.update_vacancy_fields = AsyncMock()
+        mock_db.get_vacancy_by_id = AsyncMock(
+            return_value=_vacancy_row(vacancy_id=99, title="Backend Dev")
+        )
 
         await cv_fetch_jd(ctx, "https://djinni.co/jobs/999-test/")
 
@@ -259,53 +401,39 @@ async def test_fetch_jd_passes_user_id_to_db(tmp_path):
     assert call_kwargs["user_id"] == 42
 
 
-# ── cv_fetch_jd — queued status (webhook pre-created) ────────────────────────
-
 @pytest.mark.asyncio
-async def test_fetch_jd_processes_queued_vacancy(tmp_path):
-    """When existing vacancy has status='queued', proceed with fetch and update fields."""
+async def test_cv_fetch_jd_queued_vacancy_updates_not_inserts(tmp_path):
     doc = _make_doc(title="Queued PM Role")
     parser = AsyncMock()
     parser.fetch_markdown = AsyncMock(return_value=doc)
     ctx = _make_ctx(tmp_path, parser, user_id=1)
 
-    queued_row = MagicMock()
-    queued_row.__getitem__ = lambda self, key: {
-        "id": 55,
-        "title": "Senior PM",  # pre-populated from RSS feed
-        "markdown_path": None,
-        "status": "queued",
-    }[key]
+    queued = _vacancy_row(vacancy_id=55, title="Senior PM", status="queued")
 
     with patch("tools.cv_fetch_jd.database") as mock_db:
-        mock_db.get_vacancy_by_url = AsyncMock(return_value=queued_row)
+        mock_db.get_vacancy_by_url = AsyncMock(return_value=queued)
         mock_db.update_vacancy_fields = AsyncMock()
-        mock_db.update_vacancy_status = AsyncMock()
+        mock_db.get_vacancy_by_id = AsyncMock(
+            return_value=_vacancy_row(vacancy_id=55, title="Queued PM Role")
+        )
 
         result = await cv_fetch_jd(ctx, "https://djinni.co/jobs/555/")
 
-    # Should NOT have inserted a new record — updates existing
     mock_db.insert_vacancy.assert_not_called()
     mock_db.update_vacancy_fields.assert_awaited_once()
-    call_kwargs = mock_db.update_vacancy_fields.call_args
-    assert call_kwargs.args[0] == 55  # vacancy_id
+    call_args = mock_db.update_vacancy_fields.call_args
+    assert call_args is not None
+    assert call_args.args[0] == 55
     assert "✅" in result
 
 
 @pytest.mark.asyncio
-async def test_fetch_jd_non_queued_duplicate_skips_fetch(tmp_path):
-    """When existing vacancy has status != 'queued', return early without fetching."""
+async def test_cv_fetch_jd_non_queued_duplicate_skips_fetch(tmp_path):
     ctx = _make_ctx(tmp_path)
-    existing_row = MagicMock()
-    existing_row.__getitem__ = lambda self, key: {
-        "id": 10,
-        "title": "Old PM",
-        "markdown_path": "/some/path/JD.md",
-        "status": "analyzed",
-    }[key]
+    existing = _vacancy_row(vacancy_id=10, title="Old PM", status="analyzed")
 
     with patch("tools.cv_fetch_jd.database") as mock_db:
-        mock_db.get_vacancy_by_url = AsyncMock(return_value=existing_row)
+        mock_db.get_vacancy_by_url = AsyncMock(return_value=existing)
 
         result = await cv_fetch_jd(ctx, "https://djinni.co/jobs/10/")
 
