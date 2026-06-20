@@ -202,6 +202,7 @@ async def main() -> None:
         deps=deps,
         telegram_bot=bot,
         poll_interval=settings.rss_poll_interval,
+        concurrency=settings.rss_concurrency,
     )
 
     # ── 8. Run ────────────────────────────────────────────────────────────────

@@ -260,3 +260,131 @@ async def test_process_source_label_djinni():
         await watcher._process("https://djinni.co/jobs/123/")
     msg = bot.send_message.call_args[0][0]
     assert "Djinni" in msg
+
+
+# ── Semaphore ─────────────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_watcher_default_concurrency_is_2():
+    watcher, _ = _make_watcher()
+    assert watcher._sem._value == 2
+
+
+@pytest.mark.asyncio
+async def test_watcher_custom_concurrency():
+    deps = MagicMock()
+    deps.user_id = 1
+    bot = MagicMock()
+    bot.send_message = AsyncMock()
+    watcher = RSSWatcher(deps=deps, telegram_bot=bot, poll_interval=1, concurrency=5)
+    assert watcher._sem._value == 5
+
+
+@pytest.mark.asyncio
+async def test_notification_not_gated_by_semaphore():
+    """Notification fires before semaphore is acquired — user sees vacancy immediately."""
+    import asyncio
+    deps = MagicMock()
+    deps.user_id = 1
+    bot = MagicMock()
+    call_order: list[str] = []
+
+    async def track_notify(msg: str) -> None:
+        call_order.append("notify")
+
+    bot.send_message = AsyncMock(side_effect=track_notify)
+
+    watcher = RSSWatcher(deps=deps, telegram_bot=bot, poll_interval=1, concurrency=1)
+
+    # Acquire semaphore externally so cv_fetch_jd is forced to wait
+    await watcher._sem.acquire()
+
+    fetch_started = asyncio.Event()
+
+    async def track_fetch(ctx, url: str) -> str:
+        fetch_started.set()
+        call_order.append("fetch")
+        return "✅"
+
+    async def run_process():
+        with patch("tools.cv_fetch_jd.cv_fetch_jd", track_fetch):
+            await watcher._process("https://djinni.co/jobs/1/")
+
+    task = asyncio.create_task(run_process())
+
+    # Give process() a tick to run — notification should fire even while sem is held
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+
+    assert "notify" in call_order, "Notification must fire before semaphore released"
+    assert "fetch" not in call_order, "Fetch must not start until semaphore released"
+
+    # Release semaphore — fetch should now proceed
+    watcher._sem.release()
+    await task
+
+    assert call_order == ["notify", "fetch"]
+
+
+@pytest.mark.asyncio
+async def test_semaphore_limits_concurrent_fetches():
+    """With concurrency=1, two concurrent _process calls serialize at cv_fetch_jd."""
+    import asyncio
+    deps = MagicMock()
+    deps.user_id = 1
+    bot = MagicMock()
+    bot.send_message = AsyncMock()
+
+    watcher = RSSWatcher(deps=deps, telegram_bot=bot, poll_interval=1, concurrency=1)
+
+    concurrent_peak = 0
+    active = 0
+
+    async def slow_fetch(ctx, url: str) -> str:
+        nonlocal active, concurrent_peak
+        active += 1
+        concurrent_peak = max(concurrent_peak, active)
+        await asyncio.sleep(0.01)
+        active -= 1
+        return "✅"
+
+    with patch("tools.cv_fetch_jd.cv_fetch_jd", slow_fetch):
+        await asyncio.gather(
+            watcher._process("https://djinni.co/jobs/1/"),
+            watcher._process("https://djinni.co/jobs/2/"),
+            watcher._process("https://djinni.co/jobs/3/"),
+        )
+
+    assert concurrent_peak == 1, f"Expected max 1 concurrent fetch, got {concurrent_peak}"
+
+
+@pytest.mark.asyncio
+async def test_semaphore_concurrency_2_allows_two_parallel():
+    """With concurrency=2, up to 2 fetches run at the same time."""
+    import asyncio
+    deps = MagicMock()
+    deps.user_id = 1
+    bot = MagicMock()
+    bot.send_message = AsyncMock()
+
+    watcher = RSSWatcher(deps=deps, telegram_bot=bot, poll_interval=1, concurrency=2)
+
+    concurrent_peak = 0
+    active = 0
+
+    async def slow_fetch(ctx, url: str) -> str:
+        nonlocal active, concurrent_peak
+        active += 1
+        concurrent_peak = max(concurrent_peak, active)
+        await asyncio.sleep(0.02)
+        active -= 1
+        return "✅"
+
+    with patch("tools.cv_fetch_jd.cv_fetch_jd", slow_fetch):
+        await asyncio.gather(
+            watcher._process("https://djinni.co/jobs/1/"),
+            watcher._process("https://djinni.co/jobs/2/"),
+            watcher._process("https://djinni.co/jobs/3/"),
+        )
+
+    assert concurrent_peak == 2, f"Expected max 2 concurrent fetches, got {concurrent_peak}"

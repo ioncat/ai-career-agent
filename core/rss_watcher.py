@@ -56,11 +56,13 @@ class RSSWatcher:
         deps: AgentDeps,
         telegram_bot: object,   # TelegramBot — avoids circular import
         poll_interval: int = 30,
+        concurrency: int = 2,
     ) -> None:
         self._deps = deps
         self._bot = telegram_bot
         self._interval = poll_interval
         self._task: asyncio.Task | None = None
+        self._sem = asyncio.Semaphore(concurrency)
 
     async def start(self) -> None:
         """Launch background polling task."""
@@ -148,10 +150,11 @@ class RSSWatcher:
             f'📌 <a href="{url}">{display}</a>'
         )
 
-        # Parse JD in background — vacancy is already in DB as 'fetching'
+        # Parse JD — semaphore limits concurrent parser+LLM calls
         log.info("RSSWatcher: fetching JD - %s", url)
         ctx = _Ctx(deps=self._deps)
-        try:
-            await cv_fetch_jd(ctx, url)  # type: ignore[arg-type]
-        except Exception as exc:
-            log.error("RSSWatcher: failed to fetch JD %s: %s", url, exc)
+        async with self._sem:
+            try:
+                await cv_fetch_jd(ctx, url)  # type: ignore[arg-type]
+            except Exception as exc:
+                log.error("RSSWatcher: failed to fetch JD %s: %s", url, exc)
