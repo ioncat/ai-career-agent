@@ -1,0 +1,42 @@
+name: career_agent
+description: "Career Agent — AI-powered job counselor for PdM/PO/PM job search"
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State management
+  flutter_riverpod: ^2.6.1
+  riverpod_annotation: ^2.6.1
+
+  # HTTP
+  http: ^1.2.2
+
+  # Local storage
+  shared_preferences: ^2.3.3
+
+  # Markdown rendering
+  flutter_markdown: ^0.7.6
+
+  # Desktop notifications
+  flutter_local_notifications: ^18.0.1
+
+  # Date formatting
+  intl: ^0.20.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  build_runner: ^2.4.13
+  riverpod_generator: ^2.6.3
+  custom_lint: ^0.7.5
+  riverpod_lint: ^2.6.3
+
+flutter:
+  uses-material-design: true
