@@ -58,7 +58,7 @@ Source: https://example.com/job/1
 
 **Category:** AI Product · Remote
 **Fit score:** 8/10
-**Blockers:** нет
+**Key Barriers:** нет
 **Warnings:** нет публичной информации; зарплата не указана
 **Recommendation:** подавать
 

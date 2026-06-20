@@ -116,23 +116,29 @@ async def main() -> None:
     log.info("Default user: id=%d skill_type=%s", default_user_id, default_skill_type)
 
     # ── 3. LLM client ─────────────────────────────────────────────────────────
-    # EPIC-17: load profile from DB first; fall back to PROFILE.md file if DB profile is empty.
-    # When a user completes onboarding, their profile_json replaces the file-based profile.
-    # PROFILE_MD_PATH setting is a deprecated fallback — remove after all users are onboarded.
-    from tools.cv_onboard import get_profile_for_llm
-    profile_md = await get_profile_for_llm(default_user_id)
+    # Load full PROFILE.md from file — authoritative LLM system prompt (PROFILE.md > DB).
+    # Also parse CandidateProfile (structured fields) and store in users.profile_json
+    # so the auto-pipeline can access domain_interests without reading the file.
+    from core.profile_loader import parse_profile_md as _parse_profile
 
-    # Fallback: if DB profile is the "not yet created" stub, try the file
-    if "not yet created" in profile_md and settings.profile_md_path.exists():
+    if settings.profile_md_path.exists():
         profile_md = settings.profile_md_path.read_text(encoding="utf-8")
-        log.info("Profile loaded from file (DB empty, fallback) (%d chars)", len(profile_md))
-    elif "not yet created" in profile_md:
-        log.warning(
-            "No profile in DB and PROFILE.md not found at %s — pipeline will run with degraded profile",
-            settings.profile_md_path,
+        log.info("Profile loaded from %s (%d chars)", settings.profile_md_path, len(profile_md))
+        profile = _parse_profile(profile_md)
+        await database.update_user_profile(
+            default_user_id, profile.model_dump_json()
+        )
+        log.info(
+            "CandidateProfile stored in DB — user_id=%d skill_type=%s domains=%d",
+            default_user_id, profile.skill_type, len(profile.domain_interests),
         )
     else:
-        log.info("Profile loaded from DB for user_id=%d (%d chars)", default_user_id, len(profile_md))
+        log.warning(
+            "PROFILE.md not found at %s — pipeline will run with degraded profile",
+            settings.profile_md_path,
+        )
+        profile_md = "# Candidate Profile\n\n_Profile not found._"
+        profile = None
 
     if settings.llm_provider == "ollama":
         llm = OllamaProvider(
@@ -168,6 +174,7 @@ async def main() -> None:
         cv_adapter=cv_adapter,
         user_id=default_user_id,
         skill_type=default_skill_type,
+        profile=profile,
     )
 
     registry = ToolRegistry()
