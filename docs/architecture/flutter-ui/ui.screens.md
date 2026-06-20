@@ -33,8 +33,11 @@ Badge on Inbox: count of unread (new since last seen).
 
 Top bar (per screen):
 - Screen title + vacancy count
-- Refresh button (manual poll trigger)
+- Refresh button (manual poll trigger) — disabled when backend offline
 - Last updated timestamp
+- Backend status dot (right corner): ● green pulse = online / ● red static = offline / ● gray blink = checking
+  - Polls `GET /health` every 60s on separate timer
+  - Tooltip: "Сервер доступен" / "Сервер недоступен — проверь localhost:8080"
 
 ---
 
@@ -291,11 +294,27 @@ Back navigation: standard Flutter back button or breadcrumb in top bar.
 ## UI Principles
 
 - Desktop-first: wide layout, NavigationRail not BottomNav
-- No animations required for MVP
 - Collapsible sections for information density
 - Color-coded semantics: green/amber/gray for scores (not decorative)
 - Markdown rendered natively (flutter_markdown)
 - No login screen — single user, localhost
+
+## Animation principles
+
+Allowed — functional animations that communicate state:
+- `AnimatedList` fade-in when new vacancy arrives (user sees it appear)
+- Inbox badge: animated counter increment
+- CollapsibleSection: smooth expand/collapse (Material 3 built-in)
+- Thin `LinearProgressIndicator` at top of screen during polling/loading
+- `CircularProgressIndicator` on action buttons (Generate CV, Download PDF)
+- FitScoreChip: color fade-in on data load (not instant pop)
+- Backend status dot: CSS-style pulse on green (alive heartbeat feel)
+
+Avoid — decorative animations that slow the user down:
+- Page transition slide/flip with >200ms delay
+- Hero animations (card flying to detail)
+- Parallax, confetti, celebrate effects
+- Any animation that requires the user to wait before interacting
 
 ---
 

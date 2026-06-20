@@ -43,13 +43,31 @@ Per-screen header.
 
 Elements:
 - Left: screen title + vacancy count
-- Right: RefreshButton + LastUpdatedLabel
+- Right: RefreshButton + LastUpdatedLabel + BackendStatusDot
 
 Props:
 - title
 - count
 - lastUpdatedAt
 - onRefresh
+
+---
+
+### BackendStatusDot
+Small animated status indicator in TopBar right corner.
+
+States:
+- online → green dot with CSS-style pulse animation
+- offline → red dot, static, tooltip "Сервер недоступен — проверь localhost:8080"
+- checking → gray dot, opacity blink
+
+Behavior:
+- Polls `GET /health` every 60s via separate `healthCheckProvider`
+- On offline: RefreshButton disabled
+- On online → offline transition: show SnackBar "Сервер недоступен"
+
+Props:
+- status: HealthStatus (online / offline / checking)
 
 ---
 
@@ -450,7 +468,8 @@ providers/
 - vacancyListProvider.dart — AsyncNotifierProvider, polling + refresh
 - vacancyDetailProvider.dart — AsyncNotifierProvider(id), per-vacancy cache
 - cvProvider.dart — CV + cover content per vacancy
-- pollingTimerProvider.dart — background Timer.periodic
+- pollingTimerProvider.dart — background Timer.periodic (30s, vacancies)
+- healthCheckProvider.dart — backend /health poll (60s), exposes HealthStatus
 - settingsProvider.dart — SharedPreferences wrapper
 
 repositories/
