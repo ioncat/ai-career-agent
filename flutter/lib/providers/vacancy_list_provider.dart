@@ -53,12 +53,12 @@ class VacancyListNotifier extends AsyncNotifier<PollingState> {
 
     ref.onDispose(() => _timer?.cancel());
 
-    return _fetchAll(settings.apiUrl, settings.sinceTimestamp);
+    return _fetchAll(settings.apiUrl);
   }
 
-  Future<PollingState> _fetchAll(String apiUrl, String? since) async {
+  Future<PollingState> _fetchAll(String apiUrl) async {
     final repo = VacancyRepository(baseUrl: apiUrl);
-    final items = await repo.listVacancies(since: since);
+    final items = await repo.listVacancies();
     return PollingState(
       vacancies: items,
       status: PollingStatus.idle,
@@ -77,24 +77,17 @@ class VacancyListNotifier extends AsyncNotifier<PollingState> {
 
     try {
       final repo = VacancyRepository(baseUrl: settings.apiUrl);
-      final items = await repo.listVacancies(since: settings.sinceTimestamp);
+      final items = await repo.listVacancies();
 
       final existingIds = current?.vacancies.map((v) => v.id).toSet() ?? {};
-      final newCount = items.where((v) => !existingIds.contains(v.id)).length;
-
-      if (items.isNotEmpty) {
-        final latest = items
-            .map((v) => v.updatedAt ?? '')
-            .reduce((a, b) => a.compareTo(b) > 0 ? a : b);
-        if (latest.isNotEmpty) {
-          await ref.read(settingsProvider.notifier).updateSinceTimestamp(latest);
-        }
-      }
+      final newAnalyzed = items
+          .where((v) => !existingIds.contains(v.id) && v.status == 'analyzed')
+          .length;
 
       state = AsyncData(PollingState(
         vacancies: items,
-        status: newCount > 0 ? PollingStatus.found : PollingStatus.empty,
-        newCount: newCount,
+        status: newAnalyzed > 0 ? PollingStatus.found : PollingStatus.empty,
+        newCount: newAnalyzed,
         lastUpdatedAt: DateTime.now(),
       ));
     } catch (e) {

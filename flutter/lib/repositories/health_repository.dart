@@ -9,7 +9,7 @@ class HealthRepository {
   Future<HealthStatus> check() async {
     try {
       final response = await http
-          .get(Uri.parse('$baseUrl/health'))
+          .get(Uri.parse('$baseUrl/api/vacancies?limit=0'))
           .timeout(const Duration(seconds: 5));
       return response.statusCode == 200 ? HealthStatus.online : HealthStatus.offline;
     } catch (_) {
