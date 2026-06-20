@@ -31,7 +31,7 @@ async def run(vacancy_id: int, phase: int) -> None:
     load_dotenv()
 
     from core.settings import load_settings
-    from core.llm_client import OllamaProvider
+    from core.llm_client import OllamaProvider, ClaudeProvider
     from adapters.parser_adapter import ParserAdapter
     from db import database
 
@@ -59,7 +59,7 @@ async def run(vacancy_id: int, phase: int) -> None:
 
     ollama_folder = vacancy_folder / "ollama"
     ollama_folder.mkdir(exist_ok=True)
-    log.info("Output folder: %s", ollama_folder)
+    log.info("Output folder: %s (provider determined after settings load)", ollama_folder)
 
     # ── Fetch JD (always needed) ──────────────────────────────────────────────
     jd_file = ollama_folder / "JD.md"
@@ -80,20 +80,31 @@ async def run(vacancy_id: int, phase: int) -> None:
     phase1_prompt = (skill_dir / "phase1_analysis.md").read_text(encoding="utf-8")
     phase2_prompt = (skill_dir / "phase2_fit.md").read_text(encoding="utf-8")
 
-    # ── Build Ollama provider ─────────────────────────────────────────────────
+    # ── Build LLM provider ────────────────────────────────────────────────────
     from tools.cv_onboard import get_profile_for_llm
     profile_md = await get_profile_for_llm(settings.telegram_chat_id)
     if "not yet created" in profile_md and settings.profile_md_path.exists():
         profile_md = settings.profile_md_path.read_text(encoding="utf-8")
 
-    llm = OllamaProvider(
-        base_url=settings.ollama_base_url,
-        model=settings.ollama_model,
-        profile_md=profile_md,
-        max_tokens=settings.max_tokens,
-        timeout=settings.ollama_timeout,
-    )
-    log.info("Ollama: model=%s base_url=%s", settings.ollama_model, settings.ollama_base_url)
+    if settings.llm_provider == "claude":
+        llm = ClaudeProvider(
+            api_key=settings.anthropic_api_key,
+            model=settings.llm_model,
+            profile_md=profile_md,
+            max_tokens=settings.max_tokens,
+        )
+        provider_label = f"claude/{settings.llm_model}"
+        log.info("Claude: model=%s", settings.llm_model)
+    else:
+        llm = OllamaProvider(
+            base_url=settings.ollama_base_url,
+            model=settings.ollama_model,
+            profile_md=profile_md,
+            max_tokens=settings.max_tokens,
+            timeout=settings.ollama_timeout,
+        )
+        provider_label = settings.ollama_model.replace(":", "-").replace("/", "-")
+        log.info("Ollama: model=%s base_url=%s", settings.ollama_model, settings.ollama_base_url)
 
     # ── Phase 1 ───────────────────────────────────────────────────────────────
     if phase in (1, 0):
