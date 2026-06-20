@@ -27,6 +27,8 @@ from typing import Protocol, runtime_checkable
 import anthropic
 import httpx
 
+from core.network_guard import guard_external
+
 log = logging.getLogger(__name__)
 
 # ── Token pricing (USD per 1M tokens) ────────────────────────────────────────
@@ -192,6 +194,7 @@ class ClaudeProvider:
                            When set, max_tokens is automatically raised to
                            budget_tokens + 4096 (API requirement: max_tokens > budget_tokens).
         """
+        guard_external("Claude API")
         if not await self._confirm_call(user, system):
             raise LLMError("LLM call cancelled by user (testing mode)")
 
