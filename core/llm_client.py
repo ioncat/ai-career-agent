@@ -7,9 +7,7 @@ ClaudeProvider: Anthropic SDK with prompt caching.
     (phase prompts are static and reused across vacancies).
   - Only the user turn (JD text + prior-phase output) is uncached.
 
-OllamaProvider: stub — raises LLMUnavailableError unconditionally.
-  Design rule: never silently fall back from Claude to Ollama.
-  If Claude unavailable → raise, notify user.
+OllamaProvider: local Ollama via httpx POST /api/chat. Switched via LLM_PROVIDER=ollama.
 
 Usage:
     llm = ClaudeProvider(
@@ -27,6 +25,7 @@ import time
 from typing import Protocol, runtime_checkable
 
 import anthropic
+import httpx
 
 log = logging.getLogger(__name__)
 
@@ -76,7 +75,7 @@ class LLMError(Exception):
 
 
 class LLMUnavailableError(LLMError):
-    """Claude is unavailable or Ollama stub is called."""
+    """LLM provider is unreachable or overloaded (connection failure, timeout, quota)."""
 
 
 # ── Protocol ─────────────────────────────────────────────────────────────────
@@ -372,16 +371,17 @@ class OllamaProvider:
         model: str,
         profile_md: str,
         max_tokens: int = 4096,
+        timeout: int = 600,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._model = model
         self._profile_md = profile_md
         self._max_tokens = max_tokens
+        read_timeout = None if timeout == 0 else float(timeout)
+        self._timeout = httpx.Timeout(timeout=read_timeout, connect=10.0)
 
     async def complete(self, user: str, *, system: str | None = None, **_kwargs) -> str:
         """Call Ollama /api/chat. system and user mirror ClaudeProvider.complete()."""
-        import httpx
-
         sys_parts = [self._profile_md]
         if system:
             sys_parts.append(system)
@@ -398,31 +398,52 @@ class OllamaProvider:
         }
 
         t0 = time.monotonic()
-        async with httpx.AsyncClient(timeout=300.0) as client:
+        async with httpx.AsyncClient(timeout=self._timeout) as client:
             try:
                 resp = await client.post(f"{self._base_url}/api/chat", json=payload)
                 resp.raise_for_status()
-            except httpx.ConnectError as exc:
+            except httpx.TimeoutException as exc:
+                t_str = "∞" if self._timeout.read is None else f"{int(self._timeout.read)}s"
+                raise LLMUnavailableError(
+                    f"Ollama request timed out after {t_str} ({self._base_url})"
+                ) from exc
+            except httpx.RequestError as exc:
                 raise LLMUnavailableError(
                     f"Ollama unreachable at {self._base_url}: {exc}"
                 ) from exc
             except httpx.HTTPStatusError as exc:
+                try:
+                    err_msg = exc.response.json().get("error") or exc.response.text[:200]
+                except Exception:
+                    err_msg = exc.response.text[:200]
                 raise LLMError(
-                    f"Ollama HTTP {exc.response.status_code}: {exc.response.text[:200]}"
+                    f"Ollama HTTP {exc.response.status_code}: {err_msg}"
                 ) from exc
 
         elapsed = time.monotonic() - t0
-        data = resp.json()
+        try:
+            data = resp.json()
+        except ValueError as exc:
+            raise LLMError(f"Ollama returned invalid JSON: {resp.text[:100]}") from exc
         text = (data.get("message") or {}).get("content") or ""
         if not text:
             raise LLMError("Ollama returned empty response")
 
+        done_reason = data.get("done_reason") or data.get("finish_reason") or ""
         log.info(
-            "OllamaProvider: model=%s elapsed=%.1fs in=~%d out=%d chars",
-            self._model, elapsed, len(user) + len(system_content), len(text),
+            "OllamaProvider: model=%s elapsed=%.1fs in=~%d out=%d chars done_reason=%r",
+            self._model, elapsed, len(user) + len(system_content), len(text), done_reason,
         )
+        if done_reason == "length":
+            raise LLMError(
+                f"Ollama truncated output at token limit (model={self._model}, "
+                f"num_predict={self._max_tokens}). Raise MAX_TOKENS or shorten input."
+            )
         return text
 
     @property
     def model(self) -> str:
         return self._model
+
+    def log_session_summary(self) -> None:
+        log.info("OllamaProvider: no token tracking (model=%s)", self._model)

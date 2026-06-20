@@ -140,6 +140,7 @@ async def main() -> None:
             model=settings.ollama_model,
             profile_md=profile_md,
             max_tokens=settings.max_tokens,
+            timeout=settings.ollama_timeout,
         )
         log.info("LLM provider: Ollama — model=%s base_url=%s", settings.ollama_model, settings.ollama_base_url)
     else:

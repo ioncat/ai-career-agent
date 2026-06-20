@@ -56,6 +56,7 @@ class Settings:
     llm_provider: str = "claude"           # "claude" | "ollama"
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "qwen2.5:32b"
+    ollama_timeout: int = 600              # read timeout in seconds (connect always 10s)
 
 
 class ConfigError(Exception):
@@ -112,4 +113,5 @@ def load_settings() -> Settings:
         llm_provider=_optional("LLM_PROVIDER", "claude"),
         ollama_base_url=_optional("OLLAMA_BASE_URL", "http://localhost:11434"),
         ollama_model=_optional("OLLAMA_MODEL", "qwen2.5:32b"),
+        ollama_timeout=int(_optional("OLLAMA_TIMEOUT", "600")),
     )
