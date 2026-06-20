@@ -108,3 +108,19 @@ CREATE TABLE IF NOT EXISTS llm_usage (
 CREATE INDEX IF NOT EXISTS idx_llm_usage_vacancy ON llm_usage (vacancy_id);
 CREATE INDEX IF NOT EXISTS idx_llm_usage_phase   ON llm_usage (phase);
 CREATE INDEX IF NOT EXISTS idx_llm_usage_date    ON llm_usage (created_at);
+
+-- ── push_subscriptions ────────────────────────────────────────────────────────
+-- Web Push (VAPID) subscriptions for browser / PWA notifications.
+-- endpoint is unique per browser profile; p256dh + auth = encryption keys.
+
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    endpoint    TEXT    NOT NULL UNIQUE,
+    p256dh      TEXT    NOT NULL,
+    auth        TEXT    NOT NULL,
+    user_agent  TEXT,
+    created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_push_user ON push_subscriptions (user_id);

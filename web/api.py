@@ -41,10 +41,18 @@ _TEMPLATES.env.filters["markdown"] = lambda text: md_lib.markdown(
 )
 
 
+_VAPID_PUBLIC_KEY = os.getenv("VAPID_PUBLIC_KEY", "")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     database.configure(_DB_PATH)
     await database.init_db()
+    from core import push as _push
+    _push.configure(
+        private_key=os.getenv("VAPID_PRIVATE_KEY", ""),
+        claims_email=os.getenv("VAPID_CLAIMS_EMAIL", "mailto:admin@example.com"),
+    )
     yield
 
 
@@ -244,6 +252,49 @@ async def serve_file(filepath: str):
     if not full_path.exists():
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(full_path)
+
+
+# ── Web Push endpoints ────────────────────────────────────────────────────────
+
+class PushSubscribeRequest(BaseModel):
+    endpoint: str
+    p256dh: str
+    auth: str
+    user_id: int = 1
+
+
+@app.post("/api/push/subscribe", status_code=201)
+async def api_push_subscribe(req: PushSubscribeRequest, request: Request):
+    """Register or refresh a Web Push subscription.
+
+    Called by browser after PushManager.subscribe(). The subscription object
+    contains endpoint URL + ECDH keys (p256dh, auth) for encrypted delivery.
+    On re-subscribe (same endpoint, rotated keys): updates keys in DB.
+    """
+    await database.upsert_push_subscription(
+        user_id=req.user_id,
+        endpoint=req.endpoint,
+        p256dh=req.p256dh,
+        auth=req.auth,
+        user_agent=request.headers.get("user-agent"),
+    )
+    log.info("push/subscribe: user_id=%d endpoint=%.40s", req.user_id, req.endpoint)
+    return {"status": "subscribed"}
+
+
+@app.delete("/api/push/subscribe", status_code=200)
+async def api_push_unsubscribe(endpoint: str):
+    """Remove a push subscription. Called on browser unsubscribe."""
+    await database.delete_push_subscription(endpoint)
+    return {"status": "unsubscribed"}
+
+
+@app.get("/api/push/vapid-public-key")
+async def api_vapid_public_key():
+    """Return VAPID public key for browser PushManager.subscribe() applicationServerKey."""
+    if not _VAPID_PUBLIC_KEY:
+        raise HTTPException(status_code=503, detail="Web Push not configured — set VAPID_PUBLIC_KEY")
+    return {"publicKey": _VAPID_PUBLIC_KEY}
 
 
 @app.get("/api/vacancies/{vacancy_id}")

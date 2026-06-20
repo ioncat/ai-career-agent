@@ -59,6 +59,9 @@ class Settings:
     ollama_timeout: int = 600              # read timeout in seconds (connect always 10s)
     allow_external_calls: bool = False     # ALLOW_EXTERNAL_CALLS=true to permit outbound HTTP
     rss_concurrency: int = 2               # max parallel cv_fetch_jd calls in RSS batch
+    vapid_private_key: str = ""            # VAPID_PRIVATE_KEY — PEM string (generate: see .env.example)
+    vapid_public_key: str = ""             # VAPID_PUBLIC_KEY — base64url uncompressed point (for frontend)
+    vapid_claims_email: str = "mailto:admin@example.com"  # VAPID_CLAIMS_EMAIL — identity for push service
 
 
 class ConfigError(Exception):
@@ -118,4 +121,7 @@ def load_settings() -> Settings:
         ollama_timeout=int(_optional("OLLAMA_TIMEOUT", "600")),
         allow_external_calls=_optional("ALLOW_EXTERNAL_CALLS", "false").lower() == "true",
         rss_concurrency=int(_optional("RSS_CONCURRENCY", "2")),
+        vapid_private_key=_optional("VAPID_PRIVATE_KEY", ""),
+        vapid_public_key=_optional("VAPID_PUBLIC_KEY", ""),
+        vapid_claims_email=_optional("VAPID_CLAIMS_EMAIL", "mailto:admin@example.com"),
     )
