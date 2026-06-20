@@ -8,6 +8,7 @@ import '../widgets/backend_status_dot.dart';
 import '../widgets/polling_progress_bar.dart';
 import '../widgets/status_line.dart';
 import 'vacancy_inbox_screen.dart';
+import 'settings_screen.dart';
 
 class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key});
@@ -20,12 +21,13 @@ class _AppShellState extends ConsumerState<AppShell> {
   int _selectedIndex = 0;
 
   static const _folders = ['inbox', 'in_progress', 'applied', 'archive'];
-  static const _labels = ['Inbox', 'In Progress', 'Applied', 'Archive'];
-  static const _icons = [
-    Icons.inbox_outlined,
-    Icons.work_outline,
-    Icons.check_circle_outline,
-    Icons.archive_outlined,
+
+  static const _destinations = [
+    (Icons.inbox_outlined, 'Inbox'),
+    (Icons.work_outline, 'In Progress'),
+    (Icons.check_circle_outline, 'Applied'),
+    (Icons.archive_outlined, 'Archive'),
+    (Icons.settings_outlined, 'Settings'),
   ];
 
   @override
@@ -42,7 +44,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     return Scaffold(
       body: Column(
         children: [
-          // Polling progress bar — 2px at very top
+          // 2px polling progress bar at very top
           if (listState != null)
             PollingProgressBar(
               status: listState.status,
@@ -52,17 +54,10 @@ class _AppShellState extends ConsumerState<AppShell> {
           Expanded(
             child: Row(
               children: [
-                // NavigationRail
                 NavigationRail(
                   selectedIndex: _selectedIndex,
-                  onDestinationSelected: (i) {
-                    if (i < _folders.length) {
-                      setState(() => _selectedIndex = i);
-                    } else {
-                      // Settings
-                      setState(() => _selectedIndex = i);
-                    }
-                  },
+                  onDestinationSelected: (i) =>
+                      setState(() => _selectedIndex = i),
                   leading: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     child: Column(
@@ -71,46 +66,35 @@ class _AppShellState extends ConsumerState<AppShell> {
                         const SizedBox(height: 4),
                         Text('Career\nAgent',
                             textAlign: TextAlign.center,
-                            style:
-                                Theme.of(context).textTheme.labelSmall),
+                            style: Theme.of(context).textTheme.labelSmall),
                       ],
                     ),
                   ),
-                  trailing: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      BackendStatusDot(status: health),
-                      const SizedBox(height: 8),
-                      IconButton(
-                        icon: const Icon(Icons.settings_outlined, size: 20),
-                        tooltip: 'Settings',
-                        onPressed: () {},
-                      ),
-                    ],
+                  trailing: Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: BackendStatusDot(status: health),
                   ),
-                  destinations: [
-                    ..._folders.asMap().entries.map((e) {
-                      final i = e.key;
-                      final count = i == 0 ? inboxCount : 0;
-                      return NavigationRailDestination(
-                        icon: Badge(
-                          isLabelVisible: i == 0 && count > 0,
-                          label: Text('$count'),
-                          child: Icon(_icons[i]),
-                        ),
-                        selectedIcon: Icon(_icons[i]),
-                        label: Text(_labels[i]),
-                      );
-                    }),
-                  ],
+                  destinations: _destinations.asMap().entries.map((e) {
+                    final i = e.key;
+                    final (icon, label) = e.value;
+                    // Inbox badge
+                    final showBadge = i == 0 && inboxCount > 0;
+                    return NavigationRailDestination(
+                      icon: Badge(
+                        isLabelVisible: showBadge,
+                        label: Text('$inboxCount'),
+                        child: Icon(icon),
+                      ),
+                      selectedIcon: Icon(icon),
+                      label: Text(label),
+                    );
+                  }).toList(),
                 ),
                 const VerticalDivider(width: 1, thickness: 1),
-                // Main content
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Status line
                       if (listState != null && settings != null)
                         Padding(
                           padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
@@ -126,7 +110,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                         child: _selectedIndex < _folders.length
                             ? VacancyInboxScreen(
                                 folder: _folders[_selectedIndex])
-                            : const Center(child: Text('Settings')),
+                            : const SettingsScreen(),
                       ),
                     ],
                   ),
