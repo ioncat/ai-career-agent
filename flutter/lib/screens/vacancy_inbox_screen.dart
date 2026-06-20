@@ -15,7 +15,7 @@ class VacancyInboxScreen extends ConsumerStatefulWidget {
 }
 
 class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
-  int? _selectedId;
+  VacancyListItem? _selected;
 
   String get _title => switch (widget.folder) {
         'inbox' => 'Inbox',
@@ -29,6 +29,13 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
   Widget build(BuildContext context) {
     final vacancies = ref.watch(folderVacanciesProvider(widget.folder));
     final listState = ref.watch(vacancyListProvider).valueOrNull;
+
+    // Clear selection if selected vacancy no longer in this folder
+    if (_selected != null && !vacancies.any((v) => v.id == _selected!.id)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _selected = null);
+      });
+    }
 
     return Row(
       children: [
@@ -49,11 +56,10 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
               Expanded(
                 child: vacancies.isEmpty
                     ? _EmptyState(folder: widget.folder)
-                    : _AnimatedList(
+                    : _VacancyList(
                         vacancies: vacancies,
-                        selectedId: _selectedId,
-                        onSelect: (id) =>
-                            setState(() => _selectedId = id),
+                        selectedId: _selected?.id,
+                        onSelect: (v) => setState(() => _selected = v),
                       ),
               ),
             ],
@@ -63,8 +69,11 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
         const VerticalDivider(width: 1, thickness: 1),
         // Detail panel
         Expanded(
-          child: _selectedId != null
-              ? VacancyDetailScreen(vacancyId: _selectedId!)
+          child: _selected != null
+              ? VacancyDetailScreen(
+                  vacancyId: _selected!.id,
+                  url: _selected!.url,
+                )
               : const _NoSelectionPlaceholder(),
         ),
       ],
@@ -92,14 +101,9 @@ class _ListHeader extends StatelessWidget {
       child: Row(
         children: [
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '$title  $count',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ],
+            child: Text(
+              '$title  $count',
+              style: Theme.of(context).textTheme.titleMedium,
             ),
           ),
           IconButton(
@@ -115,12 +119,12 @@ class _ListHeader extends StatelessWidget {
   }
 }
 
-class _AnimatedList extends StatelessWidget {
+class _VacancyList extends StatelessWidget {
   final List<VacancyListItem> vacancies;
   final int? selectedId;
-  final ValueChanged<int> onSelect;
+  final ValueChanged<VacancyListItem> onSelect;
 
-  const _AnimatedList({
+  const _VacancyList({
     required this.vacancies,
     required this.selectedId,
     required this.onSelect,
@@ -136,7 +140,7 @@ class _AnimatedList extends StatelessWidget {
           key: ValueKey(v.id),
           vacancy: v,
           selected: v.id == selectedId,
-          onTap: () => onSelect(v.id),
+          onTap: () => onSelect(v),
         );
       },
     );
@@ -151,7 +155,8 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final msg = switch (folder) {
-      'inbox' => 'Нет новых вакансий.\nRSS-пайплайн автоматически добавит их когда появятся.',
+      'inbox' =>
+        'Нет новых вакансий.\nRSS-пайплайн автоматически добавит их когда появятся.',
       'in_progress' => 'Нет вакансий в работе.',
       'applied' => 'Вы ещё не отправили CV.',
       'archive' => 'Архив пуст.',

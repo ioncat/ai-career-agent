@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/vacancy_detail_provider.dart';
 import '../widgets/fit_score_chip.dart';
 import '../widgets/fit_dot_bar.dart';
@@ -7,8 +8,13 @@ import '../widgets/recommendation_chip.dart';
 
 class VacancyDetailScreen extends ConsumerWidget {
   final int vacancyId;
+  final String url;
 
-  const VacancyDetailScreen({super.key, required this.vacancyId});
+  const VacancyDetailScreen({
+    super.key,
+    required this.vacancyId,
+    required this.url,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -31,7 +37,7 @@ class VacancyDetailScreen extends ConsumerWidget {
         return Column(
           children: [
             // Sticky action bar
-            _ActionBar(vacancyId: vacancyId),
+            _ActionBar(vacancyId: vacancyId, url: url),
             const Divider(height: 1),
             // Scrollable content
             Expanded(
@@ -89,8 +95,9 @@ class VacancyDetailScreen extends ConsumerWidget {
 
 class _ActionBar extends StatelessWidget {
   final int vacancyId;
+  final String url;
 
-  const _ActionBar({required this.vacancyId});
+  const _ActionBar({required this.vacancyId, required this.url});
 
   @override
   Widget build(BuildContext context) {
@@ -114,7 +121,10 @@ class _ActionBar extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.open_in_new, size: 18),
             tooltip: 'Open JD',
-            onPressed: () {},
+            onPressed: url.isNotEmpty
+                ? () => launchUrl(Uri.parse(url),
+                      mode: LaunchMode.externalApplication)
+                : null,
           ),
         ],
       ),
