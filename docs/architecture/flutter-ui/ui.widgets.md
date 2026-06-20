@@ -43,13 +43,43 @@ Per-screen header.
 
 Elements:
 - Left: screen title + vacancy count
-- Right: RefreshButton + LastUpdatedLabel + BackendStatusDot
+- Below title: StatusLine (polling status text)
+- Right: RefreshButton + BackendStatusDot
 
 Props:
 - title
 - count
-- lastUpdatedAt
 - onRefresh
+
+---
+
+### PollingProgressBar
+2px line at top of content area. Shows polling rhythm to user.
+
+States:
+- countdown: AnimationController fills 0→1 over `pollInterval` seconds, color = primary.withOpacity(0.3)
+- polling: LinearProgressIndicator indeterminate (standard animated)
+- done: reset to 0, restart countdown
+
+Driven by: `pollingTimerProvider`
+
+---
+
+### StatusLine
+Single-line text below screen title. Updates every second.
+
+States (enum PollingStatus):
+- idle → "🔄 Обновлено: X мин назад · следующее через Yс"
+- polling → "⏳ Проверяем новые вакансии..."
+- found(n) → "✨ Найдено N новые вакансии · только что"
+- empty → "✓ Нет новых вакансий · только что"
+- error → "⚠️ Не удалось получить данные · повтор через 30с"
+
+Props:
+- status: PollingStatus
+- lastUpdatedAt: DateTime?
+- secondsUntilNext: int
+- newCount: int
 
 ---
 

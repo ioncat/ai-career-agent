@@ -34,10 +34,22 @@ Badge on Inbox: count of unread (new since last seen).
 Top bar (per screen):
 - Screen title + vacancy count
 - Refresh button (manual poll trigger) — disabled when backend offline
-- Last updated timestamp
+- StatusLine (below title): polling status text (see states below)
 - Backend status dot (right corner): ● green pulse = online / ● red static = offline / ● gray blink = checking
   - Polls `GET /health` every 60s on separate timer
   - Tooltip: "Сервер доступен" / "Сервер недоступен — проверь localhost:8080"
+
+PollingProgressBar (2px line at top of content area):
+- Idle: fills left→right over 30s (countdown to next poll), color = primary/20%
+- During poll: switches to indeterminate animated bar (standard LinearProgressIndicator)
+- After poll: resets to 0 and fills again
+
+StatusLine states (text below screen title):
+- Idle countdown:    "🔄 Обновлено: 2 мин назад · следующее через 23с"
+- During poll:       "⏳ Проверяем новые вакансии..."
+- New found:         "✨ Найдено 2 новые вакансии · только что"
+- Nothing new:       "✓ Нет новых вакансий · только что"
+- Error:             "⚠️ Не удалось получить данные · повтор через 30с"
 
 ---
 
