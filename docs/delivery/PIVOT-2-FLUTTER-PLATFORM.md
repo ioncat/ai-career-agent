@@ -46,7 +46,7 @@ The Flutter app is not a tracker or dashboard. It's a **career counselor** — g
 
 ## Full Service Logic
 
-### Vacancy sources
+### Источники вакансий
 
 ```
 RSS feeds (DOU + Djinni + job-monitor)     Manual URL (Flutter input)
@@ -55,114 +55,120 @@ RSS feeds (DOU + Djinni + job-monitor)     Manual URL (Flutter input)
                                 ↓
                          cv_fetch_jd
                URL → jd-parser service → JD.md
-               Writes to DB: url, title, site, published_at, user_id
-               Returns: vacancy_id
-               [no LLM, no profile]
+               Записывает в DB: url, title, site, published_at, user_id
+               Возвращает: vacancy_id
+               [нет LLM, нет профиля]
 ```
 
 ---
 
-### Auto-pipeline (runs on every new vacancy)
+### Авто-пайплайн (запускается на каждой новой вакансии)
 
 ```
 vacancy_id + JD.md
         ↓
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 PHASE 1 — JD Analysis + VacScore
-Model: Claude Haiku ($0.022/call)
-Input: JD.md + profile_json["domain_interests"] (~10 tokens only)
-       [no full PROFILE needed]
-Output:
+Модель: Claude Haiku ($0.022/call)
+Вход: JD.md + profile_json["domain_interests"] (~10 токенов)
+      [полный PROFILE не нужен]
+Выход:
   • VacScore (8 dims): company_tier, seniority, market_scope,
     company_type, company_stage_fit, domain_score,
-    remote_policy, compensation → total X.X/10
-  • Archetype (e.g. "Execution-heavy Delivery PO")
-  • North Star (what the company is trying to solve)
-  • Pain points (what is broken, why they are hiring)
+    remote_policy, compensation → итог X.X/10
+  • Archetype ("Execution-heavy Delivery PO")
+  • North Star компании
+  • Pain points (что сломано, почему нанимают)
   • Role balance (Execution / Discovery / Strategy / Ops %)
   • Expectations: explicit / implicit / hidden pressure / toxic zones
   • Language analysis (culture signals, dominant phrases)
-  • "Who will NOT fit" — anti-patterns
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  • "Who will NOT fit" — анти-паттерны
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         ↓
 PHASE 2 — Candidate Fit Assessment
-Model: Claude Sonnet (~$0.05–0.07/call)
-Input: JD.md + Phase 1 output + full PROFILE (system prompt, cached)
-Output:
+Модель: Claude Haiku ($0.029/call)
+Вход: JD.md + Phase 1 output + полный PROFILE (system prompt, cached)
+Выход:
   • fit_score (1–10)
   • Fit × VacScore recommendation:
       go / apply — strong match / take a chance / decline
-  • Barriers (list: where candidate does not meet JD requirements)
-  • Adaptation plan (how to close each gap)
-  • Quick Scan (3 lines: fit + rec + key signal/barrier)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  • Barriers (список: что не совпадает с JD требованиями)
+  • Adaptation plan (как закрыть каждый gap)
+  • Quick Scan (3 строки: fit + rec + key signal/barrier)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         ↓
-Saved: JD_analysis.md + analysis_json in DB
-        ↓
-Web Push → Flutter PWA
-  "Product Owner — iSpeedtoLead · VacScore 7.6 · Fit 7/10 · apply ✅"
-  [click → opens Flutter app on this vacancy]
+Сохраняется: JD_analysis.md + analysis_json в DB
 ```
 
 ---
 
-### User decision point
+### Нотификация → решение пользователя
 
 ```
-User sees in Flutter app:
-  • VacScore (8 dims breakdown)
+Phase 1+2 done
+      ↓
+Web Push → Flutter PWA (браузер / установленное приложение)
+┌─────────────────────────────────────────┐
+│ Product Owner — iSpeedtoLead            │
+│ VacScore 7.6 · Fit 7/10 · apply ✅     │
+└─────────────────────────────────────────┘
+      ↓ клик
+Flutter app открывается на этой вакансии
+
+Пользователь видит в Flutter:
+  • VacScore (разбивка по 8 dims)
   • Archetype + pain points
   • fit_score + barriers + adaptation plan
   • Recommendation: apply / decline / take a chance
 
-        ↓ user decides
+        ↓ пользователь решает
 "Генерировать CV"          "Архивировать"
         ↓                        ↓
-  CV pipeline starts          vacancy closed, end
+  CV-пайплайн стартует       вакансия закрыта, конец
 ```
 
-**Go/no-go = decision to generate CV.** User cannot make this decision without fit_score + barriers — that is what Phase 2 provides. Both phases run automatically before the user sees anything.
+**Go/no-go = решение о генерации CV.** Пользователь не может принять его без fit_score + barriers — именно это даёт Phase 2. Обе фазы запускаются автоматически до того, как пользователь что-либо видит.
 
 ---
 
-### CV pipeline (on user request)
+### CV-пайплайн (по запросу пользователя)
 
 ```
 vacancy_id + user action "Генерировать CV"
         ↓
-PHASE 2.5 — Objection Handling  [only if barriers exist]
-Interface: Flutter (interactive dialog)
-Logic:
-  App presents each barrier → user responds / clarifies / provides context
-  → classified: resolved / partially resolved / remains
-  → forms adaptation brief for Phase 3
-[Competitive advantage — without this, the CV is generic]
+PHASE 2.5 — Objection Handling  [только если есть barriers]
+Интерфейс: Flutter (интерактивный диалог)
+Логика:
+  Система показывает barrier → пользователь отвечает / уточняет
+  → классифицируется: снят / частично снят / остаётся
+  → формируется adaptation brief для Phase 3
+[Конкурентное преимущество — без этого CV generic]
         ↓
 PHASE 3 — CV Generation
-Model: Claude Sonnet
-Input: JD.md + Phase 1+2 output + PROFILE + adaptation brief (from 2.5)
-Output: CV.md (tailored to this vacancy)
+Модель: Claude Sonnet
+Вход: JD.md + Phase 1+2 output + PROFILE + adaptation brief (из 2.5)
+Выход: CV.md (адаптированное под эту вакансию)
         ↓
-PHASE 3.5 — CV Self-Review  [mandatory, user does not see]
-Model: Claude Sonnet
-Input: CV.md + original JD requirements
-Output: CV.md v2 (corrected)
+PHASE 3.5 — CV Self-Review  [обязательно, пользователь не видит]
+Модель: Claude Sonnet
+Вход: CV.md + исходные требования JD
+Выход: CV.md v2 (исправленная версия)
         ↓
 PHASE 4 — Cover Letter
-Model: Claude Sonnet
-Input: CV.md v2 + JD + PROFILE
-Output: Cover.md
+Модель: Claude Sonnet
+Вход: CV.md v2 + JD + PROFILE + candidate tone preferences
+Выход: Cover.md
         ↓
 PDF render (services/pdf/ via CVAdapter — httpx POST /render)
         ↓
 Web Push: "CV готов →"
         ↓
-Flutter: CV preview + PDF download
+Flutter: CV preview + PDF download + "Подать заявку"
 ```
 
 ---
 
-### Multi-user
+### Мультипользователь
 
 ```
 feeds.json:
@@ -170,18 +176,18 @@ feeds.json:
   { "user_id": 2, "feeds": [...] }
 
 RSS watcher:
-  for each user_id → for each feed → new vacancies
+  для каждого user_id → для каждого feed → новые вакансии
   → cv_fetch_jd(url, user_id)
-  → auto-pipeline(vacancy_id, user_id)
+  → авто-пайплайн(vacancy_id, user_id)
   → Web Push → users[user_id].push_subscription
 
-All DB records: user_id FK everywhere
-PROFILE: loaded by user_id from DB or skill/users/[id]/PROFILE.md
+Все DB записи: user_id FK везде
+PROFILE: загружается по user_id из DB или skill/users/[id]/PROFILE.md
 ```
 
 ---
 
-### Vacancy status lifecycle
+### Статусы вакансии в DB
 
 ```
 new → analyzing (P1+P2 running) → analyzed (P1+P2 done, awaiting user)
@@ -195,13 +201,13 @@ new → analyzing (P1+P2 running) → analyzed (P1+P2 done, awaiting user)
 
 ### Phase A — Unblock auto-pipeline (1–2 days)
 
-1. 🔴 **`profile_json` schema + population** — structured JSON doesn't exist yet; only raw PDF text or empty. Need: define schema (domain_interests, company_stage_prefs, etc.), parse from PROFILE.md, store in DB. Required for Phase 1 (domain_interests injection) and Phase 2 (full profile as system prompt).
+1. ✅ **`profile_json` schema + population** — `CandidateProfile` (contracts/profile.py), `parse_profile_md()` (core/profile_loader.py), stored in DB on startup, passed via AgentDeps. Done 2026-06-20.
 2. 🔴 `last_call_usage` property on `OllamaProvider` — `cv_analyze` crashes without it
 3. 🔴 `cv_fetch_jd` must return `vacancy_id` — auto-pipeline can't chain without it
 4. 🟠 Semaphore on concurrent LLM calls — RSS batch safety
 5. 🟡 Web Push subscription endpoint + send utility
 6. 🟢 Logic test on Ollama (`gemma4:31b-cloud`) — validate data flow, free
-7. 🟢 Quality run on Claude Haiku (P1) + Sonnet (P2) — validate analysis quality
+7. 🟢 Quality run on Claude Haiku P1 + Haiku P2 — both phases on Haiku (decided 2026-06-20)
 
 ### Phase B — JSON contracts (foundation for Flutter) (3–5 days)
 
@@ -299,7 +305,7 @@ If GLM-5.2 quality ≈ Haiku: flat $20/month regardless of volume = better econo
 
 ### Testing policy — until Flutter is live
 
-All pipeline testing is local. External calls (Web Push, outbound Telegram, any external notification) are **banned in testing mode**. Rules:
+All pipeline testing is local. External calls (Web Push, any outbound notification) are **banned in testing mode**. Rules:
 - `AGENT_MODE=testing` must be set — already enforced in e2e_test.py
 - LLM API calls: allowed (needed for quality testing)
 - Web Push: disabled — no push subscriptions in test environment
