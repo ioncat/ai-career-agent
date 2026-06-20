@@ -29,6 +29,20 @@ class VacancyRepository {
         .toList();
   }
 
+  Future<void> decline(int vacancyId) async {
+    final uri = Uri.parse('$baseUrl/api/vacancies/$vacancyId/decline');
+    final response = await http.patch(uri).timeout(const Duration(seconds: 10));
+    if (response.statusCode == 404) throw Exception('Vacancy not found');
+    if (response.statusCode != 200) throw Exception('Decline failed: ${response.statusCode}');
+  }
+
+  Future<void> generateCv(int vacancyId) async {
+    final uri = Uri.parse('$baseUrl/api/vacancies/$vacancyId/generate-cv');
+    final response = await http.post(uri).timeout(const Duration(seconds: 10));
+    if (response.statusCode == 404) throw Exception('Vacancy not found');
+    if (response.statusCode != 200) throw Exception('Generate CV failed: ${response.statusCode}');
+  }
+
   Future<VacancyAnalysis> getAnalysis(int vacancyId) async {
     final uri = Uri.parse('$baseUrl/api/vacancies/$vacancyId/analysis');
     final response = await http.get(uri).timeout(const Duration(seconds: 10));

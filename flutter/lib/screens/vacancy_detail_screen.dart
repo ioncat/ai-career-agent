@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../providers/settings_provider.dart';
 import '../providers/vacancy_detail_provider.dart';
+import '../providers/vacancy_list_provider.dart';
+import '../repositories/vacancy_repository.dart';
 import '../widgets/fit_score_chip.dart';
 import '../widgets/fit_dot_bar.dart';
 import '../widgets/recommendation_chip.dart';
@@ -93,11 +96,62 @@ class VacancyDetailScreen extends ConsumerWidget {
   }
 }
 
-class _ActionBar extends StatelessWidget {
+class _ActionBar extends ConsumerStatefulWidget {
   final int vacancyId;
   final String url;
 
   const _ActionBar({required this.vacancyId, required this.url});
+
+  @override
+  ConsumerState<_ActionBar> createState() => _ActionBarState();
+}
+
+class _ActionBarState extends ConsumerState<_ActionBar> {
+  bool _loadingCv = false;
+  bool _loadingDecline = false;
+
+  VacancyRepository get _repo {
+    final apiUrl = ref.read(settingsProvider).valueOrNull?.apiUrl ?? 'http://localhost:8080';
+    return VacancyRepository(baseUrl: apiUrl);
+  }
+
+  Future<void> _generateCv() async {
+    setState(() => _loadingCv = true);
+    try {
+      await _repo.generateCv(widget.vacancyId);
+      if (mounted) {
+        ref.read(vacancyListProvider.notifier).refresh();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('CV generation queued'), duration: Duration(seconds: 2)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loadingCv = false);
+    }
+  }
+
+  Future<void> _decline() async {
+    setState(() => _loadingDecline = true);
+    try {
+      await _repo.decline(widget.vacancyId);
+      if (mounted) {
+        ref.read(vacancyListProvider.notifier).refresh();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+        setState(() => _loadingDecline = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -108,21 +162,25 @@ class _ActionBar extends StatelessWidget {
       child: Row(
         children: [
           FilledButton.icon(
-            onPressed: () {},
-            icon: const Icon(Icons.description_outlined, size: 16),
+            onPressed: _loadingCv ? null : _generateCv,
+            icon: _loadingCv
+                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.description_outlined, size: 16),
             label: const Text('Generate CV'),
           ),
           const SizedBox(width: 8),
           OutlinedButton(
-            onPressed: () {},
-            child: const Text('Decline'),
+            onPressed: _loadingDecline ? null : _decline,
+            child: _loadingDecline
+                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Text('Decline'),
           ),
           const Spacer(),
           IconButton(
             icon: const Icon(Icons.open_in_new, size: 18),
             tooltip: 'Open JD',
-            onPressed: url.isNotEmpty
-                ? () => launchUrl(Uri.parse(url),
+            onPressed: widget.url.isNotEmpty
+                ? () => launchUrl(Uri.parse(widget.url),
                       mode: LaunchMode.externalApplication)
                 : null,
           ),
