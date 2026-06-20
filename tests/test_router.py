@@ -110,10 +110,11 @@ def _env(**kwargs):
 def test_load_settings_happy_path(monkeypatch):
     for k, v in _env().items():
         monkeypatch.setenv(k, v)
+    monkeypatch.delenv("LLM_MODEL", raising=False)  # isolate from .env
     s = load_settings()
     assert s.anthropic_api_key == "sk-ant-test"
     assert s.telegram_chat_id == 12345
-    assert s.llm_model == "claude-sonnet-4-6"  # default (updated 2026-05-30)
+    assert s.llm_model == "claude-opus-4-5"  # code default when LLM_MODEL unset
 
 
 def test_load_settings_custom_model(monkeypatch):

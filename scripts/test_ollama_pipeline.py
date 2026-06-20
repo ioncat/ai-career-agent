@@ -81,10 +81,11 @@ async def run(vacancy_id: int, phase: int) -> None:
     phase2_prompt = (skill_dir / "phase2_fit.md").read_text(encoding="utf-8")
 
     # ── Build LLM provider ────────────────────────────────────────────────────
-    from tools.cv_onboard import get_profile_for_llm
-    profile_md = await get_profile_for_llm(settings.telegram_chat_id)
-    if "not yet created" in profile_md and settings.profile_md_path.exists():
+    if settings.profile_md_path.exists():
         profile_md = settings.profile_md_path.read_text(encoding="utf-8")
+    else:
+        profile_md = "# Candidate Profile\n\n_Profile not found._"
+        log.warning("PROFILE.md not found at %s", settings.profile_md_path)
 
     if settings.llm_provider == "claude":
         llm = ClaudeProvider(

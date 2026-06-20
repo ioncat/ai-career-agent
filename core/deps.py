@@ -13,11 +13,12 @@ Usage in a tool:
         ...
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from adapters.cv_adapter import CVAdapter
 from adapters.parser_adapter import ParserAdapter
+from contracts.profile import CandidateProfile
 from core.llm_client import ClaudeProvider, OllamaProvider
 
 
@@ -33,6 +34,9 @@ class AgentDeps:
         cv_adapter:     Subprocess wrapper for cv_to_pdf.py in callback-cv repo.
         user_id:        DB user ID for multi-user scoping. Default=1 (single-user mode).
         skill_type:     Routes ALL pipeline phases to prompts/[skill_type]/ (e.g. 'pm', 'generic').
+        profile:        Structured candidate profile parsed from PROFILE.md.
+                        Provides domain_interests + company_stage_prefs for Phase 1 injection.
+                        None if PROFILE.md is absent (pipeline runs with degraded personalisation).
     """
     parser_adapter: ParserAdapter
     llm: ClaudeProvider | OllamaProvider
@@ -41,3 +45,4 @@ class AgentDeps:
     cv_adapter: CVAdapter
     user_id: int = 1
     skill_type: str = "pm"
+    profile: CandidateProfile | None = None
