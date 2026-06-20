@@ -14,7 +14,9 @@ Pivot 2 replaces Telegram with Flutter as the sole client. Full architecture, pr
 **Three pillars:**
 1. **EPIC-21** — Python handles deterministic work (VacScore arithmetic, recommendation matrix, PDF render); LLM called only for 4 cognitive phases
 2. **Ollama-first testing** — validate pipeline logic free on local/cloud model before Claude spend
-3. **Flutter Web as sole UI** — Telegram removed; Web Push for notifications; web first, mobile port later
+3. **Flutter Windows Desktop as primary target** — Telegram removed; same Flutter codebase runs Web/Mobile later with no rewrite; Desktop uses polling + `flutter_local_notifications`; Web Push (A5) kept for future web/mobile
+
+**Platform decision (2026-06-20):** Flutter Windows Desktop first. No HTTPS required, no hosting, FastAPI on localhost. `flutter build windows` from the same codebase that will later ship as Web/Mobile.
 
 ---
 
@@ -23,7 +25,7 @@ Pivot 2 replaces Telegram with Flutter as the sole client. Full architecture, pr
 Career Agent has no dedicated client. Telegram was the primary UI — it is removed entirely. The pipeline currently:
 - Returns string blobs, not structured data (Flutter needs JSON per phase)
 - Has no auto-trigger from RSS → Phase 1+2 without user intervention
-- Has no Web Push endpoint (no way to notify Flutter PWA)
+- Has no notification mechanism for Desktop (Web Push = browser API; Desktop needs polling + system tray)
 - Has no Flutter app (Phase C)
 
 The deterministic/cognitive split (EPIC-21) is required before Flutter makes sense — the app renders structured JSON, not markdown.
@@ -78,11 +80,13 @@ So that I spend time only on decision-making and CV review, not on triggering pi
 | A2 | `OllamaProvider.last_call_usage` — matches ClaudeProvider shape; fixes cv_analyze crash on Ollama | ✅ Done | 2026-06-20 |
 | A3 | `cv_fetch_jd` → `fetch_jd(deps, url) -> int` split; `FetchError`; auto-pipeline can chain Phase 1+2 | ✅ Done | 2026-06-20 |
 | A4 | `asyncio.Semaphore(RSS_CONCURRENCY)` in RSSWatcher; guards cv_fetch_jd after notification | ✅ Done | 2026-06-20 |
-| A5 | Web Push subscription endpoint (`POST /api/push/subscribe`) + `send_push()` utility | 🟡 Next | — |
-| A6 | Logic test on `gemma4:31b-cloud` — validate full data flow (fetch→P1→P2→push), free | 🟢 Planned | — |
+| A5a | Web Push: `POST /api/push/subscribe` + `send_push()` utility — for future web/mobile target | 🟡 Next | — |
+| A5b | Desktop notification: Flutter polls `GET /api/vacancies?status=analyzed&since=X` → `flutter_local_notifications` fires system tray alert — Flutter-side only, no new backend endpoint | 🟡 Next | B3 |
+| A6 | Logic test on `gemma4:31b-cloud` — validate full data flow (fetch→P1→P2→notify), free | 🟢 Planned | — |
 | A7 | Quality run Haiku P1 + Haiku P2 — both phases confirmed as production choice | ✅ Done | 2026-06-20 |
 
-**A5 note:** Web Push requires HTTPS. Local testing: self-signed cert or ngrok. Production: hosting decision needed (see Open Questions).
+**A5a note:** Web Push requires HTTPS — not needed for Desktop MVP. Implement now (small, reusable) to unblock future web/mobile target.
+**A5b note:** Pure Flutter — polls existing `/api/vacancies` endpoint. No new backend work. Ships with Phase C Desktop app.
 
 ---
 
@@ -128,7 +132,7 @@ So that I spend time only on decision-making and CV review, not on triggering pi
 | EPIC-21 Task 2 (JSON contracts) | 🔴 BLOCKER for Phase B | Must land before Flutter |
 | EPIC-21 Task 3 (VacScore → Python) | 🟠 | Needed before B4 (auto-pipeline) |
 | `fetch_jd() -> int` (A3) | ✅ Done | Auto-pipeline can chain |
-| Web Push HTTPS infra | 🔴 BLOCKER for A5 | Hosting decision pending |
+| Web Push HTTPS infra | 🟡 for A5a only | Desktop MVP doesn't need it; deferred |
 
 ---
 
@@ -147,7 +151,7 @@ So that I spend time only on decision-making and CV review, not on triggering pi
 
 ## Open Questions
 
-- [ ] **HTTPS for Web Push** — required by Web Push API. Options: ngrok for dev, VPS with Let's Encrypt for prod. Hosting decision blocks A5.
-- [ ] **Auth in Flutter app** — current web tracker has no auth. Flutter needs login. Options: magic link email, Google OAuth, PIN. Decide before Phase C.
+- [ ] **HTTPS for Web Push** — required by Web Push API. Not needed for Desktop MVP (A5b = polling). Revisit when web/mobile target starts.
+- [ ] **Auth in Flutter Desktop** — single-user local app: no auth needed initially. Multi-user scenario: decide before Phase C multi-user support.
 - [ ] **Flutter experience level** — affects Phase C estimation.
 - [ ] **Phase 2.5 UX design** — barrier cards + reply flow needs UX design before C3.
