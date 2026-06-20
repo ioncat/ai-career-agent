@@ -10,7 +10,7 @@
 
 **Goal:** Flutter Web = sole UI. Telegram removed. Pipeline emits JSON. RSS → auto Phase 1+2 → Web Push → Flutter.
 
-**Status:** Phase A (4/7 done). Next: A5 Web Push endpoint. Full architecture: `docs/delivery/PIVOT-2-FLUTTER-PLATFORM.md`.
+**Status:** Phase B done (2026-06-20). Phase C next — Flutter vacancy list + detail screens. Full architecture: `docs/delivery/PIVOT-2-FLUTTER-PLATFORM.md`.
 
 **Critical path:** Phase A (auto-pipeline) → Phase B (JSON contracts + EPIC-21 Tasks 2–3) → Phase C (Flutter MVP) → Phase D (polish + Telegram removal).
 
