@@ -409,6 +409,29 @@ async def api_vapid_public_key():
     return {"publicKey": key}
 
 
+@app.patch("/api/vacancies/{vacancy_id}/decline")
+async def api_vacancy_decline(vacancy_id: int):
+    """Flutter Decline button — moves vacancy to archive folder."""
+    row = await database.get_vacancy_by_id(vacancy_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Vacancy not found")
+    await database.update_vacancy_status(vacancy_id, "declined")
+    return {"id": vacancy_id, "status": "declined"}
+
+
+@app.post("/api/vacancies/{vacancy_id}/generate-cv")
+async def api_vacancy_generate_cv(vacancy_id: int):
+    """Flutter Generate CV button — queues vacancy for CV generation pipeline.
+
+    Does not call LLM directly. Pipeline picks up cv_queued status.
+    """
+    row = await database.get_vacancy_by_id(vacancy_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Vacancy not found")
+    await database.update_vacancy_status(vacancy_id, "cv_queued")
+    return {"id": vacancy_id, "status": "cv_queued"}
+
+
 @app.get("/api/vacancies/{vacancy_id}/analysis")
 async def api_vacancy_analysis(vacancy_id: int):
     """Return full AnalysisJson for a vacancy (Flutter detail screen).
