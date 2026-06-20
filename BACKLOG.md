@@ -1,6 +1,6 @@
 # career-agent — Backlog
 
-> Last updated: 2026-06-15
+> Last updated: 2026-06-17
 > Epic format: post-pivot epics (13+) live in `docs/delivery/epics/`. This file = priority tracker + status overview.
 > Pre-pivot epics (1–12): `docs/delivery/epics-archive/EPIC-01-12-pre-pivot.md`
 
@@ -247,6 +247,48 @@ Merged 2026-06-15. Engine decision resolved: **weasyprint** (HTML/Jinja2 + CSS �
 3. Из Windows: `http://VM_IP:8080` (трекер), бот через Telegram
 
 **launcher.py** — локальный запуск без Docker (все 5 сервисов в одном окне, sequential start, Ctrl+C убивает всё). PDF сервис на Windows без GTK не работает — только через Docker.
+
+---
+
+## ✅ Ollama error handling + model testing (2026-06-18)
+
+- **No-timeout mode** — `OLLAMA_TIMEOUT=0` → `read_timeout=None` in httpx (for slow thinking models like qwen3:8b that run 10+ min)
+  - `core/llm_client.py` — `OllamaProvider.__init__`: `read_timeout = None if timeout == 0 else float(timeout)` → `httpx.Timeout(timeout=read_timeout, connect=10.0)`
+  - Timeout error message shows `∞` when read timeout is None
+- **done_reason logging** — every OllamaProvider call logs `model / elapsed / in / out / done_reason`
+- **Truncation detection** — `done_reason='length'` → raises `LLMError` with actionable message (raise MAX_TOKENS or shorten input)
+- **scripts/test_ollama_pipeline.py** — `--phase 1|2` flag: run Phase 1 only, Phase 2 only, or both; Phase 2 reads existing `phase1.md` from `ollama/` folder
+- **Model comparison** (vacancy #120 — Product Owner iSpeedtoLead):
+
+  | Model | Type | Phase 1+2 | Output | Rating |
+  |-------|------|-----------|--------|--------|
+  | qwen3:8b | local | 19 min | full | ★★★ |
+  | glm-5.2:cloud | cloud | — | 403 paid | ❌ |
+  | minimax-m3:cloud | cloud | ~157s | truncated | ❌ |
+  | gemma4:31b-cloud | cloud | 105s | full | ★★★ |
+  | cas/aya-expanse-8b | local | 29s | full | ★ |
+
+  **Best for logic testing:** `gemma4:31b-cloud` (105s, full structure, free)
+- **Tests**: 316 → 320 total (4 new OllamaProvider error path tests)
+
+---
+
+## ✅ RSS watcher hardening + inbox folder naming + Ollama provider (2026-06-17)
+
+- **RSS watcher**
+  - `core/rss_watcher.py` — notify-first (Telegram message before processing), salary extracted from title, status machine fix (fetching→done)
+  - `core/rss_watcher.py` — concurrent processing via `asyncio.gather` (all queued vacancies fetched in parallel)
+  - `web/api.py` — `_site_from_url()` + site set at webhook insert; fixes "?" site badge in tracker
+  - `db/schema.sql` + `db/database.py` — `published_at` column (RSS publication date stored; backfilled from `created_at` for existing rows)
+- **Inbox folder naming** — `{vacancy_id} — {role} — {company}` format
+  - `contracts/parsed_document.py` — `company: str | None` field added to `ParsedDocument`
+  - `services/parser/app.py` — `_extract_company()`: DOU from URL slug, Djinni from `<title>` tag
+  - `tools/cv_fetch_jd.py` — DB insert before folder creation (to get vacancy_id), `_safe_folder_name()` strips forbidden Windows chars
+- **Ollama LLM provider**
+  - `core/llm_client.py` — `OllamaProvider` full httpx implementation: POST `/api/chat`, 300s timeout, `LLMUnavailableError` on connect fail
+  - `core/settings.py` — `LLM_PROVIDER` / `OLLAMA_BASE_URL` / `OLLAMA_MODEL` env vars (`.env`)
+  - `agent.py` — runtime branch: `LLM_PROVIDER=ollama` → `OllamaProvider`; default → `ClaudeProvider`
+- **Tests**: 291 → 316 total
 
 ---
 

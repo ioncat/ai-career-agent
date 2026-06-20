@@ -214,6 +214,62 @@ async def test_ollama_connect_error_raises_unavailable():
 
 
 @pytest.mark.asyncio
+async def test_ollama_timeout_raises_unavailable():
+    import httpx
+    provider = _make_ollama()
+
+    with patch("httpx.AsyncClient") as mock_client_cls:
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.post = AsyncMock(side_effect=httpx.ReadTimeout("timed out"))
+        mock_client_cls.return_value = mock_client
+
+        with pytest.raises(LLMUnavailableError, match="timed out after"):
+            await provider.complete("test")
+
+
+@pytest.mark.asyncio
+async def test_ollama_model_not_found_raises_llm_error():
+    import httpx
+    provider = _make_ollama()
+    fake_resp = MagicMock()
+    fake_resp.status_code = 404
+    fake_resp.json.return_value = {"error": "model 'qwen2.5:99b' not found, try pulling it first"}
+    fake_resp.text = '{"error": "model not found"}'
+    http_exc = httpx.HTTPStatusError("not found", request=MagicMock(), response=fake_resp)
+
+    with patch("httpx.AsyncClient") as mock_client_cls:
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.post = AsyncMock(side_effect=http_exc)
+        mock_client_cls.return_value = mock_client
+
+        with pytest.raises(LLMError, match="not found"):
+            await provider.complete("test")
+
+
+@pytest.mark.asyncio
+async def test_ollama_invalid_json_raises_llm_error():
+    provider = _make_ollama()
+    fake_resp = MagicMock()
+    fake_resp.json.side_effect = ValueError("invalid json")
+    fake_resp.text = "not json at all"
+    fake_resp.raise_for_status = MagicMock()
+
+    with patch("httpx.AsyncClient") as mock_client_cls:
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.post = AsyncMock(return_value=fake_resp)
+        mock_client_cls.return_value = mock_client
+
+        with pytest.raises(LLMError, match="invalid JSON"):
+            await provider.complete("test")
+
+
+@pytest.mark.asyncio
 async def test_ollama_empty_response_raises_llm_error():
     provider = _make_ollama()
     fake_resp = MagicMock()

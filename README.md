@@ -84,7 +84,7 @@ When fit is real: a targeted CV from actual experience, cross-checked against th
 
 | Layer | Tech |
 |-------|------|
-| AI | Claude Sonnet 4.6 · PydanticAI · prompt caching (profile + all phase prompts) |
+| AI | Claude Sonnet 4.6 (default) · Ollama (local, `LLM_PROVIDER=ollama`) · PydanticAI · prompt caching |
 | UI | Telegram (aiogram 3.x) · Web tracker (FastAPI + HTMX) |
 | HTTP | httpx async |
 | Storage | SQLite + filesystem |
