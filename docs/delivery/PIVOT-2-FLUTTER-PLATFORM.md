@@ -202,12 +202,12 @@ new → analyzing (P1+P2 running) → analyzed (P1+P2 done, awaiting user)
 ### Phase A — Unblock auto-pipeline (1–2 days)
 
 1. ✅ **`profile_json` schema + population** — `CandidateProfile` (contracts/profile.py), `parse_profile_md()` (core/profile_loader.py), stored in DB on startup, passed via AgentDeps. Done 2026-06-20.
-2. 🔴 `last_call_usage` property on `OllamaProvider` — `cv_analyze` crashes without it
-3. 🔴 `cv_fetch_jd` must return `vacancy_id` — auto-pipeline can't chain without it
-4. 🟠 Semaphore on concurrent LLM calls — RSS batch safety
+2. ✅ **`last_call_usage` on `OllamaProvider`** — property added, shape matches ClaudeProvider. Done 2026-06-20.
+3. ✅ **`cv_fetch_jd` returns `vacancy_id`** — split into `fetch_jd(deps, url) -> int` + `cv_fetch_jd()` tool wrapper; `FetchError` exception. Done 2026-06-20.
+4. ✅ **Semaphore on concurrent LLM calls** — `asyncio.Semaphore(RSS_CONCURRENCY)` in RSSWatcher; guards cv_fetch_jd after notification. Done 2026-06-20.
 5. 🟡 Web Push subscription endpoint + send utility
 6. 🟢 Logic test on Ollama (`gemma4:31b-cloud`) — validate data flow, free
-7. 🟢 Quality run on Claude Haiku P1 + Haiku P2 — both phases on Haiku (decided 2026-06-20)
+7. ✅ **Quality run on Claude Haiku P1 + Haiku P2** — tested 2026-06-20 on vacancy #120; both phases on Haiku confirmed as production choice.
 
 ### Phase B — JSON contracts (foundation for Flutter) (3–5 days)
 
