@@ -94,8 +94,8 @@ So that I spend time only on decision-making and CV review, not on triggering pi
 
 | # | Task | Status | Depends on |
 |---|------|--------|-----------|
-| B1 | EPIC-21 Task 2: Pydantic JSON contracts for P1+2, P3+3.5, P4 in `contracts/` | 🔴 BLOCKER | A3 |
-| B2 | EPIC-21 Task 3: VacScore composite + Fit×VacScore matrix → Python; LLM returns dim scores only | 🟠 | B1 |
+| B1 | EPIC-21 Task 2: Pydantic JSON contracts for P1+2, P3+3.5, P4 in `contracts/pipeline.py` | ✅ Done | A3 | 2026-06-20 |
+| B2 | EPIC-21 Task 3: VacScore composite + Fit×VacScore matrix → Python; LLM returns dim scores only | 🔴 BLOCKER | B1 |
 | B3 | FastAPI JSON endpoints for Flutter: `GET /api/vacancies`, `GET /api/vacancies/{id}/analysis`, `GET /api/vacancies/{id}/cv` | 🟠 | B1 |
 | B4 | Auto-pipeline orchestrator: RSS → `fetch_jd` → Phase 1+2 → `save analysis_json` → Web Push | 🟠 | A5, B1, B2 |
 
