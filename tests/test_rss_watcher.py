@@ -98,11 +98,12 @@ async def test_poll_once_triggers_fetch_for_queued_vacancy():
     watcher, bot = _make_watcher()
     row = _make_row(42, "https://djinni.co/jobs/42/", title="Product Manager в Acme")
     mock_db = _mock_db([row])
-    mock_fetch = AsyncMock(return_value="✅ Вакансия сохранена!")
 
-    with patch("core.rss_watcher.database", mock_db):
-        with patch("tools.cv_fetch_jd.cv_fetch_jd", mock_fetch):
-            await watcher._poll_once()
+    with patch("core.rss_watcher.database", mock_db), \
+         patch("tools.cv_fetch_jd.fetch_jd", AsyncMock(return_value=42)), \
+         patch("tools.cv_analyze.cv_analyze", AsyncMock()), \
+         patch("core.rss_watcher.RSSWatcher._push_result", AsyncMock()):
+        await watcher._poll_once()
 
     # status updated to 'fetching' before processing
     mock_db.update_vacancy_status.assert_awaited_once_with(42, "fetching")
@@ -167,12 +168,14 @@ async def test_process_sends_notification_before_fetch():
     async def track_notify(msg: str) -> None:
         call_order.append("notify")
 
-    async def track_fetch(ctx, url: str) -> str:
+    async def track_fetch(deps, url: str) -> int:
         call_order.append("fetch")
-        return "✅ Fetched!"
+        return 1
 
     bot.send_message.side_effect = track_notify
-    with patch("tools.cv_fetch_jd.cv_fetch_jd", track_fetch):
+    with patch("tools.cv_fetch_jd.fetch_jd", track_fetch), \
+         patch("tools.cv_analyze.cv_analyze", AsyncMock()), \
+         patch("core.rss_watcher.RSSWatcher._push_result", AsyncMock()):
         await watcher._process(url)
 
     assert call_order == ["notify", "fetch"], "Notification must precede fetch"
@@ -301,13 +304,15 @@ async def test_notification_not_gated_by_semaphore():
 
     fetch_started = asyncio.Event()
 
-    async def track_fetch(ctx, url: str) -> str:
+    async def track_fetch(deps, url: str) -> int:
         fetch_started.set()
         call_order.append("fetch")
-        return "✅"
+        return 1
 
     async def run_process():
-        with patch("tools.cv_fetch_jd.cv_fetch_jd", track_fetch):
+        with patch("tools.cv_fetch_jd.fetch_jd", track_fetch), \
+             patch("tools.cv_analyze.cv_analyze", AsyncMock()), \
+             patch("core.rss_watcher.RSSWatcher._push_result", AsyncMock()):
             await watcher._process("https://djinni.co/jobs/1/")
 
     task = asyncio.create_task(run_process())
@@ -340,15 +345,17 @@ async def test_semaphore_limits_concurrent_fetches():
     concurrent_peak = 0
     active = 0
 
-    async def slow_fetch(ctx, url: str) -> str:
+    async def slow_fetch(deps, url: str) -> int:
         nonlocal active, concurrent_peak
         active += 1
         concurrent_peak = max(concurrent_peak, active)
         await asyncio.sleep(0.01)
         active -= 1
-        return "✅"
+        return 1
 
-    with patch("tools.cv_fetch_jd.cv_fetch_jd", slow_fetch):
+    with patch("tools.cv_fetch_jd.fetch_jd", slow_fetch), \
+         patch("tools.cv_analyze.cv_analyze", AsyncMock()), \
+         patch("core.rss_watcher.RSSWatcher._push_result", AsyncMock()):
         await asyncio.gather(
             watcher._process("https://djinni.co/jobs/1/"),
             watcher._process("https://djinni.co/jobs/2/"),
@@ -372,15 +379,17 @@ async def test_semaphore_concurrency_2_allows_two_parallel():
     concurrent_peak = 0
     active = 0
 
-    async def slow_fetch(ctx, url: str) -> str:
+    async def slow_fetch(deps, url: str) -> int:
         nonlocal active, concurrent_peak
         active += 1
         concurrent_peak = max(concurrent_peak, active)
         await asyncio.sleep(0.02)
         active -= 1
-        return "✅"
+        return 1
 
-    with patch("tools.cv_fetch_jd.cv_fetch_jd", slow_fetch):
+    with patch("tools.cv_fetch_jd.fetch_jd", slow_fetch), \
+         patch("tools.cv_analyze.cv_analyze", AsyncMock()), \
+         patch("core.rss_watcher.RSSWatcher._push_result", AsyncMock()):
         await asyncio.gather(
             watcher._process("https://djinni.co/jobs/1/"),
             watcher._process("https://djinni.co/jobs/2/"),
