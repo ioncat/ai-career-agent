@@ -4,6 +4,7 @@ import '../models/health.dart';
 import '../providers/health_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/vacancy_list_provider.dart';
+import '../services/notification_service.dart';
 import '../widgets/backend_status_dot.dart';
 import '../widgets/polling_progress_bar.dart';
 import '../widgets/status_line.dart';
@@ -38,6 +39,17 @@ class _AppShellState extends ConsumerState<AppShell> {
     final listState = listAsync.valueOrNull;
     final settingsAsync = ref.watch(settingsProvider);
     final settings = settingsAsync.valueOrNull;
+
+    ref.listen<AsyncValue<PollingState>>(vacancyListProvider, (prev, next) {
+      final newState = next.valueOrNull;
+      if (newState == null) return;
+      if (newState.status == PollingStatus.found && newState.newCount > 0) {
+        final notificationsEnabled = settings?.notificationsEnabled ?? true;
+        if (notificationsEnabled) {
+          NotificationService.showNewVacancies(newState.newCount);
+        }
+      }
+    });
 
     final inboxCount = ref.watch(folderVacanciesProvider('inbox')).length;
 
