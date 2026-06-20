@@ -58,6 +58,7 @@ class Settings:
     ollama_model: str = "qwen2.5:32b"
     ollama_timeout: int = 600              # read timeout in seconds (connect always 10s)
     allow_external_calls: bool = False     # ALLOW_EXTERNAL_CALLS=true to permit outbound HTTP
+    rss_concurrency: int = 2               # max parallel cv_fetch_jd calls in RSS batch
 
 
 class ConfigError(Exception):
@@ -116,4 +117,5 @@ def load_settings() -> Settings:
         ollama_model=_optional("OLLAMA_MODEL", "qwen2.5:32b"),
         ollama_timeout=int(_optional("OLLAMA_TIMEOUT", "600")),
         allow_external_calls=_optional("ALLOW_EXTERNAL_CALLS", "false").lower() == "true",
+        rss_concurrency=int(_optional("RSS_CONCURRENCY", "2")),
     )
