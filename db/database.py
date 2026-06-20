@@ -589,6 +589,54 @@ async def insert_llm_usage(
         return cursor.lastrowid  # type: ignore[return-value]
 
 
+# ── Push subscription helpers ─────────────────────────────────────────────────
+
+async def upsert_push_subscription(
+    user_id: int,
+    endpoint: str,
+    p256dh: str,
+    auth: str,
+    user_agent: str | None = None,
+) -> None:
+    """Store or refresh a Web Push subscription. endpoint is the unique key.
+
+    On conflict (same endpoint, different keys — browser key rotation):
+    updates p256dh + auth so sends don't fail with stale keys.
+    """
+    async with get_db() as db:
+        await db.execute(
+            """
+            INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth, user_agent)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(endpoint) DO UPDATE SET
+                p256dh     = excluded.p256dh,
+                auth       = excluded.auth,
+                user_agent = excluded.user_agent
+            """,
+            (user_id, endpoint, p256dh, auth, user_agent),
+        )
+        await db.commit()
+
+
+async def delete_push_subscription(endpoint: str) -> None:
+    """Remove a push subscription. Called when endpoint returns 404/410 (expired)."""
+    async with get_db() as db:
+        await db.execute(
+            "DELETE FROM push_subscriptions WHERE endpoint = ?", (endpoint,)
+        )
+        await db.commit()
+
+
+async def get_push_subscriptions(user_id: int) -> list[aiosqlite.Row]:
+    """Return all active push subscriptions for user_id."""
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT * FROM push_subscriptions WHERE user_id = ? ORDER BY created_at ASC",
+            (user_id,),
+        )
+        return await cursor.fetchall()
+
+
 async def get_pipeline_runs(vacancy_id: int) -> list[aiosqlite.Row]:
     """Return all pipeline runs for a vacancy, ordered by phase."""
     async with get_db() as db:
