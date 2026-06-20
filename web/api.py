@@ -93,30 +93,99 @@ async def tracker_page(
     )
 
 
+def _rec_label(rec: str) -> str:
+    """Generate recommendation_label from recommendation value for legacy data."""
+    return {"apply": "apply — strong match", "take_a_chance": "take a chance — worth trying", "decline": "decline — not worth the effort"}.get(rec, rec)
+
+
+def _legacy_fit_dims(raw: dict) -> dict:
+    """Map old fit_dimensions keys (domain/execution/...) to new snake_case + compute overall."""
+    mapping = {"domain": "domain_fit", "execution": "execution_fit", "strategy": "strategy_fit", "systems": "systems_fit", "stakeholder": "stakeholder_fit"}
+    out = {v: float(raw.get(k, 0)) for k, v in mapping.items()}
+    vals = list(out.values())
+    out["overall_fit"] = round(sum(vals) / len(vals), 1) if vals else 0.0
+    return out
+
+
+def _legacy_analysis_dict(raw: dict) -> dict:
+    """Convert pre-B1 analysis_json to Flutter-compatible structure."""
+    result: dict = {}
+    p1 = raw.get("p1")
+    p2 = raw.get("p2")
+    if p1:
+        result["p1"] = {
+            "role": "",
+            "company": "",
+            "north_star": "",
+            "primary_archetype": p1.get("role_archetype", ""),
+            "company_type": p1.get("company_type", "product"),
+            "role_balance": p1.get("role_balance", {}),
+            "dominant_culture": p1.get("dominant_culture", ""),
+            "vacscore_dims": p1.get("vacancy_dims", {}),
+            "vacancy_score": p1.get("vacancy_score", 0.0),
+        }
+    if p2:
+        rec = p2.get("recommendation", "")
+        result["p2"] = {
+            "fit_score": p2.get("fit_score", 0),
+            "recommendation": rec,
+            "recommendation_label": p2.get("recommendation_label") or _rec_label(rec),
+            "category": p2.get("category", ""),
+            "who_they_want": p2.get("who_they_want", ""),
+            "key_barriers": p2.get("key_barriers", []),
+            "hidden_risks": p2.get("hidden_risks", []),
+            "warnings": p2.get("warnings", []),
+            "fit_dimensions": _legacy_fit_dims(p2.get("fit_dimensions", {})),
+        }
+    return result
+
+
 def _parse_analysis_summary(analysis_json_str: str | None) -> dict:
     """Extract list-card fields from analysis_json for GET /api/vacancies response.
 
-    Flutter vacancy list cards need: fit_score, recommendation, recommendation_label,
-    vacancy_score, key_barriers, warnings. These live in p2/p1 of analysis_json.
+    Handles both new (B1+) and legacy (pre-B1) analysis_json formats.
     Returns partial dict — missing keys absent when phase not yet run.
     """
     if not analysis_json_str:
         return {}
     try:
         aj = AnalysisJson.model_validate_json(analysis_json_str)
+        out: dict = {}
+        if aj.p2:
+            out["fit_score"] = aj.p2.fit_score
+            out["recommendation"] = aj.p2.recommendation
+            out["recommendation_label"] = aj.p2.recommendation_label
+            out["key_barriers"] = aj.p2.key_barriers
+            out["warnings"] = aj.p2.warnings
+            out["category"] = aj.p2.category
+        if aj.p1:
+            out["vacancy_score"] = aj.p1.vacancy_score
+            out["primary_archetype"] = aj.p1.primary_archetype
+            out["role"] = aj.p1.role
+            out["company"] = aj.p1.company
+        return out
+    except Exception:
+        pass
+    # Legacy pre-B1 format fallback
+    try:
+        raw = json.loads(analysis_json_str)
+        p2 = raw.get("p2", {})
+        p1 = raw.get("p1", {})
+        out = {}
+        if p2:
+            rec = p2.get("recommendation", "")
+            out["fit_score"] = p2.get("fit_score")
+            out["recommendation"] = rec
+            out["recommendation_label"] = _rec_label(rec)
+            out["key_barriers"] = p2.get("key_barriers", [])
+            out["warnings"] = p2.get("warnings", [])
+            out["category"] = p2.get("category", "")
+        if p1:
+            out["vacancy_score"] = p1.get("vacancy_score")
+            out["primary_archetype"] = p1.get("role_archetype", "")
+        return out
     except Exception:
         return {}
-    out: dict = {}
-    if aj.p2:
-        out["fit_score"] = aj.p2.fit_score
-        out["recommendation"] = aj.p2.recommendation
-        out["recommendation_label"] = aj.p2.recommendation_label
-        out["key_barriers"] = aj.p2.key_barriers
-        out["warnings"] = aj.p2.warnings
-    if aj.p1:
-        out["vacancy_score"] = aj.p1.vacancy_score
-        out["primary_archetype"] = aj.p1.primary_archetype
-    return out
 
 
 @app.get("/api/vacancies")
@@ -354,9 +423,14 @@ async def api_vacancy_analysis(vacancy_id: int):
     aj_str = row["analysis_json"] if "analysis_json" in row.keys() else None
     try:
         aj = AnalysisJson.model_validate_json(aj_str or "{}")
+        return aj.model_dump(exclude_none=True)
     except Exception:
-        aj = AnalysisJson()
-    return aj.model_dump(exclude_none=True)
+        pass
+    # Legacy pre-B1 format fallback
+    try:
+        return _legacy_analysis_dict(json.loads(aj_str)) if aj_str else {}
+    except Exception:
+        return {}
 
 
 @app.get("/api/vacancies/{vacancy_id}/cv")

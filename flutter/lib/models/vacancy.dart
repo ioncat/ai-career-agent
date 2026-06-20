@@ -34,7 +34,8 @@ class VacancyListItem {
   factory VacancyListItem.fromJson(Map<String, dynamic> json) {
     return VacancyListItem(
       id: json['id'] as int,
-      role: json['role'] as String? ?? '',
+      // 'role' from p1 analysis; fallback to 'title' from DB row for unanalyzed vacancies
+      role: json['role'] as String? ?? json['title'] as String? ?? '',
       company: json['company'] as String? ?? '',
       site: json['site'] as String? ?? '',
       url: json['url'] as String? ?? '',
