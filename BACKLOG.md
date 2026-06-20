@@ -1,6 +1,6 @@
 # career-agent — Backlog
 
-> Last updated: 2026-06-17
+> Last updated: 2026-06-20
 > Epic format: post-pivot epics (13+) live in `docs/delivery/epics/`. This file = priority tracker + status overview.
 > Pre-pivot epics (1–12): `docs/delivery/epics-archive/EPIC-01-12-pre-pivot.md`
 
@@ -247,6 +247,37 @@ Merged 2026-06-15. Engine decision resolved: **weasyprint** (HTML/Jinja2 + CSS �
 3. Из Windows: `http://VM_IP:8080` (трекер), бот через Telegram
 
 **launcher.py** — локальный запуск без Docker (все 5 сервисов в одном окне, sequential start, Ctrl+C убивает всё). PDF сервис на Windows без GTK не работает — только через Docker.
+
+---
+
+## ✅ Phase A blockers — auto-pipeline foundation (2026-06-20)
+
+**Goal:** unblock the RSS → Phase 1+2 auto-pipeline by resolving 4 infrastructure gaps.
+
+### #1 — CandidateProfile schema + population from PROFILE.md
+- `contracts/profile.py` — `CandidateProfile(BaseModel)`: `skill_type`, `language`, `domain_interests`, `company_stage_prefs`; `phase1_context()` returns compact JSON for Phase 1 injection
+- `core/profile_loader.py` — `parse_profile_md(text)`: parses `## Settings` key-value + `## Vacancy Preferences` YAML block; never raises
+- `core/deps.py` — `AgentDeps.profile: CandidateProfile | None` field added
+- `agent.py` — loads PROFILE.md from file, calls `parse_profile_md`, stores to DB + `deps.profile`
+- `tests/test_profile_loader.py` — 20 tests (settings, YAML prefs, phase1_context, integration)
+
+### #2 — OllamaProvider.last_call_usage
+- `core/llm_client.py` — `last_call_usage` property on `OllamaProvider`; tracks `prompt_eval_count` / `eval_count` from Ollama response; matches ClaudeProvider shape (cost_usd=0.0, cache tokens=0); `log_session_summary()` added
+- `tests/test_llm_client.py` — 4 new tests (None before first call, populated after, zero on missing counts, updates on second call)
+- **Why:** `cv_analyze.py` logged token usage via `llm.last_call_usage` → AttributeError crash when `LLM_PROVIDER=ollama`
+
+### #3 — cv_fetch_jd returns vacancy_id
+- `tools/cv_fetch_jd.py` — split into `fetch_jd(deps, url) -> int` (core, auto-pipeline callable) + `cv_fetch_jd(ctx, url) -> str` (PydanticAI tool wrapper); `FetchError` exception replaces string error returns
+- `tests/test_cv_fetch_jd.py` — rewritten: 26 tests covering both entry points, FetchError, duplicate/queued handling, vacancy_id propagation
+- **Why:** auto-pipeline needs vacancy_id as int to chain Phase 1+2 without user interaction; old tool returned only a display string
+
+### #4 — RSS batch semaphore
+- `core/rss_watcher.py` — `asyncio.Semaphore(concurrency)` in `__init__`; guards `cv_fetch_jd` in `_process` (after Telegram notification, before parser+LLM)
+- `core/settings.py` — `rss_concurrency: int = 2` + `RSS_CONCURRENCY` env var
+- `agent.py` — passes `concurrency=settings.rss_concurrency` to `RSSWatcher`
+- `tests/test_rss_watcher.py` — 5 new tests (default/custom concurrency, notification not gated, concurrency=1 serializes, concurrency=2 allows 2 parallel)
+- **Why:** N queued vacancies → N parallel LLM calls → Anthropic rate limit (RPM/TPM) + Ollama GPU contention; semaphore scope will extend to cover Phase 1+2 auto-run
+- **Tests total:** 320 → 362
 
 ---
 
