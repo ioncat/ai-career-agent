@@ -285,3 +285,103 @@ async def test_ollama_empty_response_raises_llm_error():
 
         with pytest.raises(LLMError, match="empty"):
             await provider.complete("test")
+
+
+# ── OllamaProvider.last_call_usage ───────────────────────────────────────────
+
+
+def _make_ollama_response(content: str = "ok", inp: int = 50, out: int = 20) -> MagicMock:
+    resp = MagicMock()
+    resp.raise_for_status = MagicMock()
+    resp.json.return_value = {
+        "message": {"content": content},
+        "prompt_eval_count": inp,
+        "eval_count": out,
+        "done_reason": "stop",
+    }
+    return resp
+
+
+def _patch_ollama_client(fake_resp):
+    from unittest.mock import patch, AsyncMock
+    mock_client = AsyncMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    mock_client.post = AsyncMock(return_value=fake_resp)
+    return patch("httpx.AsyncClient", return_value=mock_client), mock_client
+
+
+@pytest.mark.asyncio
+async def test_ollama_last_call_usage_none_before_first_call():
+    provider = _make_ollama()
+    assert provider.last_call_usage is None
+
+
+@pytest.mark.asyncio
+async def test_ollama_last_call_usage_populated_after_complete():
+    provider = _make_ollama()
+    fake_resp = _make_ollama_response(content="result", inp=123, out=45)
+
+    with patch("httpx.AsyncClient") as mock_cls:
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.post = AsyncMock(return_value=fake_resp)
+        mock_cls.return_value = mock_client
+
+        await provider.complete("user msg", system="sys prompt")
+
+    u = provider.last_call_usage
+    assert u is not None
+    assert u["model"] == FAKE_OLLAMA_MODEL
+    assert u["input_tokens"] == 123
+    assert u["output_tokens"] == 45
+    assert u["cache_write_tokens"] == 0
+    assert u["cache_read_tokens"] == 0
+    assert u["cost_usd"] == 0.0
+    assert u["elapsed_ms"] >= 0
+    assert u["profile_tokens"] == len(FAKE_PROFILE) // 4
+    assert u["prompt_tokens"] == len("sys prompt") // 4
+    assert u["user_tokens"] == len("user msg") // 4
+
+
+@pytest.mark.asyncio
+async def test_ollama_last_call_usage_zero_tokens_when_not_reported():
+    """Models that don't report eval counts → zeros, not crash."""
+    provider = _make_ollama()
+    fake_resp = MagicMock()
+    fake_resp.raise_for_status = MagicMock()
+    fake_resp.json.return_value = {"message": {"content": "answer"}}  # no eval counts
+
+    with patch("httpx.AsyncClient") as mock_cls:
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.post = AsyncMock(return_value=fake_resp)
+        mock_cls.return_value = mock_client
+
+        await provider.complete("q")
+
+    u = provider.last_call_usage
+    assert u is not None
+    assert u["input_tokens"] == 0
+    assert u["output_tokens"] == 0
+
+
+@pytest.mark.asyncio
+async def test_ollama_last_call_usage_updates_on_second_call():
+    provider = _make_ollama()
+
+    with patch("httpx.AsyncClient") as mock_cls:
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        mock_client.post = AsyncMock(return_value=_make_ollama_response("first", 10, 5))
+        mock_cls.return_value = mock_client
+        await provider.complete("q1")
+        assert provider.last_call_usage["input_tokens"] == 10
+
+        mock_client.post = AsyncMock(return_value=_make_ollama_response("second", 99, 77))
+        await provider.complete("q2")
+        assert provider.last_call_usage["input_tokens"] == 99

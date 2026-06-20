@@ -382,6 +382,10 @@ class OllamaProvider:
         self._max_tokens = max_tokens
         read_timeout = None if timeout == 0 else float(timeout)
         self._timeout = httpx.Timeout(timeout=read_timeout, connect=10.0)
+        self._last_call_usage: dict | None = None
+        self._sess_calls = 0
+        self._sess_input = 0
+        self._sess_output = 0
 
     async def complete(self, user: str, *, system: str | None = None, **_kwargs) -> str:
         """Call Ollama /api/chat. system and user mirror ClaudeProvider.complete()."""
@@ -433,9 +437,35 @@ class OllamaProvider:
             raise LLMError("Ollama returned empty response")
 
         done_reason = data.get("done_reason") or data.get("finish_reason") or ""
+
+        # Token counts from Ollama response (0 if model doesn't report them)
+        inp = int(data.get("prompt_eval_count") or 0)
+        out = int(data.get("eval_count") or 0)
+        elapsed_ms = int(elapsed * 1000)
+
+        self._sess_calls += 1
+        self._sess_input += inp
+        self._sess_output += out
+        self._last_call_usage = {
+            "model": self._model,
+            "profile_tokens": len(self._profile_md) // 4,
+            "prompt_tokens": len(system) // 4 if system else 0,
+            "user_tokens": len(user) // 4,
+            "input_tokens": inp,
+            "output_tokens": out,
+            "cache_write_tokens": 0,
+            "cache_read_tokens": 0,
+            "budget_tokens": 0,
+            "thinking_tokens": 0,
+            "elapsed_ms": elapsed_ms,
+            "cost_usd": 0.0,
+        }
+
         log.info(
-            "OllamaProvider: model=%s elapsed=%.1fs in=~%d out=%d chars done_reason=%r",
-            self._model, elapsed, len(user) + len(system_content), len(text), done_reason,
+            "OllamaProvider: model=%s elapsed=%.1fs in=%d out=%d tokens done_reason=%r"
+            " | session: calls=%d in=%d out=%d",
+            self._model, elapsed, inp, out, done_reason,
+            self._sess_calls, self._sess_input, self._sess_output,
         )
         if done_reason == "length":
             raise LLMError(
@@ -448,5 +478,13 @@ class OllamaProvider:
     def model(self) -> str:
         return self._model
 
+    @property
+    def last_call_usage(self) -> dict | None:
+        """Usage dict from the most recent complete() call. None if no calls yet."""
+        return self._last_call_usage
+
     def log_session_summary(self) -> None:
-        log.info("OllamaProvider: no token tracking (model=%s)", self._model)
+        log.info(
+            "OllamaProvider session: calls=%d in=%d out=%d tokens cost=$0.00 (model=%s)",
+            self._sess_calls, self._sess_input, self._sess_output, self._model,
+        )
