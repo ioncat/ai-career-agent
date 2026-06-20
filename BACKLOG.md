@@ -6,6 +6,16 @@
 
 ---
 
+## 🔵 P0 — [EPIC-22](docs/delivery/Epics/EPIC-22-flutter-platform.md) — Flutter Platform (Pivot 2)
+
+**Goal:** Flutter Web = sole UI. Telegram removed. Pipeline emits JSON. RSS → auto Phase 1+2 → Web Push → Flutter.
+
+**Status:** Phase A (4/7 done). Next: A5 Web Push endpoint. Full architecture: `docs/delivery/PIVOT-2-FLUTTER-PLATFORM.md`.
+
+**Critical path:** Phase A (auto-pipeline) → Phase B (JSON contracts + EPIC-21 Tasks 2–3) → Phase C (Flutter MVP) → Phase D (polish + Telegram removal).
+
+---
+
 ## 🔴 P0 — [EPIC-21](docs/delivery/Epics/EPIC-21-deterministic-vs-cognitive-pipeline.md) — Deterministic vs Cognitive pipeline split
 
 **Goal:** Draw the boundary — deterministic work in Python (FSM orchestrator), LLM only for irreducible cognitive phases. Source: `docs/discovery/hypotheses/H-002`.
