@@ -151,9 +151,17 @@ pre {
 h2 { page-break-after: avoid; }
 h3 { page-break-after: avoid; }
 table { page-break-inside: avoid; }
+
+/* ── Accent bar (bleeds to page edges, restores 16mm gap below) ── */
+.accent-bar {
+    height: 4mm;
+    background: #4285F4;
+    margin: -20mm -22mm 16mm -22mm;
+}
 </style>
 </head>
 <body>
+<div class="accent-bar"></div>
 {{ content }}
 </body>
 </html>
