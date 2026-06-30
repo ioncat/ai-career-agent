@@ -9,25 +9,24 @@ class FitScoreChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = FitColors.forScore(score);
-    final size = large ? 14.0 : 11.0;
+    final cs = Theme.of(context).colorScheme;
+    final fg = FitColors.forScore(score, cs);
+    final bg = FitColors.bgForScore(score, cs);
+
     return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: large ? 10 : 6,
-        vertical: large ? 4 : 2,
-      ),
+      height: 24,
+      padding: EdgeInsets.symmetric(horizontal: large ? 10 : 8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
-        border: Border.all(color: color.withOpacity(0.4)),
+        color: bg,
         borderRadius: BorderRadius.circular(999),
       ),
+      alignment: Alignment.center,
       child: Text(
-        'Fit $score/10',
-        style: TextStyle(
-          fontSize: size,
-          fontWeight: FontWeight.w600,
-          color: color,
-        ),
+        large ? 'Fit $score/10' : 'F: $score',
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: fg,
+              fontWeight: FontWeight.w700,
+            ),
       ),
     );
   }

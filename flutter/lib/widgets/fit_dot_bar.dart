@@ -8,7 +8,10 @@ class FitDotBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final filled = FitColors.forScore(score);
+    final cs = Theme.of(context).colorScheme;
+    final filledColor = FitColors.forScore(score, cs);
+    final emptyColor = cs.surfaceContainerHighest;
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: List.generate(10, (i) {
@@ -18,7 +21,7 @@ class FitDotBar extends StatelessWidget {
           margin: const EdgeInsets.only(right: 4),
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: i < score ? filled : const Color(0xFFE0E0E0),
+            color: i < score ? filledColor : emptyColor,
           ),
         );
       }),

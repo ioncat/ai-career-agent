@@ -9,26 +9,28 @@ class VacScoreBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = VacScoreColors.forScore(score);
+    final cs = Theme.of(context).colorScheme;
+    final bg = VacScoreColors.bgForScore(score, cs);
+    final fg = VacScoreColors.onBgForScore(score, cs);
     final tier = VacScoreColors.tierLabel(score);
-    final size = large ? 13.0 : 10.0;
+
     return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: large ? 8 : 5,
-        vertical: large ? 3 : 2,
-      ),
+      height: 24,
+      padding: EdgeInsets.symmetric(horizontal: large ? 10 : 8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: bg,
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: score < 5.5
+            ? Border.all(color: cs.outline.withValues(alpha: 0.5))
+            : null,
       ),
+      alignment: Alignment.center,
       child: Text(
-        '${score.toStringAsFixed(1)} $tier',
-        style: TextStyle(
-          fontSize: size,
-          fontWeight: FontWeight.w600,
-          color: color,
-        ),
+        large ? '${score.toStringAsFixed(1)} $tier' : 'V: ${score.toStringAsFixed(1)}',
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: fg,
+              fontWeight: FontWeight.w700,
+            ),
       ),
     );
   }

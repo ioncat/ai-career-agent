@@ -75,10 +75,7 @@ class _StatusLineState extends State<StatusLine> {
     return Text(
       _text,
       style: Theme.of(context).textTheme.labelMedium?.copyWith(
-            color: Theme.of(context)
-                .colorScheme
-                .onSurface
-                .withOpacity(0.55),
+            color: Theme.of(context).colorScheme.secondary,
           ),
     );
   }

@@ -10,21 +10,21 @@ class SourceBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = SourceColors.forSite(site);
     final label = SourceColors.label(site);
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+      height: 24,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: color.withOpacity(0.3)),
+        color: color,
+        borderRadius: BorderRadius.circular(999),
       ),
+      alignment: Alignment.center,
       child: Text(
         label,
-        style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w500,
-          color: color,
-          letterSpacing: 0.3,
-        ),
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w500,
+            ),
       ),
     );
   }
