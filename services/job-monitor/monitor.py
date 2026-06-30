@@ -58,6 +58,31 @@ CHECK_TIMEOUT: int = DEFAULT_CONFIG["check_timeout_seconds"]
 # Salary extraction from DOU titles (e.g. "$1500–2000").
 SALARY_RE = re.compile(r"\$\s*\d{1,5}(?:\s*[–—\-]\s*\d{1,5})?")
 
+# Company extraction from DOU title: "Role в Company, ..." or "Role at Company, ..."
+_COMPANY_DOU_RE = re.compile(r"\s+(?:в|у|at)\s+([^,\n]+)", re.IGNORECASE)
+# Strip HTML tags for Djinni description parsing
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def _extract_company_from_title(title: str) -> str:
+    """Extract company from DOU-style title: 'Role в Company, ...' → 'Company'."""
+    m = _COMPANY_DOU_RE.search(title)
+    return m.group(1).strip() if m else ""
+
+
+def _extract_company_from_description(description: str) -> str:
+    """Extract company from Djinni RSS description HTML.
+
+    Djinni descriptions typically start with the company name in <b> or plain text.
+    Strategy: strip HTML, take first non-empty line.
+    """
+    if not description:
+        return ""
+    text = _HTML_TAG_RE.sub(" ", description)
+    lines = [l.strip() for l in text.splitlines() if l.strip()]
+    # First line is usually company name on Djinni
+    return lines[0][:80] if lines else ""
+
 
 def _pid_alive(pid: int) -> bool:
     try:
@@ -355,6 +380,16 @@ def _parse_pub_date(pub_date: str) -> str | None:
         return None
 
 
+def _resolve_company(title: str, description: str, feed_url: str) -> str:
+    """Extract company name from RSS data depending on source."""
+    if "dou.ua" in feed_url:
+        return _extract_company_from_title(title)
+    if "djinni.co" in feed_url:
+        return _extract_company_from_description(description)
+    # Fallback: try title pattern first, then description
+    return _extract_company_from_title(title) or _extract_company_from_description(description)
+
+
 async def post_to_career_agent(
     session: aiohttp.ClientSession,
     career_agent_url: str,
@@ -363,6 +398,8 @@ async def post_to_career_agent(
     feed_name: str,
     user_id: int,
     pub_date: str = "",
+    company: str = "",
+    salary: str = "",
 ) -> None:
     """POST new vacancy to career-agent webhook endpoint.
 
@@ -374,6 +411,10 @@ async def post_to_career_agent(
     published_at = _parse_pub_date(pub_date)
     if published_at:
         payload["published_at"] = published_at
+    if company:
+        payload["company"] = company
+    if salary:
+        payload["salary"] = salary
     async with session.post(endpoint, json=payload) as resp:
         if resp.status == 409:
             log.info("[WEBHOOK] %s already known by career-agent — marking sent", url)
@@ -393,8 +434,9 @@ async def fetch_jobs(session: aiohttp.ClientSession, url: str) -> list[dict]:
         title = (item.findtext("title") or "").strip()
         link = (item.findtext("link") or "").strip()
         pub_date = (item.findtext("pubDate") or "").strip()
+        description = (item.findtext("description") or "").strip()
         if link:
-            jobs.append({"title": title, "link": link, "pubDate": pub_date})
+            jobs.append({"title": title, "link": link, "pubDate": pub_date, "description": description})
     return jobs
 
 
@@ -422,7 +464,10 @@ async def deliver_one(
     delivery["last_attempt"] = now.isoformat(timespec="seconds")
 
     try:
-        await post_to_career_agent(session, career_agent_url, link, j["title"], feed_name, user_id, j.get("pubDate", ""))
+        await post_to_career_agent(
+            session, career_agent_url, link, j["title"], feed_name, user_id,
+            j.get("pubDate", ""), j.get("company", ""), j.get("salary", ""),
+        )
         delivery["status"] = "sent"
         delivery["last_error"] = None
         return True
@@ -498,6 +543,11 @@ async def check_feed(
         log.error("[%s] fetch failed: %s", feed["name"], e)
         return 0
 
+    # Enrich each job with company + salary extracted from RSS data
+    for j in jobs:
+        j["company"] = _resolve_company(j["title"], j.get("description", ""), feed["url"])
+        j["salary"] = SALARY_RE.search(j["title"]).group() if SALARY_RE.search(j["title"]) else ""
+
     new_jobs = [j for j in jobs if j["link"] not in state]
     now = datetime.now()
     now_iso = now.isoformat(timespec="seconds")
@@ -506,7 +556,8 @@ async def check_feed(
         log.info("[%s] total: %d, new: %d, seen: %d",
                  feed["name"], len(jobs), len(new_jobs), len(jobs) - len(new_jobs))
         for j in new_jobs:
-            log.info("  → %s\n    %s", j["title"], j["link"])
+            log.info("  → %s | company=%s | salary=%s\n    %s",
+                     j["title"], j["company"], j["salary"], j["link"])
             state[j["link"]] = _build_state_entry(j, feed, now_iso, silent=True)
         return 0
 

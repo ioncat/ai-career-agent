@@ -53,6 +53,7 @@ class VacancyView:
     cv_pdf_url: str = ""    # "/files/vacancies/..." — empty string if no PDF
     analysis_md: str = ""   # full JD_analysis.md content for marked.js rendering
     salary: str = ""         # "$4500" or "" if unknown
+    company: str = ""        # company name from RSS feed or JD analysis
     applied: bool = False   # True if CV was submitted to this vacancy
     starred: bool = False   # True if marked as favourite
     vacancy_score: str = "—"  # "7.2" or "—" — attractiveness score from p1
@@ -135,6 +136,7 @@ def build_vacancy_view(row: object, candidate_name: str = "Candidate") -> Vacanc
     db_applied: bool = bool(row["applied"]) if "applied" in row.keys() else False  # type: ignore[index]
     db_starred: bool = bool(row["starred"]) if "starred" in row.keys() else False  # type: ignore[index]
     db_user_id: int | None = row["user_id"] if "user_id" in row.keys() else None  # type: ignore[index]
+    db_company: str = str(row["company"] or "") if "company" in row.keys() else ""  # type: ignore[index]
 
     date = created_at[:10]  # "YYYY-MM-DD"
 
@@ -194,6 +196,8 @@ def build_vacancy_view(row: object, candidate_name: str = "Candidate") -> Vacanc
                     blockers = kb
             if not db_salary and p2.get("salary"):
                 db_salary = p2["salary"]
+            if not db_company and p2.get("company"):
+                db_company = str(p2["company"])
             p1 = aj.get("p1", {})
             vs = p1.get("vacancy_score")
             if vs is not None:
@@ -220,6 +224,7 @@ def build_vacancy_view(row: object, candidate_name: str = "Candidate") -> Vacanc
         cv_pdf_url=cv_pdf_url,
         analysis_md=analysis_md,
         salary=db_salary,
+        company=db_company,
         applied=db_applied,
         starred=db_starred,
         vacancy_score=vacancy_score_str,

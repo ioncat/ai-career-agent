@@ -67,7 +67,7 @@ async def tracker_page(
     request: Request,
     status: str | None = None,
     user_id: int | None = None,
-    limit: int = 200,
+    limit: int = 500,
 ):
     rows = await database.list_vacancies(status=status, user_id=user_id, limit=limit)
     vacancies = [build_vacancy_view(row, _CANDIDATE_NAME) for row in rows]
@@ -206,7 +206,12 @@ async def api_vacancies(
         item = dict(row)
         item["applied"] = bool(item.get("applied"))
         item["starred"] = bool(item.get("starred"))
-        item.update(_parse_analysis_summary(item.pop("analysis_json", None)))
+        db_company = item.get("company") or ""
+        parsed = _parse_analysis_summary(item.pop("analysis_json", None))
+        # Prefer analysis company (post-JD parse) over RSS company, but keep RSS as fallback
+        if not parsed.get("company"):
+            parsed["company"] = db_company
+        item.update(parsed)
         result.append(item)
     return result
 
@@ -234,6 +239,8 @@ class NewVacancyRequest(BaseModel):
     feed_name: str | None = None
     user_id: int | None = None
     published_at: str | None = None
+    company: str | None = None
+    salary: str | None = None
 
 
 @app.post("/api/new-vacancy", status_code=201)
@@ -254,12 +261,15 @@ async def api_new_vacancy(req: NewVacancyRequest):
             user_id=req.user_id,
             status="queued",
             published_at=req.published_at,
+            company=req.company,
         )
+        if req.salary:
+            await database.update_vacancy_fields(vacancy_id, salary=req.salary)
     except Exception as exc:
         if "UNIQUE" in str(exc).upper():
             raise HTTPException(status_code=409, detail="duplicate")
         raise
-    log.info("api/new-vacancy: queued vacancy_id=%d url=%s", vacancy_id, req.url)
+    log.info("api/new-vacancy: queued vacancy_id=%d url=%s company=%s", vacancy_id, req.url, req.company)
     return {"vacancy_id": vacancy_id, "status": "queued"}
 
 
