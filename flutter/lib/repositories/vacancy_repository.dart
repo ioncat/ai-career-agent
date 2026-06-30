@@ -10,13 +10,14 @@ class VacancyRepository {
   Future<List<VacancyListItem>> listVacancies({
     String? status,
     String? since,
+    int limit = 1000,
   }) async {
-    final params = <String, String>{};
+    final params = <String, String>{'limit': '$limit'};
     if (status != null) params['status'] = status;
     if (since != null) params['since'] = since;
 
     final uri = Uri.parse('$baseUrl/api/vacancies')
-        .replace(queryParameters: params.isNotEmpty ? params : null);
+        .replace(queryParameters: params);
 
     final response = await http.get(uri).timeout(const Duration(seconds: 10));
     if (response.statusCode != 200) {
