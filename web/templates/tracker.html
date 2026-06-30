@@ -7,33 +7,30 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:13px;background:#f4f4f5;color:#1a1a1a;padding:24px}
-.wrap{max-width:1100px;margin:0 auto}
+.wrap{max-width:1200px;margin:0 auto}
 h1{font-size:17px;font-weight:600;margin-bottom:14px}
 .controls{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center}
 .controls select,.controls input{padding:5px 9px;border:1px solid #d1d5db;border-radius:5px;font-size:13px;background:#fff}
-.btn-grp{padding:5px 10px;border:1px solid #d1d5db;border-radius:5px;font-size:12px;background:#fff;cursor:pointer;white-space:nowrap;color:#374151}
-.btn-grp:hover{background:#f0f0f0;border-color:#9ca3af}
 .sep-ctrl{display:flex;gap:4px;margin-left:auto}
 table{width:100%;border-collapse:collapse;background:#fff;border-radius:7px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.08)}
-th{background:#18181b;color:#fff;padding:8px 10px;text-align:left;cursor:pointer;white-space:nowrap;font-weight:500;font-size:12px;user-select:none}
-th:hover{background:#27272a}
+th{background:#18181b;color:#fff;padding:8px 10px;text-align:left;white-space:nowrap;font-weight:500;font-size:12px;user-select:none}
+th.sortable{cursor:pointer}
+th.sortable:hover{background:#27272a}
+th.sort-asc::after{content:" ↑";font-size:10px;color:#a1a1aa}
+th.sort-desc::after{content:" ↓";font-size:10px;color:#a1a1aa}
 td{padding:7px 10px;border-bottom:1px solid #f0f0f0;vertical-align:top}
 tr:last-child td{border-bottom:none}
-tr:hover:not(.date-sep) td{background:#fafafa}
+tr:hover:not(.expand-row) td{background:#fafafa}
 .rec-yes{border-left:3px solid #16a34a}
 .rec-no{border-left:3px solid #dc2626;opacity:.65}
 .rec-consider{border-left:3px solid #f59e0b}
 .warn-chip{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:600;background:#fef3c7;color:#92400e;border:1px solid #f59e0b;vertical-align:middle;cursor:pointer}
-.date-sep{cursor:pointer;user-select:none}
-.date-sep td{background:#e4e4e7;color:#52525b;font-weight:600;font-size:11px;padding:5px 10px;letter-spacing:.05em;border-bottom:2px solid #d4d4d8;border-top:2px solid #d4d4d8}
-.date-sep:hover td{background:#d4d4d8}
-.grp-icon{font-size:9px;margin-right:5px;display:inline-block;width:10px;color:#9ca3af}
 .vname{font-weight:500;max-width:280px}
 .vname a{color:inherit;text-decoration:none;border-bottom:1px solid #d1d5db}
 .vname a:hover{border-bottom-color:#1d4ed8;color:#1d4ed8}
 .cat{color:#6b7280;font-size:12px;max-width:220px}
 .fit{font-weight:600;white-space:nowrap;color:#1d4ed8}
-.vscore{font-weight:600;white-space:nowrap;color:#7c3aed}
+.vscore{font-weight:600;white-space:nowrap}
 .vscore-hi{color:#16a34a}.vscore-mid{color:#d97706}.vscore-lo{color:#9ca3af}
 .tick{color:#16a34a;font-weight:700}
 .cross{color:#9ca3af}
@@ -78,7 +75,7 @@ tr:hover:not(.date-sep) td{background:#fafafa}
 .star-btn{cursor:pointer;font-size:15px;background:none;border:none;padding:0;color:#d1d5db;line-height:1}
 .star-btn:hover{color:#f59e0b}
 tr[data-starred="1"] .star-btn{color:#f59e0b}
-.grp-count{margin-left:8px;color:#9ca3af;font-weight:400;font-size:11px}
+.date-cell{white-space:nowrap;font-size:11px;color:#6b7280}
 </style>
 </head>
 <body>
@@ -122,21 +119,19 @@ tr[data-starred="1"] .star-btn{color:#f59e0b}
   </select>
   <input id="f-text" type="search" placeholder="Поиск…" oninput="filter()" style="width:180px">
   <span class="count" id="count"></span>
-  <div class="sep-ctrl">
-    <button class="btn-grp" onclick="expandAll()">Развернуть всё</button>
-    <button class="btn-grp" onclick="collapseAll()">Свернуть всё</button>
-  </div>
 </div>
 <table>
   <thead>
     <tr>
       <th style="width:28px">#</th>
       <th style="width:28px" title="Избранное">⭐</th>
-      <th onclick="sort(1)">Вакансия</th>
-      <th onclick="sort(2)">Фит</th>
-      <th title="Vacancy Score — привлекательность роли">VScore</th>
-      <th>Рекоменд.</th>
-      <th>Категория</th>
+      <th class="sortable" data-col="2" data-type="str">Вакансия</th>
+      <th class="sortable" data-col="3" data-type="str">Компания</th>
+      <th class="sortable" data-col="4" data-type="num">Фит</th>
+      <th class="sortable" data-col="5" data-type="num" title="Vacancy Score — привлекательность роли">VScore</th>
+      <th class="sortable" data-col="6" data-type="str">Рекоменд.</th>
+      <th class="sortable" data-col="7" data-type="str">Категория</th>
+      <th class="sortable" data-col="8" data-type="str">Дата</th>
       <th>Зарплата</th>
       <th>Барьеры</th>
       <th>Анализ</th>
@@ -146,22 +141,17 @@ tr[data-starred="1"] .star-btn{color:#f59e0b}
     </tr>
   </thead>
   <tbody id="tbody">
-  {% set ns = namespace(last_date='') %}
   {% for v in vacancies %}
-    {% if v.date != ns.last_date %}
-    <tr class="date-sep" data-group-date="{{ v.date }}">
-      <td colspan="13"><span class="grp-icon" data-type="date" data-date="{{ v.date }}">▼</span>{{ v.date }}<span class="grp-count" data-date="{{ v.date }}"></span></td>
-    </tr>
-    {% set ns.last_date = v.date %}
-    {% endif %}
     <tr class="{{ v.rec_class }}" data-idx="{{ v.id }}" data-site="{{ v.site or '' }}" data-date="{{ v.date }}" data-applied="{{ '1' if v.applied else '0' }}" data-starred="{{ '1' if v.starred else '0' }}" data-user="{{ v.user_id or '' }}">
       <td class="num">{{ v.id }}<span class="expand-btn" data-expand="{{ v.id }}" title="Показать анализ">▶</span></td>
       <td style="text-align:center"><button class="star-btn" data-id="{{ v.id }}" onclick="toggleStarred(this)" title="Избранное">{{ '★' if v.starred else '☆' }}</button></td>
       <td class="vname"><span class="site-chip site-{{ v.site or 'other' }}">{{ v.site_display }}</span><a href="{{ v.url }}" target="_blank" rel="noopener">{{ v.title }}</a></td>
+      <td style="font-size:12px;color:#374151;max-width:160px">{{ v.company or '' }}</td>
       <td class="fit">{{ v.fit_score }}</td>
       <td class="vscore {% if v.vacancy_score != '—' %}{% set vs = v.vacancy_score | float %}{% if vs >= 7.5 %}vscore-hi{% elif vs >= 5.5 %}vscore-mid{% else %}vscore-lo{% endif %}{% endif %}">{{ v.vacancy_score }}</td>
       <td>{% if v.rec_class == 'rec-yes' %}✅{% elif v.rec_class == 'rec-no' %}❌{% elif v.rec_class == 'rec-consider' %}⚠️{% endif %} {{ v.recommendation }}{% if v.warn_count > 0 %}<span class="warn-chip" data-warn="{{ v.warn_text_escaped }}">⚠ {{ v.warn_count }}</span>{% endif %}</td>
       <td class="cat">{{ v.category }}</td>
+      <td class="date-cell">{{ v.date }}</td>
       <td><input class="salary-input" data-id="{{ v.id }}" value="{{ v.salary }}" placeholder="—" onblur="saveSalary(this)" onkeydown="if(event.key==='Enter'){this.blur()}"></td>
       <td class="barriers-cell">{% if v.barriers_list %}{% for b in v.barriers_list %}{{ b }}{% if not loop.last %} · {% endif %}{% endfor %}{% else %}<span class="cross">—</span>{% endif %}</td>
       <td>{% if v.has_analysis %}<span class="tick">✓</span>{% else %}<span class="cross">—</span>{% endif %}</td>
@@ -170,7 +160,7 @@ tr[data-starred="1"] .star-btn{color:#f59e0b}
       <td style="text-align:center"><input type="checkbox" class="applied-chk" data-id="{{ v.id }}" {% if v.applied %}checked{% endif %} onchange="toggleApplied(this)" title="Отмечено как отправлено"></td>
     </tr>
     <tr class="expand-row" data-for="{{ v.id }}" style="display:none">
-      <td colspan="13">
+      <td colspan="15">
         <div class="analysis-body">
           {% if v.has_analysis %}{{ v.analysis_md | markdown | safe }}{% else %}<em>Анализ отсутствует.</em>{% endif %}
         </div>
@@ -182,14 +172,9 @@ tr[data-starred="1"] .star-btn{color:#f59e0b}
 <p class="updated">Всего: {{ total }} вакансий · <a href="/stats/barriers" target="_blank" style="color:#5b21b6;text-decoration:none;font-size:11px">📊 Анализ барьеров</a></p>
 </div>
 <script>
-// ── User map (id → name) ─────────────────────────────────────────────────────
 const USERS = { {% for u in users %}"{{ u.id }}": "{{ (u.name or ('User ' ~ u.id)) | e }}"{% if not loop.last %}, {% endif %}{% endfor %} };
 
-// ── Group state ──────────────────────────────────────────────────────────────
-const dateState = {}; // date → true (collapsed)
-let   sortActive = false;
-
-// ── Core visibility ──────────────────────────────────────────────────────────
+// ── Filter ────────────────────────────────────────────────────────────────────
 function rowMatchesFilter(row) {
   const rec     = document.getElementById('f-rec').value;
   const site    = document.getElementById('f-site').value;
@@ -206,59 +191,58 @@ function rowMatchesFilter(row) {
 function applyViz() {
   const mainRows = [...document.querySelectorAll('#tbody tr[data-idx]')];
   let visible = 0;
-
   mainRows.forEach(row => {
-    const d = row.dataset.date;
-    const groupHidden = !sortActive && dateState[d];
-    const show = !groupHidden && rowMatchesFilter(row);
+    const show = rowMatchesFilter(row);
     row.style.display = show ? '' : 'none';
     const exp = document.querySelector(`tr[data-for="${row.dataset.idx}"]`);
     if (exp && !show) exp.style.display = 'none';
     if (show) visible++;
   });
-
-  // Per-date per-user counts (respects filters, ignores collapsed state)
-  const grpCounts = {};
-  mainRows.forEach(row => {
-    if (rowMatchesFilter(row)) {
-      const d = row.dataset.date;
-      const uid = row.dataset.user || '';
-      if (!grpCounts[d]) grpCounts[d] = {};
-      grpCounts[d][uid] = (grpCounts[d][uid] || 0) + 1;
-    }
-  });
-  document.querySelectorAll('.grp-count[data-date]').forEach(el => {
-    const counts = grpCounts[el.dataset.date] || {};
-    const parts = Object.entries(counts).map(([uid, n]) => (USERS[uid] || ('User ' + uid)) + ': ' + n);
-    el.textContent = parts.length ? ' · ' + parts.join(' · ') : '';
-  });
-
-  if (!sortActive) {
-    // Date separators
-    document.querySelectorAll('#tbody tr.date-sep').forEach(sep => {
-      const d = sep.dataset.groupDate;
-      const hasContent = mainRows.some(r => r.dataset.date === d && rowMatchesFilter(r));
-      sep.style.display = hasContent ? '' : 'none';
-    });
-    // Toggle icons
-    document.querySelectorAll('.grp-icon[data-type="date"]').forEach(b => {
-      b.textContent = dateState[b.dataset.date] ? '▶' : '▼';
-    });
-  } else {
-    document.querySelectorAll('#tbody tr.date-sep').forEach(r => r.style.display='none');
-  }
-
   document.getElementById('count').textContent = visible + ' вакансий';
 }
 
-// ── Event delegation ─────────────────────────────────────────────────────────
+// ── Sort ──────────────────────────────────────────────────────────────────────
+let _sortCol = -1, _sortAsc = true;
+
+document.querySelectorAll('th.sortable').forEach(th => {
+  th.addEventListener('click', () => {
+    const col  = parseInt(th.dataset.col);
+    const type = th.dataset.type; // 'num' | 'str'
+    if (_sortCol === col) { _sortAsc = !_sortAsc; } else { _sortCol = col; _sortAsc = true; }
+
+    document.querySelectorAll('th.sortable').forEach(h => h.classList.remove('sort-asc','sort-desc'));
+    th.classList.add(_sortAsc ? 'sort-asc' : 'sort-desc');
+
+    // Close all expanded rows
+    document.querySelectorAll('.expand-row').forEach(r => r.style.display = 'none');
+    document.querySelectorAll('.expand-btn').forEach(b => b.textContent = '▶');
+
+    const tb   = document.getElementById('tbody');
+    const rows = [...tb.querySelectorAll('tr[data-idx]')];
+    rows.sort((a, b) => {
+      let av = a.cells[col].textContent.trim();
+      let bv = b.cells[col].textContent.trim();
+      if (type === 'num') {
+        av = parseFloat(av) || 0;
+        bv = parseFloat(bv) || 0;
+        return _sortAsc ? av - bv : bv - av;
+      }
+      return _sortAsc ? av.localeCompare(bv, 'uk') : bv.localeCompare(av, 'uk');
+    });
+    rows.forEach(r => {
+      tb.appendChild(r);
+      const exp = tb.querySelector(`tr[data-for="${r.dataset.idx}"]`);
+      if (exp) tb.appendChild(exp);
+    });
+    applyViz();
+  });
+});
+
+// ── Expand ────────────────────────────────────────────────────────────────────
 document.getElementById('tbody').addEventListener('click', function(e) {
   const warnChip = e.target.closest('.warn-chip');
-  if (warnChip) {
-    e.stopPropagation();
-    showWarn(warnChip.dataset.warn);
-    return;
-  }
+  if (warnChip) { e.stopPropagation(); showWarn(warnChip.dataset.warn); return; }
+
   const expandBtn = e.target.closest('.expand-btn');
   if (expandBtn) {
     e.stopPropagation();
@@ -268,52 +252,8 @@ document.getElementById('tbody').addEventListener('click', function(e) {
     const open = row.style.display !== 'none';
     row.style.display = open ? 'none' : '';
     expandBtn.textContent = open ? '▶' : '▼';
-    return;
-  }
-  const dateSep = e.target.closest('tr.date-sep');
-  if (dateSep) {
-    const d = dateSep.dataset.groupDate;
-    dateState[d] = !dateState[d];
-    applyViz();
   }
 });
-
-// ── Group controls ───────────────────────────────────────────────────────────
-function expandAll() {
-  sortActive = false;
-  Object.keys(dateState).forEach(k => dateState[k] = false);
-  applyViz();
-}
-
-function collapseAll() {
-  sortActive = false;
-  document.querySelectorAll('#tbody tr.date-sep').forEach(sep => {
-    dateState[sep.dataset.groupDate] = true;
-  });
-  applyViz();
-}
-
-// ── Sort ─────────────────────────────────────────────────────────────────────
-let dir = {};
-function sort(c) {
-  document.querySelectorAll('.expand-row').forEach(r => r.style.display = 'none');
-  document.querySelectorAll('.expand-btn').forEach(b => b.textContent = '▶');
-  const tb = document.getElementById('tbody');
-  const mainRows = [...tb.querySelectorAll('tr[data-idx]')];
-  dir[c] = !dir[c];
-  mainRows.sort((a, b) => {
-    let av = a.cells[c].textContent.trim(), bv = b.cells[c].textContent.trim();
-    if (c === 2) { av = parseFloat(av) || 0; bv = parseFloat(bv) || 0; return dir[c] ? bv - av : av - bv; }
-    return dir[c] ? bv.localeCompare(av, 'uk') : av.localeCompare(bv, 'uk');
-  });
-  mainRows.forEach(r => {
-    tb.appendChild(r);
-    const exp = tb.querySelector(`tr[data-for="${r.dataset.idx}"]`);
-    if (exp) tb.appendChild(exp);
-  });
-  sortActive = true;
-  applyViz();
-}
 
 // ── Filter / user ─────────────────────────────────────────────────────────────
 function filterUser(uid) {
@@ -330,85 +270,57 @@ function filter() {
   applyViz();
 }
 
+// ── Applied / starred / salary ────────────────────────────────────────────────
 async function toggleApplied(cb) {
-  const id = cb.dataset.id;
-  const applied = cb.checked;
-  // Optimistically update row data-applied for filter to work immediately
+  const id = cb.dataset.id, applied = cb.checked;
   const row = document.querySelector(`tr[data-idx="${id}"]`);
   if (row) row.dataset.applied = applied ? '1' : '0';
   try {
     const resp = await fetch(`/api/vacancies/${id}/applied`, {
-      method: 'PATCH',
-      headers: {'Content-Type': 'application/json'},
+      method: 'PATCH', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({applied})
     });
-    if (!resp.ok) {
-      cb.checked = !applied; // revert on server error
-      if (row) row.dataset.applied = applied ? '0' : '1';
-    } else {
-      // Show "✓ saved" flash next to checkbox, fade out after 1.6s, remove after 2s
-      const cell = cb.parentElement;
-      const existing = cell.querySelector('.saved-flash');
-      if (existing) existing.remove();
-      const flash = document.createElement('span');
-      flash.className = 'saved-flash';
-      flash.textContent = '✓ saved';
-      cell.appendChild(flash);
-      setTimeout(() => flash.classList.add('fade'), 1600);
-      setTimeout(() => flash.remove(), 2000);
-    }
-  } catch(e) {
-    cb.checked = !applied;
-    if (row) row.dataset.applied = applied ? '0' : '1';
-  }
-  applyViz(); // re-filter in case f-applied filter is active
+    if (!resp.ok) { cb.checked = !applied; if (row) row.dataset.applied = applied ? '0' : '1'; }
+    else { flash(cb.parentElement, '✓ saved'); }
+  } catch(e) { cb.checked = !applied; if (row) row.dataset.applied = applied ? '0' : '1'; }
+  applyViz();
 }
 
 async function toggleStarred(btn) {
-  const id = btn.dataset.id;
-  const starred = btn.textContent.trim() === '☆'; // ☆ → starring, ★ → unstarring
+  const id = btn.dataset.id, starred = btn.textContent.trim() === '☆';
   const row = document.querySelector(`tr[data-idx="${id}"]`);
   btn.textContent = starred ? '★' : '☆';
   if (row) row.dataset.starred = starred ? '1' : '0';
   try {
     const resp = await fetch(`/api/vacancies/${id}/starred`, {
-      method: 'PATCH',
-      headers: {'Content-Type': 'application/json'},
+      method: 'PATCH', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({starred})
     });
-    if (!resp.ok) {
-      btn.textContent = starred ? '☆' : '★';
-      if (row) row.dataset.starred = starred ? '0' : '1';
-    }
-  } catch(e) {
-    btn.textContent = starred ? '☆' : '★';
-    if (row) row.dataset.starred = starred ? '0' : '1';
-  }
+    if (!resp.ok) { btn.textContent = starred ? '☆' : '★'; if (row) row.dataset.starred = starred ? '0' : '1'; }
+  } catch(e) { btn.textContent = starred ? '☆' : '★'; if (row) row.dataset.starred = starred ? '0' : '1'; }
   applyViz();
 }
 
 async function saveSalary(inp) {
-  const id = inp.dataset.id;
-  const salary = inp.value.trim();
-  inp.value = salary; // normalise whitespace
+  const id = inp.dataset.id, salary = inp.value.trim();
+  inp.value = salary;
   try {
     const resp = await fetch(`/api/vacancies/${id}/salary`, {
-      method: 'PATCH',
-      headers: {'Content-Type': 'application/json'},
+      method: 'PATCH', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({salary})
     });
-    if (resp.ok) {
-      const cell = inp.parentElement;
-      const existing = cell.querySelector('.saved-flash');
-      if (existing) existing.remove();
-      const flash = document.createElement('span');
-      flash.className = 'saved-flash';
-      flash.textContent = '✓';
-      cell.appendChild(flash);
-      setTimeout(() => flash.classList.add('fade'), 1200);
-      setTimeout(() => flash.remove(), 1600);
-    }
+    if (resp.ok) flash(inp.parentElement, '✓');
   } catch(_) {}
+}
+
+function flash(parent, text) {
+  const existing = parent.querySelector('.saved-flash');
+  if (existing) existing.remove();
+  const el = document.createElement('span');
+  el.className = 'saved-flash'; el.textContent = text;
+  parent.appendChild(el);
+  setTimeout(() => el.classList.add('fade'), 1200);
+  setTimeout(() => el.remove(), 1600);
 }
 
 // ── Warn modal ────────────────────────────────────────────────────────────────
