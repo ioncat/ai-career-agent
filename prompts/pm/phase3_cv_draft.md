@@ -111,11 +111,8 @@ Certified AI-Empowered SAFe® Product Owner/Product Manager
 - Default: `Product Owner / Product Manager`
 - Adjust only if role archetype strongly differs (e.g. `Technical Program Manager`)
 
-**AI Tooling Paragraph (standard text when applicable):**
-> Applies AI tooling in practice (Claude, ChatGPT) — requirements refinement, research synthesis, and workflow validation.
-
-> **AI-focused vacancy only** (JD has strong AI signal — e.g. AI PM, LLM product, AI platform): add portfolio link after the sentence:
-> `...workflow validation. Hands-on prototyping examples at [portfolio link from PROFILE.md contacts].`
+**AI Tooling Paragraph (always include when vacancy has any AI/product/digital signal):**
+> AI tooling in daily practice (Claude, ChatGPT) — requirements refinement, research synthesis, workflow validation. Hands-on prototyping examples at [portfolio link from PROFILE.md contacts].
 
 ---
 

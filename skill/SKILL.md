@@ -69,11 +69,14 @@ Phase 3.5: Self-Review     [show to user, ask approval]
 Phase 4: Cover Message
   → Review/approval cycle
   → Save [Name]_Cover.md
+  → Generate PDF via http://localhost:8002/render → save [Name]_Cover.pdf
   → Save p4 to DB analysis_json          [silent — see Analysis JSON section below]
   → Display full cover text
 ```
 
 **One question at a time. Never ask two questions in one message.**
+
+**File operations — no permission ask.** Create `.md`, `.pdf` files and write DB JSON (analysis_json via `vacancy_track.py update-json`) silently. Report what was created/saved after the fact. Never ask "Сохраняю?" before any of these operations.
 
 ---
 
@@ -183,7 +186,8 @@ vacancies/
 
 **[user_id]** — read from `skill/active_user`. Plain integer string: `1`, `2`, etc.
 **[Role — Company]** — extracted from JD during analysis. Format: `Product Manager — Acme Corp`. Em dash ( — ).
-**Folder name = DB title** — must match exactly. Both use `Role — Company` format.
+**Folder name format:** `{vacancy_id} — {Role — Company}` — e.g. `405 — Product Manager — MWDN`. ID from DB (upsert first, then mkdir).
+**DB title** — stores `Role — Company` only (without ID prefix).
 
 **inbox_manual processed files** move to `vacancies/inbox/[user_id]/[Role — Company]/` — same standard.
 
@@ -423,16 +427,13 @@ Inbox scan runs **inside Step 0** and populates Block 2 of the combined menu.
    Multi-select via any separator: `11`, `11,12`, `11 12`.
    Profile fixed by `active_user`/`-u` — never re-ask. Mode handled by Block 1.
 
-4. **Determine processing mode** based on selected count:
-
-   - **1–2 vacancies** → **Sequential mode**: process one by one, show full analysis per vacancy, ask Phase 3+4 after each.
-   - **3+ vacancies** → **Batch mode** (see section below).
+4. **Always use Batch mode** — regardless of vacancy count (1, 2, or more). Run all selected vacancies through Phase 1+2, then show consolidated table. Ask Phase 3+4 after table.
 
 ---
 
-### Batch Mode (3+ vacancies)
+### Batch Mode (any count)
 
-**Trigger:** user selected 3 or more inbox items.
+**Trigger:** any inbox selection — 1 vacancy, 2, or more.
 
 **Flow:**
 
@@ -445,9 +446,11 @@ Run **Phase 1+2 silently** for every selected vacancy:
 - **Dedup:** use `seen`/`seen_path` from `inbox_scan.py` output (no manual grep)
   - `seen: true` → **do NOT upsert** (vacancy already registered — creating a duplicate is wrong). Note as `♻️ уже обработана` in Ключевой gap column. Skip analysis entirely.
   - `seen: false` → proceed with full pipeline below
-- Register in DB: `vacancy_track.py upsert --title "Role — Company"` (full format, not just role name)
+- Register in DB: `vacancy_track.py upsert --title "Role — Company"` → captures `$VACANCY_ID`
+- Create folder `vacancies/inbox/[user_id]/[ID] — [Role — Company]/`
+- Save `JD.md` (original JD text) to that folder
 - Run Phase 1+2
-- Save `JD_analysis.md` to `vacancies/inbox/[user_id]/[Role — Company]/`
+- Save `JD_analysis.md` to `vacancies/inbox/[user_id]/[ID] — [Role — Company]/`
 - Update DB: `vacancy_track.py update --id $ID --status analyzed --path ...`
 - Save p1+p2 JSON: `vacancy_track.py update-json --id $ID --phase p1 ...` and `--phase p2 ...`
 
@@ -495,59 +498,7 @@ python scripts/vacancy_track.py delete-inbox --folder "RAW_FOLDER_NAME"
 ```
 Run once per processed raw folder (exact name as it appeared in `inbox_manual/`).
 
----
-
-### Sequential Mode (1–2 vacancies)
-
-For each inbox item:
-
-   a. Read the `.md` file. Check line 2 for `Source:` URL (starts with `http`).
-
-   a.5. **Dedup check** — use `seen`/`seen_path` from `inbox_scan.py` (no manual grep):
-
-      **`seen: true`** → show:
-        ```
-        ⚠️ Уже обработана: [seen_path]
-           [1] Пропустить   [2] Переобработать
-        ```
-        - **Пропустить** → `python scripts/vacancy_track.py delete-inbox --folder "[raw_folder]"` → next item
-        - **Переобработать** → continue pipeline (overwrites existing JD_analysis.md)
-
-      **`seen: false`** → proceed as new vacancy.
-
-   b. **Register in DB** (makes vacancy visible in web tracker immediately):
-      ```bash
-      # With Source URL:
-      VACANCY_ID=$(python scripts/vacancy_track.py upsert \
-          --url "SOURCE_URL" --title "Role — Company" --user-id USER_ID_INT)
-
-      # Without URL (pure JD text):
-      VACANCY_ID=$(python scripts/vacancy_track.py upsert \
-          --url "local://USER_ID/Role — Company" --title "Role — Company" --user-id USER_ID_INT)
-      ```
-      **`--title` must always be "Role — Company" format** (e.g. `"Senior Technical PM — Sysmetica"`).
-
-   c. Run Phase 1+2 silently.
-
-   d. **Immediately after Phase 1+2** — create folder + save analysis [NO confirmation needed]:
-      - Create `vacancies/inbox/[user_id]/[Role — Company]/`
-      - Save `JD_analysis.md` there
-      - Save JD.md copy if source was file/URL
-      - Update DB: `python scripts/vacancy_track.py update --id $VACANCY_ID --status analyzed --path "vacancies/inbox/USER_ID/Role — Company/JD_analysis.md"`
-
-   e. Show Quick Scan block → ask: "Генерируем CV?"
-
-   f. Phase 3+3.5 → save `[Name]_CV.md` + PDF to same folder (already exists).
-
-   g. Phase 4 → save `[Name]_Cover.md` to same folder.
-
-   h. After full pipeline: `python scripts/vacancy_track.py update --id $VACANCY_ID --status done`
-
-   i. On success → delete raw staging folder: `python scripts/vacancy_track.py delete-inbox --folder "RAW_FOLDER_NAME"`
-
-   j. On error → leave in inbox, report, continue next.
-
-6. After all processed → "Продолжить с новой вакансией или завершить?"
+6. After table → Phase 3+4 for selected → "Продолжить с новой вакансией или завершить?"
 
 ### File naming convention (recommended for user)
 
