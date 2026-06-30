@@ -13,23 +13,36 @@ class RecommendationChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = RecColors.forRec(recommendation);
-    final icon = RecColors.icon(recommendation);
+    final cs = Theme.of(context).colorScheme;
+    final bg = RecColors.forRec(recommendation, cs);
+    final fg = RecColors.onForRec(recommendation, cs);
+    final icon = RecColors.iconForRec(recommendation);
+    final isOutlined = recommendation != 'apply' && recommendation != 'take_a_chance';
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      height: 28,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: bg,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withOpacity(0.35)),
+        border: isOutlined ? Border.all(color: cs.outline) : null,
       ),
-      child: Text(
-        '$icon $label',
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w500,
-          color: color,
-        ),
-        overflow: TextOverflow.ellipsis,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: fg),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: fg,
+                    fontWeight: FontWeight.w500,
+                  ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
       ),
     );
   }

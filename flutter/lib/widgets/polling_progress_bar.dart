@@ -61,7 +61,7 @@ class _PollingProgressBarState extends State<PollingProgressBar> {
       value: _progress,
       minHeight: 2,
       backgroundColor: Colors.transparent,
-      valueColor: AlwaysStoppedAnimation<Color>(primary.withOpacity(0.3)),
+      valueColor: AlwaysStoppedAnimation<Color>(primary.withValues(alpha: 0.35)),
     );
   }
 }

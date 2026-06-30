@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 import '../models/vacancy.dart';
 import 'fit_score_chip.dart';
 import 'vac_score_badge.dart';
-import 'recommendation_chip.dart';
 import 'source_badge.dart';
 
-class VacancyCard extends StatelessWidget {
+class VacancyCard extends StatefulWidget {
   final VacancyListItem vacancy;
   final bool selected;
   final VoidCallback onTap;
@@ -18,100 +17,152 @@ class VacancyCard extends StatelessWidget {
   });
 
   @override
+  State<VacancyCard> createState() => _VacancyCardState();
+}
+
+class _VacancyCardState extends State<VacancyCard> {
+  bool _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return InkWell(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        decoration: BoxDecoration(
-          color: selected ? cs.primaryContainer.withOpacity(0.3) : cs.surface,
-          border: Border(
-            left: BorderSide(
-              color: selected ? cs.primary : Colors.transparent,
-              width: 3,
-            ),
-            bottom: BorderSide(color: cs.outlineVariant, width: 1),
+    final v = widget.vacancy;
+
+    final bgColor = widget.selected
+        ? cs.surfaceContainerHighest
+        : _hovered
+            ? cs.surfaceContainerLow
+            : cs.surface;
+
+    final borderRadius = widget.selected
+        ? const BorderRadius.only(
+            topLeft: Radius.circular(4),
+            bottomLeft: Radius.circular(4),
+            topRight: Radius.circular(12),
+            bottomRight: Radius.circular(12),
+          )
+        : BorderRadius.circular(12);
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          margin: const EdgeInsets.only(bottom: 8),
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: borderRadius,
+            border: widget.selected
+                ? Border(
+                    left: BorderSide(color: cs.primary, width: 3),
+                    top: BorderSide(color: Colors.transparent),
+                    right: BorderSide(color: Colors.transparent),
+                    bottom: BorderSide(color: Colors.transparent),
+                  )
+                : Border.all(
+                    color: cs.outlineVariant.withValues(alpha: 0.3),
+                  ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: _hovered ? 0.08 : 0.04),
+                blurRadius: _hovered ? 8 : 2,
+                offset: Offset(0, _hovered ? 2 : 1),
+              ),
+            ],
           ),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Row 1: role + source badge
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    vacancy.role,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                SourceBadge(site: vacancy.site),
-              ],
-            ),
-            const SizedBox(height: 4),
-            // Row 2: company + scores
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    vacancy.company,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: cs.onSurfaceVariant,
-                        ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                if (vacancy.fitScore != null)
-                  FitScoreChip(score: vacancy.fitScore!),
-                if (vacancy.vacancyScore != null) ...[
-                  const SizedBox(width: 4),
-                  VacScoreBadge(score: vacancy.vacancyScore!),
-                ],
-              ],
-            ),
-            const SizedBox(height: 4),
-            // Row 3: recommendation + date
-            Row(
-              children: [
-                if (vacancy.recommendation != null &&
-                    vacancy.recommendationLabel != null)
-                  Expanded(
-                    child: RecommendationChip(
-                      recommendation: vacancy.recommendation!,
-                      label: vacancy.recommendationLabel!,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Row 1: source badge + date · recommendation icon
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  if (v.site.isNotEmpty) SourceBadge(site: v.site),
+                  if (v.publishedAt != null) ...[
+                    const SizedBox(width: 8),
+                    Text(
+                      _relativeTime(v.publishedAt!),
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: cs.secondary,
+                          ),
                     ),
-                  ),
-                if (vacancy.publishedAt != null)
-                  Text(
-                    _relativeTime(vacancy.publishedAt!),
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: cs.onSurfaceVariant,
-                        ),
-                  ),
-              ],
-            ),
-            // Row 4: first barrier (optional)
-            if (vacancy.keyBarriers.isNotEmpty) ...[
-              const SizedBox(height: 4),
+                  ],
+                  const Spacer(),
+                  if (v.recommendation != null)
+                    _RecIcon(rec: v.recommendation!, cs: cs),
+                ],
+              ),
+              const SizedBox(height: 8),
+              // Row 2: role title
               Text(
-                '⚠️ ${vacancy.keyBarriers.first}',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: const Color(0xFFE65100),
+                v.role,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: widget.selected ? cs.primary : cs.onSurface,
                     ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
+              const SizedBox(height: 2),
+              // Row 3: company
+              if (v.company.isNotEmpty)
+                Text(
+                  v.company,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              const SizedBox(height: 10),
+              // Row 4: scores
+              Row(
+                children: [
+                  if (v.fitScore != null) FitScoreChip(score: v.fitScore!),
+                  if (v.vacancyScore != null) ...[
+                    const SizedBox(width: 6),
+                    VacScoreBadge(score: v.vacancyScore!),
+                  ],
+                ],
+              ),
+              // Row 5: key barrier (optional)
+              if (v.keyBarriers.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: cs.errorContainer.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: cs.error.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.warning_amber_rounded,
+                          size: 14, color: cs.error),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          v.keyBarriers.first,
+                          style:
+                              Theme.of(context).textTheme.labelSmall?.copyWith(
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -127,6 +178,26 @@ class VacancyCard extends StatelessWidget {
       return 'только что';
     } catch (_) {
       return iso;
+    }
+  }
+}
+
+// Small icon in top-right of card indicating recommendation
+class _RecIcon extends StatelessWidget {
+  final String rec;
+  final ColorScheme cs;
+
+  const _RecIcon({required this.rec, required this.cs});
+
+  @override
+  Widget build(BuildContext context) {
+    switch (rec) {
+      case 'apply':
+        return Icon(Icons.check_circle_outline, size: 20, color: cs.primary);
+      case 'take_a_chance':
+        return Icon(Icons.bolt, size: 20, color: cs.outline);
+      default:
+        return Icon(Icons.close, size: 20, color: cs.error);
     }
   }
 }
