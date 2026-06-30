@@ -37,44 +37,60 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
       });
     }
 
+    final cs = Theme.of(context).colorScheme;
+
     return Row(
       children: [
-        // Master: vacancy list
+        // Master: vacancy list (360px, bg-surface)
         SizedBox(
           width: 360,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _ListHeader(
-                title: _title,
-                count: vacancies.length,
-                onRefresh: () =>
-                    ref.read(vacancyListProvider.notifier).refresh(),
-                pollingState: listState,
-              ),
-              const Divider(height: 1),
-              Expanded(
-                child: vacancies.isEmpty
-                    ? _EmptyState(folder: widget.folder)
-                    : _VacancyList(
-                        vacancies: vacancies,
-                        selectedId: _selected?.id,
-                        onSelect: (v) => setState(() => _selected = v),
-                      ),
-              ),
-            ],
+          child: Container(
+            color: cs.surface,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _ListHeader(
+                  title: _title,
+                  count: vacancies.length,
+                  onRefresh: () =>
+                      ref.read(vacancyListProvider.notifier).refresh(),
+                  pollingState: listState,
+                ),
+                Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: cs.outlineVariant.withValues(alpha: 0.2),
+                ),
+                Expanded(
+                  child: vacancies.isEmpty
+                      ? _EmptyState(folder: widget.folder)
+                      : _VacancyList(
+                          vacancies: vacancies,
+                          selectedId: _selected?.id,
+                          onSelect: (v) => setState(() => _selected = v),
+                        ),
+                ),
+              ],
+            ),
           ),
         ),
         // Vertical divider
-        const VerticalDivider(width: 1, thickness: 1),
-        // Detail panel
+        VerticalDivider(
+          width: 1,
+          thickness: 1,
+          color: cs.outlineVariant.withValues(alpha: 0.2),
+        ),
+        // Detail panel (bg-surface-container-lowest)
         Expanded(
-          child: _selected != null
-              ? VacancyDetailScreen(
-                  vacancyId: _selected!.id,
-                  url: _selected!.url,
-                )
-              : const _NoSelectionPlaceholder(),
+          child: ColoredBox(
+            color: cs.surfaceContainerLowest,
+            child: _selected != null
+                ? VacancyDetailScreen(
+                    vacancyId: _selected!.id,
+                    url: _selected!.url,
+                  )
+                : const _NoSelectionPlaceholder(),
+          ),
         ),
       ],
     );
@@ -96,22 +112,53 @@ class _ListHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final polling = pollingState?.status == PollingStatus.polling;
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(16, 16, 8, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Text(
-              '$title  $count',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: Theme.of(context).textTheme.headlineMedium,
+                ),
+              ),
+              IconButton(
+                icon: Icon(
+                  Icons.tune,
+                  size: 20,
+                  color: cs.onSurfaceVariant,
+                ),
+                onPressed: polling ? null : onRefresh,
+                tooltip: 'Обновить',
+                splashRadius: 18,
+              ),
+            ],
           ),
-          IconButton(
-            icon: const Icon(Icons.refresh, size: 18),
-            onPressed: pollingState?.status == PollingStatus.polling
-                ? null
-                : onRefresh,
-            tooltip: 'Обновить',
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: polling ? cs.primary : const Color(0xFF4CAF50),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '$count вакансий проанализировано',
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: cs.secondary,
+                    ),
+              ),
+            ],
           ),
         ],
       ),
@@ -133,6 +180,7 @@ class _VacancyList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView.builder(
+      padding: const EdgeInsets.all(8),
       itemCount: vacancies.length,
       itemBuilder: (ctx, i) {
         final v = vacancies[i];
