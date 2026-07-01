@@ -76,7 +76,37 @@ Phase 4: Cover Message
 
 **One question at a time. Never ask two questions in one message.**
 
-**File operations — no permission ask.** Create `.md`, `.pdf` files and write DB JSON (analysis_json via `vacancy_track.py update-json`) silently. Report what was created/saved after the fact. Never ask "Сохраняю?" before any of these operations.
+**File operations — no permission ask.** Create `.md`, `.pdf`, `.json` files and write DB JSON (analysis_json via `vacancy_track.py update-json`) silently. Report what was created/saved after the fact. Never ask "Сохраняю?" before any of these operations.
+
+**Phase completion report — MANDATORY after each phase.** After completing each phase, output a visually distinct block so the user can scroll and immediately see what was done:
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Phase 1+2 — Анализ завершён
+Fit: N/10 · VScore: N.N · Рекомендация: [value]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Phase 2.5 — Objection Handling завершён
+Resolved: N/N · Genuine gaps: [list]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Phase 3+3.5 — CV сгенерирован
+[Name] · [language] · [N] правок · CV.md + CV.pdf
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Phase 4 — Cover готов
+[language] · [вариант] · Cover.md + Cover.pdf
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
 
 ---
 

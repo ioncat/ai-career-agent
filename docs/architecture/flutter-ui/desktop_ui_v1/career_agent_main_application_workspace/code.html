@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Career Agent</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700&amp;family=Inter:wght@400;500&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-variant": "#e6e0e9",
+                        "outline-variant": "#cbc4d2",
+                        "tertiary": "#633b48",
+                        "surface-container-highest": "#e6e0e9",
+                        "inverse-primary": "#cfbcff",
+                        "on-primary": "#ffffff",
+                        "secondary-container": "#e8def9",
+                        "on-background": "#1d1b20",
+                        "on-secondary-fixed": "#1e192b",
+                        "inverse-surface": "#322f35",
+                        "primary": "#4f378a",
+                        "on-tertiary": "#ffffff",
+                        "on-error": "#ffffff",
+                        "on-primary-container": "#e0d2ff",
+                        "error-container": "#ffdad6",
+                        "secondary": "#625b71",
+                        "surface-bright": "#fdf7ff",
+                        "tertiary-container": "#7d5260",
+                        "primary-fixed": "#e9ddff",
+                        "primary-container": "#6750a4",
+                        "surface-tint": "#6750a4",
+                        "outline": "#7a7582",
+                        "on-tertiary-fixed": "#31111d",
+                        "on-primary-fixed": "#22005d",
+                        "on-secondary-container": "#686177",
+                        "error": "#ba1a1a",
+                        "surface-container": "#f2ecf4",
+                        "secondary-fixed": "#e8def9",
+                        "source-djinni": "#007BFF",
+                        "source-linkedin": "#004182",
+                        "on-tertiary-fixed-variant": "#633b48",
+                        "on-tertiary-container": "#ffcbda",
+                        "surface": "#fdf7ff",
+                        "on-error-container": "#93000a",
+                        "on-primary-fixed-variant": "#4f378a",
+                        "on-surface": "#1d1b20",
+                        "on-secondary": "#ffffff",
+                        "secondary-fixed-dim": "#ccc2dc",
+                        "surface-dim": "#ded8e0",
+                        "tertiary-fixed": "#ffd9e3",
+                        "source-dou": "#4CAF50",
+                        "on-surface-variant": "#494551",
+                        "surface-container-high": "#ece6ee",
+                        "on-secondary-fixed-variant": "#4a4358",
+                        "inverse-on-surface": "#f5eff7",
+                        "surface-container-lowest": "#ffffff",
+                        "primary-fixed-dim": "#cfbcff",
+                        "background": "#fdf7ff",
+                        "tertiary-fixed-dim": "#eeb8c8",
+                        "surface-container-low": "#f8f2fa"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "card-padding": "16px",
+                        "section-gap": "24px",
+                        "list-item-height-2line": "56px",
+                        "gutter": "12px",
+                        "list-item-height-3line": "72px",
+                        "content-max-width": "1440px",
+                        "rail-width": "80px"
+                    },
+                    "fontFamily": {
+                        "display-sm": ["Hanken Grotesk"],
+                        "title-small": ["Hanken Grotesk"],
+                        "title-medium": ["Hanken Grotesk"],
+                        "label-small": ["JetBrains Mono"],
+                        "label-medium": ["JetBrains Mono"],
+                        "headline-md": ["Hanken Grotesk"],
+                        "body-medium": ["Inter"]
+                    },
+                    "fontSize": {
+                        "display-sm": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "title-small": ["14px", { "lineHeight": "20px", "fontWeight": "600" }],
+                        "title-medium": ["16px", { "lineHeight": "24px", "fontWeight": "700" }],
+                        "label-small": ["11px", { "lineHeight": "16px", "letterSpacing": "0.5px", "fontWeight": "500" }],
+                        "label-medium": ["12px", { "lineHeight": "16px", "fontWeight": "500" }],
+                        "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }],
+                        "body-medium": ["14px", { "lineHeight": "20px", "fontWeight": "400" }]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            background: linear-gradient(135deg, #f2ecf4 0%, #ded8e0 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+        
+        /* Custom scrollbar for webkit */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbc4d2;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #7a7582;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 2px;
+            background-color: #e8def9;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .progress-bar-value {
+            width: 30%;
+            height: 100%;
+            background-color: #4f378a;
+            position: absolute;
+            animation: progress 2s infinite ease-in-out;
+        }
+        
+        @keyframes progress {
+            0% { left: -30%; width: 30%; }
+            50% { left: 30%; width: 70%; }
+            100% { left: 100%; width: 30%; }
+        }
+    </style>
+</head>
+<body class="text-on-surface antialiased font-body-medium">
+<!-- Floating Content Block -->
+<main class="w-full max-w-content-max-width bg-surface/90 backdrop-blur-md rounded-[16px] shadow-lg border border-outline-variant/30 flex overflow-hidden relative" style="height: calc(100vh - 48px); max-height: 900px;">
+<!-- Progress Bar (Flush Top) -->
+<div class="absolute top-0 left-0 w-full z-50">
+<div class="progress-bar rounded-t-[16px]">
+<div class="progress-bar-value rounded-t-[16px]"></div>
+</div>
+</div>
+<!-- Navigation Rail (Shared Component) -->
+<nav aria-label="Side Navigation" class="w-rail-width h-full bg-surface-container flex flex-col items-center py-6 shrink-0 z-10 shadow-none border-r border-outline-variant/20 pt-8">
+<!-- Brand / Logo Area (Reduced for NavRail) -->
+<div class="mb-8 flex flex-col items-center justify-center">
+<span class="material-symbols-outlined text-primary text-[32px]">hub</span>
+</div>
+<ul class="flex flex-col gap-4 w-full px-2">
+<!-- Active Item -->
+<li>
+<a aria-current="page" class="flex flex-col items-center justify-center py-3 w-full rounded-lg text-primary bg-surface-container-highest transition-transform duration-150 scale-95 border-l-4 border-primary group" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">work</span>
+<span class="font-title-small text-title-small mt-1 group-hover:text-primary transition-colors">Vacancies</span>
+</a>
+</li>
+<!-- Inactive Items -->
+<li>
+<a class="flex flex-col items-center justify-center py-3 w-full rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors group" href="#">
+<span class="material-symbols-outlined">insert_chart</span>
+<span class="font-title-small text-[10px] font-semibold mt-1 opacity-0 group-hover:opacity-100 transition-opacity">Analytics</span>
+</a>
+</li>
+<li>
+<a class="flex flex-col items-center justify-center py-3 w-full rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors group" href="#">
+<span class="material-symbols-outlined">description</span>
+<span class="font-title-small text-[10px] font-semibold mt-1 opacity-0 group-hover:opacity-100 transition-opacity">Resumes</span>
+</a>
+</li>
+<li>
+<a class="flex flex-col items-center justify-center py-3 w-full rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors group" href="#">
+<span class="material-symbols-outlined">group</span>
+<span class="font-title-small text-[10px] font-semibold mt-1 opacity-0 group-hover:opacity-100 transition-opacity">Network</span>
+</a>
+</li>
+<li>
+<a class="flex flex-col items-center justify-center py-3 w-full rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors group" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-title-small text-[10px] font-semibold mt-1 opacity-0 group-hover:opacity-100 transition-opacity">Settings</span>
+</a>
+</li>
+</ul>
+<div class="mt-auto mb-4">
+<img alt="User Profile Avatar" class="w-10 h-10 rounded-full border-2 border-surface-container-high shadow-sm cursor-pointer hover:opacity-80 transition-opacity" data-alt="A small circular avatar image of a professional person in a well-lit studio. Light, airy background, crisp focus, soft corporate aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAgCQNFs8ncQ2AM9zLmddxLsliC7TbdGJ_efr5aw3tULxP6gycBzSD8lfdmYbqNP_T50XJ2O77_y9SB_sZfhCSTj-dGs9BqCX68FnamAPec5FsfXzAyetWya7vCL70K1dL4Y4fMvHUrCczorJHJs9MHiv1jh_yv9yQ1us3F3BEF3F3yj5LDg2dpdMVnK57RgNtAJoYuFL-EpfSR3I4ipRRlVUlRQaJu3RwczDRjEK_Vo72mVZsNxxTy-yP7_0tJ_TCTBC_4g4GqBzg"/>
+</div>
+</nav>
+<!-- List Column -->
+<aside class="w-[360px] bg-surface flex flex-col border-r border-outline-variant/30 shrink-0 pt-6 z-10">
+<!-- Header Area -->
+<div class="px-card-padding pb-4 flex flex-col gap-1 border-b border-outline-variant/20">
+<div class="flex items-center justify-between">
+<h2 class="font-headline-md text-headline-md text-on-surface">Opportunities</h2>
+<button aria-label="Filter" class="p-2 rounded-full hover:bg-surface-container-high text-on-surface-variant transition-colors">
+<span class="material-symbols-outlined text-[20px]">tune</span>
+</button>
+</div>
+<!-- Status Line -->
+<p class="font-label-medium text-label-medium text-secondary flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-source-dou animate-pulse"></span>
+                    ✨ Найдено 12 новых вакансий · только что
+                </p>
+</div>
+<!-- List Content -->
+<div class="flex-1 overflow-y-auto p-2 flex flex-col gap-2">
+<!-- Card 1 (Selected) -->
+<article class="bg-surface-container-highest border-l-[3px] border-primary rounded-r-[12px] rounded-l-[4px] p-card-padding cursor-pointer transition-shadow shadow-sm hover:shadow-md relative overflow-hidden group">
+<div class="flex justify-between items-start mb-2">
+<div class="flex gap-2 items-center">
+<span class="px-2 py-0.5 rounded-full bg-source-linkedin text-white font-label-small text-label-small shadow-sm">LinkedIn</span>
+<span class="font-label-small text-label-small text-secondary">2h ago</span>
+</div>
+<span class="material-symbols-outlined text-primary text-[20px]" style="font-variation-settings: 'FILL' 1;">bolt</span>
+</div>
+<h3 class="font-title-medium text-title-medium text-on-surface leading-tight mb-1">Senior Flutter Developer</h3>
+<p class="font-body-medium text-body-medium text-on-surface-variant mb-3">TechNova Solutions</p>
+<div class="flex gap-2">
+<!-- Fit Score Chip -->
+<div class="flex items-center gap-1 bg-primary-container/20 text-primary-container px-2 py-1 rounded-full h-[24px]">
+<span class="font-label-medium text-label-medium font-bold text-primary">F: 9.0</span>
+</div>
+<!-- Vac Score Badge -->
+<div class="flex items-center gap-1 bg-surface-variant text-on-surface-variant px-2 py-1 rounded-[6px] h-[24px]">
+<span class="font-label-medium text-label-medium font-bold">V: 8.2</span>
+</div>
+</div>
+</article>
+<!-- Card 2 -->
+<article class="bg-surface hover:bg-surface-container-lowest border border-outline-variant/30 rounded-[12px] p-card-padding cursor-pointer transition-all shadow-sm hover:shadow-md group">
+<div class="flex justify-between items-start mb-2">
+<div class="flex gap-2 items-center">
+<span class="px-2 py-0.5 rounded-full bg-source-djinni text-white font-label-small text-label-small shadow-sm">Djinni</span>
+<span class="font-label-small text-label-small text-secondary">5h ago</span>
+</div>
+<span class="material-symbols-outlined text-outline text-[20px]">help_outline</span>
+</div>
+<h3 class="font-title-medium text-title-medium text-on-surface leading-tight mb-1 group-hover:text-primary transition-colors">Full Stack Engineer (Node/Vue)</h3>
+<p class="font-body-medium text-body-medium text-on-surface-variant mb-3">FinTech Global</p>
+<div class="flex gap-2 mb-2">
+<div class="flex items-center gap-1 bg-tertiary-container/20 text-tertiary px-2 py-1 rounded-full h-[24px]">
+<span class="font-label-medium text-label-medium font-bold text-tertiary">F: 6.0</span>
+</div>
+<div class="flex items-center gap-1 bg-surface-variant text-on-surface-variant px-2 py-1 rounded-[6px] h-[24px]">
+<span class="font-label-medium text-label-medium font-bold">V: 6.5</span>
+</div>
+</div>
+<div class="mt-2 p-2 bg-error-container/30 rounded-md border border-error/20 flex gap-1 items-start">
+<span class="material-symbols-outlined text-error text-[14px] mt-0.5">warning</span>
+<span class="font-label-small text-[10px] text-on-surface-variant leading-tight">Requires 5+ years native Android experience</span>
+</div>
+</article>
+<!-- Card 3 -->
+<article class="bg-surface hover:bg-surface-container-lowest border border-outline-variant/30 rounded-[12px] p-card-padding cursor-pointer transition-all shadow-sm hover:shadow-md group opacity-75">
+<div class="flex justify-between items-start mb-2">
+<div class="flex gap-2 items-center">
+<span class="px-2 py-0.5 rounded-full bg-source-dou text-white font-label-small text-label-small shadow-sm">DOU.ua</span>
+<span class="font-label-small text-label-small text-secondary">1d ago</span>
+</div>
+<span class="material-symbols-outlined text-error text-[20px]">close</span>
+</div>
+<h3 class="font-title-medium text-title-medium text-on-surface leading-tight mb-1 group-hover:text-primary transition-colors">Lead UI/UX Designer</h3>
+<p class="font-body-medium text-body-medium text-on-surface-variant mb-3">Creative Agency</p>
+<div class="flex gap-2">
+<div class="flex items-center gap-1 bg-error/10 text-error px-2 py-1 rounded-full h-[24px]">
+<span class="font-label-medium text-label-medium font-bold">F: 2.0</span>
+</div>
+<div class="flex items-center gap-1 bg-surface-variant text-on-surface-variant px-2 py-1 rounded-[6px] h-[24px]">
+<span class="font-label-medium text-label-medium font-bold">V: 4.1</span>
+</div>
+</div>
+</article>
+</div>
+</aside>
+<!-- Detail View -->
+<section class="flex-1 bg-surface-container-lowest flex flex-col relative pt-6 overflow-y-auto">
+<!-- Action Header -->
+<header class="px-section-gap pb-4 flex justify-between items-center sticky top-0 bg-surface-container-lowest/90 backdrop-blur-sm z-20 border-b border-outline-variant/10">
+<button class="p-2 rounded-full hover:bg-surface-container text-on-surface-variant transition-colors flex items-center justify-center">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<div class="flex gap-3">
+<button class="p-2 rounded-full hover:bg-surface-container text-on-surface-variant transition-colors flex items-center justify-center border border-outline-variant/30">
+<span class="material-symbols-outlined">share</span>
+</button>
+<button class="bg-primary text-on-primary px-6 py-2 rounded-full font-title-small text-title-small hover:bg-primary/90 transition-colors shadow-sm flex items-center gap-2">
+<span>Apply Now</span>
+<span class="material-symbols-outlined text-[18px]">open_in_new</span>
+</button>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<div class="px-section-gap py-6 max-w-4xl mx-auto w-full">
+<!-- Role Header -->
+<div class="mb-8">
+<div class="flex items-center gap-3 mb-4">
+<div class="w-12 h-12 rounded-[12px] bg-surface-container flex items-center justify-center border border-outline-variant/20 shadow-sm">
+<span class="material-symbols-outlined text-primary text-[28px]">code</span>
+</div>
+<div>
+<h1 class="font-display-sm text-[32px] font-bold text-on-surface leading-tight">Senior Flutter Developer</h1>
+<p class="font-title-medium text-title-medium text-on-surface-variant mt-1 flex items-center gap-2">
+                                TechNova Solutions
+                                <span class="w-1 h-1 rounded-full bg-outline"></span>
+                                Remote (EU)
+                                <span class="w-1 h-1 rounded-full bg-outline"></span>
+                                $7k - $9k / mo
+                            </p>
+</div>
+</div>
+<div class="flex gap-2">
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary-container/10 text-primary border border-primary/20 shadow-sm">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="font-title-small text-title-small">Strong Match - Apply</span>
+</span>
+<span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-surface-container text-on-surface-variant border border-outline-variant/30">
+<span class="material-symbols-outlined text-[16px]">schedule</span>
+<span class="font-label-medium text-label-medium">Posted 2h ago</span>
+</span>
+</div>
+</div>
+<!-- Metrics Bento Grid -->
+<div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-section-gap">
+<!-- Fit Score -->
+<div class="bg-surface-container-lowest border border-outline-variant/30 rounded-[16px] p-5 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+<div class="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-bl-[100px] -z-10"></div>
+<h4 class="font-label-medium text-label-medium text-on-surface-variant mb-2">Overall Fit Score</h4>
+<div class="flex items-baseline gap-2">
+<span class="font-display-sm text-[40px] font-bold text-primary leading-none">9.0</span>
+<span class="font-title-small text-title-small text-secondary">/ 10</span>
+</div>
+<div class="mt-4 flex gap-[4px]">
+<!-- FitDotBar -->
+<div class="w-[10px] h-[10px] rounded-full bg-primary"></div>
+<div class="w-[10px] h-[10px] rounded-full bg-primary"></div>
+<div class="w-[10px] h-[10px] rounded-full bg-primary"></div>
+<div class="w-[10px] h-[10px] rounded-full bg-primary"></div>
+<div class="w-[10px] h-[10px] rounded-full bg-primary"></div>
+<div class="w-[10px] h-[10px] rounded-full bg-primary"></div>
+<div class="w-[10px] h-[10px] rounded-full bg-primary"></div>
+<div class="w-[10px] h-[10px] rounded-full bg-primary"></div>
+<div class="w-[10px] h-[10px] rounded-full bg-primary"></div>
+<div class="w-[10px] h-[10px] rounded-full bg-surface-variant"></div>
+</div>
+</div>
+<!-- Vacancy Score -->
+<div class="bg-surface-container-lowest border border-outline-variant/30 rounded-[16px] p-5 shadow-sm hover:shadow-md transition-shadow">
+<h4 class="font-label-medium text-label-medium text-on-surface-variant mb-2">Vacancy Quality Score</h4>
+<div class="flex items-baseline gap-2">
+<span class="font-display-sm text-[40px] font-bold text-on-surface leading-none">8.2</span>
+<span class="font-title-small text-title-small text-secondary">/ 10</span>
+</div>
+<p class="font-label-medium text-label-medium text-secondary mt-3">Solid company rep, clear requirements.</p>
+</div>
+<!-- Key Requirements Summary -->
+<div class="bg-surface-container-lowest border border-outline-variant/30 rounded-[16px] p-5 shadow-sm md:col-span-1 col-span-2">
+<h4 class="font-label-medium text-label-medium text-on-surface-variant mb-3">Key Matches</h4>
+<ul class="flex flex-col gap-2">
+<li class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[18px]">check</span>
+<span class="font-body-medium text-[13px]">Flutter / Dart (4+ yrs)</span>
+</li>
+<li class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[18px]">check</span>
+<span class="font-body-medium text-[13px]">State Management (Bloc)</span>
+</li>
+<li class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[18px]">check</span>
+<span class="font-body-medium text-[13px]">CI/CD (Codemagic)</span>
+</li>
+</ul>
+</div>
+</div>
+<!-- Text Content Areas -->
+<div class="flex flex-col gap-8 bg-surface border border-outline-variant/20 rounded-[16px] p-8 shadow-sm">
+<section>
+<h3 class="font-title-medium text-[20px] font-bold text-on-surface mb-4">About the Role</h3>
+<div class="prose prose-sm prose-slate max-w-none font-body-medium text-on-surface-variant leading-relaxed space-y-4">
+<p>We are looking for an experienced Senior Flutter Developer to join our core engineering team. You will be responsible for architecting and building high-performance, responsive cross-platform mobile applications that serve millions of users.</p>
+<p>At TechNova, we value clean code, robust testing, and a deep understanding of the Flutter framework's internals. You will work closely with product managers, designers, and backend engineers to deliver seamless digital experiences.</p>
+</div>
+</section>
+<hr class="border-outline-variant/20"/>
+<section>
+<h3 class="font-title-medium text-[20px] font-bold text-on-surface mb-4">Key Responsibilities</h3>
+<ul class="list-disc list-outside ml-5 space-y-2 font-body-medium text-on-surface-variant">
+<li>Design and build advanced applications for iOS and Android platforms using Flutter.</li>
+<li>Collaborate with cross-functional teams to define, design, and ship new features.</li>
+<li>Ensure code quality, organization, and automation through comprehensive unit and integration testing.</li>
+<li>Mentor junior developers and participate in architectural reviews.</li>
+</ul>
+</section>
+</div>
+</div>
+</section>
+</main>
+</body></html>
