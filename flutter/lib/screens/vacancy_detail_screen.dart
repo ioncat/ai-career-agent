@@ -7,7 +7,7 @@ import '../providers/vacancy_detail_provider.dart';
 import '../providers/vacancy_list_provider.dart';
 import '../repositories/vacancy_repository.dart';
 import '../widgets/fit_dot_bar.dart';
-import '../widgets/recommendation_chip.dart';
+import '../widgets/fit_score_chip.dart';
 import '../widgets/vac_score_badge.dart';
 
 class VacancyDetailScreen extends ConsumerWidget {
@@ -207,7 +207,7 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
   }
 }
 
-// ── Hero header — role icon + title + subtitle + chips + bento grid ───────────
+// ── Hero header — role icon + title + verdict card + compact scores ───────────
 
 class _VacancyHero extends StatelessWidget {
   final Phase1Data? p1;
@@ -224,7 +224,6 @@ class _VacancyHero extends StatelessWidget {
     final category = p2.category;
     final publishedAt = vacancy?.publishedAt;
 
-    // Subtitle: "Company • Category"
     final subtitleParts = [
       if (company.isNotEmpty) company,
       if (category.isNotEmpty) category,
@@ -238,7 +237,6 @@ class _VacancyHero extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Company icon
             Container(
               width: 48,
               height: 48,
@@ -257,7 +255,6 @@ class _VacancyHero extends StatelessWidget {
               child: Icon(Icons.code, color: cs.primary, size: 26),
             ),
             const SizedBox(width: 16),
-            // Title + Subtitle
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -286,24 +283,96 @@ class _VacancyHero extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 16),
-        // Chips row: recommendation + posted
-        Wrap(
-          spacing: 8,
-          runSpacing: 6,
+        const SizedBox(height: 20),
+        // Verdict card — primary go/no-go decision
+        _VerdictCard(
+          recommendation: p2.recommendation,
+          recommendationLabel: p2.recommendationLabel,
+          northStar: p1?.northStar,
+        ),
+        const SizedBox(height: 12),
+        // Supporting scores row
+        Row(
           children: [
-            RecommendationChip(
-              recommendation: p2.recommendation,
-              label: p2.recommendationLabel,
-            ),
+            FitScoreChip(score: p2.fitScore),
+            const SizedBox(width: 8),
+            FitDotBar(score: p2.fitScore),
+            if (p1 != null) ...[
+              const SizedBox(width: 16),
+              VacScoreBadge(score: p1!.vacancyScore),
+            ],
+            const Spacer(),
             if (publishedAt != null)
               _PostedChip(publishedAt: publishedAt, cs: cs),
           ],
         ),
-        const SizedBox(height: 24),
-        // Bento grid
-        _BentoGrid(p1: p1, p2: p2),
       ],
+    );
+  }
+}
+
+class _VerdictCard extends StatelessWidget {
+  final String recommendation;
+  final String recommendationLabel;
+  final String? northStar;
+
+  const _VerdictCard({
+    required this.recommendation,
+    required this.recommendationLabel,
+    this.northStar,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    final (bgColor, iconColor, icon) = switch (recommendation) {
+      'apply' => (cs.primaryContainer, cs.primary, Icons.check_circle_rounded),
+      'take_a_chance' => (cs.tertiaryContainer, cs.tertiary, Icons.bolt_rounded),
+      _ => (cs.errorContainer, cs.error, Icons.cancel_rounded),
+    };
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(icon, size: 36, color: iconColor),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  recommendationLabel.isNotEmpty
+                      ? recommendationLabel
+                      : recommendation,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: cs.onSurface,
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                if (northStar != null && northStar!.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    northStar!,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: cs.onSurface.withValues(alpha: 0.65),
+                        ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -350,175 +419,6 @@ class _PostedChip extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-// ── Bento grid: Fit Score + VacScore + Category ───────────────────────────────
-
-class _BentoGrid extends StatelessWidget {
-  final Phase1Data? p1;
-  final Phase2Data p2;
-
-  const _BentoGrid({required this.p1, required this.p2});
-
-  @override
-  Widget build(BuildContext context) {
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Fit Score
-          Expanded(child: _BentoCard(
-            label: 'Overall Fit Score',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _BigScore(
-                  value: p2.fitScore.toDouble(),
-                  max: 10,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                const SizedBox(height: 12),
-                FitDotBar(score: p2.fitScore),
-              ],
-            ),
-          )),
-          const SizedBox(width: 12),
-          // VacScore
-          if (p1 != null)
-            Expanded(child: _BentoCard(
-              label: 'Vacancy Quality Score',
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _BigScore(
-                    value: p1!.vacancyScore,
-                    max: 10,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                  const SizedBox(height: 8),
-                  VacScoreBadge(score: p1!.vacancyScore),
-                  if (p1!.northStar.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      p1!.northStar,
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                            color: Theme.of(context).colorScheme.secondary,
-                          ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ],
-              ),
-            )),
-          const SizedBox(width: 12),
-          // Category / Info
-          Expanded(child: _BentoCard(
-            label: 'Category',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: p2.category
-                  .split('·')
-                  .map((s) => s.trim())
-                  .where((s) => s.isNotEmpty)
-                  .map((s) => Padding(
-                        padding: const EdgeInsets.only(bottom: 6),
-                        child: Row(
-                          children: [
-                            Icon(Icons.check,
-                                size: 16,
-                                color: Theme.of(context).colorScheme.primary),
-                            const SizedBox(width: 6),
-                            Flexible(
-                              child: Text(
-                                s,
-                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 13),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ))
-                  .toList(),
-            ),
-          )),
-        ],
-      ),
-    );
-  }
-}
-
-class _BentoCard extends StatelessWidget {
-  final String label;
-  final Widget child;
-
-  const _BentoCard({required this.label, required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 4,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: cs.onSurfaceVariant,
-                ),
-          ),
-          const SizedBox(height: 10),
-          child,
-        ],
-      ),
-    );
-  }
-}
-
-class _BigScore extends StatelessWidget {
-  final double value;
-  final double max;
-  final Color color;
-
-  const _BigScore({required this.value, required this.max, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.baseline,
-      textBaseline: TextBaseline.alphabetic,
-      children: [
-        Text(
-          value.toStringAsFixed(1),
-          style: TextStyle(
-            fontSize: 40,
-            fontWeight: FontWeight.w700,
-            color: color,
-            height: 1.0,
-          ),
-        ),
-        const SizedBox(width: 4),
-        Text(
-          '/ ${max.toInt()}',
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                color: Theme.of(context).colorScheme.secondary,
-              ),
-        ),
-      ],
     );
   }
 }
