@@ -67,7 +67,7 @@ class VacancyDetailScreen extends ConsumerWidget {
                     if (p1 != null) ...[
                       const SizedBox(height: 16),
                       _CollapsibleSection(
-                        title: 'VacScore Breakdown',
+                        title: 'Attraction Breakdown',
                         child: _VacScoreTable(dims: p1.vacscoreDims),
                       ),
                       const SizedBox(height: 16),
