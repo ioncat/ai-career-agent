@@ -447,10 +447,20 @@ class _QuickOverviewCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (p2.category.isNotEmpty)
-            _OverviewRow(label: 'Category', text: p2.category),
+            _OverviewRow(
+              label: 'Category',
+              text: p2.category,
+              icon: Icons.label_outline,
+              iconColor: const Color(0xFF2E7D32),
+            ),
           if (p2.whoTheyWant.isNotEmpty) ...[
             const SizedBox(height: 10),
-            _OverviewRow(label: 'Who they want', text: p2.whoTheyWant),
+            _OverviewRow(
+              label: 'Who they want',
+              text: p2.whoTheyWant,
+              icon: Icons.person_search_outlined,
+              iconColor: const Color(0xFF1565C0),
+            ),
           ],
           if (p2.keyBarriers.isNotEmpty) ...[
             const SizedBox(height: 10),
@@ -466,8 +476,8 @@ class _QuickOverviewCard extends StatelessWidget {
             _OverviewRow(
               label: 'Hidden Risks',
               text: p2.hiddenRisks.join('; '),
-              icon: Icons.block,
-              iconColor: cs.onErrorContainer,
+              icon: Icons.warning_amber_rounded,
+              iconColor: cs.error,
             ),
           ],
           if (p2.warnings.isNotEmpty) ...[
@@ -476,7 +486,7 @@ class _QuickOverviewCard extends StatelessWidget {
               label: 'Warnings',
               text: p2.warnings.join('; '),
               icon: Icons.info_outline,
-              iconColor: cs.secondary,
+              iconColor: const Color(0xFFF57F17),
             ),
           ],
         ],
