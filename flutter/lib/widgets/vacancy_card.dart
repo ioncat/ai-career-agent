@@ -74,7 +74,7 @@ class _VacancyCardState extends State<VacancyCard> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Row 1: source badge + date · vacancy id
+              // Row 1: source badge + date
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -88,25 +88,31 @@ class _VacancyCardState extends State<VacancyCard> {
                           ),
                     ),
                   ],
-                  const Spacer(),
-                  Text(
-                    '#${v.id}',
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: cs.onSurfaceVariant.withValues(alpha: 0.5),
-                          fontFeatures: [const FontFeature.tabularFigures()],
-                        ),
-                  ),
                 ],
               ),
               const SizedBox(height: 8),
-              // Row 2: role title
-              Text(
-                v.role,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: widget.selected ? cs.primary : cs.onSurface,
+              // Row 2: role title + #id aligned right
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Text(
+                      v.role,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: widget.selected ? cs.primary : cs.onSurface,
+                          ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '#${v.id}',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: cs.onSurfaceVariant.withValues(alpha: 0.45),
+                        ),
+                  ),
+                ],
               ),
               const SizedBox(height: 2),
               // Row 3: company
