@@ -89,8 +89,6 @@ class _VacancyCardState extends State<VacancyCard> {
                     ),
                   ],
                   const Spacer(),
-                  if (v.recommendation != null)
-                    _RecIcon(rec: v.recommendation!, cs: cs),
                 ],
               ),
               const SizedBox(height: 8),
@@ -179,22 +177,3 @@ class _VacancyCardState extends State<VacancyCard> {
   }
 }
 
-// Small icon in top-right of card indicating recommendation
-class _RecIcon extends StatelessWidget {
-  final String rec;
-  final ColorScheme cs;
-
-  const _RecIcon({required this.rec, required this.cs});
-
-  @override
-  Widget build(BuildContext context) {
-    switch (rec) {
-      case 'apply':
-        return Icon(Icons.check_circle_outline, size: 20, color: cs.primary);
-      case 'take_a_chance':
-        return Icon(Icons.bolt, size: 20, color: cs.outline);
-      default:
-        return Icon(Icons.close, size: 20, color: cs.error);
-    }
-  }
-}

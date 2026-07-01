@@ -398,7 +398,7 @@ class _BentoGrid extends StatelessWidget {
                     color: Theme.of(context).colorScheme.onSurface,
                   ),
                   const SizedBox(height: 8),
-                  VacScoreBadge(score: p1!.vacancyScore, large: true),
+                  VacScoreBadge(score: p1!.vacancyScore),
                   if (p1!.northStar.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Text(
