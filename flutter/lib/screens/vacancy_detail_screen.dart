@@ -170,6 +170,15 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
       child: Row(
         children: [
           const Spacer(),
+          // Vacancy ID
+          Text(
+            '#${widget.vacancyId}',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: cs.onSurfaceVariant.withValues(alpha: 0.5),
+                  fontFeatures: [const FontFeature.tabularFigures()],
+                ),
+          ),
+          const SizedBox(width: 12),
           // Open JD
           if (widget.url.isNotEmpty)
             IconButton(

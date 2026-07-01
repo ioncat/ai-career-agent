@@ -74,7 +74,7 @@ class _VacancyCardState extends State<VacancyCard> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Row 1: source badge + date · recommendation icon
+              // Row 1: source badge + date · vacancy id
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -89,6 +89,13 @@ class _VacancyCardState extends State<VacancyCard> {
                     ),
                   ],
                   const Spacer(),
+                  Text(
+                    '#${v.id}',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: cs.onSurfaceVariant.withValues(alpha: 0.5),
+                          fontFeatures: [const FontFeature.tabularFigures()],
+                        ),
+                  ),
                 ],
               ),
               const SizedBox(height: 8),
