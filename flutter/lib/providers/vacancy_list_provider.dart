@@ -1,10 +1,15 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/vacancy.dart';
 import '../repositories/vacancy_repository.dart';
 import 'settings_provider.dart';
 
 enum PollingStatus { idle, polling, found, empty, error }
+
+const _kCacheKey = 'vacancy_list_cache';
+const _kCacheTimestampKey = 'vacancy_list_cache_ts';
 
 class PollingState {
   final List<VacancyListItem> vacancies;
@@ -12,6 +17,7 @@ class PollingState {
   final int newCount;
   final DateTime? lastUpdatedAt;
   final String? errorMessage;
+  final bool fromCache;
 
   const PollingState({
     this.vacancies = const [],
@@ -19,6 +25,7 @@ class PollingState {
     this.newCount = 0,
     this.lastUpdatedAt,
     this.errorMessage,
+    this.fromCache = false,
   });
 
   PollingState copyWith({
@@ -27,6 +34,7 @@ class PollingState {
     int? newCount,
     DateTime? lastUpdatedAt,
     String? errorMessage,
+    bool? fromCache,
   }) {
     return PollingState(
       vacancies: vacancies ?? this.vacancies,
@@ -34,6 +42,7 @@ class PollingState {
       newCount: newCount ?? this.newCount,
       lastUpdatedAt: lastUpdatedAt ?? this.lastUpdatedAt,
       errorMessage: errorMessage ?? this.errorMessage,
+      fromCache: fromCache ?? this.fromCache,
     );
   }
 }
@@ -50,19 +59,62 @@ class VacancyListNotifier extends AsyncNotifier<PollingState> {
       Duration(seconds: settings.pollIntervalSeconds),
       (_) => _poll(),
     );
-
     ref.onDispose(() => _timer?.cancel());
 
+    // Load cache immediately, then fetch in background
+    final cached = await _loadCache();
+    if (cached != null) {
+      // Show cache instantly, kick off background refresh
+      state = AsyncData(cached);
+      _poll();
+      return cached;
+    }
+
     return _fetchAll(settings.apiUrl);
+  }
+
+  Future<PollingState?> _loadCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final json = prefs.getString(_kCacheKey);
+      final tsStr = prefs.getString(_kCacheTimestampKey);
+      if (json == null) return null;
+
+      final list = (jsonDecode(json) as List)
+          .map((e) => VacancyListItem.fromJson(e as Map<String, dynamic>))
+          .toList();
+
+      final ts = tsStr != null ? DateTime.tryParse(tsStr) : null;
+
+      return PollingState(
+        vacancies: list,
+        status: PollingStatus.idle,
+        lastUpdatedAt: ts,
+        fromCache: true,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _saveCache(List<VacancyListItem> items) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final json = jsonEncode(items.map((v) => v.toJson()).toList());
+      await prefs.setString(_kCacheKey, json);
+      await prefs.setString(_kCacheTimestampKey, DateTime.now().toIso8601String());
+    } catch (_) {}
   }
 
   Future<PollingState> _fetchAll(String apiUrl) async {
     final repo = VacancyRepository(baseUrl: apiUrl);
     final items = await repo.listVacancies();
+    await _saveCache(items);
     return PollingState(
       vacancies: items,
       status: PollingStatus.idle,
       lastUpdatedAt: DateTime.now(),
+      fromCache: false,
     );
   }
 
@@ -78,6 +130,7 @@ class VacancyListNotifier extends AsyncNotifier<PollingState> {
     try {
       final repo = VacancyRepository(baseUrl: settings.apiUrl);
       final items = await repo.listVacancies();
+      await _saveCache(items);
 
       final existingIds = current?.vacancies.map((v) => v.id).toSet() ?? {};
       final newAnalyzed = items
@@ -89,6 +142,7 @@ class VacancyListNotifier extends AsyncNotifier<PollingState> {
         status: newAnalyzed > 0 ? PollingStatus.found : PollingStatus.empty,
         newCount: newAnalyzed,
         lastUpdatedAt: DateTime.now(),
+        fromCache: false,
       ));
     } catch (e) {
       state = AsyncData(
@@ -107,7 +161,6 @@ final vacancyListProvider =
     AsyncNotifierProvider<VacancyListNotifier, PollingState>(
         VacancyListNotifier.new);
 
-// Filter: vacancies by folder/status
 final folderVacanciesProvider =
     Provider.family<List<VacancyListItem>, String>((ref, folder) {
   final state = ref.watch(vacancyListProvider).valueOrNull;

@@ -29,19 +29,12 @@ class _VacancyCardState extends State<VacancyCard> {
     final v = widget.vacancy;
 
     final bgColor = widget.selected
-        ? cs.surfaceContainerHighest
+        ? cs.surface
         : _hovered
             ? cs.surfaceContainerLow
             : cs.surface;
 
-    final borderRadius = widget.selected
-        ? const BorderRadius.only(
-            topLeft: Radius.circular(4),
-            bottomLeft: Radius.circular(4),
-            topRight: Radius.circular(12),
-            bottomRight: Radius.circular(12),
-          )
-        : BorderRadius.circular(12);
+    final borderRadius = BorderRadius.circular(12);
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -55,22 +48,26 @@ class _VacancyCardState extends State<VacancyCard> {
             color: bgColor,
             borderRadius: borderRadius,
             border: widget.selected
-                ? Border(
-                    left: BorderSide(color: cs.primary, width: 3),
-                    top: BorderSide(color: Colors.transparent),
-                    right: BorderSide(color: Colors.transparent),
-                    bottom: BorderSide(color: Colors.transparent),
-                  )
+                ? Border.all(color: cs.primary.withValues(alpha: 0.55), width: 1.5)
                 : Border.all(
                     color: cs.outlineVariant.withValues(alpha: 0.3),
                   ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: _hovered ? 0.08 : 0.04),
-                blurRadius: _hovered ? 8 : 2,
-                offset: Offset(0, _hovered ? 2 : 1),
-              ),
-            ],
+            boxShadow: widget.selected
+                ? [
+                    BoxShadow(
+                      color: cs.primary.withValues(alpha: 0.14),
+                      blurRadius: 10,
+                      spreadRadius: 0,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: _hovered ? 0.08 : 0.04),
+                      blurRadius: _hovered ? 8 : 2,
+                      offset: Offset(0, _hovered ? 2 : 1),
+                    ),
+                  ],
           ),
           padding: const EdgeInsets.all(16),
           child: Column(

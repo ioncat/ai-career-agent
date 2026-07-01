@@ -53,6 +53,23 @@ class VacancyListItem {
           [],
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'role': role,
+        'company': company,
+        'site': site,
+        'url': url,
+        'status': status,
+        'fit_score': fitScore,
+        'vacancy_score': vacancyScore,
+        'recommendation': recommendation,
+        'recommendation_label': recommendationLabel,
+        'category': category,
+        'published_at': publishedAt,
+        'updated_at': updatedAt,
+        'key_barriers': keyBarriers,
+      };
 }
 
 class VacancyAnalysis {

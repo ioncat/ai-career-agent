@@ -523,36 +523,50 @@ class _BigScore extends StatelessWidget {
   }
 }
 
+// ── Barriers & Risks ──────────────────────────────────────────────────────────
+
 class _BarriersCard extends StatelessWidget {
-  final dynamic p2;
+  final Phase2Data p2;
 
   const _BarriersCard({required this.p2});
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return _SectionCard(
       title: 'Barriers & Risks',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (p2.keyBarriers.isNotEmpty)
-            _BulletList(
-                items: p2.keyBarriers,
-                icon: '⚠️',
-                color: const Color(0xFFE65100)),
+          if (p2.keyBarriers.isNotEmpty) ...[
+            _BarrierGroup(
+              label: 'Key Barriers',
+              items: p2.keyBarriers,
+              icon: Icons.warning_amber_rounded,
+              iconColor: cs.error,
+              bgColor: cs.errorContainer.withValues(alpha: 0.35),
+            ),
+          ],
           if (p2.hiddenRisks.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            _BulletList(
-                items: p2.hiddenRisks,
-                icon: '🔴',
-                color: const Color(0xFFBA1A1A)),
+            if (p2.keyBarriers.isNotEmpty) const SizedBox(height: 10),
+            _BarrierGroup(
+              label: 'Hidden Risks',
+              items: p2.hiddenRisks,
+              icon: Icons.block,
+              iconColor: cs.onErrorContainer,
+              bgColor: cs.errorContainer.withValues(alpha: 0.6),
+            ),
           ],
           if (p2.warnings.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            _BulletList(
-                items: p2.warnings,
-                icon: '💡',
-                color: const Color(0xFF005DAC)),
+            if (p2.keyBarriers.isNotEmpty || p2.hiddenRisks.isNotEmpty)
+              const SizedBox(height: 10),
+            _BarrierGroup(
+              label: 'Warnings',
+              items: p2.warnings,
+              icon: Icons.info_outline,
+              iconColor: cs.secondary,
+              bgColor: cs.secondaryContainer.withValues(alpha: 0.4),
+            ),
           ],
         ],
       ),
@@ -560,145 +574,247 @@ class _BarriersCard extends StatelessWidget {
   }
 }
 
-class _BulletList extends StatelessWidget {
+class _BarrierGroup extends StatelessWidget {
+  final String label;
   final List<String> items;
-  final String icon;
-  final Color color;
+  final IconData icon;
+  final Color iconColor;
+  final Color bgColor;
 
-  const _BulletList(
-      {required this.items, required this.icon, required this.color});
+  const _BarrierGroup({
+    required this.label,
+    required this.items,
+    required this.icon,
+    required this.iconColor,
+    required this.bgColor,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: items
-          .map((item) => Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text(
-                  '$icon $item',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: color),
+      children: [
+        Text(
+          label,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: cs.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.5,
+              ),
+        ),
+        const SizedBox(height: 6),
+        ...items.map((item) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                decoration: BoxDecoration(
+                  color: bgColor,
+                  borderRadius: BorderRadius.circular(8),
                 ),
-              ))
-          .toList(),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(icon, size: 14, color: iconColor),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        item,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: cs.onSurface,
+                            ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )),
+      ],
     );
   }
 }
 
+// ── Fit Dimensions ────────────────────────────────────────────────────────────
+
 class _FitDimsTable extends StatelessWidget {
-  final dynamic dims;
+  final FitDimensions dims;
 
   const _FitDimsTable({required this.dims});
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final rows = [
-      ('Domain fit', dims.domainFit),
-      ('Execution fit', dims.executionFit),
-      ('Strategy fit', dims.strategyFit),
-      ('Systems fit', dims.systemsFit),
+      ('Domain fit',      dims.domainFit),
+      ('Execution fit',   dims.executionFit),
+      ('Strategy fit',    dims.strategyFit),
+      ('Systems fit',     dims.systemsFit),
       ('Stakeholder fit', dims.stakeholderFit),
-      ('Overall fit', dims.overallFit),
+      ('Overall fit',     dims.overallFit),
     ];
-    return Table(
-      columnWidths: const {0: FlexColumnWidth(), 1: FixedColumnWidth(60)},
-      children: rows
-          .map((r) => TableRow(children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 3),
-                  child: Text(r.$1,
-                      style: Theme.of(context).textTheme.bodySmall),
-                ),
-                Text('${r.$2.toStringAsFixed(1)}/10',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        )),
-              ]))
-          .toList(),
+    return Column(
+      children: rows.map((r) => _ScoreBar(
+            label: r.$1,
+            value: r.$2,
+            max: 10,
+            color: cs.primary,
+          )).toList(),
     );
   }
 }
 
+// ── VacScore Breakdown ────────────────────────────────────────────────────────
+
 class _VacScoreTable extends StatelessWidget {
-  final dynamic dims;
+  final VacScoreDims dims;
 
   const _VacScoreTable({required this.dims});
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final rows = [
-      ('Company tier', dims.companyTier, 4),
-      ('Seniority', dims.seniority, 4),
-      ('Market scope', dims.marketScope, 3),
-      ('Company type', dims.companyType, 3),
-      ('Stage fit', dims.companyStageFit, 3),
-      ('Domain score', dims.domainScore, 5),
-      ('Remote policy', dims.remotePolicy, 3),
-      ('Compensation', dims.compensation, 3),
+      ('Company tier',  dims.companyTier,      4),
+      ('Seniority',     dims.seniority,        4),
+      ('Market scope',  dims.marketScope,      3),
+      ('Company type',  dims.companyType,      3),
+      ('Stage fit',     dims.companyStageFit,  3),
+      ('Domain score',  dims.domainScore,      5),
+      ('Remote policy', dims.remotePolicy,     3),
+      ('Compensation',  dims.compensation,     3),
     ];
-    return Table(
-      columnWidths: const {0: FlexColumnWidth(), 1: FixedColumnWidth(60)},
-      children: rows
-          .map((r) => TableRow(children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 3),
-                  child: Text(r.$1,
-                      style: Theme.of(context).textTheme.bodySmall),
-                ),
-                Text('${r.$2}/${r.$3}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        )),
-              ]))
-          .toList(),
+    return Column(
+      children: rows.map((r) => _ScoreBar(
+            label: r.$1,
+            value: r.$2.toDouble(),
+            max: r.$3.toDouble(),
+            color: cs.secondary,
+          )).toList(),
     );
   }
 }
+
+// ── Shared score bar row ──────────────────────────────────────────────────────
+
+class _ScoreBar extends StatelessWidget {
+  final String label;
+  final double value;
+  final double max;
+  final Color color;
+
+  const _ScoreBar({
+    required this.label,
+    required this.value,
+    required this.max,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 116,
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+            ),
+          ),
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: max > 0 ? value / max : 0,
+                minHeight: 6,
+                backgroundColor: cs.surfaceContainerHighest,
+                valueColor: AlwaysStoppedAnimation<Color>(color),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 36,
+            child: Text(
+              value % 1 == 0
+                  ? '${value.toInt()}/${ max.toInt()}'
+                  : '${value.toStringAsFixed(1)}/${max.toInt()}',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: cs.onSurface,
+                    fontWeight: FontWeight.w600,
+                  ),
+              textAlign: TextAlign.end,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Role Balance ──────────────────────────────────────────────────────────────
 
 class _RoleBalanceBar extends StatelessWidget {
   final Map<String, int> balance;
 
   const _RoleBalanceBar({required this.balance});
 
-  static const _colors = {
-    'strategy': Color(0xFF1976D2),
-    'discovery': Color(0xFF7B1FA2),
-    'execution': Color(0xFF388E3C),
-    'stakeholder': Color(0xFFF57C00),
-    'operational': Color(0xFF757575),
-  };
+  Color _colorForKey(String key, ColorScheme cs) {
+    switch (key.toLowerCase()) {
+      case 'strategy':    return cs.primary;
+      case 'discovery':   return cs.tertiary;
+      case 'execution':   return const Color(0xFF388E3C);
+      case 'stakeholder': return cs.secondary;
+      default:            return cs.outline;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Column(
       children: balance.entries.map((e) {
-        final color = _colors[e.key.toLowerCase()] ?? const Color(0xFF757575);
+        final color = _colorForKey(e.key, cs);
         return Padding(
-          padding: const EdgeInsets.only(bottom: 6),
+          padding: const EdgeInsets.only(bottom: 8),
           child: Row(
             children: [
               SizedBox(
-                width: 100,
-                child: Text(e.key,
-                    style: Theme.of(context).textTheme.labelSmall),
+                width: 116,
+                child: Text(
+                  e.key,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                ),
               ),
               Expanded(
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(3),
+                  borderRadius: BorderRadius.circular(4),
                   child: LinearProgressIndicator(
                     value: e.value / 100,
-                    minHeight: 8,
-                    backgroundColor: color.withValues(alpha: 0.15),
+                    minHeight: 6,
+                    backgroundColor: cs.surfaceContainerHighest,
                     valueColor: AlwaysStoppedAnimation<Color>(color),
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              Text('${e.value}%',
-                  style: Theme.of(context).textTheme.labelSmall),
+              const SizedBox(width: 10),
+              SizedBox(
+                width: 36,
+                child: Text(
+                  '${e.value}%',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: cs.onSurface,
+                        fontWeight: FontWeight.w600,
+                      ),
+                  textAlign: TextAlign.end,
+                ),
+              ),
             ],
           ),
         );
@@ -706,6 +822,8 @@ class _RoleBalanceBar extends StatelessWidget {
     );
   }
 }
+
+// ── Section card — bento style ────────────────────────────────────────────────
 
 class _SectionCard extends StatelessWidget {
   final String title;
@@ -715,24 +833,40 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title,
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    )),
-            const SizedBox(height: 10),
-            child,
-          ],
-        ),
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
+          ),
+          const SizedBox(height: 12),
+          child,
+        ],
       ),
     );
   }
 }
+
+// ── Collapsible section — bento style ────────────────────────────────────────
 
 class _CollapsibleSection extends StatefulWidget {
   final String title;
@@ -760,37 +894,64 @@ class _CollapsibleSectionState extends State<_CollapsibleSection> {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           InkWell(
             onTap: () => setState(() => _expanded = !_expanded),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(16),
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
               child: Row(
                 children: [
-                  Text(widget.title,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          )),
+                  Text(
+                    widget.title,
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                  ),
                   const Spacer(),
-                  Icon(_expanded ? Icons.expand_less : Icons.expand_more,
-                      size: 18),
+                  Icon(
+                    _expanded ? Icons.expand_less : Icons.expand_more,
+                    size: 16,
+                    color: cs.onSurfaceVariant,
+                  ),
                 ],
               ),
             ),
           ),
           AnimatedCrossFade(
             firstChild: const SizedBox.shrink(),
-            secondChild: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: widget.child,
+            secondChild: Column(
+              children: [
+                Divider(
+                  height: 1,
+                  color: cs.outlineVariant.withValues(alpha: 0.3),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: widget.child,
+                ),
+              ],
             ),
             crossFadeState: _expanded
                 ? CrossFadeState.showSecond
                 : CrossFadeState.showFirst,
-            duration: const Duration(milliseconds: 200),
+            duration: const Duration(milliseconds: 180),
           ),
         ],
       ),
