@@ -218,6 +218,23 @@ class Phase2Data {
   }
 }
 
+class VacancyCv {
+  final String? cvMd;
+  final String? coverMd;
+
+  const VacancyCv({this.cvMd, this.coverMd});
+
+  bool get hasCv => cvMd != null && cvMd!.isNotEmpty;
+  bool get hasCover => coverMd != null && coverMd!.isNotEmpty;
+
+  factory VacancyCv.fromJson(Map<String, dynamic> json) {
+    return VacancyCv(
+      cvMd: json['cv_md'] as String?,
+      coverMd: json['cover_md'] as String?,
+    );
+  }
+}
+
 class FitDimensions {
   final double domainFit;
   final double executionFit;
