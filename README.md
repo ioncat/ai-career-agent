@@ -49,9 +49,9 @@ When fit is real: a targeted CV from actual experience, cross-checked against th
 
 **6. Self-Review (Phase 3.5)** — word frequency check, tools gap, tone vs archetype. First time user sees the CV.
 
-**7. Approval → CV.pdf → Telegram**
+**7. Approval → CV.pdf** — preview in Flutter, PDF download.
 
-**8. Cover Letter (Phase 4) → CoverLetter.pdf → Telegram**
+**8. Cover Letter (Phase 4) → Cover.pdf**
 
 ### Diagrams
 
@@ -71,8 +71,8 @@ When fit is real: a targeted CV from actual experience, cross-checked against th
 | **PdM / PO as primary ICP** (PM, BA as extended) | Serve all roles equally | PdM / PO job search has role-specific archetypes (Founder Proxy vs Executor, discovery vs delivery bias), domain signals, and lexicon that generic tools miss. Vertical depth beats horizontal breadth. PM and BA supported via generic skill_type — not the core optimization target. |
 | **Decision-first pipeline** — analyze fit before generating anything | Generate CV for every vacancy | Effort should follow a go/no-go recommendation, not precede it. Don't optimize a document the user shouldn't send. |
 | **RSS-first workflow** — jobs are pushed to the user | Manual vacancy search | Users should *evaluate* opportunities, not spend time *finding* them. |
-| **Telegram as primary UI** | Web app / dedicated client | Zero install, already in the user's pocket, native push + inline approve/skip buttons. The interaction is decisions, not browsing. |
-| **Channel-agnostic architecture** | Telegram-only forever | Telegram is primary today (CIS/EU). PWA and WhatsApp added as adapters when needed — tools layer unchanged. |
+| **Flutter Desktop as primary UI** | Telegram bot / web app | Local desktop app: zero hosting, zero HTTPS, no external dependency. Same Flutter codebase compiles to Web and Mobile later — no rewrite. RSS → auto-analysis → system tray notification → user opens app and decides. |
+| **Telegram → push-only, then removed** | Telegram as permanent UI | Telegram stays for push notifications during Flutter MVP phase. Removed in Phase D — the interaction model moves to Flutter entirely. |
 | **Monorepo — all services inside** | Permanent external dependencies | All user-built services live inside `services/`. Audit before migrating — cut dead code, keep only what the pipeline needs. |
 | **Human-in-the-loop on irreversible steps** | Full auto-apply | The user owns the apply/skip and CV-approval calls. Automation removes toil, not judgment. |
 
@@ -85,7 +85,8 @@ When fit is real: a targeted CV from actual experience, cross-checked against th
 | Layer | Tech |
 |-------|------|
 | AI | Claude Sonnet 4.6 (default) · Ollama (local, `LLM_PROVIDER=ollama`) · PydanticAI · prompt caching |
-| UI | Telegram (aiogram 3.x) · Web tracker (FastAPI + HTMX) |
-| HTTP | httpx async |
+| UI | Flutter Desktop (primary) · Web tracker (FastAPI + HTMX, read-only) |
+| Backend | FastAPI — JSON endpoints for Flutter (`/api/vacancies`, `/api/vacancies/{id}/analysis`, `/api/vacancies/{id}/cv`) |
+| HTTP | httpx async (backend) · http (Flutter) |
 | Storage | SQLite + filesystem |
 | Deploy | Docker Compose — career-agent · services/ |
