@@ -131,12 +131,14 @@ class _ListHeader extends StatelessWidget {
               ),
               IconButton(
                 icon: Icon(
-                  Icons.tune,
+                  polling ? Icons.sync : Icons.refresh,
                   size: 20,
-                  color: cs.onSurfaceVariant,
+                  color: polling
+                      ? cs.primary
+                      : cs.onSurfaceVariant,
                 ),
                 onPressed: polling ? null : onRefresh,
-                tooltip: 'Обновить',
+                tooltip: 'Обновить список',
                 splashRadius: 18,
               ),
             ],
