@@ -212,13 +212,8 @@ class _VacancyHero extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final role    = p1?.role.isNotEmpty == true ? p1!.role : (vacancy?.role ?? '');
     final company = p1?.company.isNotEmpty == true ? p1!.company : (vacancy?.company ?? '');
-    final category = p2.category;
     final publishedAt = vacancy?.publishedAt;
-
-    final subtitleParts = [
-      if (company.isNotEmpty) company,
-      if (category.isNotEmpty) category,
-    ];
+    // category moves to Quick Overview block, not used in hero
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -273,10 +268,10 @@ class _VacancyHero extends StatelessWidget {
                       ),
                     ],
                   ),
-                  if (subtitleParts.isNotEmpty) ...[
+                  if (company.isNotEmpty) ...[
                     const SizedBox(height: 6),
                     Text(
-                      subtitleParts.join(' • '),
+                      company,
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
                             color: cs.onSurfaceVariant,
                             fontWeight: FontWeight.w400,
@@ -428,7 +423,7 @@ class _PostedChip extends StatelessWidget {
   }
 }
 
-// ── Quick Overview — who they want + barriers + risks + warnings ──────────────
+// ── Quick Overview ────────────────────────────────────────────────────────────
 
 class _QuickOverviewCard extends StatelessWidget {
   final Phase2Data p2;
@@ -438,7 +433,8 @@ class _QuickOverviewCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final hasContent = p2.whoTheyWant.isNotEmpty ||
+    final hasContent = p2.category.isNotEmpty ||
+        p2.whoTheyWant.isNotEmpty ||
         p2.keyBarriers.isNotEmpty ||
         p2.hiddenRisks.isNotEmpty ||
         p2.warnings.isNotEmpty;
@@ -450,53 +446,37 @@ class _QuickOverviewCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Who they want
+          if (p2.category.isNotEmpty)
+            _OverviewRow(label: 'Category', text: p2.category),
           if (p2.whoTheyWant.isNotEmpty) ...[
-            Text(
-              'Who they want',
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: cs.onSurfaceVariant,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.5,
-                  ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              p2.whoTheyWant,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
+            const SizedBox(height: 10),
+            _OverviewRow(label: 'Who they want', text: p2.whoTheyWant),
           ],
-          // Barriers
           if (p2.keyBarriers.isNotEmpty) ...[
-            if (p2.whoTheyWant.isNotEmpty) const SizedBox(height: 14),
-            _QuickGroup(
+            const SizedBox(height: 10),
+            _OverviewRow(
               label: 'Key Barriers',
-              items: p2.keyBarriers,
+              text: p2.keyBarriers.join('; '),
               icon: Icons.warning_amber_rounded,
               iconColor: cs.error,
-              bgColor: cs.errorContainer.withValues(alpha: 0.35),
             ),
           ],
-          // Hidden risks
           if (p2.hiddenRisks.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            _QuickGroup(
+            const SizedBox(height: 10),
+            _OverviewRow(
               label: 'Hidden Risks',
-              items: p2.hiddenRisks,
+              text: p2.hiddenRisks.join('; '),
               icon: Icons.block,
               iconColor: cs.onErrorContainer,
-              bgColor: cs.errorContainer.withValues(alpha: 0.6),
             ),
           ],
-          // Warnings
           if (p2.warnings.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            _QuickGroup(
+            const SizedBox(height: 10),
+            _OverviewRow(
               label: 'Warnings',
-              items: p2.warnings,
+              text: p2.warnings.join('; '),
               icon: Icons.info_outline,
               iconColor: cs.secondary,
-              bgColor: cs.secondaryContainer.withValues(alpha: 0.4),
             ),
           ],
         ],
@@ -505,61 +485,54 @@ class _QuickOverviewCard extends StatelessWidget {
   }
 }
 
-class _QuickGroup extends StatelessWidget {
+class _OverviewRow extends StatelessWidget {
   final String label;
-  final List<String> items;
-  final IconData icon;
-  final Color iconColor;
-  final Color bgColor;
+  final String text;
+  final IconData? icon;
+  final Color? iconColor;
 
-  const _QuickGroup({
+  const _OverviewRow({
     required this.label,
-    required this.items,
-    required this.icon,
-    required this.iconColor,
-    required this.bgColor,
+    required this.text,
+    this.icon,
+    this.iconColor,
   });
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Column(
+    final tt = Theme.of(context).textTheme;
+    final labelColor = iconColor ?? cs.onSurfaceVariant;
+
+    return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: cs.onSurfaceVariant,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.5,
-              ),
+        if (icon != null) ...[
+          Padding(
+            padding: const EdgeInsets.only(top: 1),
+            child: Icon(icon, size: 13, color: labelColor),
+          ),
+          const SizedBox(width: 5),
+        ],
+        Expanded(
+          child: RichText(
+            text: TextSpan(
+              children: [
+                TextSpan(
+                  text: '$label: ',
+                  style: tt.bodySmall?.copyWith(
+                    color: labelColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                TextSpan(
+                  text: text,
+                  style: tt.bodySmall?.copyWith(color: cs.onSurface),
+                ),
+              ],
+            ),
+          ),
         ),
-        const SizedBox(height: 6),
-        ...items.map((item) => Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                decoration: BoxDecoration(
-                  color: bgColor,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(icon, size: 14, color: iconColor),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        item,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: cs.onSurface,
-                            ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            )),
       ],
     );
   }
