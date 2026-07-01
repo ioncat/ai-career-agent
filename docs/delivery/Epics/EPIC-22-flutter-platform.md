@@ -94,10 +94,13 @@ So that I spend time only on decision-making and CV review, not on triggering pi
 
 | # | Task | Status | Depends on |
 |---|------|--------|-----------|
-| B1 | EPIC-21 Task 2: Pydantic JSON contracts for P1+2, P3+3.5, P4 in `contracts/pipeline.py` | ✅ Done | A3 | 2026-06-20 |
-| B2 | EPIC-21 Task 3: VacScore composite + Fit×VacScore matrix → Python; LLM returns dim scores only | ✅ Done | B1 | 2026-06-20 |
-| B3 | FastAPI JSON endpoints for Flutter: `GET /api/vacancies`, `GET /api/vacancies/{id}/analysis`, `GET /api/vacancies/{id}/cv` | ✅ Done | B1 | 2026-06-20 |
-| B4 | Auto-pipeline orchestrator: RSS → `fetch_jd` → Phase 1+2 → `save analysis_json` → Web Push | ✅ Done | 2026-06-20 |
+| B1 | EPIC-21 Task 2: Pydantic JSON contracts for P1+2, P3+3.5, P4 in `contracts/pipeline.py` | ✅ Done | A3 |
+| B2 | EPIC-21 Task 3: VacScore composite + Fit×VacScore matrix → Python; LLM returns dim scores only | ✅ Done | B1 |
+| B3 | FastAPI JSON endpoints for Flutter: `GET /api/vacancies`, `GET /api/vacancies/{id}/analysis`, `GET /api/vacancies/{id}/cv` | ✅ Done | B1 |
+| B4 | Auto-pipeline orchestrator: RSS → `fetch_jd` → Phase 1+2 → `save analysis_json` → Web Push | ✅ Done | — |
+| B5 | `AUTO_ANALYZE` env flag in `rss_watcher.py` (`False` = stop after fetch; `True` = full-auto) | 🔴 Planned | — |
+| B6 | `GET /api/vacancies/{id}/jd` endpoint — returns JD.md content as markdown | 🟠 Planned | — |
+| B7 | `POST /api/vacancies/{id}/analyze` endpoint — stub now; wires to Phase 1+2 on LLM unlock | 🟠 Planned | B5 |
 
 ---
 
@@ -110,10 +113,14 @@ So that I spend time only on decision-making and CV review, not on triggering pi
 | C3 | Flutter: Phase 2.5 objection handling UI (barrier card → user reply → submit → adaptation brief) | 🔴 Blocked | LLM required |
 | C4 | Flutter: CV preview dialog (View CV button → VacancyCvDialog tabs CV/Cover) | 🔵 Partial | 2026-07-01 |
 | C5 | Flutter: Web Push registration | ❌ N/A Desktop | Browser-only |
+| C6 | Flutter: inbox filter includes `fetched` + `analysis_queued` statuses | 🟠 Planned | — |
+| C7 | Flutter: detail screen JD view when p2==null (JD markdown + Analyze/Skip buttons) | 🟠 Planned | C6 |
+| C8 | Flutter: `VacancyCard` "New" badge for `fetched`; `vacancyJdProvider` + `analyzeVacancy()` | 🟠 Planned | C6 |
 
 **C1 done (2026-07-01):** Fluid Desktop design system — purple M3 `ColorScheme`, glassmorphic `AppShell`, custom `NavigationRail`, `VacancyCard` (hover, selected state, source badge, Fit/Attraction outlined pill badges, #id in title row, reload icon in header).
 **C2 done (2026-07-01):** `VacancyDetailScreen` — `_VerdictCard` (full-width go/no-go colored container), `_QuickOverviewCard` (label:text rows with icons — Category green, Who they want blue, Barriers/Risks red, Warnings amber), Fit Dimensions expanded by default, Attraction Breakdown section, `#id` in hero title row. `_ActionBar`: Open JD + View CV + Decline + Generate CV.
 **C4 partial (2026-07-01):** `VacancyCvDialog` — tabbed overlay (CV + Cover), `flutter_markdown` render, empty state per tab. `getCv()` in repo + `vacancyCvProvider`. Cover file glob fixed (`*Cover.md`). PDF download + generate polling pending LLM.
+**C6–C8 (Inbox-first flow):** See [`docs/delivery/INBOX-FIRST-FLOW.md`](../INBOX-FIRST-FLOW.md). Flutter inbox shows `fetched` vacancies; unanalyzed → JD view + Analyze/Skip. Backend: B5–B7.
 
 ---
 
