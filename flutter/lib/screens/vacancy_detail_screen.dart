@@ -61,6 +61,7 @@ class VacancyDetailScreen extends ConsumerWidget {
                     if (p2.fitDimensions != null)
                       _CollapsibleSection(
                         title: 'Fit Dimensions',
+                        initiallyExpanded: true,
                         child: _FitDimsTable(dims: p2.fitDimensions!),
                       ),
                     if (p1 != null) ...[
