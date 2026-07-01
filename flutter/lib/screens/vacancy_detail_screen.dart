@@ -52,7 +52,7 @@ class VacancyDetailScreen extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Hero header
-                    _VacancyHero(p1: p1, p2: p2, vacancy: vacancy),
+                    _VacancyHero(p1: p1, p2: p2, vacancyId: vacancyId, vacancy: vacancy),
                     const SizedBox(height: 24),
                     // Who they want
                     _SectionCard(
@@ -170,15 +170,6 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
       child: Row(
         children: [
           const Spacer(),
-          // Vacancy ID
-          Text(
-            '#${widget.vacancyId}',
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: cs.onSurfaceVariant.withValues(alpha: 0.5),
-                  fontFeatures: [const FontFeature.tabularFigures()],
-                ),
-          ),
-          const SizedBox(width: 12),
           // Open JD
           if (widget.url.isNotEmpty)
             IconButton(
@@ -222,8 +213,9 @@ class _VacancyHero extends StatelessWidget {
   final Phase1Data? p1;
   final Phase2Data p2;
   final VacancyListItem? vacancy;
+  final int vacancyId;
 
-  const _VacancyHero({required this.p1, required this.p2, this.vacancy});
+  const _VacancyHero({required this.p1, required this.p2, required this.vacancyId, this.vacancy});
 
   @override
   Widget build(BuildContext context) {
@@ -268,14 +260,28 @@ class _VacancyHero extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    role,
-                    style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w700,
-                          color: cs.onSurface,
-                          height: 1.2,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          role,
+                          style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                                fontSize: 28,
+                                fontWeight: FontWeight.w700,
+                                color: cs.onSurface,
+                                height: 1.2,
+                              ),
                         ),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        '#$vacancyId',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: cs.onSurfaceVariant.withValues(alpha: 0.45),
+                            ),
+                      ),
+                    ],
                   ),
                   if (subtitleParts.isNotEmpty) ...[
                     const SizedBox(height: 6),
