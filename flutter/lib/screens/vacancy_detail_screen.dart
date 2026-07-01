@@ -9,6 +9,7 @@ import '../repositories/vacancy_repository.dart';
 import '../widgets/fit_dot_bar.dart';
 import '../widgets/fit_score_chip.dart';
 import '../widgets/vac_score_badge.dart';
+import 'vacancy_cv_screen.dart';
 
 class VacancyDetailScreen extends ConsumerWidget {
   final int vacancyId;
@@ -40,10 +41,14 @@ class VacancyDetailScreen extends ConsumerWidget {
           return const Center(child: Text('Анализ ещё выполняется...'));
         }
 
+        final role = p1?.role.isNotEmpty == true
+            ? p1!.role
+            : vacancy?.role ?? '';
+
         return Column(
           children: [
             // Sticky action bar
-            _ActionBar(vacancyId: vacancyId, url: url),
+            _ActionBar(vacancyId: vacancyId, url: url, role: role),
             // Scrollable content
             Expanded(
               child: SingleChildScrollView(
@@ -92,8 +97,9 @@ class VacancyDetailScreen extends ConsumerWidget {
 class _ActionBar extends ConsumerStatefulWidget {
   final int vacancyId;
   final String url;
+  final String role;
 
-  const _ActionBar({required this.vacancyId, required this.url});
+  const _ActionBar({required this.vacancyId, required this.url, required this.role});
 
   @override
   ConsumerState<_ActionBar> createState() => _ActionBarState();
@@ -171,6 +177,18 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
                 mode: LaunchMode.externalApplication,
               ),
             ),
+          // View CV
+          IconButton(
+            icon: Icon(Icons.article_outlined, size: 18, color: cs.onSurfaceVariant),
+            tooltip: 'View CV',
+            onPressed: () => showDialog<void>(
+              context: context,
+              builder: (_) => VacancyCvDialog(
+                vacancyId: widget.vacancyId,
+                role: widget.role,
+              ),
+            ),
+          ),
           const SizedBox(width: 4),
           // Decline
           OutlinedButton(

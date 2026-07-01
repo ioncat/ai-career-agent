@@ -44,6 +44,14 @@ class VacancyRepository {
     if (response.statusCode != 200) throw Exception('Generate CV failed: ${response.statusCode}');
   }
 
+  Future<VacancyCv> getCv(int vacancyId) async {
+    final uri = Uri.parse('$baseUrl/api/vacancies/$vacancyId/cv');
+    final response = await http.get(uri).timeout(const Duration(seconds: 10));
+    if (response.statusCode == 404) throw Exception('Vacancy not found');
+    if (response.statusCode != 200) throw Exception('Failed to load CV: ${response.statusCode}');
+    return VacancyCv.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
   Future<VacancyAnalysis> getAnalysis(int vacancyId) async {
     final uri = Uri.parse('$baseUrl/api/vacancies/$vacancyId/analysis');
     final response = await http.get(uri).timeout(const Duration(seconds: 10));
