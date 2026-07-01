@@ -1,6 +1,6 @@
 # career-agent — Backlog
 
-> Last updated: 2026-06-20
+> Last updated: 2026-07-01
 > Epic format: post-pivot epics (13+) live in `docs/delivery/epics/`. This file = priority tracker + status overview.
 > Pre-pivot epics (1–12): `docs/delivery/epics-archive/EPIC-01-12-pre-pivot.md`
 
@@ -10,7 +10,7 @@
 
 **Goal:** Flutter Web = sole UI. Telegram removed. Pipeline emits JSON. RSS → auto Phase 1+2 → Web Push → Flutter.
 
-**Status:** Phase B done (2026-06-20). Phase C next — Flutter vacancy list + detail screens. Full architecture: `docs/delivery/PIVOT-2-FLUTTER-PLATFORM.md`.
+**Status:** Phase C in progress (2026-07-01). C1+C2 done. C4 partial (CV preview). C3 blocked on LLM. Full architecture: `docs/delivery/PIVOT-2-FLUTTER-PLATFORM.md`.
 
 **Critical path:** Phase A (auto-pipeline) → Phase B (JSON contracts + EPIC-21 Tasks 2–3) → Phase C (Flutter MVP) → Phase D (polish + Telegram removal).
 
