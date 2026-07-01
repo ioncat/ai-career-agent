@@ -1,5 +1,8 @@
 # Phase 4: Cover Message
 
+> **GOVERNING PRINCIPLE — applies before any rule below:**
+> The cover is NOT a CV summary. It does not need to cover everything. It needs to create the impulse: *"this sounds relevant — I want to see more."*
+
 Write a short cover message tailored to this specific vacancy.
 The candidate's full profile is in your system context (PROFILE.md).
 

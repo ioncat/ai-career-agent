@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Career Management Console</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "tier-solid": "#F57C00",
+                        "fit-low": "#C62828",
+                        "inverse-primary": "#a5c8ff",
+                        "secondary-container": "#9defde",
+                        "surface-container-lowest": "#ffffff",
+                        "tier-premium": "#388E3C",
+                        "primary-fixed-dim": "#a5c8ff",
+                        "tertiary-fixed-dim": "#ebb2ff",
+                        "tertiary-container": "#a64dcc",
+                        "on-error": "#ffffff",
+                        "segment-strategy": "#1976D2",
+                        "source-other": "#616161",
+                        "surface-bright": "#f9f9ff",
+                        "error-container": "#ffdad6",
+                        "error": "#ba1a1a",
+                        "inverse-surface": "#2d3037",
+                        "on-secondary-container": "#0f6f62",
+                        "on-primary-fixed-variant": "#004786",
+                        "secondary-fixed": "#a0f2e1",
+                        "primary": "#005dac",
+                        "primary-container": "#1976d2",
+                        "fit-mid-low": "#E65100",
+                        "surface-container": "#ecedf6",
+                        "segment-stakeholder": "#F57C00",
+                        "on-tertiary-fixed-variant": "#721199",
+                        "source-djinni": "#1565C0",
+                        "surface-container-low": "#f2f3fc",
+                        "tier-limited": "#757575",
+                        "tertiary-fixed": "#f8d8ff",
+                        "primary-fixed": "#d4e3ff",
+                        "on-tertiary-fixed": "#320047",
+                        "segment-execution": "#388E3C",
+                        "on-background": "#181c21",
+                        "on-primary-container": "#fffdff",
+                        "on-surface": "#181c21",
+                        "surface-container-high": "#e6e8f0",
+                        "fit-mid-high": "#00695C",
+                        "on-primary-fixed": "#001c3a",
+                        "background": "#f9f9ff",
+                        "segment-operational": "#757575",
+                        "surface-tint": "#005faf",
+                        "surface-variant": "#e0e2ea",
+                        "fit-high": "#2E7D32",
+                        "segment-discovery": "#7B1FA2",
+                        "on-surface-variant": "#414752",
+                        "secondary-fixed-dim": "#84d5c5",
+                        "surface": "#f9f9ff",
+                        "outline-variant": "#c1c6d4",
+                        "surface-dim": "#d8dae2",
+                        "secondary": "#046b5e",
+                        "on-tertiary": "#ffffff",
+                        "inverse-on-surface": "#eff0f9",
+                        "on-primary": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "source-linkedin": "#0A3D62",
+                        "on-secondary-fixed": "#00201b",
+                        "tertiary": "#8a31b1",
+                        "surface-container-highest": "#e0e2ea",
+                        "on-error-container": "#93000a",
+                        "on-tertiary-container": "#fffdff",
+                        "source-dou": "#2E7D32",
+                        "outline": "#717783",
+                        "on-secondary-fixed-variant": "#005046"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    spacing: {
+                        "nav-rail-width": "256px",
+                        "gutter-md": "16px",
+                        "section-gap": "24px",
+                        "list-item-height": "72px",
+                        "margin-lg": "24px",
+                        "card-padding": "16px"
+                    },
+                    fontFamily: {
+                        "headline-md": ["Inter"],
+                        "title-sm": ["Inter"],
+                        "body-md": ["Inter"],
+                        "display-sm": ["Inter"],
+                        "title-md": ["Inter"],
+                        "label-md": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "headline-sm": ["Inter"]
+                    },
+                    fontSize: {
+                        "headline-md": ["20px", { lineHeight: "28px", fontWeight: "600" }],
+                        "title-sm": ["14px", { lineHeight: "20px", fontWeight: "600" }],
+                        "body-md": ["14px", { lineHeight: "20px", fontWeight: "400" }],
+                        "display-sm": ["24px", { lineHeight: "32px", fontWeight: "700" }],
+                        "title-md": ["16px", { lineHeight: "24px", fontWeight: "600" }],
+                        "label-md": ["12px", { lineHeight: "16px", fontWeight: "500" }],
+                        "label-sm": ["11px", { lineHeight: "14px", letterSpacing: "0.5px", fontWeight: "500" }],
+                        "headline-sm": ["18px", { lineHeight: "24px", fontWeight: "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined.filled {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        
+        /* Indeterminate Progress Bar Animation */
+        @keyframes indeterminate {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+        .progress-bar-indeterminate {
+            animation: indeterminate 1.5s infinite linear;
+        }
+
+        /* Pulse Animation for Status Dot */
+        @keyframes pulse-green {
+            0% { box-shadow: 0 0 0 0 rgba(46, 125, 50, 0.4); }
+            70% { box-shadow: 0 0 0 6px rgba(46, 125, 50, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(46, 125, 50, 0); }
+        }
+        .status-dot-pulse {
+            animation: pulse-green 2s infinite;
+        }
+        
+        /* Custom Scrollbar for Master List */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #c1c6d4;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #717783;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md h-screen overflow-hidden flex">
+<!-- SideNavBar -->
+<nav class="fixed left-0 top-0 h-full w-[256px] border-r border-outline-variant bg-surface flex-shrink-0 flex flex-col z-40">
+<!-- Brand Header -->
+<div class="h-16 flex items-center px-gutter-md border-b border-outline-variant bg-surface">
+<img alt="User Profile Avatar" class="w-8 h-8 rounded object-cover mr-3" data-alt="A stylized, modern geometric logo for a career management application. Professional, sharp lines, corporate color palette." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCv5kp2xFivlMKxou1P9pd0BMiS7KUz0X9zXVjWLQA3TICghOyV1ScYagDPviilFMFmNnD3bPdh1rnShMR5249Zr9FCey4FCT2Vx0ZB3fJVLUb-TFEiTbg6k4UTDGLIk0SO_0ufyB2hRV7F5Zi0R7tg7SGbYJtEpdZkhReIfNm3_xsCqHJP38c73Ofkp1d7Z7sQsarlbitSeRSQwCNHuSFxpsXQ0ju9gzkYhKLFoboB5aROIEwKHxW7qKZe0HUcW28oBKKyiUM_3tlo"/>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary truncate">Career Manager</h1>
+<p class="font-label-sm text-label-sm text-on-surface-variant truncate">Professional Edition</p>
+</div>
+</div>
+<!-- Navigation Links -->
+<div class="flex-1 py-4 flex flex-col gap-1 overflow-y-auto bg-surface-container">
+<!-- Active Tab: Vacancies -->
+<a class="flex items-center px-gutter-md py-3 text-primary border-l-4 border-primary bg-secondary-container/20 cursor-pointer" href="#">
+<span class="material-symbols-outlined filled mr-3 text-xl">work</span>
+<span class="font-title-sm text-title-sm">Vacancies</span>
+</a>
+<a class="flex items-center px-gutter-md py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer" href="#">
+<span class="material-symbols-outlined mr-3 text-xl">bar_chart</span>
+<span class="font-title-sm text-title-sm">Analytics</span>
+</a>
+<a class="flex items-center px-gutter-md py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer" href="#">
+<span class="material-symbols-outlined mr-3 text-xl">business</span>
+<span class="font-title-sm text-title-sm">Companies</span>
+</a>
+<a class="flex items-center px-gutter-md py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer" href="#">
+<span class="material-symbols-outlined mr-3 text-xl">person</span>
+<span class="font-title-sm text-title-sm">Profile</span>
+</a>
+<a class="flex items-center px-gutter-md py-3 text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer" href="#">
+<span class="material-symbols-outlined mr-3 text-xl">settings</span>
+<span class="font-title-sm text-title-sm">Settings</span>
+</a>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="ml-[256px] flex-1 flex flex-col h-screen relative">
+<!-- TopNavBar -->
+<header class="flex items-center justify-between px-gutter-md w-full h-16 bg-surface border-b border-outline-variant fixed top-0 right-0 z-50 ml-[256px]" style="width: calc(100% - 256px);">
+<!-- PollingProgressBar (Absolute Top) -->
+<div class="absolute top-0 left-0 w-full h-[2px] bg-surface-container-high overflow-hidden">
+<div class="h-full bg-primary progress-bar-indeterminate w-1/3"></div>
+</div>
+<!-- Left: Context / Title -->
+<div class="flex items-center">
+<h2 class="font-headline-sm text-headline-sm font-semibold text-on-surface mr-4">Career Management Console</h2>
+<div class="flex items-center gap-2 bg-surface-container px-3 py-1.5 rounded-full">
+<div class="w-2.5 h-2.5 rounded-full bg-fit-high status-dot-pulse"></div>
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wide">Syncing Data</span>
+</div>
+</div>
+<!-- Right: Actions -->
+<div class="flex items-center gap-2">
+<button class="p-2 text-on-surface-variant hover:bg-surface-container-highest hover:text-primary transition-all rounded-full scale-95 active:scale-90 flex items-center justify-center">
+<span class="material-symbols-outlined">sync</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-surface-container-highest hover:text-primary transition-all rounded-full scale-95 active:scale-90 flex items-center justify-center relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-2 right-2 w-2 h-2 bg-error rounded-full"></span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-surface-container-highest hover:text-primary transition-all rounded-full scale-95 active:scale-90 flex items-center justify-center">
+<span class="material-symbols-outlined">account_circle</span>
+</button>
+</div>
+</header>
+<!-- Master-Detail Layout -->
+<div class="flex-1 flex mt-16 h-[calc(100vh-64px)] overflow-hidden">
+<!-- Master List (Left) -->
+<div class="w-[400px] flex-shrink-0 flex flex-col bg-surface-container-lowest border-r border-outline-variant">
+<!-- List Header -->
+<div class="px-card-padding py-section-gap border-b border-outline-variant sticky top-0 bg-surface-container-lowest z-10">
+<div class="flex justify-between items-end mb-2">
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Vacancies</h3>
+<span class="font-label-md text-label-md text-on-surface-variant">1,248 total</span>
+</div>
+<!-- StatusLine -->
+<div class="flex gap-2">
+<span class="bg-surface-container-high text-on-surface px-2 py-1 rounded font-label-sm text-label-sm flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-fit-high"></span> New: 24
+                        </span>
+<span class="bg-surface-container-high text-on-surface px-2 py-1 rounded font-label-sm text-label-sm flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-tier-solid"></span> Review: 12
+                        </span>
+</div>
+</div>
+<!-- Scrollable List -->
+<div class="flex-1 overflow-y-auto p-2 space-y-2">
+<!-- Vacancy Card 1 (Active/Unread) -->
+<div class="relative bg-surface-container-low rounded-lg p-card-padding border border-outline-variant cursor-pointer hover:bg-surface-container transition-colors shadow-sm">
+<!-- Unread Indicator (Left Accent Bar) -->
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-l-lg"></div>
+<div class="flex justify-between items-start mb-2">
+<div class="flex-1 pr-2">
+<h4 class="font-title-sm text-title-sm text-on-surface line-clamp-1">Senior Flutter Developer</h4>
+<p class="font-label-sm text-label-sm text-on-surface-variant">TechCorp Inc.</p>
+</div>
+<!-- Source Badge -->
+<span class="font-label-sm text-label-sm bg-source-djinni/10 text-source-djinni px-2 py-0.5 rounded flex-shrink-0">Djinni</span>
+</div>
+<!-- Scores & Chips -->
+<div class="flex items-center gap-2 mb-2">
+<span class="font-label-md text-label-md bg-fit-high/10 text-fit-high px-2 py-0.5 rounded-full flex items-center gap-1 border border-fit-high/20">
+                                Fit <span class="font-semibold">92%</span>
+</span>
+<span class="w-1.5 h-1.5 rounded-full bg-outline-variant"></span>
+<span class="font-label-md text-label-md text-tier-solid flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">star</span> Premium
+                            </span>
+</div>
+<div class="flex justify-between items-end mt-3">
+<p class="font-label-sm text-label-sm text-on-surface-variant truncate flex-1">Recommended by Jane Doe</p>
+<span class="font-label-sm text-label-sm text-on-surface-variant flex-shrink-0">2h ago</span>
+</div>
+</div>
+<!-- Vacancy Card 2 -->
+<div class="bg-surface-container-lowest rounded-lg p-card-padding border border-outline-variant cursor-pointer hover:bg-surface-container-low transition-colors">
+<div class="flex justify-between items-start mb-2">
+<div class="flex-1 pr-2">
+<h4 class="font-title-sm text-title-sm text-on-surface line-clamp-1">Lead Mobile Engineer</h4>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Fintech Solutions</p>
+</div>
+<span class="font-label-sm text-label-sm bg-source-linkedin/10 text-source-linkedin px-2 py-0.5 rounded flex-shrink-0">LinkedIn</span>
+</div>
+<div class="flex items-center gap-2 mb-2">
+<span class="font-label-md text-label-md bg-fit-mid-high/10 text-fit-mid-high px-2 py-0.5 rounded-full flex items-center gap-1 border border-fit-mid-high/20">
+                                Fit <span class="font-semibold">78%</span>
+</span>
+<span class="w-1.5 h-1.5 rounded-full bg-outline-variant"></span>
+<span class="font-label-md text-label-md text-on-surface-variant flex items-center gap-1">
+                                Standard
+                            </span>
+</div>
+<!-- Barrier Line -->
+<div class="mt-2 bg-error-container/50 border border-error/20 rounded p-1.5 flex items-center gap-1.5">
+<span class="material-symbols-outlined text-error text-[14px]">warning</span>
+<p class="font-label-sm text-label-sm text-error truncate">Requires relocation to Berlin</p>
+</div>
+<div class="flex justify-between items-end mt-2">
+<p class="font-label-sm text-label-sm text-on-surface-variant truncate flex-1">Direct application</p>
+<span class="font-label-sm text-label-sm text-on-surface-variant flex-shrink-0">Yesterday</span>
+</div>
+</div>
+<!-- Vacancy Card 3 -->
+<div class="bg-surface-container-lowest rounded-lg p-card-padding border border-outline-variant cursor-pointer hover:bg-surface-container-low transition-colors opacity-75">
+<div class="flex justify-between items-start mb-2">
+<div class="flex-1 pr-2">
+<h4 class="font-title-sm text-title-sm text-on-surface line-clamp-1">Flutter Developer (Mid)</h4>
+<p class="font-label-sm text-label-sm text-on-surface-variant">Startup X</p>
+</div>
+<span class="font-label-sm text-label-sm bg-source-dou/10 text-source-dou px-2 py-0.5 rounded flex-shrink-0">DOU</span>
+</div>
+<div class="flex items-center gap-2 mb-2">
+<span class="font-label-md text-label-md bg-fit-low/10 text-fit-low px-2 py-0.5 rounded-full flex items-center gap-1 border border-fit-low/20">
+                                Fit <span class="font-semibold">45%</span>
+</span>
+</div>
+<div class="flex justify-between items-end mt-3">
+<p class="font-label-sm text-label-sm text-on-surface-variant truncate flex-1">Archived</p>
+<span class="font-label-sm text-label-sm text-on-surface-variant flex-shrink-0">3d ago</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Detail View (Right) -->
+<div class="flex-1 bg-surface flex flex-col overflow-y-auto">
+<!-- Detail Header -->
+<div class="p-margin-lg bg-surface-container-lowest border-b border-outline-variant">
+<div class="flex justify-between items-start mb-4">
+<div>
+<div class="flex items-center gap-3 mb-1">
+<h2 class="font-display-sm text-display-sm text-on-surface">Senior Flutter Developer</h2>
+<span class="font-label-sm text-label-sm bg-source-djinni/10 text-source-djinni px-2 py-1 rounded">Djinni</span>
+</div>
+<h3 class="font-title-md text-title-md text-primary">TechCorp Inc.</h3>
+</div>
+<div class="flex gap-2">
+<button class="px-4 py-2 bg-surface-container hover:bg-surface-container-high text-on-surface rounded-lg font-label-md text-label-md transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">bookmark</span> Save
+                            </button>
+<button class="px-4 py-2 bg-primary hover:bg-primary/90 text-on-primary rounded-lg font-label-md text-label-md transition-colors shadow-sm">
+                                Apply Now
+                            </button>
+</div>
+</div>
+<!-- Detail Stats Row -->
+<div class="flex gap-6 mt-6 pt-6 border-t border-outline-variant">
+<div>
+<p class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-1">Fit Score</p>
+<div class="flex items-end gap-2">
+<span class="font-headline-md text-headline-md text-fit-high">92</span>
+<span class="font-body-md text-body-md text-on-surface-variant pb-0.5">/ 100</span>
+</div>
+</div>
+<div class="w-px bg-outline-variant"></div>
+<div>
+<p class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-1">Company Tier</p>
+<div class="flex items-center gap-1 text-tier-solid font-title-sm text-title-sm">
+<span class="material-symbols-outlined text-[18px]">star</span> Premium
+                            </div>
+</div>
+<div class="w-px bg-outline-variant"></div>
+<div>
+<p class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-1">Location</p>
+<p class="font-title-sm text-title-sm text-on-surface">Remote (EU)</p>
+</div>
+</div>
+</div>
+<!-- Detail Content Canvas -->
+<div class="p-margin-lg max-w-4xl">
+<div class="grid grid-cols-3 gap-6">
+<!-- Main Description (Left 2/3) -->
+<div class="col-span-2 space-y-8">
+<section>
+<h4 class="font-title-md text-title-md text-on-surface mb-3 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">description</span>
+                                    Role Overview
+                                </h4>
+<p class="font-body-md text-body-md text-on-surface-variant leading-relaxed mb-4">
+                                    We are looking for a Senior Flutter Developer to join our core engineering team. You will be responsible for architecting and building high-performance mobile applications from scratch, mentoring junior developers, and contributing to our internal UI component library.
+                                </p>
+</section>
+<section>
+<h4 class="font-title-md text-title-md text-on-surface mb-3 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">fact_check</span>
+                                    Key Requirements
+                                </h4>
+<ul class="space-y-2">
+<li class="flex items-start gap-2">
+<span class="material-symbols-outlined text-fit-high text-[18px] mt-0.5">check_circle</span>
+<span class="font-body-md text-body-md text-on-surface-variant">5+ years of software development experience.</span>
+</li>
+<li class="flex items-start gap-2">
+<span class="material-symbols-outlined text-fit-high text-[18px] mt-0.5">check_circle</span>
+<span class="font-body-md text-body-md text-on-surface-variant">Deep expertise in Dart and the Flutter framework (3.0+).</span>
+</li>
+<li class="flex items-start gap-2">
+<span class="material-symbols-outlined text-fit-high text-[18px] mt-0.5">check_circle</span>
+<span class="font-body-md text-body-md text-on-surface-variant">Experience with native iOS (Swift) or Android (Kotlin) is a strong plus.</span>
+</li>
+</ul>
+</section>
+</div>
+<!-- Sidebar Info (Right 1/3) -->
+<div class="col-span-1 space-y-4">
+<!-- Bento Box: Tech Stack -->
+<div class="bg-surface-container-low rounded-xl p-4 border border-outline-variant">
+<h5 class="font-title-sm text-title-sm text-on-surface mb-3">Tech Stack</h5>
+<div class="flex flex-wrap gap-2">
+<span class="bg-surface-container px-2 py-1 rounded font-label-sm text-label-sm text-on-surface-variant">Flutter</span>
+<span class="bg-surface-container px-2 py-1 rounded font-label-sm text-label-sm text-on-surface-variant">Dart</span>
+<span class="bg-surface-container px-2 py-1 rounded font-label-sm text-label-sm text-on-surface-variant">BLoC</span>
+<span class="bg-surface-container px-2 py-1 rounded font-label-sm text-label-sm text-on-surface-variant">Firebase</span>
+</div>
+</div>
+<!-- Bento Box: Agent Analysis -->
+<div class="bg-primary/5 rounded-xl p-4 border border-primary/20">
+<h5 class="font-title-sm text-title-sm text-primary mb-2 flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">smart_toy</span> Agent Insights
+                                </h5>
+<p class="font-label-sm text-label-sm text-on-surface-variant mb-2">
+                                    High match based on your recent projects. The requested BLoC architecture aligns perfectly with your current repository setup.
+                                </p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

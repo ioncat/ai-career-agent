@@ -105,11 +105,14 @@ So that I spend time only on decision-making and CV review, not on triggering pi
 
 | # | Task | Status | Depends on |
 |---|------|--------|-----------|
-| C1 | Flutter: vacancy list screen (VacScore badge, fit score, rec chip, status) | 🟠 | B3 |
-| C2 | Flutter: vacancy detail screen (Phase 1+2 JSON as cards: archetype, dims, barriers, adaptation) | 🟠 | B3 |
+| C1 | Flutter: vacancy list screen (VacScore badge, fit score, rec chip, status) | 🔵 In Progress | B3 |
+| C2 | Flutter: vacancy detail screen (Phase 1+2 JSON as cards: archetype, dims, barriers, adaptation) | 🔵 In Progress | B3 |
 | C3 | Flutter: Phase 2.5 objection handling UI (barrier card → user reply → submit → adaptation brief) | 🟠 | B1, C2 |
 | C4 | Flutter: "Generate CV" trigger → poll status → CV preview + PDF download | 🟡 | C2 |
 | C5 | Flutter: Web Push registration (subscribe on app open, store in DB) | 🟡 | A5 |
+
+**C1 progress (2026-07-01):** Fluid Desktop design system — purple M3 `ColorScheme`, glassmorphic `AppShell`, custom `NavigationRail`, redesigned `VacancyCard` (hover, selected state, source badge, company row, score chips, barrier row), `_ListHeader` redesign.
+**C2 progress (2026-07-01):** `VacancyDetailScreen` — `_VacancyHero` widget (company icon, role title, subtitle, `RecommendationChip`, `_PostedChip`, bento grid: FitScore + VacScore + Category cards). `_ActionBar` right-aligned (Open JD icon + Decline outline + Generate CV filled). `VacancyListItem?` param passed from inbox screen.
 
 ---
 

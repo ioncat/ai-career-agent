@@ -88,6 +88,7 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
                 ? VacancyDetailScreen(
                     vacancyId: _selected!.id,
                     url: _selected!.url,
+                    vacancy: _selected!,
                   )
                 : const _NoSelectionPlaceholder(),
           ),
