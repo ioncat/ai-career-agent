@@ -518,9 +518,9 @@ async def api_vacancy_cv(vacancy_id: int):
     if cv_files:
         result["cv_md"] = cv_files[-1].read_text(encoding="utf-8")
 
-    cover = folder / "Cover.md"
-    if cover.exists():
-        result["cover_md"] = cover.read_text(encoding="utf-8")
+    cover_files = sorted(folder.glob("*Cover.md"))
+    if cover_files:
+        result["cover_md"] = cover_files[-1].read_text(encoding="utf-8")
 
     return result
 
