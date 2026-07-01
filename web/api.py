@@ -98,6 +98,24 @@ def _rec_label(rec: str) -> str:
     return {"apply": "apply — strong match", "take_a_chance": "take a chance — worth trying", "decline": "decline — not worth the effort"}.get(rec, rec)
 
 
+def _parse_quick_scan_field(markdown_path: str | None, field: str) -> str:
+    """Extract **Field:** value from ## Quick Scan section of JD_analysis.md."""
+    if not markdown_path:
+        return ""
+    analysis_file = (_PROJECT_ROOT / markdown_path).parent / "JD_analysis.md"
+    if not analysis_file.exists():
+        return ""
+    try:
+        text = analysis_file.read_text(encoding="utf-8")
+        m = re.search(r"## Quick Scan\n(.*?)(?=\n## |\Z)", text, re.DOTALL)
+        if not m:
+            return ""
+        field_m = re.search(rf"\*\*{re.escape(field)}:\*\*\s*(.+)", m.group(1))
+        return field_m.group(1).strip() if field_m else ""
+    except Exception:
+        return ""
+
+
 def _legacy_fit_dims(raw: dict) -> dict:
     """Map old fit_dimensions keys (domain/execution/...) to new snake_case + compute overall."""
     mapping = {"domain": "domain_fit", "execution": "execution_fit", "strategy": "strategy_fit", "systems": "systems_fit", "stakeholder": "stakeholder_fit"}
@@ -454,16 +472,23 @@ async def api_vacancy_analysis(vacancy_id: int):
     if row is None:
         raise HTTPException(status_code=404, detail="Vacancy not found")
     aj_str = row["analysis_json"] if "analysis_json" in row.keys() else None
+    md_path = row["markdown_path"] if "markdown_path" in row.keys() else None
     try:
         aj = AnalysisJson.model_validate_json(aj_str or "{}")
-        return aj.model_dump(exclude_none=True)
+        result = aj.model_dump(exclude_none=True)
     except Exception:
-        pass
-    # Legacy pre-B1 format fallback
-    try:
-        return _legacy_analysis_dict(json.loads(aj_str)) if aj_str else {}
-    except Exception:
-        return {}
+        # Legacy pre-B1 format fallback
+        try:
+            result = _legacy_analysis_dict(json.loads(aj_str)) if aj_str else {}
+        except Exception:
+            result = {}
+    # Populate who_they_want from Quick Scan markdown when JSON field absent
+    p2 = result.get("p2")
+    if p2 is not None and not p2.get("who_they_want"):
+        who = _parse_quick_scan_field(md_path, "Who they want")
+        if who:
+            p2["who_they_want"] = who
+    return result
 
 
 @app.get("/api/vacancies/{vacancy_id}/cv")

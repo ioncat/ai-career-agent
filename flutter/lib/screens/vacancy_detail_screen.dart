@@ -54,18 +54,8 @@ class VacancyDetailScreen extends ConsumerWidget {
                     // Hero header
                     _VacancyHero(p1: p1, p2: p2, vacancyId: vacancyId, vacancy: vacancy),
                     const SizedBox(height: 24),
-                    // Who they want
-                    _SectionCard(
-                      title: 'Who they want',
-                      child: Text(p2.whoTheyWant,
-                          style: Theme.of(context).textTheme.bodyMedium),
-                    ),
-                    const SizedBox(height: 16),
-                    // Barriers
-                    if (p2.keyBarriers.isNotEmpty ||
-                        p2.hiddenRisks.isNotEmpty ||
-                        p2.warnings.isNotEmpty)
-                      _BarriersCard(p2: p2),
+                    // Quick Overview — who they want + barriers + risks + warnings
+                    _QuickOverviewCard(p2: p2),
                     const SizedBox(height: 16),
                     // Fit dimensions
                     if (p2.fitDimensions != null)
@@ -438,23 +428,48 @@ class _PostedChip extends StatelessWidget {
   }
 }
 
-// ── Barriers & Risks ──────────────────────────────────────────────────────────
+// ── Quick Overview — who they want + barriers + risks + warnings ──────────────
 
-class _BarriersCard extends StatelessWidget {
+class _QuickOverviewCard extends StatelessWidget {
   final Phase2Data p2;
 
-  const _BarriersCard({required this.p2});
+  const _QuickOverviewCard({required this.p2});
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final hasContent = p2.whoTheyWant.isNotEmpty ||
+        p2.keyBarriers.isNotEmpty ||
+        p2.hiddenRisks.isNotEmpty ||
+        p2.warnings.isNotEmpty;
+
+    if (!hasContent) return const SizedBox.shrink();
+
     return _SectionCard(
-      title: 'Barriers & Risks',
+      title: 'Quick Overview',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Who they want
+          if (p2.whoTheyWant.isNotEmpty) ...[
+            Text(
+              'Who they want',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.5,
+                  ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              p2.whoTheyWant,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
+          // Barriers
           if (p2.keyBarriers.isNotEmpty) ...[
-            _BarrierGroup(
+            if (p2.whoTheyWant.isNotEmpty) const SizedBox(height: 14),
+            _QuickGroup(
               label: 'Key Barriers',
               items: p2.keyBarriers,
               icon: Icons.warning_amber_rounded,
@@ -462,9 +477,10 @@ class _BarriersCard extends StatelessWidget {
               bgColor: cs.errorContainer.withValues(alpha: 0.35),
             ),
           ],
+          // Hidden risks
           if (p2.hiddenRisks.isNotEmpty) ...[
-            if (p2.keyBarriers.isNotEmpty) const SizedBox(height: 10),
-            _BarrierGroup(
+            const SizedBox(height: 8),
+            _QuickGroup(
               label: 'Hidden Risks',
               items: p2.hiddenRisks,
               icon: Icons.block,
@@ -472,10 +488,10 @@ class _BarriersCard extends StatelessWidget {
               bgColor: cs.errorContainer.withValues(alpha: 0.6),
             ),
           ],
+          // Warnings
           if (p2.warnings.isNotEmpty) ...[
-            if (p2.keyBarriers.isNotEmpty || p2.hiddenRisks.isNotEmpty)
-              const SizedBox(height: 10),
-            _BarrierGroup(
+            const SizedBox(height: 8),
+            _QuickGroup(
               label: 'Warnings',
               items: p2.warnings,
               icon: Icons.info_outline,
@@ -489,14 +505,14 @@ class _BarriersCard extends StatelessWidget {
   }
 }
 
-class _BarrierGroup extends StatelessWidget {
+class _QuickGroup extends StatelessWidget {
   final String label;
   final List<String> items;
   final IconData icon;
   final Color iconColor;
   final Color bgColor;
 
-  const _BarrierGroup({
+  const _QuickGroup({
     required this.label,
     required this.items,
     required this.icon,
