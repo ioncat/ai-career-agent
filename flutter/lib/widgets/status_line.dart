@@ -8,6 +8,7 @@ class StatusLine extends StatefulWidget {
   final int pollIntervalSeconds;
   final int newCount;
   final String? errorMessage;
+  final bool fromCache;
 
   const StatusLine({
     super.key,
@@ -16,6 +17,7 @@ class StatusLine extends StatefulWidget {
     this.lastUpdatedAt,
     this.newCount = 0,
     this.errorMessage,
+    this.fromCache = false,
   });
 
   @override
@@ -52,6 +54,13 @@ class _StatusLineState extends State<StatusLine> {
   }
 
   String get _text {
+    if (widget.fromCache && widget.status == PollingStatus.polling) {
+      if (widget.lastUpdatedAt == null) return '📦 Загружаем из кэша...';
+      final ago = _secondsAgo < 3600
+          ? '${(_secondsAgo / 60).round()} мин назад'
+          : '${(_secondsAgo / 3600).round()} ч назад';
+      return '📦 Офлайн · кэш от $ago · подключаемся...';
+    }
     switch (widget.status) {
       case PollingStatus.polling:
         return '⏳ Проверяем новые вакансии...';
@@ -60,6 +69,13 @@ class _StatusLineState extends State<StatusLine> {
       case PollingStatus.empty:
         return '✓ Нет новых вакансий · только что';
       case PollingStatus.error:
+        if (widget.fromCache) {
+          if (widget.lastUpdatedAt == null) return '📦 Офлайн · нет кэша';
+          final ago = _secondsAgo < 3600
+              ? '${(_secondsAgo / 60).round()} мин назад'
+              : '${(_secondsAgo / 3600).round()} ч назад';
+          return '📦 Офлайн · кэш от $ago';
+        }
         return '⚠️ Не удалось получить данные · повтор через ${_secondsUntilNext}с';
       case PollingStatus.idle:
         if (widget.lastUpdatedAt == null) return '🔄 Ожидание...';
@@ -75,7 +91,9 @@ class _StatusLineState extends State<StatusLine> {
     return Text(
       _text,
       style: Theme.of(context).textTheme.labelMedium?.copyWith(
-            color: Theme.of(context).colorScheme.secondary,
+            color: widget.fromCache && widget.status != PollingStatus.idle
+                ? Theme.of(context).colorScheme.outline
+                : Theme.of(context).colorScheme.secondary,
           ),
     );
   }

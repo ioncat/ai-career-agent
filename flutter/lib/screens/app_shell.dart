@@ -341,6 +341,7 @@ class _StatusHeader extends StatelessWidget {
         pollIntervalSeconds: settings.pollIntervalSeconds,
         lastUpdatedAt: listState.lastUpdatedAt,
         newCount: listState.newCount,
+        fromCache: listState.fromCache,
       ),
     );
   }
