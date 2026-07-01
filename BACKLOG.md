@@ -78,9 +78,68 @@ New pipeline step formalized in `skill/SKILL.md` → "Phase 2.5 — Objection Ha
 
 ---
 
-## 🟢 P2 — Evidence Bank per user (added 2026-06-05)
+## 🟠 P1 — EPIC-24: Evidence Bank + Onboarding Interview (updated 2026-07-01)
 
-Two-layer profile: `PROFILE.md` (canonical, lean) + `skill/users/[id]/evidence/*.md` (deep narrative cases). Pipeline consults evidence bank in Phase 2.5 (objection arguments), Phase 3 (CV case detail), interview prep. Integrate existing narrative docs (e.g. `HostiServer — нарратив опыта.md`, currently outside repo). See `docs/discovery/hypotheses/H-003`. **Deferred** — mechanism design later; for now evidence mined manually.
+**Центральный элемент pipeline.** PROFILE.md сейчас = уже отфильтрованный CV. Phase 3 только перетасовывает одни и те же карты и не может найти сигналы которых нет в контексте.
+
+**Решение — два слоя:**
+
+```
+skill/users/[id]/evidence.json   ← ЕДИНЫЙ JSON, не набор файлов MD
+                                    Максимальная детализация по каждой роли:
+                                    все что делал, все сигналы, все метрики
+                                    Phase 3 читает нужные секции → богатый контекст
+
+PROFILE.md                       ← только: Settings, Name variants, Contacts,
+                                    Archetype, Vacancy Preferences, Honest Gaps
+                                    Больше не хранит детали опыта
+```
+
+**Формат evidence.json (структура на проработку):**
+```json
+{
+  "roles": [
+    {
+      "id": "hostserver_po",
+      "company": "HostiServer.com",
+      "title": "Product Owner — Platform & Operational Systems",
+      "dates": "Jan 2018 – Oct 2021",
+      "signals": {
+        "discovery": ["CustDev через операционный диалог", "сегмент арбитражников", "JTBD без ярлыка"],
+        "funnel": ["self-service portal", "off-hours cohort → automated flow", "order-to-payment"],
+        "content": ["копирайтинг всего сайта", "лендинги", "тексты с одним другим человеком"],
+        "team": ["онбординг + менторинг billing support", "informal head of support"],
+        "client": ["pre-sales enterprise", "pilot negotiation", "VIP account management", "migration onboarding"],
+        "marketing": ["Google Ads PPC", "conversion rate analysis", "competitor positioning"],
+        ...
+      },
+      "metrics": { "nps": "+19→+48", "billing_errors": "-95%", "automation": "~100%", ... }
+    },
+    ...
+  ]
+}
+```
+
+**Онбординг-интервью (процесс):**
+Провести сессию по каждой роли — не "расскажи о себе" а структурированный разбор:
+- Что конкретно делал? Какие решения принимал?
+- Что построил с нуля?
+- Какие метрики двигал?
+- Что было неожиданным (CustDev, сегменты, инсайты)?
+- Что гордишься и что бы не стал повторять?
+
+Результат → секция в `evidence.json`.
+
+**Начать с HostiServer** — самый богатый и важный опыт, значительная часть незафиксирована (контент/копирайтинг, лендинги, полный масштаб поддержки).
+
+**Затем:** Marketplace, InsulaLabs, SBC Distribution, General Servers.
+
+**Влияние на pipeline:**
+- Phase 3 получает `evidence.json` → может найти сигналы под конкретную вакансию
+- Phase 2.5 консультирует evidence напрямую → меньше "не знаю есть ли кейс"
+- PROFILE.md становится легче и актуальнее
+
+**Статус:** не начат. Приоритет поднят с P2 → P1. Первый шаг: онбординг-сессия HostiServer.
 
 ---
 

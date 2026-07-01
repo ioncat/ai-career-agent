@@ -116,11 +116,11 @@ Evidence-heavy. Three specific bullets, each with a verifiable fact or metric. B
 ```
 Hi!
 
-[1 sentence direct opener]
+I'm a [role] who [category signal — what kind of work at a conceptual level].
 
 - [Strongest match #1]
 - [Strongest match #2]
-- [Strongest match #3 — metric]
+- [Strongest match #3]
 
 [Specific closing referencing company/product]
 
