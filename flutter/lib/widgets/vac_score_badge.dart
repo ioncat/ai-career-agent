@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../theme/app_theme.dart';
 
 class VacScoreBadge extends StatelessWidget {
   final double score;
@@ -9,25 +8,20 @@ class VacScoreBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final bg = VacScoreColors.bgForScore(score, cs);
-    final fg = VacScoreColors.onBgForScore(score, cs);
-
     return Container(
       height: 24,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(6),
-        border: score < 5.5
-            ? Border.all(color: cs.outline.withValues(alpha: 0.5))
-            : null,
+        color: cs.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.55)),
       ),
       alignment: Alignment.center,
       child: Text(
         'Attraction ${score.toStringAsFixed(1)}',
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: fg,
-              fontWeight: FontWeight.w700,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: cs.onSurfaceVariant,
+              fontWeight: FontWeight.w500,
             ),
       ),
     );
