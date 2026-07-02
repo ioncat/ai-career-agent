@@ -118,6 +118,8 @@ async def init_db() -> None:
             "ALTER TABLE vacancies ADD COLUMN published_at TEXT",
             # Company name extracted from RSS (before full JD parse)
             "ALTER TABLE vacancies ADD COLUMN company TEXT",
+            # EPIC-24: Progressive Profile evidence bank
+            "ALTER TABLE users ADD COLUMN evidence_json TEXT",
         ]:
             try:
                 await db.execute(migration)

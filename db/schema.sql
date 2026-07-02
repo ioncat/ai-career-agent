@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS users (
     skill_type       TEXT    NOT NULL DEFAULT 'pm', -- 'pm' | 'generic'
     profile_json     TEXT,                        -- synthesised profile (JSON); NULL until onboarding complete
     onboarding_step  TEXT,                        -- FSM resume point: NULL | 'awaiting_name' | 'awaiting_skill' | 'awaiting_pdf' | 'interview' | 'done'
+    evidence_json    TEXT,                        -- EPIC-24 Progressive Profile: structured role evidence {roles:[{id,narrative,key_results,framing,caveats,tags}]}
     created_at       TEXT    NOT NULL DEFAULT (datetime('now'))
     -- NOTE: profile_json stored as single column for simplicity.
     -- Known trade-off: no versioning, single-writer per user.
