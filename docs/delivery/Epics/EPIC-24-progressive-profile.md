@@ -60,7 +60,7 @@ Not a file. Reasons: multi-user native, Flutter reads via API, Phase 2.5 write-b
 | 2 | DB migration: `ALTER TABLE users ADD COLUMN evidence_json TEXT` + seed empty `{}` | 🟠 | 1 |
 | 3 | Manual onboarding session: HostiServer → populate evidence_json via `vacancy_track.py` or direct DB | 🟠 | 2 |
 | 4 | Manual onboarding sessions: Marketplace, InsulaLabs, SBC Distribution | 🟡 | 3 |
-| 5 | Phase 2.5 write-back: structured INSERT into evidence_json (replaces PROFILE.md append) | 🟡 | 2 |
+| 5 | Phase 2.5 write-back: MERGE new signals into narrative/key_results/framing (replaces PROFILE.md append) | 🟡 | 2 |
 | 6 | Phase 3 evidence reader: load targeted roles[] sections based on vacancy gap areas | 🟡 | 2, 5 |
 | 7 | Trim PROFILE.md: remove Experience + Additional Evidence sections | 🟡 | 3, 4 |
 | 8 | GET /api/users/{id}/evidence endpoint for Flutter | 🟡 | 2 |
