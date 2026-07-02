@@ -40,7 +40,8 @@ User will provide:
 19. **NEVER use third-person verbs anywhere in the CV** — no "Understands", "Knows", "Applies", "Works", "Brings", "Has". CV language = headline-style (no subject) or past-tense action verbs. Applies to Summary, bullets, and all prose.
 20. **CERTIFICATIONS: include only "Certified AI-Empowered SAFe® Product Owner/Product Manager" by default.** Add others only when directly relevant to the specific vacancy.
 21. **NPS/CSAT — context-dependent.** For technical/platform/AI roles: NPS and CSAT are CX/support metrics — deprioritize or remove; use error reduction %, automation %, delivery velocity instead. Keep for: CX-focused PM, growth PM, customer-success-adjacent roles.
-22. **Years of experience — count ONLY "Product Owner"-titled roles.** Default summary = "Product Owner with 5+ years…". PO-titled roles as of 2026-06: InsulaLabs (5m) + Marketplace PO (14m) + HostiServer PO (46m) = ~65m ≈ 5+ years. Project Manager title ≠ product years — never fold it in. Recompute only if a new PO-titled role is added.
+22. **CV describes practice, NOT cases.** Role descriptions state what the candidate did as a pattern (approach, method, ongoing responsibility). Specific examples, named projects, and case-study evidence belong in the interview, not the CV. Wrong: "identified an off-hours revenue gap and built an automated flow". Right: "applied gap analysis to identify process discrepancies and defined requirements to close them." The CV proves breadth of practice; the interview proves depth with specifics.
+23. **Years of experience — count ONLY "Product Owner"-titled roles.** Default summary = "Product Owner with 5+ years…". PO-titled roles as of 2026-06: InsulaLabs (5m) + Marketplace PO (14m) + HostiServer PO (46m) = ~65m ≈ 5+ years. Project Manager title ≠ product years — never fold it in. Recompute only if a new PO-titled role is added.
 
 ---
 
@@ -113,6 +114,8 @@ Certified AI-Empowered SAFe® Product Owner/Product Manager
 
 **AI Tooling Paragraph (always include when vacancy has any AI/product/digital signal):**
 > AI tooling in daily practice (Claude, ChatGPT) — requirements refinement, research synthesis, workflow validation. Hands-on prototyping examples at [portfolio link from PROFILE.md contacts].
+
+> ⚠️ See active user PROFILE.md → ## CV Presentation Rules for extended AI paragraph structure (1-component vs 2-component).
 
 ---
 

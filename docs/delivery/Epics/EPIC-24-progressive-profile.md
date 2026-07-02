@@ -1,6 +1,6 @@
-# EPIC-24 — Progressive Profile: Evidence Bank + Onboarding Interview
+# EPIC-24 — Progressive Profile: Structured DB Profile + Onboarding Interview
 
-**Status:** 🟠 P1 Backlog — not started
+**Status:** 🟡 In Progress — Tasks 1–4 done, 5–9 pending
 **Priority:** P1
 **Last updated:** 2026-07-02
 **Design doc:** `docs/discovery/progressive-profile.md` (gitignored — internal only)
@@ -25,10 +25,11 @@ PROFILE.md is a LinkedIn/CV copy-paste — already filtered, already generic. Ph
 
 ## Goal
 
-`evidence.json` — a single structured JSON accumulator of the candidate's real experience:
-- Populated via onboarding interview
-- Enriched by every Phase 2.5 session
+`users.progressive_profile` — structured JSON DB profile of the candidate's real experience:
+- Roles with narrative, key_results[], framing[], caveats[], tags[]
+- Populated manually first; enriched by every Phase 2.5 session
 - Read by Phase 3 to find signals relevant to each specific vacancy
+- Switchable via `/analyze [4]` toggle: Markdown profile | DB profile
 
 PROFILE.md shrinks to: Settings · Name variants · Contacts · Summary · Archetype · Preferences · Gaps.
 
@@ -56,17 +57,18 @@ Not a file. Reasons: multi-user native, Flutter reads via API, Phase 2.5 write-b
 
 | # | Task | Status | Depends on |
 |---|------|--------|-----------|
-| 1 | Design evidence JSON schema — Path B: narrative + tags (not typed signal domains) | ✅ Done 2026-07-02 | — |
-| 2 | DB migration: `ALTER TABLE users ADD COLUMN progressive_profile TEXT` + seed empty `{}` | 🟠 | 1 |
-| 3 | Manual onboarding session: HostiServer → populate progressive_profile via `vacancy_track.py` or direct DB | 🟠 | 2 |
-| 4 | Manual onboarding sessions: Marketplace, InsulaLabs, SBC Distribution | 🟡 | 3 |
-| 5 | Phase 2.5 write-back: MERGE new signals into narrative/key_results/framing (replaces PROFILE.md append) | 🟡 | 2 |
-| 6 | Phase 3 evidence reader: load targeted roles[] sections based on vacancy gap areas | 🟡 | 2, 5 |
-| 7 | Trim PROFILE.md: remove Experience + Additional Evidence sections | 🟡 | 3, 4 |
-| 8 | GET /api/users/{id}/evidence endpoint for Flutter | 🟡 | 2 |
+| 1 | Design schema — Path B: narrative + key_results + framing + caveats + tags | ✅ Done 2026-07-02 | — |
+| 2 | DB migration: `ALTER TABLE users ADD COLUMN progressive_profile TEXT` | ✅ Done 2026-07-02 | 1 |
+| 3 | Seed HostiServer role into progressive_profile | ✅ Done 2026-07-02 | 2 |
+| 4 | Seed Marketplace, InsulaLabs, SBC Distribution roles | ✅ Done 2026-07-02 | 3 |
+| A | Profile source toggle `[4]` in `/analyze` Step 0 menu (Markdown \| DB) | ✅ Done 2026-07-02 | 2 |
+| 5 | Phase 2.5 write-back: MERGE new signals into narrative/key_results/framing | 🟡 LLM required | 2 |
+| 6 | Phase 3 evidence reader: load targeted roles[] sections based on vacancy gap areas | 🟡 LLM required | 2, 5 |
+| 7 | Trim PROFILE.md: remove Experience + Additional Evidence sections | 🟡 After testing DB profile | 3, 4 |
+| 8 | GET /api/users/{id}/progressive_profile endpoint for Flutter | 🟡 | 2 |
 | 9 | Onboarding interview flow (LLM-driven, EPIC-17 Phase 2) | 🔴 LLM required | — |
 
-**Tasks 1–4** require no LLM, no code changes (except migration). Start here.
+**Tasks 1–4 + A done.** DB profile ready, toggle available. Next: test via `/analyze [4]` → compare output with Markdown profile.
 
 ---
 
