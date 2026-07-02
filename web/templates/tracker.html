@@ -117,6 +117,10 @@ tr[data-starred="1"] .star-btn{color:#f59e0b}
     <option value="1">✉️ Отправлено</option>
     <option value="0">Не отправлено</option>
   </select>
+  <select id="f-docs" onchange="filter()">
+    <option value="">Все вакансии</option>
+    <option value="1">📄 Есть документы</option>
+  </select>
   <input id="f-text" type="search" placeholder="Поиск…" oninput="filter()" style="width:180px">
   <span class="count" id="count"></span>
 </div>
@@ -142,7 +146,7 @@ tr[data-starred="1"] .star-btn{color:#f59e0b}
   </thead>
   <tbody id="tbody">
   {% for v in vacancies %}
-    <tr class="{{ v.rec_class }}" data-idx="{{ v.id }}" data-site="{{ v.site or '' }}" data-date="{{ v.date }}" data-applied="{{ '1' if v.applied else '0' }}" data-starred="{{ '1' if v.starred else '0' }}" data-user="{{ v.user_id or '' }}">
+    <tr class="{{ v.rec_class }}" data-idx="{{ v.id }}" data-site="{{ v.site or '' }}" data-date="{{ v.date }}" data-applied="{{ '1' if v.applied else '0' }}" data-starred="{{ '1' if v.starred else '0' }}" data-user="{{ v.user_id or '' }}" data-docs="{{ '1' if (v.has_analysis or v.has_pdf or v.has_cover) else '0' }}">
       <td class="num">{{ v.id }}<span class="expand-btn" data-expand="{{ v.id }}" title="Показать анализ">▶</span></td>
       <td style="text-align:center"><button class="star-btn" data-id="{{ v.id }}" onclick="toggleStarred(this)" title="Избранное">{{ '★' if v.starred else '☆' }}</button></td>
       <td class="vname"><span class="site-chip site-{{ v.site or 'other' }}">{{ v.site_display }}</span><a href="{{ v.url }}" target="_blank" rel="noopener">{{ v.title }}</a></td>
@@ -180,11 +184,13 @@ function rowMatchesFilter(row) {
   const site    = document.getElementById('f-site').value;
   const applied = document.getElementById('f-applied').value;
   const starred = document.getElementById('f-starred').value;
+  const docs    = document.getElementById('f-docs').value;
   const txt     = document.getElementById('f-text').value.trim().toLowerCase();
   return (!rec     || row.classList.contains(rec))
       && (!site    || row.dataset.site === site)
       && (!applied || row.dataset.applied === applied)
       && (!starred || row.dataset.starred === starred)
+      && (!docs    || row.dataset.docs === docs)
       && (!txt     || row.textContent.toLowerCase().includes(txt));
 }
 
@@ -267,6 +273,7 @@ function filter() {
   localStorage.setItem('f-site',    document.getElementById('f-site').value);
   localStorage.setItem('f-applied', document.getElementById('f-applied').value);
   localStorage.setItem('f-starred', document.getElementById('f-starred').value);
+  localStorage.setItem('f-docs',    document.getElementById('f-docs').value);
   applyViz();
 }
 
@@ -341,6 +348,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') document.get
   const t = localStorage.getItem('f-site');    if (t) document.getElementById('f-site').value    = t;
   const u = localStorage.getItem('f-applied'); if (u) document.getElementById('f-applied').value = u;
   const v = localStorage.getItem('f-starred'); if (v) document.getElementById('f-starred').value = v;
+  const w = localStorage.getItem('f-docs');    if (w) document.getElementById('f-docs').value    = w;
   applyViz();
 })();
 </script>
