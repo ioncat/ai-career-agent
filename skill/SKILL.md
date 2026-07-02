@@ -357,6 +357,12 @@ python scripts/vacancy_track.py update-json --id $VACANCY_ID --phase p2 --data '
 **fit_score:** integer (7, not "7/10").
 **warnings/hidden_risks:** array of short strings, or empty array `[]` if none.
 
+**After p1+p2 saved — update status (MANDATORY):**
+
+```bash
+python scripts/vacancy_track.py update --id $VACANCY_ID --status analyzed
+```
+
 **After Phase 3.5 approval — save p3:**
 
 ```bash
