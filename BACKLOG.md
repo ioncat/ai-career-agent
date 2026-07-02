@@ -138,7 +138,7 @@ PROFILE.md                       ← только: Settings, Name variants, Cont
 - Phase 3 получает `evidence.json` → может найти сигналы под конкретную вакансию
 - Phase 2.5 консультирует evidence напрямую → меньше "не знаю есть ли кейс"
 
-**Design doc:** [`docs/delivery/progressive-profile.md`](docs/delivery/progressive-profile.md) — архитектурное обоснование, vision, план реализации.
+**Design doc:** `docs/discovery/progressive-profile.md` (gitignored — internal only) — архитектурное обоснование, vision, план реализации.
 - PROFILE.md становится легче и актуальнее
 
 **Статус:** не начат. Приоритет поднят с P2 → P1. Первый шаг: онбординг-сессия HostiServer.
