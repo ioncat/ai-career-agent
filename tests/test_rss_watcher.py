@@ -24,6 +24,7 @@ from core.rss_watcher import RSSWatcher, _extract_salary
 def _make_watcher(poll_interval: int = 1) -> tuple[RSSWatcher, MagicMock]:
     deps = MagicMock()
     deps.user_id = 1
+    deps.settings.auto_analyze = False  # inbox-first by default
     bot = MagicMock()
     bot.send_message = AsyncMock()
     watcher = RSSWatcher(deps=deps, telegram_bot=bot, poll_interval=poll_interval)
@@ -105,8 +106,10 @@ async def test_poll_once_triggers_fetch_for_queued_vacancy():
          patch("core.rss_watcher.RSSWatcher._push_result", AsyncMock()):
         await watcher._poll_once()
 
-    # status updated to 'fetching' before processing
-    mock_db.update_vacancy_status.assert_awaited_once_with(42, "fetching")
+    # 'fetching' claimed before processing; 'fetched' set after JD saved
+    assert mock_db.update_vacancy_status.await_count == 2
+    mock_db.update_vacancy_status.assert_any_await(42, "fetching")
+    mock_db.update_vacancy_status.assert_any_await(42, "fetched")
     # telegram notified (notification sent first, before fetch)
     bot.send_message.assert_awaited_once()
     msg = bot.send_message.call_args[0][0]
@@ -172,8 +175,10 @@ async def test_process_sends_notification_before_fetch():
         call_order.append("fetch")
         return 1
 
+    mock_db = _mock_db([])
     bot.send_message.side_effect = track_notify
-    with patch("tools.cv_fetch_jd.fetch_jd", track_fetch), \
+    with patch("core.rss_watcher.database", mock_db), \
+         patch("tools.cv_fetch_jd.fetch_jd", track_fetch), \
          patch("tools.cv_analyze.cv_analyze", AsyncMock()), \
          patch("core.rss_watcher.RSSWatcher._push_result", AsyncMock()):
         await watcher._process(url)
@@ -263,6 +268,42 @@ async def test_process_source_label_djinni():
         await watcher._process("https://djinni.co/jobs/123/")
     msg = bot.send_message.call_args[0][0]
     assert "Djinni" in msg
+
+
+# ── Inbox-first / AUTO_ANALYZE ───────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_process_inbox_first_skips_analysis():
+    """AUTO_ANALYZE=false (default): analysis not triggered after fetch."""
+    watcher, _ = _make_watcher()  # auto_analyze=False set in _make_watcher
+    mock_analyze = AsyncMock()
+    mock_db = _mock_db([])
+
+    with patch("core.rss_watcher.database", mock_db), \
+         patch("tools.cv_fetch_jd.fetch_jd", AsyncMock(return_value=1)), \
+         patch("tools.cv_analyze.cv_analyze", mock_analyze):
+        await watcher._process("https://djinni.co/jobs/1/")
+
+    mock_analyze.assert_not_awaited()
+    mock_db.update_vacancy_status.assert_awaited_with(1, "fetched")
+
+
+@pytest.mark.asyncio
+async def test_process_auto_analyze_runs_analysis():
+    """AUTO_ANALYZE=true: Phase 1+2 runs automatically after fetch."""
+    watcher, _ = _make_watcher()
+    watcher._deps.settings.auto_analyze = True
+    mock_analyze = AsyncMock()
+    mock_db = _mock_db([])
+
+    with patch("core.rss_watcher.database", mock_db), \
+         patch("tools.cv_fetch_jd.fetch_jd", AsyncMock(return_value=1)), \
+         patch("tools.cv_analyze.cv_analyze", mock_analyze), \
+         patch("core.rss_watcher.RSSWatcher._push_result", AsyncMock()):
+        await watcher._process("https://djinni.co/jobs/1/")
+
+    mock_analyze.assert_awaited_once()
+    mock_db.update_vacancy_status.assert_awaited_with(1, "fetched")
 
 
 # ── Semaphore ─────────────────────────────────────────────────────────────────
