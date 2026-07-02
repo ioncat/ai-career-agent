@@ -85,10 +85,11 @@ New pipeline step formalized in `skill/SKILL.md` → "Phase 2.5 — Objection Ha
 **Решение — два слоя:**
 
 ```
-skill/users/[id]/evidence.json   ← ЕДИНЫЙ JSON, не набор файлов MD
+users.evidence_json (SQLite)     ← JSON column, same pattern as profile_json
                                     Максимальная детализация по каждой роли:
                                     все что делал, все сигналы, все метрики
                                     Phase 3 читает нужные секции → богатый контекст
+                                    Flutter читает через /api/users/{id}/evidence
 
 PROFILE.md                       ← только: Settings, Name variants, Contacts,
                                     Archetype, Vacancy Preferences, Honest Gaps
