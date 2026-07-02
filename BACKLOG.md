@@ -85,7 +85,7 @@ New pipeline step formalized in `skill/SKILL.md` → "Phase 2.5 — Objection Ha
 **Решение — два слоя:**
 
 ```
-users.evidence_json (SQLite)     ← JSON column, same pattern as profile_json
+users.progressive_profile (SQLite) ← JSON column — DB profile (structured roles)
                                     Максимальная детализация по каждой роли:
                                     все что делал, все сигналы, все метрики
                                     Phase 3 читает нужные секции → богатый контекст

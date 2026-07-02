@@ -46,7 +46,7 @@ So that each new CV generation is stronger than the last — without starting fr
 
 ## Architecture Decision
 
-**Storage: `users.evidence_json` (SQLite)** — JSON column, same pattern as `users.profile_json`.
+**Storage: `users.progressive_profile` (SQLite)** — JSON column, same pattern as `users.profile_json`.
 
 Not a file. Reasons: multi-user native, Flutter reads via API, Phase 2.5 write-back = atomic DB update, both pipelines (Claude Code + FastAPI) read via `database.py`.
 
@@ -57,8 +57,8 @@ Not a file. Reasons: multi-user native, Flutter reads via API, Phase 2.5 write-b
 | # | Task | Status | Depends on |
 |---|------|--------|-----------|
 | 1 | Design evidence JSON schema — Path B: narrative + tags (not typed signal domains) | ✅ Done 2026-07-02 | — |
-| 2 | DB migration: `ALTER TABLE users ADD COLUMN evidence_json TEXT` + seed empty `{}` | 🟠 | 1 |
-| 3 | Manual onboarding session: HostiServer → populate evidence_json via `vacancy_track.py` or direct DB | 🟠 | 2 |
+| 2 | DB migration: `ALTER TABLE users ADD COLUMN progressive_profile TEXT` + seed empty `{}` | 🟠 | 1 |
+| 3 | Manual onboarding session: HostiServer → populate progressive_profile via `vacancy_track.py` or direct DB | 🟠 | 2 |
 | 4 | Manual onboarding sessions: Marketplace, InsulaLabs, SBC Distribution | 🟡 | 3 |
 | 5 | Phase 2.5 write-back: MERGE new signals into narrative/key_results/framing (replaces PROFILE.md append) | 🟡 | 2 |
 | 6 | Phase 3 evidence reader: load targeted roles[] sections based on vacancy gap areas | 🟡 | 2, 5 |
