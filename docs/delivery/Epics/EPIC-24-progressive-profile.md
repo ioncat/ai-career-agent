@@ -3,7 +3,7 @@
 **Status:** 🟠 P1 Backlog — not started
 **Priority:** P1
 **Last updated:** 2026-07-02
-**Design doc:** [`docs/delivery/progressive-profile.md`](../progressive-profile.md)
+**Design doc:** `docs/discovery/progressive-profile.md` (gitignored — internal only)
 
 ---
 
