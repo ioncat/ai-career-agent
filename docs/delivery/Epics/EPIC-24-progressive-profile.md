@@ -56,7 +56,7 @@ Not a file. Reasons: multi-user native, Flutter reads via API, Phase 2.5 write-b
 
 | # | Task | Status | Depends on |
 |---|------|--------|-----------|
-| 1 | Design evidence JSON schema — roles[], signals{}, metrics{}, framing{}, phase25_evidence[] | 🟠 | — |
+| 1 | Design evidence JSON schema — Path B: narrative + tags (not typed signal domains) | ✅ Done 2026-07-02 | — |
 | 2 | DB migration: `ALTER TABLE users ADD COLUMN evidence_json TEXT` + seed empty `{}` | 🟠 | 1 |
 | 3 | Manual onboarding session: HostiServer → populate evidence_json via `vacancy_track.py` or direct DB | 🟠 | 2 |
 | 4 | Manual onboarding sessions: Marketplace, InsulaLabs, SBC Distribution | 🟡 | 3 |
