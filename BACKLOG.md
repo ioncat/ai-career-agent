@@ -78,71 +78,54 @@ New pipeline step formalized in `skill/SKILL.md` → "Phase 2.5 — Objection Ha
 
 ---
 
-## 🟠 P1 — [EPIC-24](docs/delivery/Epics/EPIC-24-progressive-profile.md): Progressive Profile — Evidence Bank + Onboarding (updated 2026-07-02)
+## 🟡 P1 — [EPIC-24](docs/delivery/Epics/EPIC-24-progressive-profile.md): Progressive Profile — Structured DB Profile + Onboarding (updated 2026-07-02)
 
-**Центральный элемент pipeline.** PROFILE.md сейчас = уже отфильтрованный CV. Phase 3 только перетасовывает одни и те же карты и не может найти сигналы которых нет в контексте.
+**Центральный элемент pipeline.** PROFILE.md = уже отфильтрованный CV. Phase 3 не может найти сигналы которых нет в контексте.
 
-**Решение — два слоя:**
+**Решение — два слоя профиля:**
 
 ```
-users.progressive_profile (SQLite) ← JSON column — DB profile (structured roles)
-                                    Максимальная детализация по каждой роли:
-                                    все что делал, все сигналы, все метрики
-                                    Phase 3 читает нужные секции → богатый контекст
-                                    Flutter читает через /api/users/{id}/evidence
+users.progressive_profile (SQLite) ← DB profile: rich structured roles, все детали опыта
+                                     Phase 3 читает нужные секции → богатый контекст
+                                     Flutter читает через /api/users/{id}/progressive_profile
 
-PROFILE.md                       ← только: Settings, Name variants, Contacts,
-                                    Archetype, Vacancy Preferences, Honest Gaps
-                                    Больше не хранит детали опыта
+PROFILE.md                         ← только: Settings, Name variants, Contacts,
+                                     Archetype, Vacancy Preferences, Honest Gaps
+                                     Опыт вынесен в DB profile
 ```
 
-**Формат evidence.json (структура на проработку):**
+**Схема `progressive_profile` (Tasks 1-4 ✅ реализована):**
 ```json
 {
+  "meta": { "schema_version": 1, "last_updated": "2026-07-02" },
   "roles": [
     {
       "id": "hostserver_po",
       "company": "HostiServer.com",
       "title": "Product Owner — Platform & Operational Systems",
       "dates": "Jan 2018 – Oct 2021",
-      "signals": {
-        "discovery": ["CustDev через операционный диалог", "сегмент арбитражников", "JTBD без ярлыка"],
-        "funnel": ["self-service portal", "off-hours cohort → automated flow", "order-to-payment"],
-        "content": ["копирайтинг всего сайта", "лендинги", "тексты с одним другим человеком"],
-        "team": ["онбординг + менторинг billing support", "informal head of support"],
-        "client": ["pre-sales enterprise", "pilot negotiation", "VIP account management", "migration onboarding"],
-        "marketing": ["Google Ads PPC", "conversion rate analysis", "competitor positioning"],
-        ...
-      },
-      "metrics": { "nps": "+19→+48", "billing_errors": "-95%", "automation": "~100%", ... }
-    },
-    ...
+      "narrative": "Полный нарратив роли — всё что делал, контекст, кейсы...",
+      "key_results": ["Improved NPS from +19 to +48", "Reduced billing errors by ~95%"],
+      "framing": [{"label": "Founder Proxy", "emphasis": "...", "de_emphasis": "..."}],
+      "caveats": ["Support team not on LinkedIn — disclose selectively"],
+      "tags": ["discovery", "billing", "automation", "funnel", "enterprise"]
+    }
   ]
 }
 ```
 
-**Онбординг-интервью (процесс):**
-Провести сессию по каждой роли — не "расскажи о себе" а структурированный разбор:
-- Что конкретно делал? Какие решения принимал?
-- Что построил с нуля?
-- Какие метрики двигал?
-- Что было неожиданным (CustDev, сегменты, инсайты)?
-- Что гордишься и что бы не стал повторять?
+**Переключение профиля** — в `/analyze` Step 0: `[4] Профиль: Markdown → DB`.
+Переменная `PROFILE_SOURCE = md|db`. DB профиль: читается `SELECT progressive_profile FROM users WHERE id=[id]`.
 
-Результат → секция в `evidence.json`.
+**Статус Tasks 1–4 + toggle (A):** ✅ Done 2026-07-02. 4 роли засеяны: insulalabs_po, marketplace_po, hostserver_po, sbc_distribution.
 
-**Начать с HostiServer** — самый богатый и важный опыт, значительная часть незафиксирована (контент/копирайтинг, лендинги, полный масштаб поддержки).
+**Следующие шаги:**
+- **Task 5:** Phase 2.5 write-back — MERGE новых сигналов в narrative/key_results/framing (LLM required)
+- **Task 6:** Phase 3 evidence reader — загрузка нужных roles[] по gap areas вакансии (LLM required)
+- **Task 7:** Trim PROFILE.md — убрать Experience + Additional Evidence (после тестирования DB profile)
+- **Task 8:** `GET /api/users/{id}/progressive_profile` для Flutter
 
-**Затем:** Marketplace, InsulaLabs, SBC Distribution, General Servers.
-
-**Влияние на pipeline:**
-- Phase 3 получает `evidence.json` → может найти сигналы под конкретную вакансию
-- Phase 2.5 консультирует evidence напрямую → меньше "не знаю есть ли кейс"
-
-**Design doc:** `docs/discovery/progressive-profile.md` (gitignored — internal only) — архитектурное обоснование, vision, план реализации.
-- PROFILE.md становится легче и актуальнее
-
-**Статус:** не начат. Приоритет поднят с P2 → P1. Первый шаг: онбординг-сессия HostiServer.
+**Design doc:** `docs/discovery/progressive-profile.md` (gitignored) — схема, поля, rationale.
 
 ---
 
