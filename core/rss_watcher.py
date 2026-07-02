@@ -187,6 +187,13 @@ class RSSWatcher:
                 log.error("RSSWatcher: fetch failed %s: %s", url, exc)
                 return
 
+            await database.update_vacancy_status(vacancy_id, "fetched")
+
+            # Inbox-first mode: stop after fetch — user triggers analysis manually
+            if not self._deps.settings.auto_analyze:
+                log.info("RSSWatcher: inbox-first — v#%d fetched, awaiting user", vacancy_id)
+                return
+
             # Step 2: Phase 1+2 analysis → saves JD_analysis.md + analysis_json
             try:
                 await cv_analyze(ctx, vacancy_id)  # type: ignore[arg-type]
