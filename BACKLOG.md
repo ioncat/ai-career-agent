@@ -78,7 +78,7 @@ New pipeline step formalized in `skill/SKILL.md` → "Phase 2.5 — Objection Ha
 
 ---
 
-## 🟠 P1 — EPIC-24: Evidence Bank + Onboarding Interview (updated 2026-07-01)
+## 🟠 P1 — [EPIC-24](docs/delivery/Epics/EPIC-24-progressive-profile.md): Progressive Profile — Evidence Bank + Onboarding (updated 2026-07-02)
 
 **Центральный элемент pipeline.** PROFILE.md сейчас = уже отфильтрованный CV. Phase 3 только перетасовывает одни и те же карты и не может найти сигналы которых нет в контексте.
 
@@ -137,6 +137,8 @@ PROFILE.md                       ← только: Settings, Name variants, Cont
 **Влияние на pipeline:**
 - Phase 3 получает `evidence.json` → может найти сигналы под конкретную вакансию
 - Phase 2.5 консультирует evidence напрямую → меньше "не знаю есть ли кейс"
+
+**Design doc:** [`docs/delivery/progressive-profile.md`](docs/delivery/progressive-profile.md) — архитектурное обоснование, vision, план реализации.
 - PROFILE.md становится легче и актуальнее
 
 **Статус:** не начат. Приоритет поднят с P2 → P1. Первый шаг: онбординг-сессия HostiServer.
