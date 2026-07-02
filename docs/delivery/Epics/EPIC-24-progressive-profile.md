@@ -44,19 +44,29 @@ So that each new CV generation is stronger than the last — without starting fr
 
 ---
 
+## Architecture Decision
+
+**Storage: `users.evidence_json` (SQLite)** — JSON column, same pattern as `users.profile_json`.
+
+Not a file. Reasons: multi-user native, Flutter reads via API, Phase 2.5 write-back = atomic DB update, both pipelines (Claude Code + FastAPI) read via `database.py`.
+
+---
+
 ## Tasks
 
 | # | Task | Status | Depends on |
 |---|------|--------|-----------|
-| 1 | Design `evidence.json` schema — roles[], signals{}, metrics{}, phase25_evidence[] | 🟠 | — |
-| 2 | Manual onboarding session: HostiServer (richest, most under-represented) | 🟠 | 1 |
-| 3 | Manual onboarding sessions: Marketplace, InsulaLabs, SBC Distribution | 🟡 | 2 |
-| 4 | Phase 2.5 write-back: structured insert to evidence.json (replaces PROFILE.md append) | 🟡 | 1 |
-| 5 | Phase 3 evidence reader: targeted sections based on vacancy gap areas | 🟡 | 1, 4 |
-| 6 | Trim PROFILE.md: move experience → evidence.json, keep only identity + framing | 🟡 | 2, 3 |
-| 7 | Onboarding interview flow (LLM-driven, EPIC-17 Phase 2) | 🔴 LLM required | — |
+| 1 | Design evidence JSON schema — roles[], signals{}, metrics{}, framing{}, phase25_evidence[] | 🟠 | — |
+| 2 | DB migration: `ALTER TABLE users ADD COLUMN evidence_json TEXT` + seed empty `{}` | 🟠 | 1 |
+| 3 | Manual onboarding session: HostiServer → populate evidence_json via `vacancy_track.py` or direct DB | 🟠 | 2 |
+| 4 | Manual onboarding sessions: Marketplace, InsulaLabs, SBC Distribution | 🟡 | 3 |
+| 5 | Phase 2.5 write-back: structured INSERT into evidence_json (replaces PROFILE.md append) | 🟡 | 2 |
+| 6 | Phase 3 evidence reader: load targeted roles[] sections based on vacancy gap areas | 🟡 | 2, 5 |
+| 7 | Trim PROFILE.md: remove Experience + Additional Evidence sections | 🟡 | 3, 4 |
+| 8 | GET /api/users/{id}/evidence endpoint for Flutter | 🟡 | 2 |
+| 9 | Onboarding interview flow (LLM-driven, EPIC-17 Phase 2) | 🔴 LLM required | — |
 
-**Tasks 1–3** require no LLM, no code. Pure data structuring. Start here.
+**Tasks 1–4** require no LLM, no code changes (except migration). Start here.
 
 ---
 
