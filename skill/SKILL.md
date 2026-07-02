@@ -363,6 +363,12 @@ python scripts/vacancy_track.py update-json --id $VACANCY_ID --phase p2 --data '
 python scripts/vacancy_track.py update --id $VACANCY_ID --status analyzed
 ```
 
+> **Почему MANDATORY:** без этого шага вакансия остаётся в статусе `fetching` в DB и трекере,
+> даже если анализ выполнен и analysis_json сохранён. Баг обнаружен на вакансии #461 (Navis)
+> — трекер показывал company=MONTE-PRO и status=fetching после полного pipeline.
+> Этот шаг ранее существовал только в секции URL-flow (ниже), но отсутствовал здесь,
+> и Claude Desktop его пропускал. Исправлено 2026-07-02.
+
 **After Phase 3.5 approval — save p3:**
 
 ```bash
