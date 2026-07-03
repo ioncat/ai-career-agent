@@ -488,3 +488,100 @@ class OllamaProvider:
             "OllamaProvider session: calls=%d in=%d out=%d tokens cost=$0.00 (model=%s)",
             self._sess_calls, self._sess_input, self._sess_output, self._model,
         )
+
+
+# ── ClaudeCodeProvider ────────────────────────────────────────────────────────
+
+
+class ClaudeCodeProvider:
+    """LLM provider via Claude Code CLI subprocess. Dev/testing only — $0 cost.
+
+    Routes LLM calls through `claude -p` subprocess using the Claude Code
+    subscription quota instead of Anthropic API credits. No prompt caching,
+    no streaming, no token counts available from CLI.
+
+    Args:
+        profile_md: Full text content of PROFILE.md — prepended to every prompt.
+        model:      Model to pass via --model flag. Default: claude-sonnet-4-6.
+        timeout:    Subprocess timeout in seconds. Default: 120.
+    """
+
+    def __init__(
+        self,
+        profile_md: str,
+        model: str = "claude-sonnet-4-6",
+        timeout: int = 120,
+    ) -> None:
+        self._profile_md = profile_md
+        self._model = model
+        self._timeout = timeout
+        self._sess_calls = 0
+        self._last_call_usage: dict | None = None
+
+    async def complete(self, user: str, *, system: str | None = None, **_kwargs) -> str:
+        """Call Claude Code CLI subprocess with profile + system + user prompt."""
+        parts = [self._profile_md]
+        if system:
+            parts.append(system)
+        parts.append(user)
+        prompt = "\n\n---\n\n".join(parts)
+
+        t0 = time.monotonic()
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "claude", "-p", prompt,
+                "--model", self._model,
+                stdin=asyncio.subprocess.DEVNULL,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=self._timeout)
+        except FileNotFoundError:
+            raise LLMUnavailableError("claude CLI not found in PATH — install Claude Code CLI")
+        except asyncio.TimeoutError:
+            proc.kill()
+            raise LLMUnavailableError(f"claude CLI timed out after {self._timeout}s")
+
+        if proc.returncode != 0:
+            err = stderr.decode(errors="replace")[:300]
+            raise LLMError(f"claude CLI error (rc={proc.returncode}): {err}")
+
+        text = stdout.decode(errors="replace").strip()
+        if not text:
+            raise LLMError("claude CLI returned empty response")
+
+        elapsed_ms = int((time.monotonic() - t0) * 1000)
+        self._sess_calls += 1
+        self._last_call_usage = {
+            "model": f"claudecode/{self._model}",
+            "profile_tokens": len(self._profile_md) // 4,
+            "prompt_tokens": len(system) // 4 if system else 0,
+            "user_tokens": len(user) // 4,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "cache_write_tokens": 0,
+            "cache_read_tokens": 0,
+            "budget_tokens": 0,
+            "thinking_tokens": 0,
+            "elapsed_ms": elapsed_ms,
+            "cost_usd": 0.0,
+        }
+        log.info(
+            "ClaudeCodeProvider: model=%s elapsed=%dms session_calls=%d",
+            self._model, elapsed_ms, self._sess_calls,
+        )
+        return text
+
+    @property
+    def model(self) -> str:
+        return self._model
+
+    @property
+    def last_call_usage(self) -> dict | None:
+        return self._last_call_usage
+
+    def log_session_summary(self) -> None:
+        log.info(
+            "ClaudeCodeProvider session: calls=%d cost=$0.00 (model=%s)",
+            self._sess_calls, self._model,
+        )

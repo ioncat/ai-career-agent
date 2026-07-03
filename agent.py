@@ -26,7 +26,7 @@ from adapters.parser_adapter import ParserAdapter
 from core.deps import AgentDeps
 from core.rss_watcher import RSSWatcher
 from core.settings import ConfigError, load_settings
-from core.llm_client import ClaudeProvider, OllamaProvider
+from core.llm_client import ClaudeProvider, OllamaProvider, ClaudeCodeProvider
 from core.tool_registry import ToolRegistry
 from core.router import Router
 from core.telegram import TelegramBot
@@ -140,7 +140,13 @@ async def main() -> None:
         profile_md = "# Candidate Profile\n\n_Profile not found._"
         profile = None
 
-    if settings.llm_provider == "ollama":
+    if settings.llm_provider == "claudecode":
+        llm = ClaudeCodeProvider(
+            profile_md=profile_md,
+            model=settings.llm_model,
+        )
+        log.info("LLM provider: Claude Code CLI — model=%s (subscription, $0 cost)", settings.llm_model)
+    elif settings.llm_provider == "ollama":
         llm = OllamaProvider(
             base_url=settings.ollama_base_url,
             model=settings.ollama_model,
