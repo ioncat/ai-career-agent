@@ -234,6 +234,51 @@ async def test_set_salary_not_found(client):
     assert resp.status_code == 404
 
 
+# ── GET /api/vacancies/{id}/jd ────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_vacancy_jd_returns_markdown(client, tmp_path):
+    """GET /api/vacancies/{id}/jd returns jd_md when JD.md exists on disk."""
+    jd_file = tmp_path / "JD.md"
+    jd_file.write_text("# Senior PM\n\nJob description here.", encoding="utf-8")
+
+    vid = await database.insert_vacancy(
+        url="https://djinni.co/jobs/jd1/",
+        markdown_path=str(jd_file),
+    )
+    resp = client.get(f"/api/vacancies/{vid}/jd")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "jd_md" in data
+    assert "Senior PM" in data["jd_md"]
+
+
+@pytest.mark.asyncio
+async def test_vacancy_jd_not_found_vacancy(client):
+    """GET /api/vacancies/9999/jd returns 404 for missing vacancy."""
+    resp = client.get("/api/vacancies/9999/jd")
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_vacancy_jd_no_markdown_path(client):
+    """GET /api/vacancies/{id}/jd returns 404 when markdown_path is null."""
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/jd2/")
+    resp = client.get(f"/api/vacancies/{vid}/jd")
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_vacancy_jd_file_missing_on_disk(client, tmp_path):
+    """GET /api/vacancies/{id}/jd returns 404 when markdown_path points to nonexistent file."""
+    vid = await database.insert_vacancy(
+        url="https://djinni.co/jobs/jd3/",
+        markdown_path=str(tmp_path / "nonexistent" / "JD.md"),
+    )
+    resp = client.get(f"/api/vacancies/{vid}/jd")
+    assert resp.status_code == 404
+
+
 # ── GET /api/config ────────────────────────────────────────────────────────────
 
 def test_api_config_defaults(client, monkeypatch):
