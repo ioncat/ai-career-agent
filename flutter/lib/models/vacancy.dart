@@ -1,3 +1,10 @@
+List<String> _parseStringList(dynamic raw) {
+  if (raw == null) return [];
+  if (raw is List) return raw.map((e) => '$e').toList();
+  if (raw is String && raw.isNotEmpty) return [raw];
+  return [];
+}
+
 class VacancyListItem {
   final int id;
   final String role;
@@ -47,10 +54,7 @@ class VacancyListItem {
       category: json['category'] as String?,
       publishedAt: json['published_at'] as String?,
       updatedAt: json['updated_at'] as String?,
-      keyBarriers: (json['key_barriers'] as List<dynamic>?)
-              ?.map((e) => e as String)
-              .toList() ??
-          [],
+      keyBarriers: _parseStringList(json['key_barriers']),
     );
   }
 
@@ -198,18 +202,9 @@ class Phase2Data {
       recommendationLabel: json['recommendation_label'] as String? ?? '',
       category: json['category'] as String? ?? '',
       whoTheyWant: json['who_they_want'] as String? ?? '',
-      keyBarriers: (json['key_barriers'] as List<dynamic>?)
-              ?.map((e) => e as String)
-              .toList() ??
-          [],
-      hiddenRisks: (json['hidden_risks'] as List<dynamic>?)
-              ?.map((e) => e as String)
-              .toList() ??
-          [],
-      warnings: (json['warnings'] as List<dynamic>?)
-              ?.map((e) => e as String)
-              .toList() ??
-          [],
+      keyBarriers: _parseStringList(json['key_barriers']),
+      hiddenRisks: _parseStringList(json['hidden_risks']),
+      warnings: _parseStringList(json['warnings']),
       fitDimensions: json['fit_dimensions'] != null
           ? FitDimensions.fromJson(
               json['fit_dimensions'] as Map<String, dynamic>)

@@ -195,8 +195,10 @@ def _parse_analysis_summary(analysis_json_str: str | None) -> dict:
             out["fit_score"] = p2.get("fit_score")
             out["recommendation"] = rec
             out["recommendation_label"] = _rec_label(rec)
-            out["key_barriers"] = p2.get("key_barriers", [])
-            out["warnings"] = p2.get("warnings", [])
+            _kb = p2.get("key_barriers", [])
+            out["key_barriers"] = _kb if isinstance(_kb, list) else ([_kb] if _kb else [])
+            _w = p2.get("warnings", [])
+            out["warnings"] = _w if isinstance(_w, list) else ([_w] if _w else [])
             out["category"] = p2.get("category", "")
         if p1:
             out["vacancy_score"] = p1.get("vacancy_score")

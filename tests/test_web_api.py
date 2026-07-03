@@ -356,3 +356,46 @@ def test_api_config_analysis_mode_full_auto(client, monkeypatch):
     resp = client.get("/api/config")
     assert resp.status_code == 200
     assert resp.json()["analysis_mode"] == "full_auto"
+
+
+# ── key_barriers string coercion (legacy data guard) ─────────────────────────
+
+@pytest.mark.asyncio
+async def test_api_vacancies_key_barriers_string_coerced_to_list(client):
+    """GET /api/vacancies coerces legacy key_barriers string → list.
+
+    Old analysis_json could store key_barriers as plain string 'нет'.
+    Flutter casts json['key_barriers'] as List — throws TypeError if string.
+    Backend must coerce to [] or ['нет'] so response is always JSON array.
+    """
+    import json as _json
+    uid = await database.insert_user(name="Alice", telegram_chat_id=9901, skill_type="pm")
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/legacy/", user_id=uid)
+
+    # Inject legacy analysis_json with key_barriers as plain string
+    legacy_json = _json.dumps({
+        "p2": {
+            "fit_score": 6,
+            "recommendation": "apply",
+            "key_barriers": "нет",   # legacy string — would crash Flutter
+            "warnings": "нет",       # same issue
+            "category": "PM",
+            "who_they_want": "",
+        }
+    })
+    # Write raw legacy JSON directly (patch_analysis_json merges, not replaces)
+    import aiosqlite
+    async with aiosqlite.connect(database._db_path) as db:
+        await db.execute(
+            "UPDATE vacancies SET analysis_json=?, status='analyzed' WHERE id=?",
+            (legacy_json, vid),
+        )
+        await db.commit()
+
+    resp = client.get("/api/vacancies")
+    assert resp.status_code == 200
+    items = resp.json()
+    target = next((v for v in items if v["id"] == vid), None)
+    assert target is not None
+    assert isinstance(target["key_barriers"], list)
+    assert isinstance(target.get("warnings", []), list)
