@@ -7,7 +7,7 @@ ClaudeProvider: Anthropic SDK with prompt caching.
     (phase prompts are static and reused across vacancies).
   - Only the user turn (JD text + prior-phase output) is uncached.
 
-OllamaProvider: local Ollama via httpx POST /api/chat. Switched via LLM_PROVIDER=ollama.
+OllamaProvider: local Ollama via httpx POST /api/chat. Switched via LLM_PROVIDER=ollama_api.
 
 Usage:
     llm = ClaudeProvider(
@@ -553,7 +553,7 @@ class ClaudeCodeProvider:
         elapsed_ms = int((time.monotonic() - t0) * 1000)
         self._sess_calls += 1
         self._last_call_usage = {
-            "model": f"claudecode/{self._model}",
+            "model": f"claude_cli/{self._model}",
             "profile_tokens": len(self._profile_md) // 4,
             "prompt_tokens": len(system) // 4 if system else 0,
             "user_tokens": len(user) // 4,

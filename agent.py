@@ -140,13 +140,13 @@ async def main() -> None:
         profile_md = "# Candidate Profile\n\n_Profile not found._"
         profile = None
 
-    if settings.llm_provider == "claudecode":
+    if settings.llm_provider == "claude_cli":
         llm = ClaudeCodeProvider(
             profile_md=profile_md,
             model=settings.llm_model,
         )
-        log.info("LLM provider: Claude Code CLI — model=%s (subscription, $0 cost)", settings.llm_model)
-    elif settings.llm_provider == "ollama":
+        log.info("LLM provider: claude_cli — model=%s (subscription, $0 cost)", settings.llm_model)
+    elif settings.llm_provider == "ollama_api":
         llm = OllamaProvider(
             base_url=settings.ollama_base_url,
             model=settings.ollama_model,
@@ -154,8 +154,8 @@ async def main() -> None:
             max_tokens=settings.max_tokens,
             timeout=settings.ollama_timeout,
         )
-        log.info("LLM provider: Ollama — model=%s base_url=%s", settings.ollama_model, settings.ollama_base_url)
-    else:
+        log.info("LLM provider: ollama_api — model=%s base_url=%s", settings.ollama_model, settings.ollama_base_url)
+    else:  # claude_api (default)
         llm = ClaudeProvider(
             api_key=settings.anthropic_api_key,
             model=settings.llm_model,

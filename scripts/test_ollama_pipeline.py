@@ -87,7 +87,7 @@ async def run(vacancy_id: int, phase: int) -> None:
         profile_md = "# Candidate Profile\n\n_Profile not found._"
         log.warning("PROFILE.md not found at %s", settings.profile_md_path)
 
-    if settings.llm_provider == "claude":
+    if settings.llm_provider == "claude_api":
         llm = ClaudeProvider(
             api_key=settings.anthropic_api_key,
             model=settings.llm_model,
