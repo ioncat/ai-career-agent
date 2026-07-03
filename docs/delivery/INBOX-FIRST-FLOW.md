@@ -79,7 +79,7 @@ Flutter Inbox (shows fetched + analyzed)
 |----------|------|--------|
 | 🔴 | `ANALYSIS_MODE` in `rss_watcher.py` + `Settings` | ✅ Done — `inbox_first` stops after fetch; `full_auto` runs Phase 1+2 automatically |
 | ✅ | `GET /api/vacancies/{id}/jd` | reads JD.md from `markdown_path` → `{"jd_md": "..."}` · Done 2026-07-03 |
-| 🟠 | `POST /api/vacancies/{id}/analyze` | stub: status → `analysis_queued`; wires to Phase 1+2 when LLM available |
+| ✅ | `POST /api/vacancies/{id}/analyze` | sets `analysis_queued` → RSSWatcher picks up → `analyzing` → Phase 1+2 → `analyzed` → push · Done 2026-07-03 |
 
 **Already done (no changes needed):**
 - 🟢 `GET /api/vacancies/{id}` — vacancy metadata
@@ -140,7 +140,7 @@ fetched → analysis_queued → analyzing → analyzed
 | 2 | `ANALYSIS_MODE` в `rss_watcher.py` + `Settings` + `GET /api/config` | EPIC-22 B5 | — | ✅ Done — `inbox_first` \| `full_auto`; виден в Flutter через /api/config |
 | 3 | Проверить/добавить `PATCH /api/vacancies/{id}/decline` | EPIC-22 B5 | — | Flutter кнопка Skip |
 | 4 | `GET /api/vacancies/{id}/jd` → `{jd_md}` | EPIC-22 B6 | #2 | ✅ Done — Flutter читает JD без анализа |
-| 5 | `POST /api/vacancies/{id}/analyze` — реальный (claude_cli) | EPIC-22 B7 | #2, EPIC-23 | Пользователь нажимает Analyze → Phase 1+2 через claude_cli |
+| 5 | `POST /api/vacancies/{id}/analyze` + `_poll_analyze_queue` в RSSWatcher | EPIC-22 B7 | #2, EPIC-23 | ✅ Done — 202 → analysis_queued → analyzing → analyzed → push |
 | 6 | Flutter: inbox показывает `fetched` + `analysis_queued` | EPIC-22 C6 | #2, #4 | Вакансии без анализа видны в инбоксе |
 | 7 | Flutter: `VacancyDetailScreen` — JD-режим (p2==null) + кнопки Analyze/Skip | EPIC-22 C7 | #3, #4, #5 | Полный UI для необработанной вакансии |
 | 8 | Flutter: `VacancyCard` — бейдж "New" для `fetched` | EPIC-22 C8 | #6 | Визуальное различие новых вакансий |

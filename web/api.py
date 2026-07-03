@@ -535,6 +535,25 @@ async def api_vacancy_cv(vacancy_id: int):
     return result
 
 
+@app.post("/api/vacancies/{vacancy_id}/analyze", status_code=202)
+async def api_vacancy_analyze(vacancy_id: int):
+    """Queue vacancy for Phase 1+2 analysis (Flutter Analyze button, EPIC-22 B7).
+
+    Sets status to analysis_queued and returns 202.
+    RSSWatcher in agent.py picks up analysis_queued vacancies and runs cv_analyze.
+    Status transitions: analysis_queued → analyzing → analyzed → Web Push fires.
+    409 if vacancy is already queued or being analyzed.
+    """
+    row = await database.get_vacancy_by_id(vacancy_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Vacancy not found")
+    current_status = row["status"] if "status" in row.keys() else None
+    if current_status in ("analysis_queued", "analyzing"):
+        raise HTTPException(status_code=409, detail=f"Already in progress: {current_status}")
+    await database.update_vacancy_status(vacancy_id, "analysis_queued")
+    return {"id": vacancy_id, "status": "analysis_queued"}
+
+
 @app.get("/api/vacancies/{vacancy_id}/jd")
 async def api_vacancy_jd(vacancy_id: int):
     """Return JD markdown for a vacancy (Flutter detail screen — inbox-first JD view, EPIC-22 B6).

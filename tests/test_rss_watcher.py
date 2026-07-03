@@ -438,3 +438,53 @@ async def test_semaphore_concurrency_2_allows_two_parallel():
         )
 
     assert concurrent_peak == 2, f"Expected max 2 concurrent fetches, got {concurrent_peak}"
+
+
+# ── _poll_analyze_queue ────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_poll_analyze_queue_runs_analysis():
+    """_poll_analyze_queue: analysis_queued vacancy → cv_analyze called → status=analyzed."""
+    watcher, _ = _make_watcher()
+    row = _make_row(vacancy_id=10, url="https://djinni.co/jobs/10/", status="analysis_queued")
+    mock_analyze = AsyncMock()
+    mock_db = _mock_db([])
+    mock_db.list_vacancies = AsyncMock(return_value=[row])
+
+    with patch("core.rss_watcher.database", mock_db), \
+         patch("tools.cv_analyze.cv_analyze", mock_analyze), \
+         patch("core.rss_watcher.RSSWatcher._push_result", AsyncMock()):
+        await watcher._poll_analyze_queue()
+
+    mock_db.update_vacancy_status.assert_any_await(10, "analyzing")
+    mock_analyze.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_poll_analyze_queue_empty_does_nothing():
+    """_poll_analyze_queue: no analysis_queued vacancies → no calls."""
+    watcher, _ = _make_watcher()
+    mock_analyze = AsyncMock()
+    mock_db = _mock_db([])
+    mock_db.list_vacancies = AsyncMock(return_value=[])
+
+    with patch("core.rss_watcher.database", mock_db), \
+         patch("tools.cv_analyze.cv_analyze", mock_analyze):
+        await watcher._poll_analyze_queue()
+
+    mock_analyze.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_poll_analyze_queue_failure_reverts_to_fetched():
+    """_poll_analyze_queue: cv_analyze raises → status reverts to fetched."""
+    watcher, _ = _make_watcher()
+    row = _make_row(vacancy_id=11, url="https://djinni.co/jobs/11/", status="analysis_queued")
+    mock_db = _mock_db([])
+    mock_db.list_vacancies = AsyncMock(return_value=[row])
+
+    with patch("core.rss_watcher.database", mock_db), \
+         patch("tools.cv_analyze.cv_analyze", AsyncMock(side_effect=RuntimeError("LLM error"))):
+        await watcher._poll_analyze_queue()
+
+    mock_db.update_vacancy_status.assert_any_await(11, "fetched")
