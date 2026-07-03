@@ -237,14 +237,16 @@ async def test_set_salary_not_found(client):
 # ── GET /api/config ────────────────────────────────────────────────────────────
 
 def test_api_config_defaults(client, monkeypatch):
-    """GET /api/config returns llm_provider and model from env (defaults)."""
+    """GET /api/config returns llm_provider, model, analysis_mode from env (defaults)."""
     monkeypatch.delenv("LLM_PROVIDER", raising=False)
     monkeypatch.delenv("LLM_MODEL", raising=False)
+    monkeypatch.delenv("ANALYSIS_MODE", raising=False)
     resp = client.get("/api/config")
     assert resp.status_code == 200
     data = resp.json()
     assert data["llm_provider"] == "claude_api"
     assert data["model"] == "claude-opus-4-5"
+    assert data["analysis_mode"] == "inbox_first"
 
 
 def test_api_config_custom_provider(client, monkeypatch):
@@ -264,3 +266,11 @@ def test_api_config_provider_case_insensitive(client, monkeypatch):
     resp = client.get("/api/config")
     assert resp.status_code == 200
     assert resp.json()["llm_provider"] == "claude_cli"
+
+
+def test_api_config_analysis_mode_full_auto(client, monkeypatch):
+    """GET /api/config reflects ANALYSIS_MODE=full_auto."""
+    monkeypatch.setenv("ANALYSIS_MODE", "full_auto")
+    resp = client.get("/api/config")
+    assert resp.status_code == 200
+    assert resp.json()["analysis_mode"] == "full_auto"

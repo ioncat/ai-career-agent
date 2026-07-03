@@ -14,9 +14,10 @@ from core.rss_watcher import RSSWatcher
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _make_watcher(concurrency: int = 1) -> tuple[RSSWatcher, MagicMock]:
+def _make_watcher(concurrency: int = 1, analysis_mode: str = "full_auto") -> tuple[RSSWatcher, MagicMock]:
     deps = MagicMock()
     deps.user_id = 1
+    deps.settings.analysis_mode = analysis_mode
     bot = MagicMock()
     bot.send_message = AsyncMock()
     watcher = RSSWatcher(deps=deps, telegram_bot=bot, poll_interval=999, concurrency=concurrency)

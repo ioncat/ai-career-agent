@@ -189,9 +189,9 @@ class RSSWatcher:
 
             await database.update_vacancy_status(vacancy_id, "fetched")
 
-            # Inbox-first mode: stop after fetch — user triggers analysis manually
-            if not self._deps.settings.auto_analyze:
-                log.info("RSSWatcher: inbox-first — v#%d fetched, awaiting user", vacancy_id)
+            # inbox_first mode: stop after fetch — user triggers analysis manually
+            if self._deps.settings.analysis_mode != "full_auto":
+                log.info("RSSWatcher: mode=inbox_first — v#%d fetched, awaiting user", vacancy_id)
                 return
 
             # Step 2: Phase 1+2 analysis → saves JD_analysis.md + analysis_json

@@ -242,10 +242,11 @@ async def api_users():
 
 @app.get("/api/config")
 async def api_config():
-    """Return active LLM provider and model for Flutter Settings screen (EPIC-23 T4)."""
+    """Return active LLM provider, model, and analysis mode for Flutter Settings screen (EPIC-23 T4)."""
     return {
         "llm_provider": os.getenv("LLM_PROVIDER", "claude_api").lower(),
         "model": os.getenv("LLM_MODEL", "claude-opus-4-5"),
+        "analysis_mode": os.getenv("ANALYSIS_MODE", "inbox_first").lower(),
     }
 
 
