@@ -1,8 +1,8 @@
 # Inbox-First Flow — Implementation Plan
 
-**Version:** 1.0 (2026-07-01)
-**Status:** Planned — not started
-**Related:** EPIC-22 Phase C (tasks C6–C8), Phase B (tasks B5–B7)
+**Version:** 1.1 (2026-07-03)
+**Status:** 🟡 In Progress — backend #1–5 next
+**Related:** EPIC-22 Phase C (tasks C6–C8), Phase B (tasks B5–B7), EPIC-23, EPIC-24, EPIC-21
 
 ---
 
@@ -124,6 +124,36 @@ fetched → analysis_queued → analyzing → analyzed
 
 `fetched` — JD saved, no analysis  
 `analysis_queued` — user triggered, waiting  
-`analyzing` — Phase 1+2 running (future: real LLM)  
+`analyzing` — Phase 1+2 running  
 `analyzed` — full data available, notification sent  
 `declined` — user skipped  
+
+---
+
+## Сводный план — строгая очерёдность
+
+> Включает все незакрытые эпики. Группы: Backend → Flutter → DB Profile → Архитектура.
+
+| # | Задача | Эпик | Зависит от | Зачем |
+|---|--------|------|-----------|-------|
+| 1 | `GET /api/config` → `{llm_provider, model}` | EPIC-23 T4 | — | Flutter узнаёт какой провайдер активен |
+| 2 | `AUTO_ANALYZE` флаг в `rss_watcher.py` + `Settings` | EPIC-22 B5 | — | Переключатель inbox-first vs full-auto |
+| 3 | Проверить/добавить `PATCH /api/vacancies/{id}/decline` | EPIC-22 B5 | — | Flutter кнопка Skip |
+| 4 | `GET /api/vacancies/{id}/jd` → `{jd_md}` | EPIC-22 B6 | #2 | Flutter читает JD без анализа |
+| 5 | `POST /api/vacancies/{id}/analyze` — реальный (claude_cli) | EPIC-22 B7 | #2, EPIC-23 | Пользователь нажимает Analyze → Phase 1+2 через claude_cli |
+| 6 | Flutter: inbox показывает `fetched` + `analysis_queued` | EPIC-22 C6 | #2, #4 | Вакансии без анализа видны в инбоксе |
+| 7 | Flutter: `VacancyDetailScreen` — JD-режим (p2==null) + кнопки Analyze/Skip | EPIC-22 C7 | #3, #4, #5 | Полный UI для необработанной вакансии |
+| 8 | Flutter: `VacancyCard` — бейдж "New" для `fetched` | EPIC-22 C8 | #6 | Визуальное различие новых вакансий |
+| 9 | Flutter: `vacancyJdProvider` + `analyzeVacancy()` в репо | EPIC-22 C8 | #4, #5 | Провайдер данных + action для кнопок из #7 |
+| 10 | Flutter Settings: показать активный LLM провайдер | EPIC-23 T5 | #1 | Видно что работает claude_cli, не API |
+| 11 | Phase 2.5 write-back → MERGE в `progressive_profile` | EPIC-24 T5 | EPIC-23 | Сигналы из objection handling накапливаются в DB профиле |
+| 12 | Phase 3 evidence reader → читает roles[] из `progressive_profile` | EPIC-24 T6 | #11 | Богатый контекст при генерации CV из DB профиля |
+| 13 | `GET /api/users/{id}/progressive_profile` | EPIC-24 T8 | #12 | Flutter читает DB профиль |
+| 14 | Trim PROFILE.md — убрать Experience + Additional Evidence | EPIC-24 T7 | #12 | PROFILE.md тонкий; опыт живёт в DB |
+| 15 | Pydantic JSON contracts для cognitive phases | EPIC-21 T2 | — | Типизация контрактов pipeline (параллельно #11–14) |
+
+**Группы:**
+- **#1–5** — Backend foundation (~1–2 дня)
+- **#6–10** — Flutter MVP с inbox-first UX (~2–3 дня)
+- **#11–14** — DB profile в production pipeline
+- **#15** — архитектурный рефактор, не блокирует UX
