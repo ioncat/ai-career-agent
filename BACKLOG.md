@@ -18,16 +18,16 @@
 
 ## 🟡 P1 — [EPIC-23](docs/delivery/Epics/EPIC-23-claudecode-provider.md) — Claude Code CLI Provider (updated 2026-07-03)
 
-**Цель:** тестировать полный pipeline через Flutter без расхода API credits. `LLM_PROVIDER=claudecode` → вызовы идут через `claude -p` subprocess → используется подписка Claude Code, стоимость $0.
+**Цель:** тестировать полный pipeline через Flutter без расхода API credits. `LLM_PROVIDER=claude_cli` → вызовы идут через `claude -p` subprocess → используется подписка Claude Code, стоимость $0.
 
 **Ограничения:** нет prompt caching, нет token counts, только для локального dev/testing.
 
 **Статус:** Tasks 1–3 ✅ Done. `ClaudeCodeProvider` реализован и протестирован (5 тестов).
 
-**Активация:** `LLM_PROVIDER=claudecode` в `.env`. Pipeline tools без изменений.
+**Активация:** `LLM_PROVIDER=claude_cli` в `.env`. Pipeline tools без изменений.
 
 **Следующие шаги:**
-- Task 4: `GET /api/config` → `{"llm_provider": "claudecode", "model": "..."}` для Flutter
+- Task 4: `GET /api/config` → `{"llm_provider": "claude_cli", "model": "..."}` для Flutter
 - Task 5: Flutter Settings screen — показывать активный провайдер
 
 ---
@@ -335,7 +335,7 @@ Merged 2026-06-15. Engine decision resolved: **weasyprint** (HTML/Jinja2 + CSS �
 ### #2 — OllamaProvider.last_call_usage
 - `core/llm_client.py` — `last_call_usage` property on `OllamaProvider`; tracks `prompt_eval_count` / `eval_count` from Ollama response; matches ClaudeProvider shape (cost_usd=0.0, cache tokens=0); `log_session_summary()` added
 - `tests/test_llm_client.py` — 4 new tests (None before first call, populated after, zero on missing counts, updates on second call)
-- **Why:** `cv_analyze.py` logged token usage via `llm.last_call_usage` → AttributeError crash when `LLM_PROVIDER=ollama`
+- **Why:** `cv_analyze.py` logged token usage via `llm.last_call_usage` → AttributeError crash when `LLM_PROVIDER=ollama_api`
 
 ### #3 — cv_fetch_jd returns vacancy_id
 - `tools/cv_fetch_jd.py` — split into `fetch_jd(deps, url) -> int` (core, auto-pipeline callable) + `cv_fetch_jd(ctx, url) -> str` (PydanticAI tool wrapper); `FetchError` exception replaces string error returns
@@ -389,7 +389,7 @@ Merged 2026-06-15. Engine decision resolved: **weasyprint** (HTML/Jinja2 + CSS �
 - **Ollama LLM provider**
   - `core/llm_client.py` — `OllamaProvider` full httpx implementation: POST `/api/chat`, 300s timeout, `LLMUnavailableError` on connect fail
   - `core/settings.py` — `LLM_PROVIDER` / `OLLAMA_BASE_URL` / `OLLAMA_MODEL` env vars (`.env`)
-  - `agent.py` — runtime branch: `LLM_PROVIDER=ollama` → `OllamaProvider`; default → `ClaudeProvider`
+  - `agent.py` — runtime branch: `LLM_PROVIDER=ollama_api` → `OllamaProvider`; default → `ClaudeProvider`
 - **Tests**: 291 → 316 total
 
 ---

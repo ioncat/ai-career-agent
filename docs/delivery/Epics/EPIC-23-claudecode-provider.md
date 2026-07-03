@@ -8,7 +8,7 @@
 
 ## Context
 
-Career Agent uses `LLM_PROVIDER=claude|ollama` (see `core/llm_client.py`). Anthropic API = real money per run. Ollama = free but lower quality. Gap: no way to run full Claude-quality pipeline locally without spending API credits.
+Career Agent uses `LLM_PROVIDER=claude_api|ollama_api|claude_cli` (see `core/llm_client.py`). Anthropic API = real money per run. Ollama = free but lower quality. Gap: no way to run full Claude-quality pipeline locally without spending API credits.
 
 Claude Code CLI (`claude` command) is available as subprocess — it uses the Claude Code subscription, not API credits. This enables full-quality pipeline testing at zero marginal cost during Flutter MVP development phase.
 
@@ -28,7 +28,7 @@ No middle path exists. Can't validate pipeline quality cheaply.
 
 ## Goal
 
-Add `LLM_PROVIDER=claudecode` — a third provider that routes LLM calls through the Claude Code CLI subprocess. Same Claude model quality, zero API cost, local-only execution.
+Add `LLM_PROVIDER=claude_cli` — a third provider that routes LLM calls through the Claude Code CLI subprocess. Same Claude model quality, zero API cost, local-only execution.
 
 ---
 
@@ -46,7 +46,7 @@ So that I can validate pipeline quality without spending Anthropic API credits
 
 ### Given / When / Then
 
-**Given** `LLM_PROVIDER=claudecode` in `.env`  
+**Given** `LLM_PROVIDER=claude_cli` in `.env`  
 **When** any pipeline phase calls `LLMClient.complete()`  
 **Then** the request is routed via `subprocess` to `claude -p <prompt> --output-format json`  
 **And** the response is parsed and returned in the same format as `ClaudeProvider`
@@ -56,7 +56,7 @@ So that I can validate pipeline quality without spending Anthropic API credits
 **Then** pipeline raises `LLMProviderError` with clear message — no silent fallback
 
 **Given** any pipeline tool (cv_analyze, cv_generate, cv_cover)  
-**When** `LLM_PROVIDER=claudecode`  
+**When** `LLM_PROVIDER=claude_cli`  
 **Then** all tools work without code changes — provider is transparent
 
 **Given** prompt caching markers in the prompt  
@@ -118,14 +118,14 @@ class ClaudeCodeProvider(LLMClient):
 match settings.llm_provider:
     case "claude":      return ClaudeProvider(...)
     case "ollama":      return OllamaProvider(...)
-    case "claudecode":  return ClaudeCodeProvider(model=settings.claude_model)
+    case "claude_cli":  return ClaudeCodeProvider(model=settings.claude_model)
 ```
 
 **Prompt caching:** `ClaudeProvider` wraps blocks with `cache_control`. `ClaudeCodeProvider` must strip or ignore these markers before passing to CLI — CLI does not understand them.
 
 **Async:** CLI call is blocking I/O — must use `asyncio.create_subprocess_exec`, not `subprocess.run`, to avoid blocking the event loop.
 
-**Token tracking:** CLI does not return token counts in parseable form. `llm_usage` insert should be skipped or record `cost_usd=0`, `input_tokens=None` for claudecode runs.
+**Token tracking:** CLI does not return token counts in parseable form. `llm_usage` insert should be skipped or record `cost_usd=0`, `input_tokens=None` for claude_cli runs.
 
 ---
 
@@ -140,7 +140,7 @@ match settings.llm_provider:
 
 ## Analytics / Events
 
-- Log provider name in `llm_usage.model` field as `claudecode/claude-sonnet-4-6`
+- Log provider name in `llm_usage.model` field as `claude_cli/claude-sonnet-4-6`
 - No cost tracking (cost = $0 by definition)
 - Pipeline phases, latency, output length — still trackable
 
@@ -151,12 +151,12 @@ match settings.llm_provider:
 | # | Task | Status |
 |---|------|--------|
 | 1 | `ClaudeCodeProvider` class in `core/llm_client.py` | ✅ Done 2026-07-03 |
-| 2 | Provider wiring in `agent.py` (`LLM_PROVIDER=claudecode` branch) | ✅ Done 2026-07-03 |
+| 2 | Provider wiring in `agent.py` (`LLM_PROVIDER=claude_cli` branch) | ✅ Done 2026-07-03 |
 | 3 | Tests — 5 unit tests (mocked subprocess) | ✅ Done 2026-07-03 |
 | 4 | `GET /api/config` — expose active provider + model to Flutter | 🟡 Next |
 | 5 | Flutter Settings screen — show active LLM provider | 🟡 After 4 |
 
-**Activate:** set `LLM_PROVIDER=claudecode` in `.env`. All pipeline tools work unchanged.
+**Activate:** set `LLM_PROVIDER=claude_cli` in `.env`. All pipeline tools work unchanged.
 
 ---
 
