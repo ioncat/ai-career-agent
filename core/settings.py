@@ -63,6 +63,7 @@ class Settings:
     vapid_private_key: str = ""            # VAPID_PRIVATE_KEY — PEM string (generate: see .env.example)
     vapid_public_key: str = ""             # VAPID_PUBLIC_KEY — base64url uncompressed point (for frontend)
     vapid_claims_email: str = "mailto:admin@example.com"  # VAPID_CLAIMS_EMAIL — identity for push service
+    web_port: int = 8080                   # WEB_PORT — FastAPI tracker port (Flutter connects here)
 
 
 class ConfigError(Exception):
@@ -133,4 +134,5 @@ def load_settings() -> Settings:
         vapid_private_key=_optional("VAPID_PRIVATE_KEY", ""),
         vapid_public_key=_optional("VAPID_PUBLIC_KEY", ""),
         vapid_claims_email=_optional("VAPID_CLAIMS_EMAIL", "mailto:admin@example.com"),
+        web_port=int(_optional("WEB_PORT", "8080")),
     )
