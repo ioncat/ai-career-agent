@@ -234,6 +234,43 @@ async def test_set_salary_not_found(client):
     assert resp.status_code == 404
 
 
+# ── POST /api/vacancies/{id}/analyze ─────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_analyze_queues_vacancy(client):
+    """POST /api/vacancies/{id}/analyze sets status=analysis_queued, returns 202."""
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/ana1/", status="fetched")
+    resp = client.post(f"/api/vacancies/{vid}/analyze")
+    assert resp.status_code == 202
+    data = resp.json()
+    assert data["status"] == "analysis_queued"
+    row = await database.get_vacancy_by_id(vid)
+    assert row["status"] == "analysis_queued"
+
+
+@pytest.mark.asyncio
+async def test_analyze_not_found(client):
+    """POST /api/vacancies/9999/analyze returns 404."""
+    resp = client.post("/api/vacancies/9999/analyze")
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_analyze_already_queued_returns_409(client):
+    """POST /api/vacancies/{id}/analyze returns 409 when already analysis_queued."""
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/ana2/", status="analysis_queued")
+    resp = client.post(f"/api/vacancies/{vid}/analyze")
+    assert resp.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_analyze_already_analyzing_returns_409(client):
+    """POST /api/vacancies/{id}/analyze returns 409 when status=analyzing."""
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/ana3/", status="analyzing")
+    resp = client.post(f"/api/vacancies/{vid}/analyze")
+    assert resp.status_code == 409
+
+
 # ── GET /api/vacancies/{id}/jd ────────────────────────────────────────────────
 
 @pytest.mark.asyncio

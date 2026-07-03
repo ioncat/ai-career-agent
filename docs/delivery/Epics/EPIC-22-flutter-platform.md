@@ -100,7 +100,7 @@ So that I spend time only on decision-making and CV review, not on triggering pi
 | B4 | Auto-pipeline orchestrator: RSS → `fetch_jd` → Phase 1+2 → `save analysis_json` → Web Push | ✅ Done | — |
 | B5 | `ANALYSIS_MODE` env var in `rss_watcher.py` (`inbox_first` = stop after fetch; `full_auto` = auto Phase 1+2) | ✅ Done 2026-07-03 | — |
 | B6 | `GET /api/vacancies/{id}/jd` endpoint — returns JD.md content as markdown | ✅ Done 2026-07-03 | — |
-| B7 | `POST /api/vacancies/{id}/analyze` endpoint — stub now; wires to Phase 1+2 on LLM unlock | 🟠 Planned | B5 |
+| B7 | `POST /api/vacancies/{id}/analyze` + RSSWatcher `_poll_analyze_queue` — real Phase 1+2 via claude_cli | ✅ Done 2026-07-03 | B5 |
 
 ---
 
