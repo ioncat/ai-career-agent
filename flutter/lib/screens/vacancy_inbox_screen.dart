@@ -30,6 +30,19 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
     final vacancies = ref.watch(folderVacanciesProvider(widget.folder));
     final listState = ref.watch(vacancyListProvider).valueOrNull;
 
+    // Sync _selected with polling updates (status changes: fetched→analyzing→analyzed)
+    ref.listen(folderVacanciesProvider(widget.folder), (_, updated) {
+      if (_selected == null) return;
+      try {
+        final fresh = updated.firstWhere((v) => v.id == _selected!.id);
+        if (fresh.status != _selected!.status) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) setState(() => _selected = fresh);
+          });
+        }
+      } catch (_) {}
+    });
+
     // Clear selection if selected vacancy no longer in this folder
     if (_selected != null && !vacancies.any((v) => v.id == _selected!.id)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -156,7 +169,7 @@ class _ListHeader extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               Text(
-                '$count вакансий проанализировано',
+                '$count вакансий',
                 style: Theme.of(context).textTheme.labelMedium?.copyWith(
                       color: cs.secondary,
                     ),

@@ -11,6 +11,199 @@ import '../widgets/fit_score_chip.dart';
 import '../widgets/vac_score_badge.dart';
 import 'vacancy_cv_screen.dart';
 
+// ── JD mode — shown for status='fetched' ──────────────────────────────────────
+
+class _JdModeView extends ConsumerStatefulWidget {
+  final int vacancyId;
+  final String url;
+  final VacancyListItem? vacancy;
+
+  const _JdModeView({required this.vacancyId, required this.url, this.vacancy});
+
+  @override
+  ConsumerState<_JdModeView> createState() => _JdModeViewState();
+}
+
+class _JdModeViewState extends ConsumerState<_JdModeView> {
+  bool _loadingAnalyze = false;
+  bool _loadingDecline = false;
+
+  VacancyRepository get _repo {
+    final apiUrl = ref.read(settingsProvider).valueOrNull?.apiUrl ?? 'http://localhost:8080';
+    return VacancyRepository(baseUrl: apiUrl);
+  }
+
+  Future<void> _analyze() async {
+    setState(() => _loadingAnalyze = true);
+    try {
+      await _repo.analyze(widget.vacancyId);
+      if (mounted) {
+        ref.read(vacancyListProvider.notifier).refresh();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Analysis queued'), duration: Duration(seconds: 2)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loadingAnalyze = false);
+    }
+  }
+
+  Future<void> _decline() async {
+    setState(() => _loadingDecline = true);
+    try {
+      await _repo.decline(widget.vacancyId);
+      if (mounted) ref.read(vacancyListProvider.notifier).refresh();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+        setState(() => _loadingDecline = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final jdAsync = ref.watch(vacancyJdProvider(widget.vacancyId));
+    final role = widget.vacancy?.role ?? '';
+    final company = widget.vacancy?.company ?? '';
+
+    return Column(
+      children: [
+        // Action bar
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerLowest.withValues(alpha: 0.9),
+            border: Border(
+              bottom: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.15)),
+            ),
+          ),
+          child: Row(
+            children: [
+              if (role.isNotEmpty)
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(role,
+                          style: Theme.of(context).textTheme.titleSmall,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
+                      if (company.isNotEmpty)
+                        Text(company,
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(color: cs.onSurfaceVariant),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis),
+                    ],
+                  ),
+                )
+              else
+                const Spacer(),
+              if (widget.url.isNotEmpty)
+                IconButton(
+                  icon: Icon(Icons.open_in_new, size: 18, color: cs.onSurfaceVariant),
+                  tooltip: 'Open JD',
+                  onPressed: () => launchUrl(Uri.parse(widget.url),
+                      mode: LaunchMode.externalApplication),
+                ),
+              OutlinedButton(
+                onPressed: _loadingDecline ? null : _decline,
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: cs.outlineVariant),
+                  foregroundColor: cs.onSurfaceVariant,
+                ),
+                child: _loadingDecline
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text('Skip'),
+              ),
+              const SizedBox(width: 8),
+              FilledButton.icon(
+                onPressed: _loadingAnalyze ? null : _analyze,
+                icon: _loadingAnalyze
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.analytics_outlined, size: 16),
+                label: const Text('Analyze'),
+              ),
+            ],
+          ),
+        ),
+        // JD content
+        Expanded(
+          child: jdAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(
+              child: Text('Не удалось загрузить JD: $e',
+                  style: const TextStyle(color: Color(0xFFBA1A1A))),
+            ),
+            data: (jd) => SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+              child: SelectableText(
+                jd,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: cs.onSurface,
+                      height: 1.6,
+                    ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Analyzing view — shown for analysis_queued / analyzing ───────────────────
+
+class _AnalyzingView extends StatelessWidget {
+  final String status;
+
+  const _AnalyzingView({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final label = status == 'analyzing' ? 'Анализируется...' : 'В очереди на анализ...';
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CircularProgressIndicator(color: cs.primary),
+          const SizedBox(height: 20),
+          Text(label, style: Theme.of(context).textTheme.bodyLarge),
+          const SizedBox(height: 8),
+          Text(
+            'Результат появится автоматически',
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: cs.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class VacancyDetailScreen extends ConsumerWidget {
   final int vacancyId;
   final String url;
@@ -25,6 +218,17 @@ class VacancyDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final status = vacancy?.status ?? '';
+
+    // Status-based routing — avoids fetching analysis for unanalyzed vacancies
+    if (status == 'analysis_queued' || status == 'analyzing') {
+      return _AnalyzingView(status: status);
+    }
+    if (status == 'fetched') {
+      return _JdModeView(vacancyId: vacancyId, url: url, vacancy: vacancy);
+    }
+
+    // Analyzed path
     final async = ref.watch(vacancyDetailProvider(vacancyId));
 
     return async.when(

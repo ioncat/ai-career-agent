@@ -62,4 +62,33 @@ class VacancyRepository {
     return VacancyAnalysis.fromJson(
         jsonDecode(response.body) as Map<String, dynamic>);
   }
+
+  Future<String> getJd(int vacancyId) async {
+    final uri = Uri.parse('$baseUrl/api/vacancies/$vacancyId/jd');
+    final response = await http.get(uri).timeout(const Duration(seconds: 10));
+    if (response.statusCode == 404) throw Exception('JD not found');
+    if (response.statusCode != 200) throw Exception('Failed to load JD: ${response.statusCode}');
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return data['jd_md'] as String? ?? '';
+  }
+
+  Future<void> analyze(int vacancyId) async {
+    final uri = Uri.parse('$baseUrl/api/vacancies/$vacancyId/analyze');
+    final response = await http.post(uri).timeout(const Duration(seconds: 10));
+    if (response.statusCode == 404) throw Exception('Vacancy not found');
+    if (response.statusCode == 409) throw Exception('Already in progress');
+    if (response.statusCode != 202) throw Exception('Analyze failed: ${response.statusCode}');
+  }
+
+  Future<Map<String, String>> getConfig() async {
+    final uri = Uri.parse('$baseUrl/api/config');
+    final response = await http.get(uri).timeout(const Duration(seconds: 5));
+    if (response.statusCode != 200) throw Exception('Config unavailable');
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return {
+      'llm_provider': data['llm_provider'] as String? ?? '',
+      'model': data['model'] as String? ?? '',
+      'analysis_mode': data['analysis_mode'] as String? ?? '',
+    };
+  }
 }
