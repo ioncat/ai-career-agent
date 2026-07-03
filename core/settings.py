@@ -53,7 +53,7 @@ class Settings:
     # Known bottleneck at scale: profile_json single column, no concurrent write protection.
     # Production path: separate profiles table + proper auth. See docs/discovery/core-differentiators.md.
     multi_user_enabled: bool = False
-    llm_provider: str = "claude"           # "claude" | "ollama" | "claudecode"
+    llm_provider: str = "claude_api"       # "claude_api" | "ollama_api" | "claude_cli"
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "qwen2.5:32b"
     ollama_timeout: int = 600              # read timeout in seconds (connect always 10s)
@@ -116,7 +116,7 @@ def load_settings() -> Settings:
         agent_mode=_optional("AGENT_MODE", "production"),
         default_skill_type=_optional("DEFAULT_SKILL_TYPE", "pm"),
         multi_user_enabled=_optional("MULTI_USER_ENABLED", "false").lower() == "true",
-        llm_provider=_optional("LLM_PROVIDER", "claude"),
+        llm_provider=_optional("LLM_PROVIDER", "claude_api").lower(),
         ollama_base_url=_optional("OLLAMA_BASE_URL", "http://localhost:11434"),
         ollama_model=_optional("OLLAMA_MODEL", "qwen2.5:32b"),
         ollama_timeout=int(_optional("OLLAMA_TIMEOUT", "600")),

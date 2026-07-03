@@ -447,4 +447,4 @@ async def test_claudecode_last_call_usage_zero_cost():
     assert usage is not None
     assert usage["cost_usd"] == 0.0
     assert usage["input_tokens"] == 0
-    assert usage["model"].startswith("claudecode/")
+    assert usage["model"].startswith("claude_cli/")
