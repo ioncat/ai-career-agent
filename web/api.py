@@ -535,6 +535,27 @@ async def api_vacancy_cv(vacancy_id: int):
     return result
 
 
+@app.get("/api/vacancies/{vacancy_id}/jd")
+async def api_vacancy_jd(vacancy_id: int):
+    """Return JD markdown for a vacancy (Flutter detail screen — inbox-first JD view, EPIC-22 B6).
+
+    404 when vacancy not found or JD file missing on disk.
+    """
+    row = await database.get_vacancy_by_id(vacancy_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Vacancy not found")
+
+    md_path = row["markdown_path"] if "markdown_path" in row.keys() else None
+    if not md_path:
+        raise HTTPException(status_code=404, detail="JD not found")
+
+    jd_file = Path(md_path) if Path(md_path).is_absolute() else _PROJECT_ROOT / md_path
+    if not jd_file.exists():
+        raise HTTPException(status_code=404, detail="JD not found")
+
+    return {"jd_md": jd_file.read_text(encoding="utf-8")}
+
+
 @app.get("/api/vacancies/{vacancy_id}")
 async def api_vacancy(vacancy_id: int):
     row = await database.get_vacancy_by_id(vacancy_id)
