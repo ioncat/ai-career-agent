@@ -16,6 +16,22 @@
 
 ---
 
+## 🟡 P1 — [EPIC-23](docs/delivery/Epics/EPIC-23-claudecode-provider.md) — Claude Code CLI Provider (updated 2026-07-03)
+
+**Цель:** тестировать полный pipeline через Flutter без расхода API credits. `LLM_PROVIDER=claudecode` → вызовы идут через `claude -p` subprocess → используется подписка Claude Code, стоимость $0.
+
+**Ограничения:** нет prompt caching, нет token counts, только для локального dev/testing.
+
+**Статус:** Tasks 1–3 ✅ Done. `ClaudeCodeProvider` реализован и протестирован (5 тестов).
+
+**Активация:** `LLM_PROVIDER=claudecode` в `.env`. Pipeline tools без изменений.
+
+**Следующие шаги:**
+- Task 4: `GET /api/config` → `{"llm_provider": "claudecode", "model": "..."}` для Flutter
+- Task 5: Flutter Settings screen — показывать активный провайдер
+
+---
+
 ## 🔴 P0 — [EPIC-21](docs/delivery/Epics/EPIC-21-deterministic-vs-cognitive-pipeline.md) — Deterministic vs Cognitive pipeline split
 
 **Goal:** Draw the boundary — deterministic work in Python (FSM orchestrator), LLM only for irreducible cognitive phases. Source: `docs/discovery/hypotheses/H-002`.
