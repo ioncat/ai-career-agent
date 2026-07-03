@@ -84,7 +84,7 @@ When fit is real: a targeted CV from actual experience, cross-checked against th
 
 | Layer | Tech |
 |-------|------|
-| AI | Claude Sonnet 4.6 (default) · Ollama (local, `LLM_PROVIDER=ollama`) · PydanticAI · prompt caching |
+| AI | Claude Sonnet 4.6 (default) · Ollama (`LLM_PROVIDER=ollama_api`) · Claude CLI (`LLM_PROVIDER=claude_cli`, $0) · PydanticAI · prompt caching |
 | UI | Flutter Desktop (primary) · Web tracker (FastAPI + HTMX, read-only) |
 | Backend | FastAPI — JSON endpoints for Flutter (`/api/vacancies`, `/api/vacancies/{id}/analysis`, `/api/vacancies/{id}/cv`) |
 | HTTP | httpx async (backend) · http (Flutter) |
