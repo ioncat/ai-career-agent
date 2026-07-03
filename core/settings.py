@@ -59,7 +59,7 @@ class Settings:
     ollama_timeout: int = 600              # read timeout in seconds (connect always 10s)
     allow_external_calls: bool = False     # ALLOW_EXTERNAL_CALLS=true to permit outbound HTTP
     rss_concurrency: int = 2               # max parallel cv_fetch_jd calls in RSS batch
-    auto_analyze: bool = False             # AUTO_ANALYZE=true → Phase 1+2 runs automatically after fetch
+    analysis_mode: str = "inbox_first"     # ANALYSIS_MODE=inbox_first (default) | full_auto
     vapid_private_key: str = ""            # VAPID_PRIVATE_KEY — PEM string (generate: see .env.example)
     vapid_public_key: str = ""             # VAPID_PUBLIC_KEY — base64url uncompressed point (for frontend)
     vapid_claims_email: str = "mailto:admin@example.com"  # VAPID_CLAIMS_EMAIL — identity for push service
@@ -97,6 +97,13 @@ def load_settings() -> Settings:
     except ValueError:
         raise ConfigError(f"TELEGRAM_CHAT_ID must be an integer, got: {chat_id_str!r}")
 
+    _analysis_mode = _optional("ANALYSIS_MODE", "inbox_first").lower()
+    _valid_modes = ("inbox_first", "full_auto")
+    if _analysis_mode not in _valid_modes:
+        raise ConfigError(
+            f"ANALYSIS_MODE must be one of {_valid_modes}, got: {_analysis_mode!r}"
+        )
+
     return Settings(
         anthropic_api_key=api_key,
         telegram_token=telegram_token,
@@ -122,7 +129,7 @@ def load_settings() -> Settings:
         ollama_timeout=int(_optional("OLLAMA_TIMEOUT", "600")),
         allow_external_calls=_optional("ALLOW_EXTERNAL_CALLS", "false").lower() == "true",
         rss_concurrency=int(_optional("RSS_CONCURRENCY", "2")),
-        auto_analyze=_optional("AUTO_ANALYZE", "false").lower() == "true",
+        analysis_mode=_analysis_mode,
         vapid_private_key=_optional("VAPID_PRIVATE_KEY", ""),
         vapid_public_key=_optional("VAPID_PUBLIC_KEY", ""),
         vapid_claims_email=_optional("VAPID_CLAIMS_EMAIL", "mailto:admin@example.com"),

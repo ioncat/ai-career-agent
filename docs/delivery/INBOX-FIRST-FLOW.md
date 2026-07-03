@@ -20,7 +20,7 @@ This breaks two things:
 
 RSS → fetch JD only (status=`fetched`). User sees all incoming vacancies in the inbox. For each unanalyzed vacancy: reads the JD, decides Analyze or Skip. Analysis runs async; when done → notification fires → detail screen unlocks.
 
-Full-auto remains available via `AUTO_ANALYZE=true` (env flag, no code changes).
+Full-auto remains available via `ANALYSIS_MODE=full_auto` (env var, no code changes).
 
 ---
 
@@ -28,7 +28,7 @@ Full-auto remains available via `AUTO_ANALYZE=true` (env flag, no code changes).
 
 | | Inbox-first (default) | Full-auto |
 |---|---|---|
-| Trigger | `AUTO_ANALYZE=false` (default) | `AUTO_ANALYZE=true` |
+| Trigger | `ANALYSIS_MODE=inbox_first` (default) | `ANALYSIS_MODE=full_auto` |
 | RSS → | fetch JD only | fetch JD + Phase 1+2 |
 | Inbox shows | `fetched` + `analyzed` | `analyzed` only |
 | User decides | Analyze / Skip per vacancy | receives result only |
@@ -42,7 +42,7 @@ Full-auto remains available via `AUTO_ANALYZE=true` (env flag, no code changes).
 - **Pay-per-analyze** → inbox-first: user sees JD, decides to spend a token.
 - **Package (30 analyses)** → full-auto: all incoming vacancies auto-analyzed from pool.
 
-The `AUTO_ANALYZE` flag is the only switch between models. No other code changes.
+The `ANALYSIS_MODE` env var is the only switch between modes. No other code changes.
 
 ---
 
@@ -53,9 +53,9 @@ RSS push
   ↓
 fetch_jd() — save JD.md, status=fetched
   ↓
-AUTO_ANALYZE?
-  ├─ true  → Phase 1+2 auto → status=analyzed → notification
-  └─ false → stop here
+ANALYSIS_MODE?
+  ├─ full_auto   → Phase 1+2 auto → status=analyzed → notification
+  └─ inbox_first → stop here
 
 Flutter Inbox (shows fetched + analyzed)
   User opens fetched vacancy → reads JD
@@ -77,7 +77,7 @@ Flutter Inbox (shows fetched + analyzed)
 
 | Priority | Task | Detail |
 |----------|------|--------|
-| 🔴 | `AUTO_ANALYZE` env flag in `rss_watcher.py` | `Settings.auto_analyze: bool = False`; `False` → stop after `fetch_jd`; `True` → existing full-auto path |
+| 🔴 | `ANALYSIS_MODE` in `rss_watcher.py` + `Settings` | ✅ Done — `inbox_first` stops after fetch; `full_auto` runs Phase 1+2 automatically |
 | 🟠 | `GET /api/vacancies/{id}/jd` | reads `vacancies/{user_id}/{folder}/JD.md` → `{"jd_md": "..."}` |
 | 🟠 | `POST /api/vacancies/{id}/analyze` | stub: status → `analysis_queued`; wires to Phase 1+2 when LLM available |
 
@@ -137,7 +137,7 @@ fetched → analysis_queued → analyzing → analyzed
 | # | Задача | Эпик | Зависит от | Зачем |
 |---|--------|------|-----------|-------|
 | 1 | `GET /api/config` → `{llm_provider, model}` | EPIC-23 T4 | — | Flutter узнаёт какой провайдер активен |
-| 2 | `AUTO_ANALYZE` флаг в `rss_watcher.py` + `Settings` | EPIC-22 B5 | — | Переключатель inbox-first vs full-auto |
+| 2 | `ANALYSIS_MODE` в `rss_watcher.py` + `Settings` + `GET /api/config` | EPIC-22 B5 | — | ✅ Done — `inbox_first` \| `full_auto`; виден в Flutter через /api/config |
 | 3 | Проверить/добавить `PATCH /api/vacancies/{id}/decline` | EPIC-22 B5 | — | Flutter кнопка Skip |
 | 4 | `GET /api/vacancies/{id}/jd` → `{jd_md}` | EPIC-22 B6 | #2 | Flutter читает JD без анализа |
 | 5 | `POST /api/vacancies/{id}/analyze` — реальный (claude_cli) | EPIC-22 B7 | #2, EPIC-23 | Пользователь нажимает Analyze → Phase 1+2 через claude_cli |

@@ -24,7 +24,7 @@ from core.rss_watcher import RSSWatcher, _extract_salary
 def _make_watcher(poll_interval: int = 1) -> tuple[RSSWatcher, MagicMock]:
     deps = MagicMock()
     deps.user_id = 1
-    deps.settings.auto_analyze = False  # inbox-first by default
+    deps.settings.analysis_mode = "inbox_first"  # default
     bot = MagicMock()
     bot.send_message = AsyncMock()
     watcher = RSSWatcher(deps=deps, telegram_bot=bot, poll_interval=poll_interval)
@@ -270,12 +270,12 @@ async def test_process_source_label_djinni():
     assert "Djinni" in msg
 
 
-# ── Inbox-first / AUTO_ANALYZE ───────────────────────────────────────────────
+# ── analysis_mode ─────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_process_inbox_first_skips_analysis():
-    """AUTO_ANALYZE=false (default): analysis not triggered after fetch."""
-    watcher, _ = _make_watcher()  # auto_analyze=False set in _make_watcher
+    """ANALYSIS_MODE=inbox_first (default): analysis not triggered after fetch."""
+    watcher, _ = _make_watcher()  # analysis_mode="inbox_first" set in _make_watcher
     mock_analyze = AsyncMock()
     mock_db = _mock_db([])
 
@@ -289,10 +289,10 @@ async def test_process_inbox_first_skips_analysis():
 
 
 @pytest.mark.asyncio
-async def test_process_auto_analyze_runs_analysis():
-    """AUTO_ANALYZE=true: Phase 1+2 runs automatically after fetch."""
+async def test_process_full_auto_runs_analysis():
+    """ANALYSIS_MODE=full_auto: Phase 1+2 runs automatically after fetch."""
     watcher, _ = _make_watcher()
-    watcher._deps.settings.auto_analyze = True
+    watcher._deps.settings.analysis_mode = "full_auto"
     mock_analyze = AsyncMock()
     mock_db = _mock_db([])
 

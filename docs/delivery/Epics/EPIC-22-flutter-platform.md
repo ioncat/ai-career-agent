@@ -98,7 +98,7 @@ So that I spend time only on decision-making and CV review, not on triggering pi
 | B2 | EPIC-21 Task 3: VacScore composite + Fit×VacScore matrix → Python; LLM returns dim scores only | ✅ Done | B1 |
 | B3 | FastAPI JSON endpoints for Flutter: `GET /api/vacancies`, `GET /api/vacancies/{id}/analysis`, `GET /api/vacancies/{id}/cv` | ✅ Done | B1 |
 | B4 | Auto-pipeline orchestrator: RSS → `fetch_jd` → Phase 1+2 → `save analysis_json` → Web Push | ✅ Done | — |
-| B5 | `AUTO_ANALYZE` env flag in `rss_watcher.py` (`False` = stop after fetch; `True` = full-auto) | 🔴 Planned | — |
+| B5 | `ANALYSIS_MODE` env var in `rss_watcher.py` (`inbox_first` = stop after fetch; `full_auto` = auto Phase 1+2) | ✅ Done 2026-07-03 | — |
 | B6 | `GET /api/vacancies/{id}/jd` endpoint — returns JD.md content as markdown | 🟠 Planned | — |
 | B7 | `POST /api/vacancies/{id}/analyze` endpoint — stub now; wires to Phase 1+2 on LLM unlock | 🟠 Planned | B5 |
 
