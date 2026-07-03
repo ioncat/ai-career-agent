@@ -74,11 +74,15 @@ class _VacancyCardState extends State<VacancyCard> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Row 1: source badge + date
+              // Row 1: source badge + date + "New" badge for fetched
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   if (v.site.isNotEmpty) SourceBadge(site: v.site),
+                  if (v.status == 'fetched') ...[
+                    const SizedBox(width: 6),
+                    _NewBadge(),
+                  ],
                   if (v.publishedAt != null) ...[
                     const SizedBox(width: 8),
                     Text(
@@ -126,18 +130,23 @@ class _VacancyCardState extends State<VacancyCard> {
                   overflow: TextOverflow.ellipsis,
                 ),
               const SizedBox(height: 10),
-              // Row 4: scores
-              Row(
-                children: [
-                  if (v.fitScore != null) FitScoreChip(score: v.fitScore!),
-                  if (v.vacancyScore != null) ...[
-                    const SizedBox(width: 6),
-                    VacScoreBadge(score: v.vacancyScore!),
+              // Row 4: scores or status badge
+              if (v.status == 'analyzed')
+                Row(
+                  children: [
+                    if (v.fitScore != null) FitScoreChip(score: v.fitScore!),
+                    if (v.vacancyScore != null) ...[
+                      const SizedBox(width: 6),
+                      VacScoreBadge(score: v.vacancyScore!),
+                    ],
                   ],
-                ],
-              ),
-              // Row 5: key barrier (optional)
-              if (v.keyBarriers.isNotEmpty) ...[
+                )
+              else if (v.status == 'analysis_queued')
+                _QueuedBadge()
+              else if (v.status == 'analyzing')
+                _AnalyzingBadge(),
+              // Row 5: key barrier (analyzed only)
+              if (v.status == 'analyzed' && v.keyBarriers.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -187,6 +196,75 @@ class _VacancyCardState extends State<VacancyCard> {
     } catch (_) {
       return iso;
     }
+  }
+}
+
+class _NewBadge extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF3E0),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFFFFB300), width: 0.8),
+      ),
+      child: Text(
+        'New',
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: const Color(0xFFE65100),
+              fontWeight: FontWeight.w700,
+              fontSize: 10,
+            ),
+      ),
+    );
+  }
+}
+
+class _QueuedBadge extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.schedule_outlined, size: 13, color: cs.onSurfaceVariant),
+        const SizedBox(width: 4),
+        Text(
+          'В очереди',
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: cs.onSurfaceVariant,
+              ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AnalyzingBadge extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 12,
+          height: 12,
+          child: CircularProgressIndicator(
+            strokeWidth: 1.5,
+            color: cs.primary,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          'Анализируется',
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: cs.primary,
+              ),
+        ),
+      ],
+    );
   }
 }
 

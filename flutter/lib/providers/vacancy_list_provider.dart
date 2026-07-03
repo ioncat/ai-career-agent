@@ -134,7 +134,8 @@ class VacancyListNotifier extends AsyncNotifier<PollingState> {
 
       final existingIds = current?.vacancies.map((v) => v.id).toSet() ?? {};
       final newAnalyzed = items
-          .where((v) => !existingIds.contains(v.id) && v.status == 'analyzed')
+          .where((v) => !existingIds.contains(v.id) &&
+              (v.status == 'analyzed' || v.status == 'fetched'))
           .length;
 
       state = AsyncData(PollingState(
@@ -171,7 +172,10 @@ final folderVacanciesProvider =
 bool _folderMatch(String status, String folder) {
   switch (folder) {
     case 'inbox':
-      return status == 'analyzed';
+      return status == 'fetched' ||
+          status == 'analysis_queued' ||
+          status == 'analyzing' ||
+          status == 'analyzed';
     case 'in_progress':
       return status == 'cv_generated' || status == 'cv_queued';
     case 'applied':

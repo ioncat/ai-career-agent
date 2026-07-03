@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/config_provider.dart';
 import '../providers/settings_provider.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -124,6 +125,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               const SizedBox(height: 32),
 
+              // AI Provider (read-only, from GET /api/config)
+              _SectionLabel('AI Provider'),
+              const SizedBox(height: 12),
+              const _RemoteConfigTile(),
+              const SizedBox(height: 32),
+
               // Save button
               Row(
                 children: [
@@ -171,6 +178,81 @@ class _SectionLabel extends StatelessWidget {
             color: Theme.of(context).colorScheme.onSurfaceVariant,
             letterSpacing: 0.5,
           ),
+    );
+  }
+}
+
+class _RemoteConfigTile extends ConsumerWidget {
+  const _RemoteConfigTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cs = Theme.of(context).colorScheme;
+    final configAsync = ref.watch(remoteConfigProvider);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainer,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
+      ),
+      child: configAsync.when(
+        loading: () => const SizedBox(
+            height: 40, child: Center(child: CircularProgressIndicator())),
+        error: (e, _) => Text(
+          'Недоступен: $e',
+          style: Theme.of(context)
+              .textTheme
+              .bodySmall
+              ?.copyWith(color: cs.error),
+        ),
+        data: (config) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _ConfigRow(label: 'Provider', value: config.llmProvider),
+            const SizedBox(height: 8),
+            _ConfigRow(label: 'Model', value: config.model),
+            const SizedBox(height: 8),
+            _ConfigRow(label: 'Analysis mode', value: config.analysisMode),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ConfigRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _ConfigRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        SizedBox(
+          width: 120,
+          child: Text(
+            label,
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: cs.onSurfaceVariant),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value.isNotEmpty ? value : '—',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurface,
+                ),
+          ),
+        ),
+      ],
     );
   }
 }
