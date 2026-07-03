@@ -74,7 +74,7 @@ except ImportError:
     pass
 
 from core.settings import load_settings, ConfigError
-from core.llm_client import ClaudeProvider
+from core.llm_client import ClaudeProvider, ClaudeCodeProvider, OllamaProvider
 from adapters.parser_adapter import ParserAdapter
 from adapters.cv_adapter import CVAdapter
 from core.deps import AgentDeps
@@ -165,14 +165,28 @@ async def run_e2e(
     profile_md = effective_profile_path.read_text(encoding="utf-8")
     print(f"  PROFILE.md  : {effective_profile_path} ({len(profile_md)} chars)\n")
 
-    llm = ClaudeProvider(
-        api_key=settings.anthropic_api_key,
-        model=settings.llm_model,
-        profile_md=profile_md,
-        max_tokens=settings.max_tokens,
-        testing_mode=(settings.agent_mode == "testing"),
-        auto_confirm=auto_confirm,
-    )
+    if settings.llm_provider == "claude_cli":
+        llm = ClaudeCodeProvider(profile_md=profile_md, model=settings.llm_model, timeout=settings.claude_cli_timeout)
+        print(f"  LLM         : claude_cli ({settings.llm_model}) timeout={settings.claude_cli_timeout}s\n")
+    elif settings.llm_provider == "ollama_api":
+        llm = OllamaProvider(
+            base_url=settings.ollama_base_url,
+            model=settings.ollama_model,
+            profile_md=profile_md,
+            max_tokens=settings.max_tokens,
+            timeout=settings.ollama_timeout,
+        )
+        print(f"  LLM         : ollama ({settings.ollama_model})\n")
+    else:
+        llm = ClaudeProvider(
+            api_key=settings.anthropic_api_key,
+            model=settings.llm_model,
+            profile_md=profile_md,
+            max_tokens=settings.max_tokens,
+            testing_mode=(settings.agent_mode == "testing"),
+            auto_confirm=auto_confirm,
+        )
+        print(f"  LLM         : claude_api ({settings.llm_model})\n")
 
     parser = ParserAdapter(base_url=settings.parser_url)
     cv_adapter = CVAdapter(pdf_service_url=settings.pdf_service_url)
@@ -286,8 +300,8 @@ async def run_e2e(
         print(f"\n--- cv_cover result ---\n{result}\n")
 
     # ── Session cost summary ──────────────────────────────────────────────────
-    s = llm.session_summary
-    if s["calls"] > 0:
+    s = getattr(llm, 'session_summary', None)
+    if s and s.get("calls", 0) > 0:
         print(f"\n💰  Session cost: {s['calls']} calls | "
               f"in={s['input_tokens']} out={s['output_tokens']} "
               f"cache_write={s['cache_write_tokens']} cache_read={s['cache_read_tokens']} "

@@ -57,6 +57,7 @@ class Settings:
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "qwen2.5:32b"
     ollama_timeout: int = 600              # read timeout in seconds (connect always 10s)
+    claude_cli_timeout: int = 300          # CLAUDE_CLI_TIMEOUT — subprocess timeout for claude CLI (large prompts ~52s/17KB)
     allow_external_calls: bool = False     # ALLOW_EXTERNAL_CALLS=true to permit outbound HTTP
     rss_concurrency: int = 2               # max parallel cv_fetch_jd calls in RSS batch
     analysis_mode: str = "inbox_first"     # ANALYSIS_MODE=inbox_first (default) | full_auto
@@ -128,6 +129,7 @@ def load_settings() -> Settings:
         ollama_base_url=_optional("OLLAMA_BASE_URL", "http://localhost:11434"),
         ollama_model=_optional("OLLAMA_MODEL", "qwen2.5:32b"),
         ollama_timeout=int(_optional("OLLAMA_TIMEOUT", "600")),
+        claude_cli_timeout=int(_optional("CLAUDE_CLI_TIMEOUT", "300")),
         allow_external_calls=_optional("ALLOW_EXTERNAL_CALLS", "false").lower() == "true",
         rss_concurrency=int(_optional("RSS_CONCURRENCY", "2")),
         analysis_mode=_analysis_mode,

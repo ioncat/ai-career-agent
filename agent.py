@@ -146,6 +146,7 @@ async def main() -> None:
         llm = ClaudeCodeProvider(
             profile_md=profile_md,
             model=settings.llm_model,
+            timeout=settings.claude_cli_timeout,
         )
         log.info("LLM provider: claude_cli — model=%s (subscription, $0 cost)", settings.llm_model)
     elif settings.llm_provider == "ollama_api":
