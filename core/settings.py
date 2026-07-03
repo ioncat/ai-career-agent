@@ -53,7 +53,7 @@ class Settings:
     # Known bottleneck at scale: profile_json single column, no concurrent write protection.
     # Production path: separate profiles table + proper auth. See docs/discovery/core-differentiators.md.
     multi_user_enabled: bool = False
-    llm_provider: str = "claude"           # "claude" | "ollama"
+    llm_provider: str = "claude"           # "claude" | "ollama" | "claudecode"
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "qwen2.5:32b"
     ollama_timeout: int = 600              # read timeout in seconds (connect always 10s)

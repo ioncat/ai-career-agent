@@ -11,6 +11,7 @@ import anthropic
 import pytest
 
 from core.llm_client import (
+    ClaudeCodeProvider,
     ClaudeProvider,
     LLMClient,
     LLMError,
@@ -385,3 +386,65 @@ async def test_ollama_last_call_usage_updates_on_second_call():
         mock_client.post = AsyncMock(return_value=_make_ollama_response("second", 99, 77))
         await provider.complete("q2")
         assert provider.last_call_usage["input_tokens"] == 99
+
+
+# ── ClaudeCodeProvider ────────────────────────────────────────────────────────
+
+
+def _make_proc(stdout: bytes, returncode: int = 0, stderr: bytes = b"") -> AsyncMock:
+    proc = AsyncMock()
+    proc.returncode = returncode
+    proc.communicate = AsyncMock(return_value=(stdout, stderr))
+    proc.kill = MagicMock()
+    return proc
+
+
+@pytest.mark.asyncio
+async def test_claudecode_returns_text():
+    provider = ClaudeCodeProvider(profile_md=FAKE_PROFILE, model="claude-sonnet-4-6")
+    proc = _make_proc(b"Analysis result\n")
+    with patch("asyncio.create_subprocess_exec", return_value=proc):
+        result = await provider.complete("user input", system="sys prompt")
+    assert result == "Analysis result"
+
+
+@pytest.mark.asyncio
+async def test_claudecode_no_system():
+    provider = ClaudeCodeProvider(profile_md=FAKE_PROFILE)
+    proc = _make_proc(b"OK\n")
+    with patch("asyncio.create_subprocess_exec", return_value=proc) as mock_exec:
+        await provider.complete("user only")
+    call_args = mock_exec.call_args[0]
+    prompt = call_args[2]  # 'claude', '-p', <prompt>
+    assert FAKE_PROFILE in prompt
+    assert "user only" in prompt
+
+
+@pytest.mark.asyncio
+async def test_claudecode_cli_not_found():
+    provider = ClaudeCodeProvider(profile_md=FAKE_PROFILE)
+    with patch("asyncio.create_subprocess_exec", side_effect=FileNotFoundError):
+        with pytest.raises(LLMUnavailableError, match="not found in PATH"):
+            await provider.complete("x")
+
+
+@pytest.mark.asyncio
+async def test_claudecode_nonzero_returncode():
+    provider = ClaudeCodeProvider(profile_md=FAKE_PROFILE)
+    proc = _make_proc(b"", returncode=1, stderr=b"some CLI error")
+    with patch("asyncio.create_subprocess_exec", return_value=proc):
+        with pytest.raises(LLMError, match="CLI error"):
+            await provider.complete("x")
+
+
+@pytest.mark.asyncio
+async def test_claudecode_last_call_usage_zero_cost():
+    provider = ClaudeCodeProvider(profile_md=FAKE_PROFILE)
+    proc = _make_proc(b"result\n")
+    with patch("asyncio.create_subprocess_exec", return_value=proc):
+        await provider.complete("x")
+    usage = provider.last_call_usage
+    assert usage is not None
+    assert usage["cost_usd"] == 0.0
+    assert usage["input_tokens"] == 0
+    assert usage["model"].startswith("claudecode/")
