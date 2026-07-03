@@ -21,6 +21,8 @@ import signal
 import sys
 from pathlib import Path
 
+import uvicorn
+
 from adapters.cv_adapter import CVAdapter
 from adapters.parser_adapter import ParserAdapter
 from core.deps import AgentDeps
@@ -211,7 +213,19 @@ async def main() -> None:
         concurrency=settings.rss_concurrency,
     )
 
-    # ── 8. Run ────────────────────────────────────────────────────────────────
+    # ── 8. Web tracker (FastAPI) ──────────────────────────────────────────────
+    from web.api import app as _web_app  # import after database.configure()
+    _web_cfg = uvicorn.Config(
+        _web_app,
+        host="127.0.0.1",
+        port=settings.web_port,
+        log_level="warning",
+    )
+    _web_server = uvicorn.Server(_web_cfg)
+    _web_task = asyncio.create_task(_web_server.serve())
+    log.info("Web tracker started on http://127.0.0.1:%d", settings.web_port)
+
+    # ── 9. Run ────────────────────────────────────────────────────────────────
     log.info(
         "career-agent starting — rss_poll=%ds",
         settings.rss_poll_interval,
@@ -236,6 +250,8 @@ async def main() -> None:
     except KeyboardInterrupt:
         pass
     finally:
+        _web_server.should_exit = True
+        await _web_task
         await watcher.stop()
         await bot.stop()
         llm.log_session_summary()
