@@ -240,6 +240,15 @@ async def api_users():
     return [dict(row) for row in rows]
 
 
+@app.get("/api/config")
+async def api_config():
+    """Return active LLM provider and model for Flutter Settings screen (EPIC-23 T4)."""
+    return {
+        "llm_provider": os.getenv("LLM_PROVIDER", "claude_api").lower(),
+        "model": os.getenv("LLM_MODEL", "claude-opus-4-5"),
+    }
+
+
 def _site_from_url(url: str) -> str | None:
     netloc = urlparse(url).netloc.lower()
     if "djinni" in netloc:

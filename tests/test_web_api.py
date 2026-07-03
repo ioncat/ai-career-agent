@@ -232,3 +232,35 @@ async def test_set_salary_not_found(client):
     """PATCH /api/vacancies/9999/salary returns 404 for missing vacancy."""
     resp = client.patch("/api/vacancies/9999/salary", json={"salary": "$5000"})
     assert resp.status_code == 404
+
+
+# ── GET /api/config ────────────────────────────────────────────────────────────
+
+def test_api_config_defaults(client, monkeypatch):
+    """GET /api/config returns llm_provider and model from env (defaults)."""
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+    monkeypatch.delenv("LLM_MODEL", raising=False)
+    resp = client.get("/api/config")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["llm_provider"] == "claude_api"
+    assert data["model"] == "claude-opus-4-5"
+
+
+def test_api_config_custom_provider(client, monkeypatch):
+    """GET /api/config reflects LLM_PROVIDER env var, lowercased."""
+    monkeypatch.setenv("LLM_PROVIDER", "claude_cli")
+    monkeypatch.setenv("LLM_MODEL", "claude-haiku-4-5-20251001")
+    resp = client.get("/api/config")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["llm_provider"] == "claude_cli"
+    assert data["model"] == "claude-haiku-4-5-20251001"
+
+
+def test_api_config_provider_case_insensitive(client, monkeypatch):
+    """GET /api/config lowercases LLM_PROVIDER value."""
+    monkeypatch.setenv("LLM_PROVIDER", "Claude_CLI")
+    resp = client.get("/api/config")
+    assert resp.status_code == 200
+    assert resp.json()["llm_provider"] == "claude_cli"
