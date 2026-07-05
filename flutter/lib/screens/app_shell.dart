@@ -54,11 +54,10 @@ class _AppShellState extends ConsumerState<AppShell> {
     ref.listen<AsyncValue<PollingState>>(vacancyListProvider, (prev, next) {
       final newState = next.valueOrNull;
       if (newState == null) return;
-      if (newState.status == PollingStatus.found && newState.newCount > 0) {
-        final notificationsEnabled = settings?.notificationsEnabled ?? true;
-        if (notificationsEnabled) {
-          NotificationService.showNewVacancies(newState.newCount);
-        }
+      if (newState.status == PollingStatus.found &&
+          newState.newAnalyzedCount > 0 &&
+          (settings?.notificationsEnabled ?? true)) {
+        NotificationService.showNewVacancies(newState.newAnalyzedCount);
       }
     });
 
