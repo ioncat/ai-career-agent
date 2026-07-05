@@ -25,6 +25,7 @@ Tool registered in agent.py via ToolRegistry.
 Receives shared dependencies via RunContext[AgentDeps].
 """
 
+import json
 import logging
 import re
 import time
@@ -87,6 +88,21 @@ async def cv_generate(
     jd_text = jd_path.read_text(encoding="utf-8")
     analysis_text = analysis_path.read_text(encoding="utf-8")
 
+    # ── Load progressive_profile evidence (EPIC-24 T6) ───────────────────────
+    _pp_evidence: str | None = None
+    user_row = await database.get_user_by_id(ctx.deps.user_id)
+    if user_row:
+        pp_str = user_row["progressive_profile"] if "progressive_profile" in user_row.keys() else None
+        if pp_str:
+            try:
+                pp_data = json.loads(pp_str)
+                roles = pp_data.get("roles", [])
+                if roles:
+                    _pp_evidence = _format_pp_evidence(roles)
+                    log.info("cv_generate: loaded %d roles from progressive_profile", len(roles))
+            except Exception as exc:
+                log.warning("cv_generate: failed to load progressive_profile: %s", exc)
+
     # ── Load prompts (skill_type-routed) ─────────────────────────────────────
     skill_dir = _PROMPTS_DIR / ctx.deps.skill_type
     phase3_prompt = (skill_dir / "phase3_cv_draft.md").read_text(encoding="utf-8")
@@ -104,6 +120,8 @@ async def cv_generate(
         f"Target language: {language}\n"
         f"Candidate name: {ctx.deps.candidate_name}"
     )
+    if _pp_evidence:
+        phase3_user += f"\n\n---\n\n## Candidate Evidence (DB Profile)\n\nUse the structured evidence below to enrich the CV with specific, accurate detail. This is the authoritative source for narratives, key results, and framing. Prefer this over the summary in PROFILE.md when both are present.\n\n{_pp_evidence}"
 
     try:
         log.info("cv_generate: Phase 3 start — vacancy_id=%d", vacancy_id)
@@ -192,6 +210,52 @@ async def cv_generate(
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _format_pp_evidence(roles: list) -> str:
+    """Format progressive_profile roles[] into a structured evidence block for Phase 3."""
+    parts: list[str] = []
+    for role in roles:
+        lines: list[str] = []
+        title = role.get("title", "")
+        company = role.get("company", "")
+        dates = role.get("dates", "")
+        header = f"### {title} — {company}"
+        if dates:
+            header += f" ({dates})"
+        lines.append(header)
+
+        if role.get("narrative"):
+            lines.append(role["narrative"])
+
+        krs = role.get("key_results", [])
+        if krs:
+            lines.append("**Key Results:**")
+            lines.extend(f"- {kr}" for kr in krs)
+
+        for f_item in role.get("framing", []):
+            label = f_item.get("label", "")
+            emphasis = f_item.get("emphasis", "")
+            de_emphasis = f_item.get("de_emphasis", "")
+            if label:
+                lines.append(f"**Framing — {label}:**")
+                if emphasis:
+                    lines.append(f"Emphasise: {emphasis}")
+                if de_emphasis:
+                    lines.append(f"De-emphasise: {de_emphasis}")
+
+        caveats = role.get("caveats", [])
+        if caveats:
+            lines.append("**Caveats (internal — do not disclose):**")
+            lines.extend(f"- {c}" for c in caveats)
+
+        tags = role.get("tags", [])
+        if tags:
+            lines.append(f"**Tags:** {', '.join(tags)}")
+
+        parts.append("\n".join(lines))
+
+    return "\n\n---\n\n".join(parts)
+
 
 def _split_review_and_cv(phase35_output: str) -> tuple[str, str]:
     """Split Phase 3.5 output into (review_block, final_cv).

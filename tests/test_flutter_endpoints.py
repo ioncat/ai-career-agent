@@ -292,3 +292,44 @@ async def test_cv_endpoint_returns_both_cv_and_cover(client, db_with_vacancies, 
     body = resp.json()
     assert "cv_md" in body
     assert "cover_md" in body
+
+
+# ── GET /api/users/{id}/progressive_profile (EPIC-24 T8) ─────────────────────
+
+@pytest.mark.asyncio
+async def test_progressive_profile_returns_seeded_roles(client, db_with_vacancies):
+    """T8: GET /api/users/{id}/progressive_profile returns JSON with roles."""
+    database.configure(db_with_vacancies / "test.db")
+    profile = {
+        "meta": {"schema_version": 1, "last_updated": "2026-07-05"},
+        "roles": [{"id": "test_role", "title": "Product Owner", "company": "Acme"}],
+    }
+    import json
+    con = __import__("sqlite3").connect(str(db_with_vacancies / "test.db"))
+    con.execute("UPDATE users SET progressive_profile = ? WHERE id = 1", (json.dumps(profile),))
+    con.commit()
+    con.close()
+
+    resp = client.get("/api/users/1/progressive_profile")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "roles" in body
+    assert body["roles"][0]["company"] == "Acme"
+
+
+@pytest.mark.asyncio
+async def test_progressive_profile_returns_empty_when_null(client, db_with_vacancies):
+    """T8: endpoint returns empty roles list when profile not yet seeded."""
+    database.configure(db_with_vacancies / "test.db")
+    resp = client.get("/api/users/1/progressive_profile")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["roles"] == []
+
+
+@pytest.mark.asyncio
+async def test_progressive_profile_404_unknown_user(client, db_with_vacancies):
+    """T8: 404 for non-existent user."""
+    database.configure(db_with_vacancies / "test.db")
+    resp = client.get("/api/users/999/progressive_profile")
+    assert resp.status_code == 404

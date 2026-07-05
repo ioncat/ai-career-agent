@@ -149,12 +149,20 @@ Skip only when: `decline` (not worth it) OR clean `apply` with zero barriers.
    - **❌ Genuine gap** — confirmed absent → Phase 3 must NOT fabricate; handle honestly. Candidate may decide not to apply.
 4. Summarize: resolved (with new evidence) vs genuine gaps. Then proceed to "Генерируем CV?".
 
-### Output / persistence (decided: PROFILE.md + per-vacancy)
+### Output / persistence
 
 - **Resolved evidence → append to `skill/users/[id]/PROFILE.md`** (grows the profile; future vacancies benefit). Add under the relevant Experience/Skills entry or a `## Additional evidence` block. Factual only — never fabricated.
 - **Per-vacancy → append an `## Phase 2.5: Objection Handling` block to `JD_analysis.md`** (resolved + genuine gaps + decision).
 - Pass resolved objections into Phase 3 context (CV must surface these counter-arguments).
 - Optional DB: store under `analysis_json` key `p2_5` (`{resolved:[...], gaps:[...]}`).
+- **DB Profile write-back (EPIC-24 T5)** — after summarizing resolved evidence, merge into `progressive_profile`:
+  ```bash
+  python scripts/profile_merge.py --user-id [id] --evidence "[resolved evidence text]"
+  # Or write evidence to temp file first:
+  # python scripts/profile_merge.py --user-id [id] --evidence-file /tmp/p25_evidence.txt
+  ```
+  Only call when ≥1 resolved barriers with real evidence. Skip if all barriers are genuine gaps.
+  Use `--dry-run` to preview before saving.
 
 ### Nature (per EPIC-21)
 

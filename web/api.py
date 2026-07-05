@@ -245,6 +245,25 @@ async def api_users():
     return [dict(row) for row in rows]
 
 
+@app.get("/api/users/{user_id}/progressive_profile")
+async def api_user_progressive_profile(user_id: int):
+    """Return progressive_profile JSON for a user (EPIC-24 T8).
+
+    Returns the full structured DB profile with roles[], meta.
+    Empty object with roles=[] when profile not yet seeded.
+    """
+    row = await database.get_user_by_id(user_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    pp_str = row["progressive_profile"] if "progressive_profile" in row.keys() else None
+    if not pp_str:
+        return {"meta": {}, "roles": []}
+    try:
+        return json.loads(pp_str)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Profile data corrupted")
+
+
 @app.get("/api/config")
 async def api_config():
     """Return active LLM provider, model, and analysis mode for Flutter Settings screen (EPIC-23 T4)."""

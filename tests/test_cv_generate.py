@@ -107,9 +107,11 @@ def _mock_db(vacancy_row=None, run_ids: list[int] | None = None) -> MagicMock:
     run_ids = run_ids or [1, 2]
     db = MagicMock()
     db.get_vacancy_by_id = AsyncMock(return_value=vacancy_row)
+    db.get_user_by_id = AsyncMock(return_value=None)  # no progressive_profile by default
     db.insert_pipeline_run = AsyncMock(side_effect=run_ids)
     db.update_pipeline_run = AsyncMock()
     db.update_vacancy_status = AsyncMock()
+    db.insert_llm_usage = AsyncMock()
     return db
 
 
@@ -266,6 +268,45 @@ async def test_generate_phase35_receives_phase3_output(tmp_path):
 
     second_call_user = llm.complete.call_args_list[1][0][0]
     assert unique_p3 in second_call_user
+
+
+@pytest.mark.asyncio
+async def test_generate_injects_progressive_profile_into_phase3(tmp_path):
+    """T6: progressive_profile roles are appended to Phase 3 user message when present."""
+    import json as _json
+    jd_path, _ = _write_vacancy_files(tmp_path)
+    vacancy_row = _make_vacancy_row(jd_path)
+    llm = _make_llm(side_effect=[_PHASE3_DRAFT, _PHASE35_SAMPLE])
+    ctx = _make_ctx(tmp_path, llm)
+    mock_db = _mock_db(vacancy_row=vacancy_row)
+
+    profile = {
+        "meta": {"schema_version": 1},
+        "roles": [
+            {
+                "id": "test_po",
+                "title": "Product Owner",
+                "company": "TestCorp",
+                "dates": "2020-2024",
+                "narrative": "Led product discovery for B2B platform.",
+                "key_results": ["Shipped 3 major features", "NPS +15"],
+            }
+        ],
+    }
+    from unittest.mock import MagicMock
+    user_row = MagicMock()
+    user_row.keys.return_value = ["progressive_profile"]
+    user_row.__getitem__ = MagicMock(side_effect=lambda key: _json.dumps(profile) if key == "progressive_profile" else None)
+    mock_db.get_user_by_id = AsyncMock(return_value=user_row)
+
+    with patch("tools.cv_generate.database", mock_db):
+        await cv_generate(ctx, 1)
+
+    # Phase 3 call (first LLM call) user message should contain the profile evidence
+    phase3_user_msg = llm.complete.call_args_list[0][0][0]
+    assert "TestCorp" in phase3_user_msg
+    assert "Candidate Evidence (DB Profile)" in phase3_user_msg
+    assert "NPS +15" in phase3_user_msg
 
 
 @pytest.mark.asyncio
