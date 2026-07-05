@@ -20,6 +20,7 @@ class VacancyListItem {
   final String? publishedAt;
   final String? updatedAt;
   final List<String> keyBarriers;
+  final String? analysisError;
 
   const VacancyListItem({
     required this.id,
@@ -36,6 +37,7 @@ class VacancyListItem {
     this.publishedAt,
     this.updatedAt,
     this.keyBarriers = const [],
+    this.analysisError,
   });
 
   factory VacancyListItem.fromJson(Map<String, dynamic> json) {
@@ -55,6 +57,7 @@ class VacancyListItem {
       publishedAt: json['published_at'] as String?,
       updatedAt: json['updated_at'] as String?,
       keyBarriers: _parseStringList(json['key_barriers']),
+      analysisError: json['analysis_error'] as String?,
     );
   }
 
@@ -73,6 +76,7 @@ class VacancyListItem {
         'published_at': publishedAt,
         'updated_at': updatedAt,
         'key_barriers': keyBarriers,
+        'analysis_error': analysisError,
       };
 }
 

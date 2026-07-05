@@ -130,8 +130,8 @@ class _VacancyCardState extends State<VacancyCard> {
                   overflow: TextOverflow.ellipsis,
                 ),
               const SizedBox(height: 10),
-              // Row 4: scores or status badge
-              if (v.status == 'analyzed')
+              // Row 4: scores or status badge — show scores if present regardless of status
+              if (v.fitScore != null || v.vacancyScore != null)
                 Row(
                   children: [
                     if (v.fitScore != null) FitScoreChip(score: v.fitScore!),
@@ -144,9 +144,11 @@ class _VacancyCardState extends State<VacancyCard> {
               else if (v.status == 'analysis_queued')
                 _QueuedBadge()
               else if (v.status == 'analyzing')
-                _AnalyzingBadge(),
-              // Row 5: key barrier (analyzed only)
-              if (v.status == 'analyzed' && v.keyBarriers.isNotEmpty) ...[
+                _AnalyzingBadge()
+              else if (v.status == 'analysis_failed')
+                _FailedBadge(),
+              // Row 5: key barrier — show if present regardless of status
+              if (v.keyBarriers.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -292,6 +294,27 @@ class _AnalyzingBadge extends StatelessWidget {
           'Analyzing',
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
                 color: cs.primary,
+              ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FailedBadge extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.error_outline_rounded, size: 13, color: cs.error),
+        const SizedBox(width: 4),
+        Text(
+          'Analysis failed · tap to retry',
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: cs.error,
+                fontWeight: FontWeight.w600,
               ),
         ),
       ],

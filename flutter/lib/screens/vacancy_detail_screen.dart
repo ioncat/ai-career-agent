@@ -241,6 +241,97 @@ class _AnalyzingView extends StatelessWidget {
   }
 }
 
+// ── Analysis error view — shown for analysis_failed ──────────────────────────
+
+class _AnalysisErrorView extends ConsumerStatefulWidget {
+  final int vacancyId;
+  final String? errorMessage;
+
+  const _AnalysisErrorView({required this.vacancyId, this.errorMessage});
+
+  @override
+  ConsumerState<_AnalysisErrorView> createState() => _AnalysisErrorViewState();
+}
+
+class _AnalysisErrorViewState extends ConsumerState<_AnalysisErrorView> {
+  bool _retrying = false;
+
+  VacancyRepository get _repo {
+    final apiUrl = ref.read(settingsProvider).valueOrNull?.apiUrl ?? 'http://localhost:8080';
+    return VacancyRepository(baseUrl: apiUrl);
+  }
+
+  Future<void> _retry() async {
+    setState(() => _retrying = true);
+    try {
+      await _repo.analyze(widget.vacancyId);
+      if (mounted) {
+        ref.read(vacancyListProvider.notifier).refresh();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Analysis queued'), duration: Duration(seconds: 2)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+        setState(() => _retrying = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline_rounded, size: 48, color: cs.error),
+            const SizedBox(height: 16),
+            Text('Analysis failed', style: Theme.of(context).textTheme.titleMedium),
+            if (widget.errorMessage != null && widget.errorMessage!.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: cs.errorContainer.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: cs.error.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  widget.errorMessage!,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                        fontFamily: 'monospace',
+                      ),
+                  maxLines: 6,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              onPressed: _retrying ? null : _retry,
+              icon: _retrying
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.refresh_rounded),
+              label: Text(_retrying ? 'Queuing...' : 'Retry Analysis'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class VacancyDetailScreen extends ConsumerWidget {
   final int vacancyId;
   final String url;
@@ -260,6 +351,14 @@ class VacancyDetailScreen extends ConsumerWidget {
     // analysis_queued / analyzing — spinner only, no point fetching analysis yet
     if (status == 'analysis_queued' || status == 'analyzing') {
       return _AnalyzingView(status: status);
+    }
+
+    // analysis_failed — show error + retry button
+    if (status == 'analysis_failed') {
+      return _AnalysisErrorView(
+        vacancyId: vacancyId,
+        errorMessage: vacancy?.analysisError,
+      );
     }
 
     // For ALL other statuses (fetched, analyzed, declined): try to load analysis.
