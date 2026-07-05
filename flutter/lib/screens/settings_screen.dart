@@ -201,7 +201,7 @@ class _RemoteConfigTile extends ConsumerWidget {
         loading: () => const SizedBox(
             height: 40, child: Center(child: CircularProgressIndicator())),
         error: (e, _) => Text(
-          'Недоступен: $e',
+          'Unavailable — check backend: $e',
           style: Theme.of(context)
               .textTheme
               .bodySmall

@@ -1,6 +1,6 @@
 # career-agent — Backlog
 
-> Last updated: 2026-07-01
+> Last updated: 2026-07-05
 > Epic format: post-pivot epics (13+) live in `docs/delivery/epics/`. This file = priority tracker + status overview.
 > Pre-pivot epics (1–12): `docs/delivery/epics-archive/EPIC-01-12-pre-pivot.md`
 
@@ -10,7 +10,7 @@
 
 **Goal:** Flutter Web = sole UI. Telegram removed. Pipeline emits JSON. RSS → auto Phase 1+2 → Web Push → Flutter.
 
-**Status:** Phase C in progress (2026-07-03). C1+C2 done. C4 partial (CV preview). C3 unblocked — `claude_cli` готов (EPIC-23). Next: inbox-first backend (#1–5) → Flutter UX (#6–10).
+**Status:** Phase C complete (2026-07-05). Flutter MVP done: VacancyCard + detail redesign, VerdictCard, analysis error surfacing, settings screen, EPIC-23 provider display, EPIC-24 T5/T6/T8 evidence injection. Next: Phase D (Telegram removal, FSM orchestrator) or EPIC-24 T7 after real pipeline test.
 
 **Сводный план (все эпики, строгая очерёдность):** `docs/delivery/INBOX-FIRST-FLOW.md` → секция "Сводный план"
 
@@ -18,19 +18,13 @@
 
 ---
 
-## 🟡 P1 — [EPIC-23](docs/delivery/Epics/EPIC-23-claudecode-provider.md) — Claude Code CLI Provider (updated 2026-07-03)
+## ✅ P1 — [EPIC-23](docs/delivery/Epics/EPIC-23-claudecode-provider.md) — Claude Code CLI Provider (done 2026-07-05)
 
 **Цель:** тестировать полный pipeline через Flutter без расхода API credits. `LLM_PROVIDER=claude_cli` → вызовы идут через `claude -p` subprocess → используется подписка Claude Code, стоимость $0.
 
-**Ограничения:** нет prompt caching, нет token counts, только для локального dev/testing.
+**Статус:** ✅ All 5 tasks done. `ClaudeCodeProvider` реализован + протестирован. Flutter Settings показывает активный провайдер.
 
-**Статус:** Tasks 1–3 ✅ Done. `ClaudeCodeProvider` реализован и протестирован (5 тестов).
-
-**Активация:** `LLM_PROVIDER=claude_cli` в `.env`. Pipeline tools без изменений.
-
-**Следующие шаги:**
-- Task 4: `GET /api/config` → `{"llm_provider": "claude_cli", "model": "..."}` для Flutter
-- Task 5: Flutter Settings screen — показывать активный провайдер
+**Активация:** `LLM_PROVIDER=claude_cli` в `.env`.
 
 ---
 
@@ -96,7 +90,7 @@ New pipeline step formalized in `skill/SKILL.md` → "Phase 2.5 — Objection Ha
 
 ---
 
-## 🟡 P1 — [EPIC-24](docs/delivery/Epics/EPIC-24-progressive-profile.md): Progressive Profile — Structured DB Profile + Onboarding (updated 2026-07-02)
+## 🟡 P1 — [EPIC-24](docs/delivery/Epics/EPIC-24-progressive-profile.md): Progressive Profile — Structured DB Profile + Onboarding (updated 2026-07-05)
 
 **Центральный элемент pipeline.** PROFILE.md = уже отфильтрованный CV. Phase 3 не может найти сигналы которых нет в контексте.
 
@@ -135,15 +129,47 @@ PROFILE.md                         ← только: Settings, Name variants, Co
 **Переключение профиля** — в `/analyze` Step 0: `[4] Профиль: Markdown → DB`.
 Переменная `PROFILE_SOURCE = md|db`. DB профиль: читается `SELECT progressive_profile FROM users WHERE id=[id]`.
 
-**Статус Tasks 1–4 + toggle (A):** ✅ Done 2026-07-02. 4 роли засеяны: insulalabs_po, marketplace_po, hostserver_po, sbc_distribution.
+**Статус:**
+- Tasks 1–4 + A: ✅ Done 2026-07-02. 4 роли засеяны. Toggle `[4]` в `/analyze` Step 0.
+- Task 5: ✅ Done 2026-07-05. `scripts/profile_merge.py` + `prompts/pm/phase2_5_writeback.md` + SKILL.md call.
+- Task 6: ✅ Done 2026-07-05. `progressive_profile` roles[] инжектируются в Phase 3 user message как "Candidate Evidence (DB Profile)".
+- Task 7: 🟡 Pending — ждём реального pipeline теста с DB evidence перед trim PROFILE.md.
+- Task 8: ✅ Done 2026-07-05. `GET /api/users/{id}/progressive_profile` + 3 теста.
 
 **Следующие шаги:**
-- **Task 5:** Phase 2.5 write-back — MERGE новых сигналов в narrative/key_results/framing (LLM required)
-- **Task 6:** Phase 3 evidence reader — загрузка нужных roles[] по gap areas вакансии (LLM required)
-- **Task 7:** Trim PROFILE.md — убрать Experience + Additional Evidence (после тестирования DB profile)
-- **Task 8:** `GET /api/users/{id}/progressive_profile` для Flutter
+- **Task 7:** Trim PROFILE.md — убрать Experience + Additional Evidence (после реального pipeline теста T6)
+- **Task 9:** Onboarding interview flow (LLM-driven, EPIC-17 Phase 2)
 
 **Design doc:** `docs/discovery/progressive-profile.md` (gitignored) — схема, поля, rationale.
+
+---
+
+## 🟡 P1 — Flutter UX: First Testing Round Observations (2026-07-05)
+
+> Source: manual testing session. None implemented yet — backlog only.
+
+### UI Language
+- **All text must be English** — currently mixed Russian/Ukrainian (e.g. "В очереди на анализ", "Після завершення аналізу"). Full UI language audit + sweep needed.
+
+### Vacancy List & Cards
+- **Return to inbox from archive** — user must be able to move any archived vacancy back to inbox. Currently no such action exists.
+- **"In queue" card state** — text is grey, invisible, zero animation. Needs pulse/shimmer animation + non-grey color (e.g. amber). Easy visual win, makes queue state obvious.
+- **Queue journal / log panel** — when vacancy enters analysis queue, a visible log panel should appear showing all queued vacancies + their status. Useful especially for batch. Consider async parallel processing of queued items.
+
+### JD Text Display
+- **Markdown not rendered** — JD text shown for fetched vacancies, but raw markdown (asterisks, etc.) not parsed. Need `flutter_markdown` or equivalent widget.
+- **JD view needs UX design** — text is available but UI layout for displaying it (collapsible? separate screen? tab?) not decided. Needs design pass.
+
+### Analysis Flow & Error Handling
+- **No visibility into analysis progress** — user cannot tell if backend is actually analyzing or hung. Need:
+  - Pre-flight health check before sending analyze request (confirm backend alive)
+  - Show some in-progress indicator (timer, phase label, or heartbeat)
+  - Surface backend errors to user — e.g. token exhaustion, LLM timeout — must not silently fail
+- **Comment:** "якщо backend реально аналізує" — this UX gap is a known complaint. Defer to dedicated issue but track here.
+
+### Settings Screen
+- **Model shown as Haiku** — if user wants a different model, no way to change from Flutter. At minimum: show current model from `/api/config`, note that model is set via `.env / LLM_MODEL`. Future: dropdown in settings.
+- **Missing settings** — thinking level, max_tokens, provider not configurable from UI. Deeper settings = env-level for now, Flutter = read-only display. Design to revisit.
 
 ---
 

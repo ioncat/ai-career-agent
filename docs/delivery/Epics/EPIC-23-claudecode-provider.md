@@ -1,8 +1,8 @@
 # EPIC-23 — Claude Code CLI Provider
 
-**Status:** 🟡 In Progress — Tasks 1–4 done; Flutter Settings (T5) next
+**Status:** ✅ Done — All tasks complete (2026-07-05)
 **Priority:** P1
-**Last updated:** 2026-07-03
+**Last updated:** 2026-07-05
 
 ---
 
@@ -154,7 +154,7 @@ match settings.llm_provider:
 | 2 | Provider wiring in `agent.py` (`LLM_PROVIDER=claude_cli` branch) | ✅ Done 2026-07-03 |
 | 3 | Tests — 5 unit tests (mocked subprocess) | ✅ Done 2026-07-03 |
 | 4 | `GET /api/config` — expose active provider + model to Flutter | ✅ Done 2026-07-03 |
-| 5 | Flutter Settings screen — show active LLM provider | 🟡 Next |
+| 5 | Flutter Settings screen — show active LLM provider | ✅ Done 2026-07-05 |
 
 **Activate:** set `LLM_PROVIDER=claude_cli` in `.env`. All pipeline tools work unchanged.
 

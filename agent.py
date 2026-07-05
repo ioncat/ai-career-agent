@@ -215,16 +215,29 @@ async def main() -> None:
     )
 
     # ── 8. Web tracker (FastAPI) ──────────────────────────────────────────────
-    from web.api import app as _web_app  # import after database.configure()
-    _web_cfg = uvicorn.Config(
-        _web_app,
-        host="127.0.0.1",
-        port=settings.web_port,
-        log_level="warning",
-    )
-    _web_server = uvicorn.Server(_web_cfg)
-    _web_task = asyncio.create_task(_web_server.serve())
-    log.info("Web tracker started on http://127.0.0.1:%d", settings.web_port)
+    import socket as _socket
+    _web_server = None
+    _web_task = None
+    _probe = _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM)
+    try:
+        _probe.bind(("127.0.0.1", settings.web_port))
+        _probe.close()
+        from web.api import app as _web_app  # import after database.configure()
+        _web_cfg = uvicorn.Config(
+            _web_app,
+            host="127.0.0.1",
+            port=settings.web_port,
+            log_level="warning",
+        )
+        _web_server = uvicorn.Server(_web_cfg)
+        _web_task = asyncio.create_task(_web_server.serve())
+        log.info("Web tracker started on http://127.0.0.1:%d", settings.web_port)
+    except OSError:
+        _probe.close()
+        log.warning(
+            "Port %d already in use — web tracker running externally, skipping embedded start",
+            settings.web_port,
+        )
 
     # ── 9. Run ────────────────────────────────────────────────────────────────
     log.info(
@@ -251,8 +264,10 @@ async def main() -> None:
     except KeyboardInterrupt:
         pass
     finally:
-        _web_server.should_exit = True
-        await _web_task
+        if _web_server is not None:
+            _web_server.should_exit = True
+        if _web_task is not None:
+            await _web_task
         await watcher.stop()
         await bot.stop()
         llm.log_session_summary()

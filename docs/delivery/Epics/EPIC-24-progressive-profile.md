@@ -1,8 +1,8 @@
 # EPIC-24 — Progressive Profile: Structured DB Profile + Onboarding Interview
 
-**Status:** 🟡 In Progress — Tasks 1–4 done, 5–9 pending
+**Status:** 🟡 In Progress — Tasks 1–4 + A + 5–6 + 8 done; T7 pending (after Phase 3 testing); T9 planned
 **Priority:** P1
-**Last updated:** 2026-07-02
+**Last updated:** 2026-07-05
 **Design doc:** `docs/discovery/progressive-profile.md` (gitignored — internal only)
 
 ---
@@ -62,13 +62,13 @@ Not a file. Reasons: multi-user native, Flutter reads via API, Phase 2.5 write-b
 | 3 | Seed HostiServer role into progressive_profile | ✅ Done 2026-07-02 | 2 |
 | 4 | Seed Marketplace, InsulaLabs, SBC Distribution roles | ✅ Done 2026-07-02 | 3 |
 | A | Profile source toggle `[4]` in `/analyze` Step 0 menu (Markdown \| DB) | ✅ Done 2026-07-02 | 2 |
-| 5 | Phase 2.5 write-back: MERGE new signals into narrative/key_results/framing | 🟡 LLM required | 2 |
-| 6 | Phase 3 evidence reader: load targeted roles[] sections based on vacancy gap areas | 🟡 LLM required | 2, 5 |
-| 7 | Trim PROFILE.md: remove Experience + Additional Evidence sections | 🟡 After testing DB profile | 3, 4 |
-| 8 | GET /api/users/{id}/progressive_profile endpoint for Flutter | 🟡 | 2 |
+| 5 | Phase 2.5 write-back: `scripts/profile_merge.py` + `prompts/pm/phase2_5_writeback.md` + SKILL.md call | ✅ Done 2026-07-05 | 2 |
+| 6 | Phase 3 evidence reader: inject `progressive_profile` roles[] into Phase 3 user message | ✅ Done 2026-07-05 | 2, 5 |
+| 7 | Trim PROFILE.md: remove Experience + Additional Evidence sections | 🟡 Pending — after T6 tested in real pipeline run | 3, 4 |
+| 8 | GET /api/users/{id}/progressive_profile endpoint for Flutter | ✅ Done 2026-07-05 | 2 |
 | 9 | Onboarding interview flow (LLM-driven, EPIC-17 Phase 2) | 🔴 LLM required | — |
 
-**Tasks 1–4 + A done.** DB profile ready, toggle available. Next: test via `/analyze [4]` → compare output with Markdown profile.
+**Tasks 1–4 + A + 5 + 6 + 8 done.** T7 pending: trim PROFILE.md after Phase 3 DB evidence tested on real pipeline. T9 backlog.
 
 ---
 
