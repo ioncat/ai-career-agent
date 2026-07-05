@@ -459,6 +459,16 @@ async def api_vacancy_decline(vacancy_id: int):
     return {"id": vacancy_id, "status": "declined"}
 
 
+@app.patch("/api/vacancies/{vacancy_id}/restore")
+async def api_vacancy_restore(vacancy_id: int):
+    """Flutter Restore button — moves declined vacancy back to inbox (status=fetched)."""
+    row = await database.get_vacancy_by_id(vacancy_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Vacancy not found")
+    await database.update_vacancy_status(vacancy_id, "fetched")
+    return {"id": vacancy_id, "status": "fetched"}
+
+
 @app.post("/api/vacancies/{vacancy_id}/generate-cv")
 async def api_vacancy_generate_cv(vacancy_id: int):
     """Flutter Generate CV button — queues vacancy for CV generation pipeline.

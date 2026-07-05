@@ -13,8 +13,8 @@ class NotificationService {
     final notification = LocalNotification(
       title: 'Career Agent',
       body: count == 1
-          ? '1 новая вакансия проанализирована'
-          : '$count новых вакансий проанализировано',
+          ? '1 vacancy analysed'
+          : '$count vacancies analysed',
     );
     await notification.show();
   }

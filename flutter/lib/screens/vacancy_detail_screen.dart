@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/vacancy.dart';
@@ -152,14 +153,15 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
           child: jdAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Center(
-              child: Text('Не удалось загрузить JD: $e',
+              child: Text('Failed to load JD: $e',
                   style: const TextStyle(color: Color(0xFFBA1A1A))),
             ),
-            data: (jd) => SingleChildScrollView(
+            data: (jd) => Markdown(
+              data: jd,
+              selectable: true,
               padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
-              child: SelectableText(
-                jd,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+                p: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: cs.onSurface,
                       height: 1.6,
                     ),
@@ -182,7 +184,7 @@ class _AnalyzingView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final label = status == 'analyzing' ? 'Анализируется...' : 'В очереди на анализ...';
+    final label = status == 'analyzing' ? 'Analyzing...' : 'In queue for analysis...';
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -192,7 +194,7 @@ class _AnalyzingView extends StatelessWidget {
           Text(label, style: Theme.of(context).textTheme.bodyLarge),
           const SizedBox(height: 8),
           Text(
-            'Результат появится автоматически',
+            'Results will appear automatically',
             style: Theme.of(context)
                 .textTheme
                 .bodySmall
@@ -234,7 +236,7 @@ class VacancyDetailScreen extends ConsumerWidget {
     return async.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(
-        child: Text('Ошибка загрузки: $e',
+        child: Text('Failed to load: $e',
             style: const TextStyle(color: Color(0xFFBA1A1A))),
       ),
       data: (analysis) {
@@ -242,7 +244,7 @@ class VacancyDetailScreen extends ConsumerWidget {
         final p2 = analysis.p2;
 
         if (p2 == null) {
-          return const Center(child: Text('Анализ ещё выполняется...'));
+          return const Center(child: Text('Analysis in progress...'));
         }
 
         final role = p1?.role.isNotEmpty == true
@@ -252,7 +254,7 @@ class VacancyDetailScreen extends ConsumerWidget {
         return Column(
           children: [
             // Sticky action bar
-            _ActionBar(vacancyId: vacancyId, url: url, role: role),
+            _ActionBar(vacancyId: vacancyId, url: url, role: role, status: status),
             // Scrollable content
             Expanded(
               child: SingleChildScrollView(
@@ -302,8 +304,14 @@ class _ActionBar extends ConsumerStatefulWidget {
   final int vacancyId;
   final String url;
   final String role;
+  final String status;
 
-  const _ActionBar({required this.vacancyId, required this.url, required this.role});
+  const _ActionBar({
+    required this.vacancyId,
+    required this.url,
+    required this.role,
+    this.status = 'analyzed',
+  });
 
   @override
   ConsumerState<_ActionBar> createState() => _ActionBarState();
@@ -312,6 +320,7 @@ class _ActionBar extends ConsumerStatefulWidget {
 class _ActionBarState extends ConsumerState<_ActionBar> {
   bool _loadingCv = false;
   bool _loadingDecline = false;
+  bool _loadingRestore = false;
 
   VacancyRepository get _repo {
     final apiUrl = ref.read(settingsProvider).valueOrNull?.apiUrl ?? 'http://localhost:8080';
@@ -356,9 +365,30 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
     }
   }
 
+  Future<void> _restore() async {
+    setState(() => _loadingRestore = true);
+    try {
+      await _repo.restore(widget.vacancyId);
+      if (mounted) {
+        ref.read(vacancyListProvider.notifier).refresh();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Moved to inbox'), duration: Duration(seconds: 2)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+        setState(() => _loadingRestore = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final isDeclined = widget.status == 'declined';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -382,38 +412,54 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
               ),
             ),
           // View CV
-          IconButton(
-            icon: Icon(Icons.article_outlined, size: 18, color: cs.onSurfaceVariant),
-            tooltip: 'View CV',
-            onPressed: () => showDialog<void>(
-              context: context,
-              builder: (_) => VacancyCvDialog(
-                vacancyId: widget.vacancyId,
-                role: widget.role,
+          if (!isDeclined)
+            IconButton(
+              icon: Icon(Icons.article_outlined, size: 18, color: cs.onSurfaceVariant),
+              tooltip: 'View CV',
+              onPressed: () => showDialog<void>(
+                context: context,
+                builder: (_) => VacancyCvDialog(
+                  vacancyId: widget.vacancyId,
+                  role: widget.role,
+                ),
               ),
             ),
-          ),
           const SizedBox(width: 4),
-          // Decline
-          OutlinedButton(
-            onPressed: _loadingDecline ? null : _decline,
-            style: OutlinedButton.styleFrom(
-              side: BorderSide(color: cs.outlineVariant),
-              foregroundColor: cs.onSurfaceVariant,
+          // Archive: Restore to inbox — replaces Decline button
+          if (isDeclined) ...[
+            OutlinedButton.icon(
+              onPressed: _loadingRestore ? null : _restore,
+              icon: _loadingRestore
+                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.inbox_outlined, size: 16),
+              label: const Text('Restore to Inbox'),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: cs.primary.withValues(alpha: 0.5)),
+                foregroundColor: cs.primary,
+              ),
             ),
-            child: _loadingDecline
-                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Text('Decline'),
-          ),
-          const SizedBox(width: 8),
-          // Generate CV — primary CTA
-          FilledButton.icon(
-            onPressed: _loadingCv ? null : _generateCv,
-            icon: _loadingCv
-                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Icon(Icons.description_outlined, size: 16),
-            label: const Text('Generate CV'),
-          ),
+          ] else ...[
+            // Decline
+            OutlinedButton(
+              onPressed: _loadingDecline ? null : _decline,
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: cs.outlineVariant),
+                foregroundColor: cs.onSurfaceVariant,
+              ),
+              child: _loadingDecline
+                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Text('Decline'),
+            ),
+            const SizedBox(width: 8),
+            // Generate CV — primary CTA
+            FilledButton.icon(
+              onPressed: _loadingCv ? null : _generateCv,
+              icon: _loadingCv
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.description_outlined, size: 16),
+              label: const Text('Generate CV'),
+            ),
+          ],
         ],
       ),
     );
