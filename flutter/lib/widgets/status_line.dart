@@ -53,36 +53,34 @@ class _StatusLineState extends State<StatusLine> {
     super.dispose();
   }
 
+  String _ago(int seconds) {
+    if (seconds < 60) return '${seconds}s ago';
+    if (seconds < 3600) return '${(seconds / 60).round()}min ago';
+    return '${(seconds / 3600).round()}h ago';
+  }
+
   String get _text {
     if (widget.fromCache && widget.status == PollingStatus.polling) {
-      if (widget.lastUpdatedAt == null) return '📦 Загружаем из кэша...';
-      final ago = _secondsAgo < 3600
-          ? '${(_secondsAgo / 60).round()} мин назад'
-          : '${(_secondsAgo / 3600).round()} ч назад';
-      return '📦 Офлайн · кэш от $ago · подключаемся...';
+      if (widget.lastUpdatedAt == null) return '📦 Loading from cache...';
+      return '📦 Offline · cache from ${_ago(_secondsAgo)} · reconnecting...';
     }
     switch (widget.status) {
       case PollingStatus.polling:
-        return '⏳ Проверяем новые вакансии...';
+        return '⏳ Checking for new vacancies...';
       case PollingStatus.found:
-        return '✨ Найдено ${widget.newCount} новые вакансии · только что';
+        final n = widget.newCount;
+        return '✨ Found $n new ${n == 1 ? 'vacancy' : 'vacancies'} · just now';
       case PollingStatus.empty:
-        return '✓ Нет новых вакансий · только что';
+        return '✓ No new vacancies · just now';
       case PollingStatus.error:
         if (widget.fromCache) {
-          if (widget.lastUpdatedAt == null) return '📦 Офлайн · нет кэша';
-          final ago = _secondsAgo < 3600
-              ? '${(_secondsAgo / 60).round()} мин назад'
-              : '${(_secondsAgo / 3600).round()} ч назад';
-          return '📦 Офлайн · кэш от $ago';
+          if (widget.lastUpdatedAt == null) return '📦 Offline · no cache';
+          return '📦 Offline · cache from ${_ago(_secondsAgo)}';
         }
-        return '⚠️ Не удалось получить данные · повтор через ${_secondsUntilNext}с';
+        return '⚠️ Failed to get data · retry in ${_secondsUntilNext}s';
       case PollingStatus.idle:
-        if (widget.lastUpdatedAt == null) return '🔄 Ожидание...';
-        final ago = _secondsAgo < 60
-            ? '${_secondsAgo}с назад'
-            : '${(_secondsAgo / 60).round()} мин назад';
-        return '🔄 Обновлено: $ago · следующее через ${_secondsUntilNext}с';
+        if (widget.lastUpdatedAt == null) return '🔄 Waiting...';
+        return '🔄 Updated ${_ago(_secondsAgo)} · next in ${_secondsUntilNext}s';
     }
   }
 

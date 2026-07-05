@@ -189,10 +189,10 @@ class _VacancyCardState extends State<VacancyCard> {
     try {
       final dt = DateTime.parse(iso);
       final diff = DateTime.now().difference(dt);
-      if (diff.inDays > 0) return '${diff.inDays}д назад';
-      if (diff.inHours > 0) return '${diff.inHours}ч назад';
-      if (diff.inMinutes > 0) return '${diff.inMinutes}м назад';
-      return 'только что';
+      if (diff.inDays > 0) return '${diff.inDays}d ago';
+      if (diff.inHours > 0) return '${diff.inHours}h ago';
+      if (diff.inMinutes > 0) return '${diff.inMinutes}m ago';
+      return 'just now';
     } catch (_) {
       return iso;
     }
@@ -221,22 +221,53 @@ class _NewBadge extends StatelessWidget {
   }
 }
 
-class _QueuedBadge extends StatelessWidget {
+class _QueuedBadge extends StatefulWidget {
+  @override
+  State<_QueuedBadge> createState() => _QueuedBadgeState();
+}
+
+class _QueuedBadgeState extends State<_QueuedBadge>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+    _anim = Tween<double>(begin: 0.35, end: 1.0).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(Icons.schedule_outlined, size: 13, color: cs.onSurfaceVariant),
-        const SizedBox(width: 4),
-        Text(
-          'В очереди',
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: cs.onSurfaceVariant,
-              ),
-        ),
-      ],
+    const amberColor = Color(0xFFE65100);
+    return FadeTransition(
+      opacity: _anim,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.schedule_outlined, size: 13, color: amberColor),
+          const SizedBox(width: 4),
+          Text(
+            'In queue',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: amberColor,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -258,7 +289,7 @@ class _AnalyzingBadge extends StatelessWidget {
         ),
         const SizedBox(width: 6),
         Text(
-          'Анализируется',
+          'Analyzing',
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
                 color: cs.primary,
               ),

@@ -151,7 +151,7 @@ class _ListHeader extends StatelessWidget {
                       : cs.onSurfaceVariant,
                 ),
                 onPressed: polling ? null : onRefresh,
-                tooltip: 'Обновить список',
+                tooltip: 'Refresh',
                 splashRadius: 18,
               ),
             ],
@@ -169,7 +169,7 @@ class _ListHeader extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               Text(
-                '$count вакансий',
+                '$count ${count == 1 ? 'vacancy' : 'vacancies'}',
                 style: Theme.of(context).textTheme.labelMedium?.copyWith(
                       color: cs.secondary,
                     ),
@@ -219,12 +219,11 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final msg = switch (folder) {
-      'inbox' =>
-        'Нет новых вакансий.\nRSS-пайплайн автоматически добавит их когда появятся.',
-      'in_progress' => 'Нет вакансий в работе.',
-      'applied' => 'Вы ещё не отправили CV.',
-      'archive' => 'Архив пуст.',
-      _ => 'Нет вакансий.',
+      'inbox'       => 'No new vacancies.\nThe RSS pipeline will add them automatically.',
+      'in_progress' => 'No vacancies in progress.',
+      'applied'     => 'No applications sent yet.',
+      'archive'     => 'Archive is empty.',
+      _             => 'No vacancies.',
     };
     return Center(
       child: Text(
@@ -252,7 +251,7 @@ class _NoSelectionPlaceholder extends StatelessWidget {
               color: Theme.of(context).colorScheme.onSurfaceVariant),
           const SizedBox(height: 12),
           Text(
-            'Выбери вакансию',
+            'Select a vacancy',
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),

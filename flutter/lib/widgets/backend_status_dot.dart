@@ -35,9 +35,9 @@ class _BackendStatusDotState extends State<BackendStatusDot>
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final (color, tooltip, animate) = switch (widget.status) {
-      HealthStatus.online  => (const Color(0xFF4CAF50), 'Сервер доступен', true),
-      HealthStatus.offline => (cs.error, 'Сервер недоступен — проверь localhost:8080', false),
-      HealthStatus.checking => (cs.outline, 'Проверяем...', true),
+      HealthStatus.online   => (const Color(0xFF4CAF50), 'Backend online', true),
+      HealthStatus.offline  => (cs.error, 'Backend offline — check localhost:8080', false),
+      HealthStatus.checking => (cs.outline, 'Checking...', true),
     };
 
     final dot = Container(
