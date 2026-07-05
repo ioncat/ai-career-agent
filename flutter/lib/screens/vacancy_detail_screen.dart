@@ -257,32 +257,35 @@ class VacancyDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final status = vacancy?.status ?? '';
 
-    // Status-based routing — avoids fetching analysis for unanalyzed vacancies
+    // analysis_queued / analyzing — spinner only, no point fetching analysis yet
     if (status == 'analysis_queued' || status == 'analyzing') {
       return _AnalyzingView(status: status);
     }
-    if (status == 'fetched') {
-      return _JdModeView(vacancyId: vacancyId, url: url, vacancy: vacancy);
-    }
 
-    // Analyzed path
+    // For ALL other statuses (fetched, analyzed, declined): try to load analysis.
+    // If analysis exists → show it regardless of status (handles restored vacancies,
+    // or any status/analysis_json mismatch). If p2 == null → fall back to JD view.
     final async = ref.watch(vacancyDetailProvider(vacancyId));
 
     return async.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(
-        child: Text('Failed to load: $e',
-            style: const TextStyle(color: Color(0xFFBA1A1A))),
-      ),
+      error: (e, _) {
+        // API error → fall back to JD view with context-appropriate buttons
+        if (status == 'declined') {
+          return _JdModeView(vacancyId: vacancyId, url: url, vacancy: vacancy, restoreMode: true);
+        }
+        return _JdModeView(vacancyId: vacancyId, url: url, vacancy: vacancy);
+      },
       data: (analysis) {
         final p1 = analysis.p1;
         final p2 = analysis.p2;
 
         if (p2 == null) {
+          // No analysis yet — show JD view with context-appropriate buttons
           if (status == 'declined') {
             return _JdModeView(vacancyId: vacancyId, url: url, vacancy: vacancy, restoreMode: true);
           }
-          return const Center(child: Text('Analysis in progress...'));
+          return _JdModeView(vacancyId: vacancyId, url: url, vacancy: vacancy);
         }
 
         final role = p1?.role.isNotEmpty == true

@@ -461,12 +461,17 @@ async def api_vacancy_decline(vacancy_id: int):
 
 @app.patch("/api/vacancies/{vacancy_id}/restore")
 async def api_vacancy_restore(vacancy_id: int):
-    """Flutter Restore button — moves declined vacancy back to inbox (status=fetched)."""
+    """Flutter Restore button — moves declined vacancy back to inbox.
+
+    Restores to 'analyzed' if analysis_json exists, otherwise 'fetched'.
+    Preserves all analysis data — only status changes.
+    """
     row = await database.get_vacancy_by_id(vacancy_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Vacancy not found")
-    await database.update_vacancy_status(vacancy_id, "fetched")
-    return {"id": vacancy_id, "status": "fetched"}
+    restore_status = "analyzed" if row["analysis_json"] else "fetched"
+    await database.update_vacancy_status(vacancy_id, restore_status)
+    return {"id": vacancy_id, "status": restore_status}
 
 
 @app.post("/api/vacancies/{vacancy_id}/generate-cv")
