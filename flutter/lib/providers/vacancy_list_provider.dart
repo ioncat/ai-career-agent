@@ -15,6 +15,8 @@ class PollingState {
   final List<VacancyListItem> vacancies;
   final PollingStatus status;
   final int newCount;
+  /// Subset of newCount: only status==analyzed. Used for "N vacancies analysed" notification.
+  final int newAnalyzedCount;
   final DateTime? lastUpdatedAt;
   final String? errorMessage;
   final bool fromCache;
@@ -23,6 +25,7 @@ class PollingState {
     this.vacancies = const [],
     this.status = PollingStatus.idle,
     this.newCount = 0,
+    this.newAnalyzedCount = 0,
     this.lastUpdatedAt,
     this.errorMessage,
     this.fromCache = false,
@@ -32,6 +35,7 @@ class PollingState {
     List<VacancyListItem>? vacancies,
     PollingStatus? status,
     int? newCount,
+    int? newAnalyzedCount,
     DateTime? lastUpdatedAt,
     String? errorMessage,
     bool? fromCache,
@@ -40,6 +44,7 @@ class PollingState {
       vacancies: vacancies ?? this.vacancies,
       status: status ?? this.status,
       newCount: newCount ?? this.newCount,
+      newAnalyzedCount: newAnalyzedCount ?? this.newAnalyzedCount,
       lastUpdatedAt: lastUpdatedAt ?? this.lastUpdatedAt,
       errorMessage: errorMessage ?? this.errorMessage,
       fromCache: fromCache ?? this.fromCache,
@@ -134,14 +139,18 @@ class VacancyListNotifier extends AsyncNotifier<PollingState> {
 
       final existingIds = current?.vacancies.map((v) => v.id).toSet() ?? {};
       final newAnalyzed = items
-          .where((v) => !existingIds.contains(v.id) &&
-              (v.status == 'analyzed' || v.status == 'fetched'))
+          .where((v) => !existingIds.contains(v.id) && v.status == 'analyzed')
           .length;
+      final newFetched = items
+          .where((v) => !existingIds.contains(v.id) && v.status == 'fetched')
+          .length;
+      final newTotal = newAnalyzed + newFetched;
 
       state = AsyncData(PollingState(
         vacancies: items,
-        status: newAnalyzed > 0 ? PollingStatus.found : PollingStatus.empty,
-        newCount: newAnalyzed,
+        status: newTotal > 0 ? PollingStatus.found : PollingStatus.empty,
+        newCount: newTotal,
+        newAnalyzedCount: newAnalyzed,
         lastUpdatedAt: DateTime.now(),
         fromCache: false,
       ));

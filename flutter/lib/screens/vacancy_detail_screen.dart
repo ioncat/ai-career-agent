@@ -18,8 +18,15 @@ class _JdModeView extends ConsumerStatefulWidget {
   final int vacancyId;
   final String url;
   final VacancyListItem? vacancy;
+  /// When true: show "Restore to Inbox" instead of Analyze/Skip (used for declined-no-analysis).
+  final bool restoreMode;
 
-  const _JdModeView({required this.vacancyId, required this.url, this.vacancy});
+  const _JdModeView({
+    required this.vacancyId,
+    required this.url,
+    this.vacancy,
+    this.restoreMode = false,
+  });
 
   @override
   ConsumerState<_JdModeView> createState() => _JdModeViewState();
@@ -28,6 +35,7 @@ class _JdModeView extends ConsumerStatefulWidget {
 class _JdModeViewState extends ConsumerState<_JdModeView> {
   bool _loadingAnalyze = false;
   bool _loadingDecline = false;
+  bool _loadingRestore = false;
 
   VacancyRepository get _repo {
     final apiUrl = ref.read(settingsProvider).valueOrNull?.apiUrl ?? 'http://localhost:8080';
@@ -66,6 +74,26 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
           SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
         setState(() => _loadingDecline = false);
+      }
+    }
+  }
+
+  Future<void> _restore() async {
+    setState(() => _loadingRestore = true);
+    try {
+      await _repo.restore(widget.vacancyId);
+      if (mounted) {
+        ref.read(vacancyListProvider.notifier).refresh();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Moved to inbox'), duration: Duration(seconds: 2)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+        setState(() => _loadingRestore = false);
       }
     }
   }
@@ -120,31 +148,38 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                   onPressed: () => launchUrl(Uri.parse(widget.url),
                       mode: LaunchMode.externalApplication),
                 ),
-              OutlinedButton(
-                onPressed: _loadingDecline ? null : _decline,
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: cs.outlineVariant),
-                  foregroundColor: cs.onSurfaceVariant,
+              if (widget.restoreMode) ...[
+                OutlinedButton.icon(
+                  onPressed: _loadingRestore ? null : _restore,
+                  icon: _loadingRestore
+                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.inbox_outlined, size: 16),
+                  label: const Text('Restore to Inbox'),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: cs.primary.withValues(alpha: 0.5)),
+                    foregroundColor: cs.primary,
+                  ),
                 ),
-                child: _loadingDecline
-                    ? const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Text('Skip'),
-              ),
-              const SizedBox(width: 8),
-              FilledButton.icon(
-                onPressed: _loadingAnalyze ? null : _analyze,
-                icon: _loadingAnalyze
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.analytics_outlined, size: 16),
-                label: const Text('Analyze'),
-              ),
+              ] else ...[
+                OutlinedButton(
+                  onPressed: _loadingDecline ? null : _decline,
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: cs.outlineVariant),
+                    foregroundColor: cs.onSurfaceVariant,
+                  ),
+                  child: _loadingDecline
+                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Text('Skip'),
+                ),
+                const SizedBox(width: 8),
+                FilledButton.icon(
+                  onPressed: _loadingAnalyze ? null : _analyze,
+                  icon: _loadingAnalyze
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.analytics_outlined, size: 16),
+                  label: const Text('Analyze'),
+                ),
+              ],
             ],
           ),
         ),
@@ -244,6 +279,9 @@ class VacancyDetailScreen extends ConsumerWidget {
         final p2 = analysis.p2;
 
         if (p2 == null) {
+          if (status == 'declined') {
+            return _JdModeView(vacancyId: vacancyId, url: url, vacancy: vacancy, restoreMode: true);
+          }
           return const Center(child: Text('Analysis in progress...'));
         }
 
