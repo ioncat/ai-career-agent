@@ -7,9 +7,6 @@ import '../providers/settings_provider.dart';
 import '../providers/vacancy_detail_provider.dart';
 import '../providers/vacancy_list_provider.dart';
 import '../repositories/vacancy_repository.dart';
-import '../widgets/fit_dot_bar.dart';
-import '../widgets/fit_score_chip.dart';
-import '../widgets/vac_score_badge.dart';
 import 'vacancy_cv_screen.dart';
 
 // ── JD mode — shown for status='fetched' ──────────────────────────────────────
@@ -412,22 +409,26 @@ class VacancyDetailScreen extends ConsumerWidget {
                     if (p2.fitDimensions != null)
                       _CollapsibleSection(
                         title: 'Fit Dimensions',
-                        initiallyExpanded: true,
+                        tooltip: 'Fit scored across 5 axes (0–10 each):\ndomain, execution, strategy, systems, stakeholder',
                         child: _FitDimsTable(dims: p2.fitDimensions!),
                       ),
                     if (p1 != null) ...[
                       const SizedBox(height: 16),
                       _CollapsibleSection(
                         title: 'Attraction Breakdown',
+                        tooltip: 'How attractive this vacancy is for you\nacross 8 factors: company tier, seniority,\nscope, compensation and more',
                         child: _VacScoreTable(dims: p1.vacscoreDims),
                       ),
                       const SizedBox(height: 16),
                       if (p1.roleBalance.isNotEmpty)
                         _CollapsibleSection(
                           title: 'Role Balance',
+                          tooltip: 'Estimated split of responsibilities\nin this role (%)',
                           child: _RoleBalanceBar(balance: p1.roleBalance),
                         ),
                     ],
+                    const SizedBox(height: 16),
+                    _JdSection(vacancyId: vacancyId),
                     const SizedBox(height: 80),
                   ],
                 ),
@@ -436,6 +437,41 @@ class VacancyDetailScreen extends ConsumerWidget {
           ],
         );
       },
+    );
+  }
+}
+
+// ── JD section — always shown at the bottom of the detail view ───────────────
+
+class _JdSection extends ConsumerWidget {
+  final int vacancyId;
+
+  const _JdSection({required this.vacancyId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cs = Theme.of(context).colorScheme;
+    final jdAsync = ref.watch(vacancyJdProvider(vacancyId));
+
+    return _CollapsibleSection(
+      title: 'Job Description',
+      tooltip: 'Original job description as fetched from the source',
+      initiallyExpanded: true,
+      child: jdAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Text('Failed to load JD: $e',
+            style: TextStyle(color: cs.error)),
+        data: (jd) => MarkdownBody(
+          data: jd,
+          selectable: true,
+          styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+            p: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: cs.onSurface,
+                  height: 1.6,
+                ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -700,19 +736,25 @@ class _VacancyHero extends StatelessWidget {
           northStar: p1?.northStar,
         ),
         const SizedBox(height: 12),
-        // Scores left (wrap on narrow), date pinned right
+        // Score dot rows + date pinned right
         Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 6,
-                crossAxisAlignment: WrapCrossAlignment.center,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  FitScoreChip(score: p2.fitScore),
-                  FitDotBar(score: p2.fitScore),
-                  if (p1 != null) VacScoreBadge(score: p1!.vacancyScore),
+                  Tooltip(
+                    message: 'Candidate-to-role fit across domain, execution,\nstrategy, systems & stakeholder (0–10)',
+                    child: _ScoreDotsRow(label: 'Fit', score: p2.fitScore.toDouble(), max: 10),
+                  ),
+                  if (p1 != null) ...[
+                    const SizedBox(height: 5),
+                    Tooltip(
+                      message: 'How attractive this role is for you —\nseniority, company tier, scope, compensation (0–10)',
+                      child: _ScoreDotsRow(label: 'Attraction', score: p1!.vacancyScore, max: 10),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -722,6 +764,62 @@ class _VacancyHero extends StatelessWidget {
             ],
           ],
         ),
+      ],
+    );
+  }
+}
+
+class _ScoreDotsRow extends StatelessWidget {
+  final String label;
+  final double score;
+  final double max;
+
+  const _ScoreDotsRow({required this.label, required this.score, required this.max});
+
+  Color _filledColor() {
+    final ratio = score / max;
+    if (ratio >= 0.70) return const Color(0xFF388E3C);
+    if (ratio >= 0.40) return const Color(0xFFF57F17);
+    return const Color(0xFFB71C1C);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final filled = score.round().clamp(0, max.toInt());
+    final filledColor = _filledColor();
+    final emptyColor = cs.surfaceContainerHighest;
+    final scoreText = score % 1 == 0 ? '${score.toInt()}' : score.toStringAsFixed(1);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        SizedBox(
+          width: 72,
+          child: Text(label,
+              style: Theme.of(context)
+                  .textTheme
+                  .labelSmall
+                  ?.copyWith(color: cs.onSurfaceVariant)),
+        ),
+        ...List.generate(
+          max.toInt(),
+          (i) => Container(
+            width: 8,
+            height: 8,
+            margin: const EdgeInsets.only(right: 3),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: i < filled ? filledColor : emptyColor,
+            ),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(scoreText,
+            style: Theme.of(context)
+                .textTheme
+                .labelSmall
+                ?.copyWith(color: cs.onSurface, fontWeight: FontWeight.w600)),
       ],
     );
   }
@@ -859,6 +957,7 @@ class _QuickOverviewCard extends StatelessWidget {
 
     return _SectionCard(
       title: 'Quick Overview',
+      tooltip: 'Key signals extracted from the JD —\nwho they want, barriers, hidden risks',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1153,13 +1252,51 @@ class _RoleBalanceBar extends StatelessWidget {
   }
 }
 
+// ── Shared tooltip-aware title chip ──────────────────────────────────────────
+
+class _TooltipTitle extends StatelessWidget {
+  final String title;
+  final String? tooltip;
+  final BuildContext context;
+  final ColorScheme cs;
+
+  const _TooltipTitle({
+    required this.title,
+    required this.tooltip,
+    required this.context,
+    required this.cs,
+  });
+
+  @override
+  Widget build(BuildContext ctx) {
+    final text = Text(
+      title,
+      style: Theme.of(ctx).textTheme.labelMedium?.copyWith(color: cs.onSurfaceVariant),
+    );
+    if (tooltip == null) return text;
+    return Tooltip(
+      message: tooltip!,
+      preferBelow: true,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          text,
+          const SizedBox(width: 4),
+          Icon(Icons.info_outline, size: 12, color: cs.onSurfaceVariant.withValues(alpha: 0.55)),
+        ],
+      ),
+    );
+  }
+}
+
 // ── Section card — bento style ────────────────────────────────────────────────
 
 class _SectionCard extends StatelessWidget {
   final String title;
   final Widget child;
+  final String? tooltip;
 
-  const _SectionCard({required this.title, required this.child});
+  const _SectionCard({required this.title, required this.child, this.tooltip});
 
   @override
   Widget build(BuildContext context) {
@@ -1182,12 +1319,7 @@ class _SectionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: cs.onSurfaceVariant,
-                ),
-          ),
+          _TooltipTitle(title: title, tooltip: tooltip, context: context, cs: cs),
           const SizedBox(height: 12),
           child,
         ],
@@ -1202,11 +1334,13 @@ class _CollapsibleSection extends StatefulWidget {
   final String title;
   final Widget child;
   final bool initiallyExpanded;
+  final String? tooltip;
 
   const _CollapsibleSection({
     required this.title,
     required this.child,
     this.initiallyExpanded = false,
+    this.tooltip,
   });
 
   @override
@@ -1248,12 +1382,7 @@ class _CollapsibleSectionState extends State<_CollapsibleSection> {
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
               child: Row(
                 children: [
-                  Text(
-                    widget.title,
-                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                          color: cs.onSurfaceVariant,
-                        ),
-                  ),
+                  _TooltipTitle(title: widget.title, tooltip: widget.tooltip, context: context, cs: cs),
                   const Spacer(),
                   Icon(
                     _expanded ? Icons.expand_less : Icons.expand_more,
