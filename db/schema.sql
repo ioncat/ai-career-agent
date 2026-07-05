@@ -125,3 +125,26 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_push_user ON push_subscriptions (user_id);
+
+-- ── user_settings ─────────────────────────────────────────────────────────────
+-- Per-user overrides for LLM model and thinking effort.
+-- NULL columns fall back to env-var defaults (LLM_MODEL, etc.).
+-- Admin-only in production (once EPIC-25 auth lands); freely editable during dev.
+
+-- ── system_kv ─────────────────────────────────────────────────────────────────
+-- Generic key-value store for system-level caches (e.g. available model lists).
+-- updated_at used for TTL checks — no explicit expiry column (caller decides TTL).
+
+CREATE TABLE IF NOT EXISTS system_kv (
+    key        TEXT PRIMARY KEY,
+    value      TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- ── user_settings ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS user_settings (
+    user_id         INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    llm_model       TEXT,                            -- NULL = use LLM_MODEL env default
+    thinking_effort TEXT    NOT NULL DEFAULT 'off',  -- 'off'|'low'|'medium'|'high'|'xhigh'|'max'
+    updated_at      TEXT    NOT NULL DEFAULT (datetime('now'))
+);

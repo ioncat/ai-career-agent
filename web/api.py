@@ -14,6 +14,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import urlparse
 
+import httpx
 import markdown as md_lib
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
@@ -264,13 +265,149 @@ async def api_user_progressive_profile(user_id: int):
         raise HTTPException(status_code=500, detail="Profile data corrupted")
 
 
+_VALID_EFFORTS = {"off", "low", "medium", "high", "xhigh", "max"}
+
+# Fallback list used when network fetch fails
+_FALLBACK_MODELS: dict[str, list[str]] = {
+    "claude_api": ["claude-opus-4-5", "claude-sonnet-4-6", "claude-haiku-4-5"],
+    "claude_cli": ["claude-sonnet-4-6", "claude-opus-4-5", "claude-haiku-4-5"],
+}
+
+_MODELS_CACHE_TTL_HOURS = 24
+
+
+async def _fetch_anthropic_models(api_key: str) -> list[str]:
+    """Fetch model IDs from Anthropic /v1/models. Returns [] on error."""
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(
+                "https://api.anthropic.com/v1/models",
+                headers={"x-api-key": api_key, "anthropic-version": "2023-06-01"},
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            models = [m["id"] for m in data.get("data", []) if "id" in m]
+            # Sort: newest first (descending by id string — works for claude-* naming)
+            return sorted(models, reverse=True)
+    except Exception as exc:
+        log.warning("Failed to fetch Anthropic models: %s", exc)
+        return []
+
+
+async def _fetch_ollama_models(base_url: str) -> list[str]:
+    """Fetch model tags from Ollama /api/tags. Returns [] on error."""
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            resp = await client.get(f"{base_url.rstrip('/')}/api/tags")
+            resp.raise_for_status()
+            data = resp.json()
+            return [m["name"] for m in data.get("models", []) if "name" in m]
+    except Exception as exc:
+        log.warning("Failed to fetch Ollama models: %s", exc)
+        return []
+
+
+async def _get_available_models(provider: str) -> list[str]:
+    """Return available models for provider, using 24h DB cache."""
+    import datetime
+
+    cache_key = f"models:{provider}"
+    cached_value, updated_at = await database.get_kv(cache_key)
+
+    if cached_value and updated_at:
+        try:
+            age = datetime.datetime.utcnow() - datetime.datetime.fromisoformat(updated_at)
+            if age.total_seconds() < _MODELS_CACHE_TTL_HOURS * 3600:
+                return json.loads(cached_value)
+        except Exception:
+            pass  # bad cache entry — refetch
+
+    # Cache miss or expired — fetch fresh
+    if provider in ("claude_api", "claude_cli"):
+        api_key = os.getenv("ANTHROPIC_API_KEY", "")
+        models = await _fetch_anthropic_models(api_key) if api_key else []
+        if not models:
+            models = _FALLBACK_MODELS.get(provider, [])
+    elif provider == "ollama_api":
+        base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+        models = await _fetch_ollama_models(base_url)
+    else:
+        models = []
+
+    if models:
+        await database.set_kv(cache_key, json.dumps(models))
+
+    return models
+
+
 @app.get("/api/config")
 async def api_config():
-    """Return active LLM provider, model, and analysis mode for Flutter Settings screen (EPIC-23 T4)."""
+    """Return active LLM config for Flutter Settings (EPIC-23 T4).
+
+    env vars = global defaults; user_settings DB row for user_id=1 overrides.
+    available_models fetched from Anthropic/Ollama API, cached 24h in system_kv.
+    """
+    provider = os.getenv("LLM_PROVIDER", "claude_api").lower()
+    env_model = (
+        os.getenv("OLLAMA_MODEL", "qwen2.5:32b")
+        if provider == "ollama_api"
+        else os.getenv("LLM_MODEL", "claude-opus-4-5")
+    )
+
+    db_settings = await database.get_user_settings(1)
+    model = db_settings.get("llm_model") or env_model
+    thinking_effort = db_settings.get("thinking_effort", "off") or "off"
+    available_models = await _get_available_models(provider)
+
     return {
-        "llm_provider": os.getenv("LLM_PROVIDER", "claude_api").lower(),
-        "model": os.getenv("LLM_MODEL", "claude-opus-4-5"),
+        "llm_provider": provider,
+        "model": model,
+        "thinking_effort": thinking_effort,
         "analysis_mode": os.getenv("ANALYSIS_MODE", "inbox_first").lower(),
+        "available_models": available_models,
+    }
+
+
+class ConfigPatch(BaseModel):
+    model: str | None = None
+    thinking_effort: str | None = None
+
+
+@app.patch("/api/config")
+async def patch_config(body: ConfigPatch):
+    """Update LLM model and/or thinking effort for user_id=1 (admin action).
+
+    Stored in user_settings table — overrides env defaults on next read.
+    Does NOT hot-reload the running agent; restart backend to apply to active sessions.
+    """
+    provider = os.getenv("LLM_PROVIDER", "claude_api").lower()
+    db_settings = await database.get_user_settings(1)
+    current_model = db_settings.get("llm_model")
+    current_effort = db_settings.get("thinking_effort", "off") or "off"
+
+    new_model = body.model if body.model is not None else current_model
+    new_effort = body.thinking_effort if body.thinking_effort is not None else current_effort
+
+    if new_effort not in _VALID_EFFORTS:
+        raise HTTPException(status_code=422, detail=f"thinking_effort must be one of {sorted(_VALID_EFFORTS)}")
+
+    allowed = await _get_available_models(provider)
+    if new_model and allowed and new_model not in allowed:
+        raise HTTPException(status_code=422, detail=f"model not valid for provider {provider!r}")
+
+    await database.set_user_settings(1, llm_model=new_model, thinking_effort=new_effort)
+
+    env_model = (
+        os.getenv("OLLAMA_MODEL", "qwen2.5:32b")
+        if provider == "ollama_api"
+        else os.getenv("LLM_MODEL", "claude-opus-4-5")
+    )
+    return {
+        "llm_provider": provider,
+        "model": new_model or env_model,
+        "thinking_effort": new_effort,
+        "analysis_mode": os.getenv("ANALYSIS_MODE", "inbox_first").lower(),
+        "available_models": allowed,
     }
 
 
