@@ -27,6 +27,20 @@ description: >
 
 Default is derived from JD language, not from user language setting. But user always confirms or changes before CV is generated.
 
+**Writing tone — authenticity rule (applies to ALL users, ALL languages):**
+CV and cover prose must match the candidate's actual proficiency level in the target language. Check PROFILE.md → Languages for the candidate's level in the CV language.
+
+If the candidate is NOT a native speaker of the CV language — do NOT write in native-fluent idiomatic prose.
+
+Avoid:
+- Idioms the candidate couldn't translate or verify themselves
+- Complex native-speaker constructions that sound unnatural for a non-native writer
+- Phrasing the candidate couldn't confidently stand behind in an interview
+
+Prefer: simple, direct, professional sentences. A strong non-native professional writes clearly — not like a native impersonator.
+
+Universal principle: never make the candidate appear to be something they are not. This applies to any language — English, Ukrainian, French, or otherwise.
+
 ---
 
 ## Pipeline Flow (NON-NEGOTIABLE)

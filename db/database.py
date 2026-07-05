@@ -122,7 +122,7 @@ async def init_db() -> None:
             "ALTER TABLE users ADD COLUMN evidence_json TEXT",
             # EPIC-24: renamed evidence_json → progressive_profile
             "ALTER TABLE users ADD COLUMN progressive_profile TEXT",
-            "UPDATE users SET progressive_profile = evidence_json",
+            "UPDATE users SET progressive_profile = evidence_json WHERE progressive_profile IS NULL",
         ]:
             try:
                 await db.execute(migration)
