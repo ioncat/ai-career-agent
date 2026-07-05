@@ -26,14 +26,14 @@ Read `skill/active_user` → ID → `skill/users.yaml` → name + slug. Then dis
   [1] Локально (Claude Code)   │   [11] Role — Company 🆕
   [2] API (расход токенов)     │   [12] Role — Company ♻️
   [3] Другой профиль (-u)      │   [13] обработать все (batch)
-  [4] Профиль: Markdown → DB   │   [14] пропустить inbox → новая
-                               │   [15] Загрузить по URL
+  [4] Профиль: Markdown        │   [14] пропустить inbox → новая
+  [5] Профиль: DB              │   [15] Загрузить по URL
                                │   [16] Обновить inbox
 ```
 
 Left column = Block 1 (`1–10`). Right column = Block 2 (`11–20`). `│` separates them.
 
-**Profile source default:** `Markdown` (PROFILE.md). Header shows current source: `📄 Markdown` or `🗄️ DB`.
+**Profile source default:** `Markdown` (PROFILE.md). Header shows current source: `📄 Markdown` or `🗄️ DB`. Active profile source shown with `●`: `[4] ● Профиль: Markdown` or `[5] ● Профиль: DB`.
 
 **If inbox empty — right column collapses to:**
 ```
@@ -42,16 +42,19 @@ Left column = Block 1 (`1–10`). Right column = Block 2 (`11–20`). `│` sepa
   [1] Локально (Claude Code)   │   [11] Загрузить новую вакансию
   [2] API (расход токенов)     │        — вставь JD или URL
   [3] Другой профиль (-u)      │
-  [4] Профиль: Markdown → DB   │
+  [4] Профиль: Markdown        │
+  [5] Профиль: DB              │
 ```
 
 ### Routing (numbering is unambiguous)
 
 - **Answer 1/2** → set `MODE = local|api`. If an action wasn't also given → re-display Block 2 only ("Что обрабатываем?").
 - **Answer 3** → show user list (same as `-l`), stop — user re-runs with `-u`.
-- **Answer 4** → toggle `PROFILE_SOURCE`: `md → db` or `db → md`. Re-display Step 0 with updated header. No pipeline start.
+- **Answer 4** → set `PROFILE_SOURCE = md`. Re-display Step 0 with updated header.
+- **Answer 5** → set `PROFILE_SOURCE = db`. Re-display Step 0 with updated header.
+- **Combined answer** (e.g. `1 5`, `2 11`, `1 5 11`) → set mode AND/OR profile source AND/OR act in one step. Preferred — kills the round-trip. Example: `1 5` = Локально + DB profile; `1 5 11` = Локально + DB + process first inbox item.
 - **Answer 11–1X (a vacancy)** → process that inbox item. `[batch]` = all, `[skip→new]` = пропустить inbox, `[URL]` = вставь JD/URL → старт, `[refresh]` = пересканировать inbox_manual → перерисовать Block 2.
-- **Combined answer** (e.g. `2 11`, `1, 13`) → set mode AND act in one step. Preferred — kills the round-trip.
+- **Action given without mode** → default `MODE = local` (most common). Show `[Локально]` in status lines.
 - **Action given without mode** → default `MODE = local` (most common). Show `[Локально]` in status lines.
 
 - Selected mode applies to **all phases and all inbox files** in this invocation.

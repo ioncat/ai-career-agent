@@ -19,6 +19,24 @@ User will provide:
 
 ---
 
+## Pre-flight — Before Writing
+
+**Step 1: Formulate the vacancy's core pain in one sentence.**
+Not "they need a PM" — what specific organisational problem is this hire solving *right now*? (Example: "Founder is still the PM and needs someone to take over product ownership so they can focus on scaling.")
+
+This sentence drives the cover opening. The cover speaks to *their situation*, not the candidate's background.
+
+**When pain-first framing is optimal:**
+- First PM / founding PM roles — the core ask is ownership, not execution support
+- Founder-led / startup environments — personal contribution and individual judgment matter
+- Roles where the candidate's autonomy = the primary value delivered
+
+**When to use a different angle:**
+- Large enterprise / corp — impersonal scale makes pain-first feel presumptuous; use domain or delivery signal instead
+- Roles where technical depth or delivery metrics are the primary screen
+
+---
+
 ## Cover Purpose — Why HR Opens the CV
 
 The cover message has one job: give the hiring manager a reason to open the CV.
@@ -42,7 +60,19 @@ The CV already contains all evidence. The cover must NOT repeat or reference spe
 
 ## Rules (NON-NEGOTIABLE)
 
-- **Short** — greeting + 3 bullets + closing line + name. Nothing more.
+- **Pain-first opening (founder-led / first PM roles)** — do NOT open with self-description ("I've been...", "I've spent...", "Most of my work..."). Open with THEIR situation — the transition they're navigating, the gap they need filled. The candidate appears as the answer to their pain, not as the headline. Self-lead = talking about yourself; pain-lead = talking about their problem and positioning yourself as the solution.
+
+- **Header (mandatory)** — every cover starts with the candidate header block (same as CV), then `---`, then greeting. Read from PROFILE.md → `## Contacts` section.
+```
+# [Full Name]
+[Headline]
+[contact line]
+
+---
+
+[Greeting]
+```
+- **Short** — header + greeting + body + closing line + name. Nothing more.
 - **No bold markdown** — plain prose only. Cover is a personal message, not a formatted document. No `**bold**` anywhere.
 - **Greeting by company type** (from Phase 1 section 1.2):
   - `startup` / `founder-led` → `Hi!`
