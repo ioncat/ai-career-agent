@@ -5,6 +5,8 @@ import '../providers/vacancy_list_provider.dart';
 import '../widgets/vacancy_card.dart';
 import 'vacancy_detail_screen.dart';
 
+// ─── Screen ──────────────────────────────────────────────────────────────────
+
 class VacancyInboxScreen extends ConsumerStatefulWidget {
   final String folder;
 
@@ -19,6 +21,11 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
 
+  bool _filterExpanded = false;
+  Set<String> _statusFilter = {};
+  DateTime? _dateFrom;
+  DateTime? _dateTo;
+
   String get _title => switch (widget.folder) {
         'inbox' => 'Inbox',
         'in_progress' => 'In Progress',
@@ -26,6 +33,9 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
         'archive' => 'Archive',
         _ => 'Vacancies',
       };
+
+  int get _activeFilterCount =>
+      _statusFilter.length + (_dateFrom != null || _dateTo != null ? 1 : 0);
 
   @override
   void dispose() {
@@ -35,12 +45,47 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
 
   List<VacancyListItem> _filter(List<VacancyListItem> all) {
     final q = _searchQuery;
-    if (q.isEmpty) return all;
-    return all
-        .where((v) =>
-            v.role.toLowerCase().contains(q) ||
-            v.company.toLowerCase().contains(q))
-        .toList();
+    return all.where((v) {
+      if (q.isNotEmpty) {
+        if (!v.role.toLowerCase().contains(q) &&
+            !v.company.toLowerCase().contains(q)) {
+          return false;
+        }
+      }
+      if (_statusFilter.isNotEmpty && !_statusFilter.contains(v.status)) {
+        return false;
+      }
+      if (_dateFrom != null || _dateTo != null) {
+        final raw = v.publishedAt;
+        if (raw == null) return false;
+        final d = DateTime.tryParse(raw);
+        if (d == null) return false;
+        final day = DateTime(d.year, d.month, d.day);
+        if (_dateFrom != null && day.isBefore(_dateFrom!)) return false;
+        if (_dateTo != null && day.isAfter(_dateTo!)) return false;
+      }
+      return true;
+    }).toList();
+  }
+
+  Future<void> _pickDateFrom() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _dateFrom ?? DateTime.now(),
+      firstDate: DateTime(2024),
+      lastDate: _dateTo ?? DateTime.now(),
+    );
+    if (picked != null) setState(() => _dateFrom = picked);
+  }
+
+  Future<void> _pickDateTo() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _dateTo ?? DateTime.now(),
+      firstDate: _dateFrom ?? DateTime(2024),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) setState(() => _dateTo = picked);
   }
 
   @override
@@ -48,6 +93,7 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
     final vacancies = ref.watch(folderVacanciesProvider(widget.folder));
     final listState = ref.watch(vacancyListProvider).valueOrNull;
     final filtered = _filter(vacancies);
+    final availableStatuses = vacancies.map((v) => v.status).toSet();
 
     // Sync _selected with polling updates (status changes: fetched→analyzing→analyzed)
     ref.listen(folderVacanciesProvider(widget.folder), (_, updated) {
@@ -70,6 +116,7 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
     }
 
     final cs = Theme.of(context).colorScheme;
+    final hasFilters = _searchQuery.isNotEmpty || _activeFilterCount > 0;
 
     return Row(
       children: [
@@ -88,6 +135,10 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
                   onRefresh: () =>
                       ref.read(vacancyListProvider.notifier).refresh(),
                   pollingState: listState,
+                  filterCount: _activeFilterCount,
+                  filterExpanded: _filterExpanded,
+                  onToggleFilter: () =>
+                      setState(() => _filterExpanded = !_filterExpanded),
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
@@ -134,6 +185,24 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
                     ),
                   ),
                 ),
+                if (_filterExpanded)
+                  _FilterPanel(
+                    availableStatuses: availableStatuses,
+                    selectedStatuses: _statusFilter,
+                    onStatusToggle: (s) => setState(() {
+                      if (_statusFilter.contains(s)) {
+                        _statusFilter = Set.from(_statusFilter)..remove(s);
+                      } else {
+                        _statusFilter = Set.from(_statusFilter)..add(s);
+                      }
+                    }),
+                    dateFrom: _dateFrom,
+                    dateTo: _dateTo,
+                    onPickFrom: _pickDateFrom,
+                    onPickTo: _pickDateTo,
+                    onClearDates: () =>
+                        setState(() { _dateFrom = null; _dateTo = null; }),
+                  ),
                 Divider(
                   height: 1,
                   thickness: 1,
@@ -141,8 +210,11 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
                 ),
                 Expanded(
                   child: filtered.isEmpty
-                      ? (_searchQuery.isNotEmpty
-                          ? _NoSearchResults(query: _searchController.text)
+                      ? (hasFilters
+                          ? _NoResults(
+                              query: _searchController.text.isEmpty
+                                  ? null
+                                  : _searchController.text)
                           : _EmptyState(folder: widget.folder))
                       : _VacancyList(
                           vacancies: filtered,
@@ -178,12 +250,17 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
   }
 }
 
+// ─── Header ──────────────────────────────────────────────────────────────────
+
 class _ListHeader extends StatelessWidget {
   final String title;
   final int visibleCount;
   final int totalCount;
   final VoidCallback onRefresh;
   final PollingState? pollingState;
+  final int filterCount;
+  final bool filterExpanded;
+  final VoidCallback onToggleFilter;
 
   const _ListHeader({
     required this.title,
@@ -191,6 +268,9 @@ class _ListHeader extends StatelessWidget {
     required this.totalCount,
     required this.onRefresh,
     this.pollingState,
+    required this.filterCount,
+    required this.filterExpanded,
+    required this.onToggleFilter,
   });
 
   @override
@@ -212,12 +292,26 @@ class _ListHeader extends StatelessWidget {
                 ),
               ),
               IconButton(
+                icon: Badge(
+                  isLabelVisible: filterCount > 0,
+                  label: Text('$filterCount'),
+                  child: Icon(
+                    filterExpanded
+                        ? Icons.filter_list_off
+                        : Icons.filter_list,
+                    size: 20,
+                    color: filterCount > 0 ? cs.primary : cs.onSurfaceVariant,
+                  ),
+                ),
+                onPressed: onToggleFilter,
+                tooltip: 'Filters',
+                splashRadius: 18,
+              ),
+              IconButton(
                 icon: Icon(
                   polling ? Icons.sync : Icons.refresh,
                   size: 20,
-                  color: polling
-                      ? cs.primary
-                      : cs.onSurfaceVariant,
+                  color: polling ? cs.primary : cs.onSurfaceVariant,
                 ),
                 onPressed: polling ? null : onRefresh,
                 tooltip: 'Refresh',
@@ -253,6 +347,166 @@ class _ListHeader extends StatelessWidget {
   }
 }
 
+// ─── Filter panel ─────────────────────────────────────────────────────────────
+
+class _FilterPanel extends StatelessWidget {
+  final Set<String> availableStatuses;
+  final Set<String> selectedStatuses;
+  final ValueChanged<String> onStatusToggle;
+  final DateTime? dateFrom;
+  final DateTime? dateTo;
+  final VoidCallback onPickFrom;
+  final VoidCallback onPickTo;
+  final VoidCallback onClearDates;
+
+  const _FilterPanel({
+    required this.availableStatuses,
+    required this.selectedStatuses,
+    required this.onStatusToggle,
+    this.dateFrom,
+    this.dateTo,
+    required this.onPickFrom,
+    required this.onPickTo,
+    required this.onClearDates,
+  });
+
+  static const _statusLabels = <String, String>{
+    'fetched': 'New',
+    'analyzing': 'In Queue',
+    'analysis_failed': 'Failed',
+    'analyzed': 'Analyzed',
+    'cv_generated': 'CV Ready',
+    'cover_generated': 'Cover Ready',
+  };
+
+  static String _fmtDate(DateTime d) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return '${months[d.month - 1]} ${d.day}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final labelSmall = Theme.of(context).textTheme.labelSmall;
+
+    final statuses = _statusLabels.keys
+        .where((s) => availableStatuses.contains(s))
+        .toList();
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: cs.outlineVariant, width: 0.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (statuses.isNotEmpty) ...[
+            Text('Status',
+                style: labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: statuses.map((s) {
+                final selected = selectedStatuses.contains(s);
+                return FilterChip(
+                  label: Text(
+                    _statusLabels[s]!,
+                    style: Theme.of(context).textTheme.labelSmall,
+                  ),
+                  selected: selected,
+                  onSelected: (_) => onStatusToggle(s),
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                  visualDensity: VisualDensity.compact,
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 10),
+          ],
+          Text('Published',
+              style: labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Expanded(
+                child: _DateButton(
+                  label: dateFrom != null ? _fmtDate(dateFrom!) : 'From',
+                  hasValue: dateFrom != null,
+                  onTap: onPickFrom,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: Text('—',
+                    style: labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+              ),
+              Expanded(
+                child: _DateButton(
+                  label: dateTo != null ? _fmtDate(dateTo!) : 'To',
+                  hasValue: dateTo != null,
+                  onTap: onPickTo,
+                ),
+              ),
+              if (dateFrom != null || dateTo != null) ...[
+                const SizedBox(width: 4),
+                IconButton(
+                  icon: Icon(Icons.close, size: 14, color: cs.onSurfaceVariant),
+                  onPressed: onClearDates,
+                  splashRadius: 12,
+                  tooltip: 'Clear dates',
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DateButton extends StatelessWidget {
+  final String label;
+  final bool hasValue;
+  final VoidCallback onTap;
+
+  const _DateButton({
+    required this.label,
+    required this.hasValue,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return OutlinedButton.icon(
+      onPressed: onTap,
+      icon: const Icon(Icons.calendar_today, size: 12),
+      label: Text(label, style: Theme.of(context).textTheme.labelSmall),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: hasValue ? cs.primary : cs.onSurfaceVariant,
+        side: BorderSide(
+          color: hasValue ? cs.primary : cs.outlineVariant,
+          width: hasValue ? 1.5 : 1,
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        minimumSize: const Size(0, 28),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+    );
+  }
+}
+
+// ─── List ────────────────────────────────────────────────────────────────────
+
 class _VacancyList extends StatelessWidget {
   final List<VacancyListItem> vacancies;
   final int? selectedId;
@@ -282,16 +536,21 @@ class _VacancyList extends StatelessWidget {
   }
 }
 
-class _NoSearchResults extends StatelessWidget {
-  final String query;
+// ─── Empty / No-results states ────────────────────────────────────────────────
 
-  const _NoSearchResults({required this.query});
+class _NoResults extends StatelessWidget {
+  final String? query;
+
+  const _NoResults({this.query});
 
   @override
   Widget build(BuildContext context) {
+    final msg = (query != null && query!.isNotEmpty)
+        ? 'No matches for "$query"'
+        : 'No vacancies match the active filters';
     return Center(
       child: Text(
-        'No matches for "$query"',
+        msg,
         textAlign: TextAlign.center,
         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
