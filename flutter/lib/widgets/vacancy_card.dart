@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import '../models/vacancy.dart';
-import 'fit_score_chip.dart';
-import 'vac_score_badge.dart';
 import 'source_badge.dart';
 
 class VacancyCard extends StatefulWidget {
@@ -129,15 +127,25 @@ class _VacancyCardState extends State<VacancyCard> {
                   overflow: TextOverflow.ellipsis,
                 ),
               const SizedBox(height: 10),
-              // Row 4: scores or status badge — show scores if present regardless of status
+              // Row 4: score dot rows — two lines when both present
               if (v.fitScore != null || v.vacancyScore != null)
-                Row(
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (v.fitScore != null) FitScoreChip(score: v.fitScore!),
-                    if (v.vacancyScore != null) ...[
-                      const SizedBox(width: 6),
-                      VacScoreBadge(score: v.vacancyScore!),
-                    ],
+                    if (v.fitScore != null)
+                      _ScoreDotsRow(
+                        label: 'Fit',
+                        score: v.fitScore!.toDouble(),
+                        max: 10,
+                      ),
+                    if (v.fitScore != null && v.vacancyScore != null)
+                      const SizedBox(height: 5),
+                    if (v.vacancyScore != null)
+                      _ScoreDotsRow(
+                        label: 'Attraction',
+                        score: v.vacancyScore!,
+                        max: 10,
+                      ),
                   ],
                 )
               else if (v.status == 'analysis_queued')
@@ -197,6 +205,68 @@ class _VacancyCardState extends State<VacancyCard> {
     } catch (_) {
       return iso;
     }
+  }
+}
+
+class _ScoreDotsRow extends StatelessWidget {
+  final String label;
+  final double score;
+  final double max;
+
+  const _ScoreDotsRow({
+    required this.label,
+    required this.score,
+    required this.max,
+  });
+
+  Color _filledColor() {
+    final ratio = score / max;
+    if (ratio >= 0.70) return const Color(0xFF388E3C); // green
+    if (ratio >= 0.40) return const Color(0xFFF57F17); // amber
+    return const Color(0xFFB71C1C);                    // red
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final filled = score.round().clamp(0, max.toInt());
+    final filledColor = _filledColor();
+    final emptyColor = cs.surfaceContainerHighest;
+    final scoreText = score % 1 == 0
+        ? '${score.toInt()}'
+        : score.toStringAsFixed(1);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        SizedBox(
+          width: 72,
+          child: Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
+          ),
+        ),
+        ...List.generate(max.toInt(), (i) => Container(
+          width: 8,
+          height: 8,
+          margin: const EdgeInsets.only(right: 3),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: i < filled ? filledColor : emptyColor,
+          ),
+        )),
+        const SizedBox(width: 6),
+        Text(
+          scoreText,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: cs.onSurface,
+                fontWeight: FontWeight.w600,
+              ),
+        ),
+      ],
+    );
   }
 }
 
