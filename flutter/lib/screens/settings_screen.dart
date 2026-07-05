@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/config_provider.dart';
 import '../providers/settings_provider.dart';
+// RemoteConfig used by _ModelDropdown
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -125,10 +126,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               const SizedBox(height: 32),
 
-              // AI Provider (read-only, from GET /api/config)
+              // AI Provider — model + effort (admin panel, read from /api/config)
               _SectionLabel('AI Provider'),
               const SizedBox(height: 12),
-              const _RemoteConfigTile(),
+              const _AiProviderTile(),
               const SizedBox(height: 32),
 
               // Save button
@@ -182,8 +183,10 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
-class _RemoteConfigTile extends ConsumerWidget {
-  const _RemoteConfigTile();
+// ── AI Provider tile — model dropdown + effort segmented control ──────────────
+
+class _AiProviderTile extends ConsumerWidget {
+  const _AiProviderTile();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -202,20 +205,134 @@ class _RemoteConfigTile extends ConsumerWidget {
             height: 40, child: Center(child: CircularProgressIndicator())),
         error: (e, _) => Text(
           'Unavailable — check backend: $e',
-          style: Theme.of(context)
-              .textTheme
-              .bodySmall
-              ?.copyWith(color: cs.error),
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.error),
         ),
         data: (config) => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Provider + analysis mode — read-only
             _ConfigRow(label: 'Provider', value: config.llmProvider),
             const SizedBox(height: 8),
-            _ConfigRow(label: 'Model', value: config.model),
-            const SizedBox(height: 8),
             _ConfigRow(label: 'Analysis mode', value: config.analysisMode),
+            const Divider(height: 24),
+
+            // Model — dropdown when supported, read-only label for Ollama
+            _ConfigLabel('Model'),
+            const SizedBox(height: 8),
+            if (config.supportsModelSelection)
+              _ModelDropdown(config: config)
+            else
+              Text(
+                config.model.isNotEmpty ? config.model : '—',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: cs.onSurface,
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+
+            // Effort — hidden for Ollama
+            if (config.supportsEffort) ...[
+              const SizedBox(height: 16),
+              _ConfigLabel('Thinking effort'),
+              const SizedBox(height: 4),
+              Text(
+                'Higher effort = more reasoning tokens, higher cost & latency',
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: cs.onSurfaceVariant),
+              ),
+              const SizedBox(height: 10),
+              _EffortControl(current: config.thinkingEffort),
+            ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ConfigLabel extends StatelessWidget {
+  final String text;
+
+  const _ConfigLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+    );
+  }
+}
+
+class _ModelDropdown extends ConsumerWidget {
+  final RemoteConfig config;
+
+  const _ModelDropdown({required this.config});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cs = Theme.of(context).colorScheme;
+    final current = config.availableModels.contains(config.model)
+        ? config.model
+        : config.availableModels.firstOrNull;
+
+    return DropdownButtonHideUnderline(
+      child: DropdownButton<String>(
+        value: current,
+        isExpanded: true,
+        borderRadius: BorderRadius.circular(8),
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: cs.onSurface,
+              fontWeight: FontWeight.w600,
+            ),
+        items: config.availableModels
+            .map((m) => DropdownMenuItem(value: m, child: Text(m)))
+            .toList(),
+        onChanged: (m) {
+          if (m != null) {
+            ref.read(remoteConfigProvider.notifier).patchModel(m);
+          }
+        },
+      ),
+    );
+  }
+}
+
+class _EffortControl extends ConsumerWidget {
+  final String current;
+
+  const _EffortControl({required this.current});
+
+  static const _efforts = ['off', 'low', 'medium', 'high', 'xhigh', 'max'];
+  static const _labels  = ['Off', 'Low', 'Med', 'High', 'xHigh', 'Max'];
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selected = _efforts.contains(current) ? current : 'off';
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: SegmentedButton<String>(
+        segments: List.generate(
+          _efforts.length,
+          (i) => ButtonSegment<String>(
+            value: _efforts[i],
+            label: Text(_labels[i]),
+          ),
+        ),
+        selected: {selected},
+        onSelectionChanged: (s) {
+          if (s.isNotEmpty) {
+            ref.read(remoteConfigProvider.notifier).patchEffort(s.first);
+          }
+        },
+        style: SegmentedButton.styleFrom(
+          selectedBackgroundColor:
+              Theme.of(context).colorScheme.primaryContainer,
         ),
       ),
     );

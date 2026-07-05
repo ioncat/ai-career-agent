@@ -91,15 +91,29 @@ class VacancyRepository {
     if (response.statusCode != 202) throw Exception('Analyze failed: ${response.statusCode}');
   }
 
-  Future<Map<String, String>> getConfig() async {
+  Future<Map<String, dynamic>> getConfig() async {
     final uri = Uri.parse('$baseUrl/api/config');
     final response = await http.get(uri).timeout(const Duration(seconds: 5));
     if (response.statusCode != 200) throw Exception('Config unavailable');
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
-    return {
-      'llm_provider': data['llm_provider'] as String? ?? '',
-      'model': data['model'] as String? ?? '',
-      'analysis_mode': data['analysis_mode'] as String? ?? '',
-    };
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> patchConfig({
+    String? model,
+    String? thinkingEffort,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/config');
+    final body = <String, dynamic>{};
+    if (model != null) body['model'] = model;
+    if (thinkingEffort != null) body['thinking_effort'] = thinkingEffort;
+    final response = await http
+        .patch(uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(body))
+        .timeout(const Duration(seconds: 5));
+    if (response.statusCode != 200) {
+      throw Exception('Config update failed: ${response.statusCode}');
+    }
+    return jsonDecode(response.body) as Map<String, dynamic>;
   }
 }

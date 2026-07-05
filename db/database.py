@@ -125,6 +125,19 @@ async def init_db() -> None:
             "UPDATE users SET progressive_profile = evidence_json WHERE progressive_profile IS NULL",
             # Analysis error message — stored when analysis_failed status set
             "ALTER TABLE vacancies ADD COLUMN analysis_error TEXT",
+            # System key-value cache (e.g. available model lists)
+            """CREATE TABLE IF NOT EXISTS system_kv (
+                key        TEXT PRIMARY KEY,
+                value      TEXT NOT NULL,
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )""",
+            # EPIC-25 prep: per-user LLM settings (model + thinking effort)
+            """CREATE TABLE IF NOT EXISTS user_settings (
+                user_id         INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+                llm_model       TEXT,
+                thinking_effort TEXT NOT NULL DEFAULT 'off',
+                updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+            )""",
         ]:
             try:
                 await db.execute(migration)
@@ -672,6 +685,75 @@ async def get_push_subscriptions(user_id: int) -> list[aiosqlite.Row]:
             (user_id,),
         )
         return await cursor.fetchall()
+
+
+# ── System KV helpers ────────────────────────────────────────────────────────
+
+async def get_kv(key: str) -> tuple[str | None, str | None]:
+    """Return (value, updated_at) for key. Both None if key missing."""
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT value, updated_at FROM system_kv WHERE key = ?", (key,)
+        )
+        row = await cursor.fetchone()
+    if row is None:
+        return None, None
+    return row["value"], row["updated_at"]
+
+
+async def set_kv(key: str, value: str) -> None:
+    """Upsert a key-value entry, setting updated_at to now."""
+    async with get_db() as db:
+        await db.execute(
+            """
+            INSERT INTO system_kv (key, value, updated_at)
+            VALUES (?, ?, datetime('now'))
+            ON CONFLICT(key) DO UPDATE SET
+                value = excluded.value,
+                updated_at = excluded.updated_at
+            """,
+            (key, value),
+        )
+        await db.commit()
+
+
+# ── User settings helpers ─────────────────────────────────────────────────────
+
+async def get_user_settings(user_id: int) -> dict:
+    """Return user LLM settings. Missing row returns empty dict (caller falls back to env)."""
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT llm_model, thinking_effort FROM user_settings WHERE user_id = ?",
+            (user_id,),
+        )
+        row = await cursor.fetchone()
+    if row is None:
+        return {}
+    return {
+        "llm_model": row["llm_model"],          # None if not overridden
+        "thinking_effort": row["thinking_effort"],
+    }
+
+
+async def set_user_settings(
+    user_id: int,
+    llm_model: str | None = None,
+    thinking_effort: str = "off",
+) -> None:
+    """Upsert LLM settings for user. llm_model=None means use env default."""
+    async with get_db() as db:
+        await db.execute(
+            """
+            INSERT INTO user_settings (user_id, llm_model, thinking_effort, updated_at)
+            VALUES (?, ?, ?, datetime('now'))
+            ON CONFLICT(user_id) DO UPDATE SET
+                llm_model = excluded.llm_model,
+                thinking_effort = excluded.thinking_effort,
+                updated_at = excluded.updated_at
+            """,
+            (user_id, llm_model, thinking_effort),
+        )
+        await db.commit()
 
 
 async def get_pipeline_runs(vacancy_id: int) -> list[aiosqlite.Row]:

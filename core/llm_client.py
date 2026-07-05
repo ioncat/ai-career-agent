@@ -511,10 +511,12 @@ class ClaudeCodeProvider:
         profile_md: str,
         model: str = "claude-sonnet-4-6",
         timeout: int = 120,
+        effort: str = "off",
     ) -> None:
         self._profile_md = profile_md
         self._model = model
         self._timeout = timeout
+        self._effort = effort  # 'off'|'low'|'medium'|'high'|'xhigh'|'max'
         self._sess_calls = 0
         self._last_call_usage: dict | None = None
 
@@ -526,11 +528,14 @@ class ClaudeCodeProvider:
         parts.append(user)
         prompt = "\n\n---\n\n".join(parts)
 
+        cmd = ["claude", "-p", prompt, "--model", self._model]
+        if self._effort and self._effort != "off":
+            cmd += ["--effort", self._effort]
+
         t0 = time.monotonic()
         try:
             proc = await asyncio.create_subprocess_exec(
-                "claude", "-p", prompt,
-                "--model", self._model,
+                *cmd,
                 stdin=asyncio.subprocess.DEVNULL,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
