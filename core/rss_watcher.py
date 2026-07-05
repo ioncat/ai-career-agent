@@ -145,8 +145,9 @@ class RSSWatcher:
                     await cv_analyze(ctx, vacancy_id)  # type: ignore[arg-type]
                     log.info("RSSWatcher: analysis done — vacancy_id=%d", vacancy_id)
                 except Exception as exc:
-                    log.error("RSSWatcher: analysis failed v#%d: %s", vacancy_id, exc)
-                    await database.update_vacancy_status(vacancy_id, "fetched")
+                    err_msg = str(exc)[:500]
+                    log.error("RSSWatcher: analysis failed v#%d: %s", vacancy_id, err_msg)
+                    await database.set_analysis_error(vacancy_id, err_msg)
                     return
             await self._push_result(vacancy_id)
 

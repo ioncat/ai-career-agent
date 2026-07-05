@@ -91,7 +91,6 @@ class _AppShellState extends ConsumerState<AppShell> {
                           _AppNavRail(
                             selectedIndex: _selectedIndex,
                             inboxCount: inboxCount,
-                            health: health,
                             onSelected: (i) => setState(() => _selectedIndex = i),
                           ),
                           // Thin divider
@@ -111,6 +110,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                                   _StatusHeader(
                                     listState: listState,
                                     settings: settings,
+                                    health: health,
                                     cs: cs,
                                   ),
                                 Expanded(
@@ -177,13 +177,11 @@ class _FloatingContentBlock extends StatelessWidget {
 class _AppNavRail extends StatelessWidget {
   final int selectedIndex;
   final int inboxCount;
-  final HealthStatus health;
   final ValueChanged<int> onSelected;
 
   const _AppNavRail({
     required this.selectedIndex,
     required this.inboxCount,
-    required this.health,
     required this.onSelected,
   });
 
@@ -231,11 +229,6 @@ class _AppNavRail extends StatelessWidget {
               );
             }),
             const Spacer(),
-            // Backend status dot
-            Padding(
-              padding: const EdgeInsets.only(bottom: 20),
-              child: BackendStatusDot(status: health),
-            ),
           ],
         ),
       ),
@@ -283,7 +276,7 @@ class _NavRailItem extends StatelessWidget {
             children: [
               Badge(
                 isLabelVisible: badgeCount > 0,
-                label: Text('$badgeCount'),
+                label: Text(badgeCount > 99 ? '99+' : '$badgeCount'),
                 child: Icon(
                   selected ? item.iconFilled : item.iconOutlined,
                   color: selected ? cs.primary : cs.onSurfaceVariant,
@@ -316,11 +309,13 @@ class _NavRailItem extends StatelessWidget {
 class _StatusHeader extends StatelessWidget {
   final PollingState listState;
   final dynamic settings;
+  final HealthStatus health;
   final ColorScheme cs;
 
   const _StatusHeader({
     required this.listState,
     required this.settings,
+    required this.health,
     required this.cs,
   });
 
@@ -335,12 +330,19 @@ class _StatusHeader extends StatelessWidget {
           ),
         ),
       ),
-      child: StatusLine(
-        status: listState.status,
-        pollIntervalSeconds: settings.pollIntervalSeconds,
-        lastUpdatedAt: listState.lastUpdatedAt,
-        newCount: listState.newCount,
-        fromCache: listState.fromCache,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          BackendStatusDot(status: health),
+          const SizedBox(width: 8),
+          StatusLine(
+            status: listState.status,
+            pollIntervalSeconds: settings.pollIntervalSeconds,
+            lastUpdatedAt: listState.lastUpdatedAt,
+            newCount: listState.newCount,
+            fromCache: listState.fromCache,
+          ),
+        ],
       ),
     );
   }

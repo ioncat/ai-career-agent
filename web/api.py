@@ -232,6 +232,9 @@ async def api_vacancies(
         if not parsed.get("company"):
             parsed["company"] = db_company
         item.update(parsed)
+        # Pass analysis_error through (None when no error)
+        if 'analysis_error' not in item:
+            item['analysis_error'] = None
         result.append(item)
     return result
 
@@ -568,6 +571,8 @@ async def api_vacancy_analyze(vacancy_id: int):
     if current_status in ("analysis_queued", "analyzing"):
         raise HTTPException(status_code=409, detail=f"Already in progress: {current_status}")
     await database.update_vacancy_status(vacancy_id, "analysis_queued")
+    # Clear previous error when re-queuing
+    await database.clear_analysis_error(vacancy_id)
     return {"id": vacancy_id, "status": "analysis_queued"}
 
 

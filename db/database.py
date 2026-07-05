@@ -123,6 +123,8 @@ async def init_db() -> None:
             # EPIC-24: renamed evidence_json → progressive_profile
             "ALTER TABLE users ADD COLUMN progressive_profile TEXT",
             "UPDATE users SET progressive_profile = evidence_json WHERE progressive_profile IS NULL",
+            # Analysis error message — stored when analysis_failed status set
+            "ALTER TABLE vacancies ADD COLUMN analysis_error TEXT",
         ]:
             try:
                 await db.execute(migration)
@@ -426,6 +428,26 @@ async def update_vacancy_status(vacancy_id: int, status: str) -> None:
             WHERE id = ?
             """,
             (status, vacancy_id),
+        )
+        await db.commit()
+
+
+async def set_analysis_error(vacancy_id: int, error: str | None) -> None:
+    """Store analysis error message and set status to analysis_failed."""
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE vacancies SET analysis_error = ?, status = 'analysis_failed', updated_at = datetime('now') WHERE id = ?",
+            (error, vacancy_id),
+        )
+        await db.commit()
+
+
+async def clear_analysis_error(vacancy_id: int) -> None:
+    """Clear analysis_error when vacancy is re-queued for analysis."""
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE vacancies SET analysis_error = NULL WHERE id = ?",
+            (vacancy_id,),
         )
         await db.commit()
 
