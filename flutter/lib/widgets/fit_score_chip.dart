@@ -20,6 +20,8 @@ class _InfoBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // No `alignment` → Container wraps to content size (text + padding).
+    // With `alignment`, Container would expand to fill parent constraints.
     return Container(
       height: 24,
       padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -28,7 +30,6 @@ class _InfoBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.55)),
       ),
-      alignment: Alignment.center,
       child: Text(
         label,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
