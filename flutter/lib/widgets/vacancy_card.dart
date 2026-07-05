@@ -74,7 +74,7 @@ class _VacancyCardState extends State<VacancyCard> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Row 1: source badge + date + "New" badge for fetched
+              // Row 1: source badge + "New" badge | date right-aligned
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -83,15 +83,14 @@ class _VacancyCardState extends State<VacancyCard> {
                     const SizedBox(width: 6),
                     _NewBadge(),
                   ],
-                  if (v.publishedAt != null) ...[
-                    const SizedBox(width: 8),
+                  const Spacer(),
+                  if (v.publishedAt != null)
                     Text(
                       _relativeTime(v.publishedAt!),
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
                             color: cs.secondary,
                           ),
                     ),
-                  ],
                 ],
               ),
               const SizedBox(height: 8),
