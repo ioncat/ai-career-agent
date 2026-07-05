@@ -476,15 +476,19 @@ async def test_poll_analyze_queue_empty_does_nothing():
 
 
 @pytest.mark.asyncio
-async def test_poll_analyze_queue_failure_reverts_to_fetched():
-    """_poll_analyze_queue: cv_analyze raises → status reverts to fetched."""
+async def test_poll_analyze_queue_failure_sets_analysis_failed():
+    """_poll_analyze_queue: cv_analyze raises → set_analysis_error called with error message."""
     watcher, _ = _make_watcher()
     row = _make_row(vacancy_id=11, url="https://djinni.co/jobs/11/", status="analysis_queued")
     mock_db = _mock_db([])
     mock_db.list_vacancies = AsyncMock(return_value=[row])
+    mock_db.set_analysis_error = AsyncMock()
 
     with patch("core.rss_watcher.database", mock_db), \
          patch("tools.cv_analyze.cv_analyze", AsyncMock(side_effect=RuntimeError("LLM error"))):
         await watcher._poll_analyze_queue()
 
-    mock_db.update_vacancy_status.assert_any_await(11, "fetched")
+    mock_db.set_analysis_error.assert_awaited_once()
+    call_args = mock_db.set_analysis_error.await_args
+    assert call_args[0][0] == 11
+    assert "LLM error" in call_args[0][1]
