@@ -700,17 +700,26 @@ class _VacancyHero extends StatelessWidget {
           northStar: p1?.northStar,
         ),
         const SizedBox(height: 12),
-        // Supporting scores row — Wrap prevents overflow when panel is narrow
-        Wrap(
-          spacing: 8,
-          runSpacing: 6,
-          crossAxisAlignment: WrapCrossAlignment.center,
+        // Scores left (wrap on narrow), date pinned right
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            FitScoreChip(score: p2.fitScore),
-            FitDotBar(score: p2.fitScore),
-            if (p1 != null) VacScoreBadge(score: p1!.vacancyScore),
-            if (publishedAt != null)
+            Expanded(
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  FitScoreChip(score: p2.fitScore),
+                  FitDotBar(score: p2.fitScore),
+                  if (p1 != null) VacScoreBadge(score: p1!.vacancyScore),
+                ],
+              ),
+            ),
+            if (publishedAt != null) ...[
+              const SizedBox(width: 8),
               _PostedChip(publishedAt: publishedAt, cs: cs),
+            ],
           ],
         ),
       ],
