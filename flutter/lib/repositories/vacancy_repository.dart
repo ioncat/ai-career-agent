@@ -75,7 +75,11 @@ class VacancyRepository {
   Future<void> restore(int vacancyId) async {
     final uri = Uri.parse('$baseUrl/api/vacancies/$vacancyId/restore');
     final response = await http.patch(uri).timeout(const Duration(seconds: 10));
-    if (response.statusCode == 404) throw Exception('Vacancy not found');
+    if (response.statusCode == 404) {
+      final body = jsonDecode(response.body) as Map<String, dynamic>?;
+      final detail = body?['detail'] as String? ?? '';
+      throw Exception(detail.isNotEmpty ? detail : 'Not found — restart the backend');
+    }
     if (response.statusCode != 200) throw Exception('Restore failed: ${response.statusCode}');
   }
 
