@@ -29,6 +29,7 @@
 - **Flutter — auto-advance on skip**: after Skip in inbox, automatically selects next unread vacancy instead of showing empty screen; fires only on successful decline
 - **Flutter — starred**: star toggle (⭐) in vacancy card Row 1 (right of date) + detail screen action bar; optimistic state; `PATCH /api/vacancies/{id}/starred`
 - **Flutter — applied**: "Applied?" / "Applied ✓" toggle button in detail screen action bar only; optimistic state; `PATCH /api/vacancies/{id}/applied`
+- **Flutter — Applied folder fix**: `_folderMatch` now passes full `VacancyListItem` instead of just `status`; Applied folder filters by `v.applied` boolean (was `status == 'applied'` which never matched); inbox status list extended with `cover_generating` / `cover_generated`
 
 ### 2026-07-05
 - **Flutter Settings — dynamic model list**: available models fetched from Anthropic API / Ollama at runtime; 24h TTL cache in `system_kv` table; fallback to hardcoded list on network error

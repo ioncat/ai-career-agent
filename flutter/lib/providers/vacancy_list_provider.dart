@@ -175,24 +175,27 @@ final folderVacanciesProvider =
     Provider.family<List<VacancyListItem>, String>((ref, folder) {
   final state = ref.watch(vacancyListProvider).valueOrNull;
   if (state == null) return [];
-  return state.vacancies.where((v) => _folderMatch(v.status, folder)).toList();
+  return state.vacancies.where((v) => _folderMatch(v, folder)).toList();
 });
 
-bool _folderMatch(String status, String folder) {
+bool _folderMatch(VacancyListItem v, String folder) {
   switch (folder) {
     case 'inbox':
-      return status == 'fetched' ||
-          status == 'analysis_queued' ||
-          status == 'analyzing' ||
-          status == 'analyzed' ||
-          status == 'analysis_failed' ||
-          status == 'cv_queued' ||
-          status == 'cv_generating' ||
-          status == 'cv_generated';
+      return !v.applied &&
+          (v.status == 'fetched' ||
+          v.status == 'analysis_queued' ||
+          v.status == 'analyzing' ||
+          v.status == 'analyzed' ||
+          v.status == 'analysis_failed' ||
+          v.status == 'cv_queued' ||
+          v.status == 'cv_generating' ||
+          v.status == 'cv_generated' ||
+          v.status == 'cover_generating' ||
+          v.status == 'cover_generated');
     case 'applied':
-      return status == 'applied';
+      return v.applied;
     case 'archive':
-      return status == 'declined';
+      return v.status == 'declined';
     default:
       return false;
   }
