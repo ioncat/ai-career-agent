@@ -138,6 +138,9 @@ async def init_db() -> None:
                 thinking_effort TEXT NOT NULL DEFAULT 'off',
                 updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
             )""",
+            # Activity log: provider name + thinking effort per LLM call
+            "ALTER TABLE llm_usage ADD COLUMN provider TEXT NOT NULL DEFAULT 'claude_api'",
+            "ALTER TABLE llm_usage ADD COLUMN thinking_effort TEXT NOT NULL DEFAULT ''",
         ]:
             try:
                 await db.execute(migration)
@@ -145,6 +148,21 @@ async def init_db() -> None:
                 log.info("DB migration applied: %s", migration[:60])
             except Exception:
                 pass  # column already exists — ignore
+
+    # Recovery: vacancies stuck at 'analyzing' (process was killed mid-run) → re-queue.
+    async with aiosqlite.connect(_db_path) as db:
+        cur = await db.execute(
+            "UPDATE vacancies SET status = 'analysis_queued' WHERE status = 'analyzing'"
+        )
+        await db.commit()
+        if cur.rowcount:
+            log.warning("DB recovery: reset %d stuck 'analyzing' → 'analysis_queued'", cur.rowcount)
+        cur2 = await db.execute(
+            "UPDATE vacancies SET status = 'cv_queued' WHERE status = 'cv_generating'"
+        )
+        await db.commit()
+        if cur2.rowcount:
+            log.warning("DB recovery: reset %d stuck 'cv_generating' → 'cv_queued'", cur2.rowcount)
 
     log.info("DB initialised at %s", _db_path)
 
@@ -609,12 +627,16 @@ async def insert_llm_usage(
     budget_tokens: int = 0,
     thinking_tokens: int = 0,
     elapsed_ms: int = 0,
+    provider: str = "claude_api",
+    thinking_effort: str = "",
 ) -> int:
     """Record one LLM API call for cost tracking and unit economics analysis.
 
     Input breakdown (profile/prompt/user) is estimated from text length (len//4, ±10%).
     API-reported totals (input/output/cache) are exact from the response.
     user_id: optional FK for per-user cost analytics.
+    provider: 'claude_api' | 'claude_cli' | 'ollama_api'
+    thinking_effort: 'off'|'low'|'medium'|'high'|'xhigh'|'max'|'' (empty = not applicable)
     """
     async with get_db() as db:
         cursor = await db.execute(
@@ -625,18 +647,71 @@ async def insert_llm_usage(
                  input_tokens, output_tokens,
                  cache_write_tokens, cache_read_tokens,
                  budget_tokens, thinking_tokens,
-                 elapsed_ms, cost_usd)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 elapsed_ms, cost_usd,
+                 provider, thinking_effort)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (vacancy_id, user_id, phase, model,
              profile_tokens, prompt_tokens, user_tokens,
              input_tokens, output_tokens,
              cache_write_tokens, cache_read_tokens,
              budget_tokens, thinking_tokens,
-             elapsed_ms, round(cost_usd, 6)),
+             elapsed_ms, round(cost_usd, 6),
+             provider, thinking_effort),
         )
         await db.commit()
         return cursor.lastrowid  # type: ignore[return-value]
+
+
+async def get_vacancy_activity(vacancy_id: int) -> list[dict]:
+    """Return all LLM usage rows for a vacancy, chronological."""
+    async with get_db() as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            """
+            SELECT phase, provider, model, thinking_effort,
+                   elapsed_ms, input_tokens, output_tokens,
+                   cache_read_tokens, cost_usd, created_at
+            FROM llm_usage
+            WHERE vacancy_id = ?
+            ORDER BY created_at ASC
+            """,
+            (vacancy_id,),
+        )
+        rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
+
+
+async def get_vacancy_pipeline_runs(vacancy_id: int) -> list[dict]:
+    """Return all pipeline_runs rows for a vacancy with computed duration_ms."""
+    from datetime import datetime
+
+    async with get_db() as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            """
+            SELECT phase, status, error_message, started_at, finished_at, created_at
+            FROM pipeline_runs
+            WHERE vacancy_id = ?
+            ORDER BY created_at ASC
+            """,
+            (vacancy_id,),
+        )
+        rows = await cursor.fetchall()
+        result = []
+        for row in rows:
+            r = dict(row)
+            duration_ms = None
+            if r["started_at"] and r["finished_at"]:
+                try:
+                    start = datetime.fromisoformat(r["started_at"])
+                    end = datetime.fromisoformat(r["finished_at"])
+                    duration_ms = int((end - start).total_seconds() * 1000)
+                except ValueError:
+                    pass
+            r["duration_ms"] = duration_ms
+            result.append(r)
+        return result
 
 
 # ── Push subscription helpers ─────────────────────────────────────────────────

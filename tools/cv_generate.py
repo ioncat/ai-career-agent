@@ -133,7 +133,7 @@ async def cv_generate(
     except LLMError as exc:
         await database.update_pipeline_run(run3_id, status="error", error_message=str(exc))
         log.error("cv_generate: Phase 3 LLM error: %s", exc)
-        return f"⚠️ Ошибка Claude на фазе 3:\n{exc}"
+        raise
 
     await database.update_pipeline_run(run3_id, status="done")
 
@@ -163,7 +163,7 @@ async def cv_generate(
     except LLMError as exc:
         await database.update_pipeline_run(run35_id, status="error", error_message=str(exc))
         log.error("cv_generate: Phase 3.5 LLM error: %s", exc)
-        return f"⚠️ Ошибка Claude на фазе 3.5:\n{exc}"
+        raise
 
     # ── Split review block from final CV ──────────────────────────────────────
     review_block, final_cv = _split_review_and_cv(phase35_output)
@@ -299,6 +299,14 @@ def _split_review_and_cv(phase35_output: str) -> tuple[str, str]:
             review = ""
             cv = phase35_output.strip()
         return review, cv.strip()
+
+    # ── Strategy 4: H1 heading — CV always starts with "# FirstName LastName" ─
+    # Review sections use ## / ### or plain text; H1 only appears as CV header.
+    m = re.search(r"(?m)^# [A-Z]", phase35_output)
+    if m and m.start() > 0:
+        review = phase35_output[: m.start()].strip()
+        cv = phase35_output[m.start():].strip()
+        return review, cv
 
     log.warning("cv_generate: no split anchor found in Phase 3.5 output — using full output as CV")
     return "", phase35_output.strip()

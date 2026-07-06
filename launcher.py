@@ -23,19 +23,15 @@ LOGS_DIR.mkdir(exist_ok=True)
 
 _ENV = os.environ.copy()
 _ENV["PYTHONIOENCODING"] = "utf-8"
+# Claude Code CLI lives in %LOCALAPPDATA%\..\local\bin — not in cmd.exe PATH by default.
+_claude_bin = Path(os.environ.get("USERPROFILE", "")) / ".local" / "bin"
+if _claude_bin.exists():
+    _ENV["PATH"] = str(_claude_bin) + os.pathsep + _ENV.get("PATH", "")
 
 # Lines containing these tokens are always shown in terminal (all services).
 _CRITICAL_TOKENS = ("ERROR", "CRITICAL", "Traceback", "Exception", "exited unexpectedly")
 
 SERVICES = [
-    {
-        "name": "Tracker  :8080",
-        "cmd": [PY, "-m", "uvicorn", "web.api:app", "--port", "8080"],
-        "cwd": ROOT,
-        "ready": "Application startup complete",
-        "log": "tracker.log",
-        "verbose": False,
-    },
     {
         "name": "PDF      :8002",
         "cmd": [PY, "-m", "uvicorn", "app:app", "--port", "8002"],
@@ -53,12 +49,12 @@ SERVICES = [
         "verbose": False,
     },
     {
-        "name": "Monitor",
-        "cmd": [PY, str(ROOT / "services" / "job-monitor" / "monitor.py")],
+        "name": "Web API  :8080",
+        "cmd": [PY, "-m", "uvicorn", "web.api:app", "--port", "8080"],
         "cwd": ROOT,
-        "ready": "Watching for new listings",
-        "log": "monitor.log",
-        "verbose": True,  # all monitor output → terminal
+        "ready": "Application startup complete",
+        "log": "webapi.log",
+        "verbose": False,
     },
     {
         "name": "Bot",
@@ -67,6 +63,14 @@ SERVICES = [
         "ready": "career-agent starting",
         "log": "bot.log",
         "verbose": False,
+    },
+    {
+        "name": "Monitor",
+        "cmd": [PY, str(ROOT / "services" / "job-monitor" / "monitor.py")],
+        "cwd": ROOT,
+        "ready": "Interval:",  # always printed regardless of first-launch vs resume
+        "log": "monitor.log",
+        "verbose": True,  # all monitor output → terminal
     },
 ]
 

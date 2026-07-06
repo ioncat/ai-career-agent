@@ -256,11 +256,11 @@ async def test_analyze_not_found(client):
 
 
 @pytest.mark.asyncio
-async def test_analyze_already_queued_returns_409(client):
-    """POST /api/vacancies/{id}/analyze returns 409 when already analysis_queued."""
+async def test_analyze_already_queued_accepts(client):
+    """POST /api/vacancies/{id}/analyze accepts analysis_queued (no worker attached in test)."""
     vid = await database.insert_vacancy(url="https://djinni.co/jobs/ana2/", status="analysis_queued")
     resp = client.post(f"/api/vacancies/{vid}/analyze")
-    assert resp.status_code == 409
+    assert resp.status_code == 202
 
 
 @pytest.mark.asyncio

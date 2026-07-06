@@ -22,6 +22,7 @@ import asyncio
 import logging
 import sys
 import time
+from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 import anthropic
@@ -67,6 +68,21 @@ def _calc_cost(model: str, inp: int, out: int, cw: int, cr: int) -> float:
         + cw * p["cache_write"]
         + cr * p["cache_read"]
     ) / 1_000_000
+
+
+def _budget_to_effort(budget_tokens: int | None) -> str:
+    """Map extended thinking budget to human-readable effort label."""
+    if not budget_tokens:
+        return "off"
+    if budget_tokens <= 1_000:
+        return "low"
+    if budget_tokens <= 5_000:
+        return "medium"
+    if budget_tokens <= 10_000:
+        return "high"
+    if budget_tokens <= 20_000:
+        return "xhigh"
+    return "max"
 
 
 # ── Exceptions ────────────────────────────────────────────────────────────────
@@ -284,6 +300,8 @@ class ClaudeProvider:
         self._sess_cost_usd += cost
         self._last_call_usage = {
             "model": self._model,
+            "provider": "claude_api",
+            "thinking_effort": _budget_to_effort(budget_tokens),
             "profile_tokens": profile_tokens_est,
             "prompt_tokens": prompt_tokens_est,
             "user_tokens": user_tokens_est,
@@ -448,6 +466,8 @@ class OllamaProvider:
         self._sess_output += out
         self._last_call_usage = {
             "model": self._model,
+            "provider": "ollama_api",
+            "thinking_effort": "",
             "profile_tokens": len(self._profile_md) // 4,
             "prompt_tokens": len(system) // 4 if system else 0,
             "user_tokens": len(user) // 4,
@@ -520,45 +540,152 @@ class ClaudeCodeProvider:
         self._sess_calls = 0
         self._last_call_usage: dict | None = None
 
+    @staticmethod
+    def _subprocess_env() -> dict:
+        """Build env for claude subprocess — adds common install dirs to PATH.
+
+        Needed because launcher.py may start agent.py from cmd.exe which lacks
+        ~/.local/bin (where Claude Code CLI installs on Windows/Linux).
+        """
+        import os as _os
+        from pathlib import Path as _Path
+        env = _os.environ.copy()
+        extra = [
+            _Path.home() / ".local" / "bin",
+            _Path(_os.environ.get("APPDATA", "")) / "npm",
+        ]
+        additions = _os.pathsep.join(str(p) for p in extra if p.exists())
+        if additions:
+            env["PATH"] = additions + _os.pathsep + env.get("PATH", "")
+        return env
+
+    @staticmethod
+    def _normalize_cli_output(text: str) -> str:
+        """Normalize CLI-specific output artifacts before returning to shared pipeline.
+
+        CLI (Claude Code agent) produces quirks the API never generates:
+        - Decimal scores: **Fit score:** 6.0/10  →  **Fit score:** 6/10
+        - Status lines:   ——  ✅ Phase 2 — Quick Scan ——  (stripped)
+        """
+        import re as _re
+        # Strip CLI status/progress wrapper lines (e.g. "—— ✅ Phase 2 — Quick Scan ——")
+        text = _re.sub(r"^[—\-–]{2,}.*?[—\-–]{2,}\s*$", "", text, flags=_re.MULTILINE)
+        # Normalise decimal scores to integer: 6.0/10 → 6/10, 7.5/10 → 7/10
+        text = _re.sub(
+            r"(\*\*Fit score:\*\*\s*)(\d+)\.\d+(/10)",
+            r"\g<1>\2\3",
+            text,
+            flags=_re.IGNORECASE,
+        )
+        return text.strip()
+
     async def complete(self, user: str, *, system: str | None = None, **_kwargs) -> str:
         """Call Claude Code CLI subprocess with profile + system + user prompt."""
-        parts = [self._profile_md]
+        # CLI is a code-execution agent — prepend explicit text-only guard so it
+        # doesn't try to write files when instructions say "goes to JD_analysis.md".
+        _GUARD = (
+            "OUTPUT INSTRUCTIONS: This is a pure text-generation task. "
+            "Output only markdown text. Do NOT use any tools. "
+            "Do NOT write files. Do NOT execute code. "
+            "Your entire response must be plain markdown."
+        )
+        parts = [self._profile_md, _GUARD]
         if system:
             parts.append(system)
         parts.append(user)
         prompt = "\n\n---\n\n".join(parts)
 
-        cmd = ["claude", "-p", prompt, "--model", self._model]
+        env = self._subprocess_env()
+        import shutil as _shutil
+        claude_exe = _shutil.which("claude", path=env.get("PATH", ""))
+        if not claude_exe:
+            raise LLMUnavailableError("claude CLI not found in PATH — install Claude Code CLI")
+
+        # Prompt passed via stdin (-p -) to avoid Windows 32767-char command-line limit.
+        cmd = [claude_exe, "-p", "-", "--model", self._model]
         if self._effort and self._effort != "off":
             cmd += ["--effort", self._effort]
 
+        debug_log = Path("logs/cli_debug.log")
+        debug_log.parent.mkdir(exist_ok=True)
+
         t0 = time.monotonic()
+        import datetime as _dt
+        ts = _dt.datetime.now().strftime("%m-%d %H:%M:%S")
+        with debug_log.open("a", encoding="utf-8") as _f:
+            _f.write(f"\n{'='*60}\n[{ts}] CLI call — model={self._model} effort={self._effort}\n")
+            _f.write(f"--- PROMPT ({len(prompt)} chars) ---\n{prompt[:2000]}{'...[truncated]' if len(prompt) > 2000 else ''}\n")
+            _f.write("--- RESPONSE (streaming) ---\n")
+
         try:
             proc = await asyncio.create_subprocess_exec(
                 *cmd,
-                stdin=asyncio.subprocess.DEVNULL,
+                stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                env=env,
             )
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=self._timeout)
-        except FileNotFoundError:
+        except FileNotFoundError as _e:
+            log.error("ClaudeCodeProvider: subprocess launch failed — exe=%s err=%s", claude_exe, _e)
             raise LLMUnavailableError("claude CLI not found in PATH — install Claude Code CLI")
+        except OSError as _e:
+            log.error("ClaudeCodeProvider: subprocess OSError — exe=%s err=%s", claude_exe, _e)
+            raise LLMUnavailableError(f"claude CLI OSError: {_e}")
+
+        # Write prompt to stdin and close — claude reads it via -p -
+        assert proc.stdin is not None
+        proc.stdin.write(prompt.encode("utf-8", errors="replace"))
+        await proc.stdin.drain()
+        proc.stdin.close()
+
+        # Stream stdout line-by-line so debug log shows real-time progress.
+        output_lines: list[str] = []
+        async def _read_stdout() -> None:
+            assert proc.stdout is not None
+            with debug_log.open("a", encoding="utf-8") as _f:
+                async for raw_line in proc.stdout:
+                    line = raw_line.decode(errors="replace")
+                    output_lines.append(line)
+                    _f.write(line)
+                    _f.flush()
+
+        try:
+            # Read stderr line-by-line (not read() to EOF) to avoid pipe-buffer deadlock
+            # when CLI writes large stderr while stdout is also streaming.
+            stderr_lines: list[str] = []
+            async def _read_stderr() -> None:
+                assert proc.stderr is not None
+                async for raw_line in proc.stderr:
+                    stderr_lines.append(raw_line.decode(errors="replace"))
+
+            await asyncio.wait_for(
+                asyncio.gather(_read_stdout(), _read_stderr()),
+                timeout=self._timeout,
+            )
         except asyncio.TimeoutError:
             proc.kill()
             raise LLMUnavailableError(f"claude CLI timed out after {self._timeout}s")
 
+        await proc.wait()
+
+        elapsed_sec = time.monotonic() - t0
+        with debug_log.open("a", encoding="utf-8") as _f:
+            _f.write(f"--- END (rc={proc.returncode}, {elapsed_sec:.1f}s) ---\n")
+
         if proc.returncode != 0:
-            err = stderr.decode(errors="replace")[:300]
+            err = "".join(stderr_lines)[:300]
             raise LLMError(f"claude CLI error (rc={proc.returncode}): {err}")
 
-        text = stdout.decode(errors="replace").strip()
+        text = self._normalize_cli_output("".join(output_lines).strip())
         if not text:
             raise LLMError("claude CLI returned empty response")
 
-        elapsed_ms = int((time.monotonic() - t0) * 1000)
+        elapsed_ms = int(elapsed_sec * 1000)
         self._sess_calls += 1
         self._last_call_usage = {
-            "model": f"claude_cli/{self._model}",
+            "model": self._model,
+            "provider": "claude_cli",
+            "thinking_effort": self._effort if self._effort != "off" else "",
             "profile_tokens": len(self._profile_md) // 4,
             "prompt_tokens": len(system) // 4 if system else 0,
             "user_tokens": len(user) // 4,

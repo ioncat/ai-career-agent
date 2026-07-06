@@ -380,10 +380,9 @@ async def test_generate_phase3_llm_error(tmp_path):
     mock_db = _mock_db(vacancy_row=vacancy_row, run_ids=[1])
 
     with patch("tools.cv_generate.database", mock_db):
-        result = await cv_generate(ctx, 1)
+        with pytest.raises(LLMError, match="Phase 3 timeout"):
+            await cv_generate(ctx, 1)
 
-    assert "⚠️" in result
-    assert "Phase 3 timeout" in result
     mock_db.update_vacancy_status.assert_not_called()
 
 
@@ -396,10 +395,9 @@ async def test_generate_phase35_llm_error(tmp_path):
     mock_db = _mock_db(vacancy_row=vacancy_row)
 
     with patch("tools.cv_generate.database", mock_db):
-        result = await cv_generate(ctx, 1)
+        with pytest.raises(LLMError, match="Phase 3.5 rate limit"):
+            await cv_generate(ctx, 1)
 
-    assert "⚠️" in result
-    assert "Phase 3.5 rate limit" in result
     mock_db.update_vacancy_status.assert_not_called()
     # [Name]_CV.md must NOT be written
     assert not (jd_path.parent / "Oleksii_Bondarenko_CV.md").exists()

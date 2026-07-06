@@ -5,6 +5,7 @@ Standalone: uvicorn web.api:app --reload
 Does not require ANTHROPIC_API_KEY or TELEGRAM_BOT_TOKEN.
 """
 
+import asyncio
 import json
 import logging
 import os
@@ -634,16 +635,48 @@ async def api_vacancy_restore(vacancy_id: int):
 
 
 @app.post("/api/vacancies/{vacancy_id}/generate-cv")
-async def api_vacancy_generate_cv(vacancy_id: int):
-    """Flutter Generate CV button — queues vacancy for CV generation pipeline.
+async def api_vacancy_generate_cv(vacancy_id: int, request: Request):
+    """Start Phase 3+3.5 CV generation immediately (Flutter Generate CV button).
 
-    Does not call LLM directly. Pipeline picks up cv_queued status.
+    Enqueues into CVWorker — processing starts without polling delay.
+    Status transitions: cv_generating → cv_generated.
+    Falls back to DB-only status when running without agent.py (standalone tracker).
     """
     row = await database.get_vacancy_by_id(vacancy_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Vacancy not found")
+    current_status = row["status"] if "status" in row.keys() else None
+    if current_status == "cv_generating":
+        raise HTTPException(status_code=409, detail="CV generation already in progress")
+    worker = getattr(request.app.state, "cv_worker", None)
+    if worker is not None:
+        await worker.enqueue(vacancy_id)
+        return {"id": vacancy_id, "status": "cv_generating"}
+    # Standalone fallback
     await database.update_vacancy_status(vacancy_id, "cv_queued")
     return {"id": vacancy_id, "status": "cv_queued"}
+
+
+@app.post("/api/vacancies/{vacancy_id}/generate-cover")
+async def api_vacancy_generate_cover(vacancy_id: int, request: Request):
+    """Start Phase 4 cover letter generation immediately (Flutter Generate Cover button).
+
+    Enqueues into CoverWorker — requires CV to already exist (status cv_generated or cover_generated).
+    Status transitions: cover_generating → cover_generated.
+    Falls back to DB-only status when running without agent.py (standalone tracker).
+    """
+    row = await database.get_vacancy_by_id(vacancy_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Vacancy not found")
+    current_status = row["status"] if "status" in row.keys() else None
+    if current_status == "cover_generating":
+        raise HTTPException(status_code=409, detail="Cover generation already in progress")
+    worker = getattr(request.app.state, "cover_worker", None)
+    if worker is not None:
+        await worker.enqueue(vacancy_id)
+        return {"id": vacancy_id, "status": "cover_generating"}
+    await database.update_vacancy_status(vacancy_id, "cover_generating")
+    return {"id": vacancy_id, "status": "cover_generating"}
 
 
 @app.get("/api/vacancies/{vacancy_id}/analysis")
@@ -712,23 +745,27 @@ async def api_vacancy_cv(vacancy_id: int):
 
 
 @app.post("/api/vacancies/{vacancy_id}/analyze", status_code=202)
-async def api_vacancy_analyze(vacancy_id: int):
-    """Queue vacancy for Phase 1+2 analysis (Flutter Analyze button, EPIC-22 B7).
+async def api_vacancy_analyze(vacancy_id: int, request: Request):
+    """Start Phase 1+2 analysis immediately (Flutter Analyze button).
 
-    Sets status to analysis_queued and returns 202.
-    RSSWatcher in agent.py picks up analysis_queued vacancies and runs cv_analyze.
-    Status transitions: analysis_queued → analyzing → analyzed → Web Push fires.
-    409 if vacancy is already queued or being analyzed.
+    Enqueues into AnalysisWorker — processing starts without polling delay.
+    Status transitions: analyzing → analyzed → Web Push fires.
+    409 if vacancy is already being analyzed.
+    Falls back to DB-only status when running without agent.py (standalone tracker).
     """
     row = await database.get_vacancy_by_id(vacancy_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Vacancy not found")
     current_status = row["status"] if "status" in row.keys() else None
-    if current_status in ("analysis_queued", "analyzing"):
-        raise HTTPException(status_code=409, detail=f"Already in progress: {current_status}")
-    await database.update_vacancy_status(vacancy_id, "analysis_queued")
-    # Clear previous error when re-queuing
+    if current_status == "analyzing":
+        raise HTTPException(status_code=409, detail="Already analyzing")
     await database.clear_analysis_error(vacancy_id)
+    worker = getattr(request.app.state, "analysis_worker", None)
+    if worker is not None:
+        await worker.enqueue(vacancy_id)
+        return {"id": vacancy_id, "status": "analyzing"}
+    # Standalone fallback (no agent.py running)
+    await database.update_vacancy_status(vacancy_id, "analysis_queued")
     return {"id": vacancy_id, "status": "analysis_queued"}
 
 
@@ -759,6 +796,23 @@ async def api_vacancy(vacancy_id: int):
     if row is None:
         raise HTTPException(status_code=404, detail="Vacancy not found")
     return dict(row)
+
+
+@app.get("/api/vacancies/{vacancy_id}/activity")
+async def api_vacancy_activity(vacancy_id: int):
+    """Return full activity log for a vacancy: pipeline_runs + llm_usage.
+
+    Used by Flutter Activity tab to show both phase execution status
+    (pipeline_runs) and LLM call details (llm_usage) in one request.
+    """
+    row = await database.get_vacancy_by_id(vacancy_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Vacancy not found")
+    runs, entries = await asyncio.gather(
+        database.get_vacancy_pipeline_runs(vacancy_id),
+        database.get_vacancy_activity(vacancy_id),
+    )
+    return {"vacancy_id": vacancy_id, "pipeline_runs": runs, "entries": entries}
 
 
 class AppliedUpdate(BaseModel):

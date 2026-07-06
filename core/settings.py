@@ -60,6 +60,7 @@ class Settings:
     claude_cli_timeout: int = 300          # CLAUDE_CLI_TIMEOUT — subprocess timeout for claude CLI (large prompts ~52s/17KB)
     allow_external_calls: bool = False     # ALLOW_EXTERNAL_CALLS=true to permit outbound HTTP
     rss_concurrency: int = 2               # max parallel cv_fetch_jd calls in RSS batch
+    llm_concurrency: int = 2              # LLM_CONCURRENCY — shared semaphore: max parallel LLM calls across all workers
     analysis_mode: str = "inbox_first"     # ANALYSIS_MODE=inbox_first (default) | full_auto
     vapid_private_key: str = ""            # VAPID_PRIVATE_KEY — PEM string (generate: see .env.example)
     vapid_public_key: str = ""             # VAPID_PUBLIC_KEY — base64url uncompressed point (for frontend)
@@ -132,6 +133,7 @@ def load_settings() -> Settings:
         claude_cli_timeout=int(_optional("CLAUDE_CLI_TIMEOUT", "300")),
         allow_external_calls=_optional("ALLOW_EXTERNAL_CALLS", "false").lower() == "true",
         rss_concurrency=int(_optional("RSS_CONCURRENCY", "2")),
+        llm_concurrency=int(_optional("LLM_CONCURRENCY", "2")),
         analysis_mode=_analysis_mode,
         vapid_private_key=_optional("VAPID_PRIVATE_KEY", ""),
         vapid_public_key=_optional("VAPID_PUBLIC_KEY", ""),
