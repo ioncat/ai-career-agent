@@ -19,7 +19,7 @@ from pathlib import Path
 from adapters.cv_adapter import CVAdapter
 from adapters.parser_adapter import ParserAdapter
 from contracts.profile import CandidateProfile
-from core.llm_client import ClaudeProvider, OllamaProvider
+from core.llm_client import ClaudeCodeProvider, ClaudeProvider, OllamaProvider
 
 
 @dataclass
@@ -39,7 +39,7 @@ class AgentDeps:
                         None if PROFILE.md is absent (pipeline runs with degraded personalisation).
     """
     parser_adapter: ParserAdapter
-    llm: ClaudeProvider | OllamaProvider
+    llm: ClaudeProvider | OllamaProvider | ClaudeCodeProvider
     vacancies_path: Path
     candidate_name: str
     cv_adapter: CVAdapter

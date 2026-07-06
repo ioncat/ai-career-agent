@@ -33,12 +33,20 @@ STATE_FILE = _BASE / "seen_jobs.json"
 LOCK_FILE = _BASE / "monitor.lock"
 FEEDS_FILE = _PROJECT / "feeds.json"
 CONFIG_FILE = _PROJECT / "config.json"
-HEADERS = {"User-Agent": "Mozilla/5.0 (vacancy-monitor/1.0)"}
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/125.0.0.0 Safari/537.36"
+    ),
+    "Accept": "application/rss+xml, application/xml, text/xml, */*",
+    "Accept-Language": "uk-UA,uk;q=0.9,en-US;q=0.8,en;q=0.7",
+}
 
 # Defaults applied when config.json is missing or a field is omitted.
 DEFAULT_CONFIG = {
     "interval_minutes": 5,
-    "http_timeout": {"total_seconds": 30, "connect_seconds": 10},
+    "http_timeout": {"total_seconds": 45, "connect_seconds": 20},
     "check_timeout_seconds": 120,
     "retry": {"backoff_schedule_seconds": [60, 300, 1800, 7200]},
     "logging": {"level": "INFO", "max_bytes": 10 * 1024 * 1024, "backup_count": 5},

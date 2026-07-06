@@ -21,6 +21,7 @@ from contextlib import suppress
 from dataclasses import dataclass
 
 from core.deps import AgentDeps
+from core.settings import Settings
 from db import database
 
 log = logging.getLogger(__name__)
@@ -57,12 +58,14 @@ class RSSWatcher:
         telegram_bot: object,   # TelegramBot — avoids circular import
         poll_interval: int = 30,
         concurrency: int = 2,
+        settings: Settings | None = None,
     ) -> None:
         self._deps = deps
         self._bot = telegram_bot
         self._interval = poll_interval
         self._task: asyncio.Task | None = None
         self._sem = asyncio.Semaphore(concurrency)
+        self._settings = settings
 
     async def start(self) -> None:
         """Launch background polling task."""
@@ -83,12 +86,11 @@ class RSSWatcher:
     # ── Internal ──────────────────────────────────────────────────────────────
 
     async def _run(self) -> None:
-        """Polling loop — runs until cancelled."""
+        """Polling loop — runs until cancelled. Only handles RSS fetch."""
         while True:
             await asyncio.sleep(self._interval)
             try:
                 await self._poll_once()
-                await self._poll_analyze_queue()
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
@@ -117,47 +119,6 @@ class RSSWatcher:
         for row, exc in zip(rows, results):
             if isinstance(exc, Exception):
                 log.error("RSSWatcher: failed %s: %s", row["url"], exc)
-
-    async def _poll_analyze_queue(self) -> None:
-        """Pick up analysis_queued vacancies (triggered by POST /api/vacancies/{id}/analyze).
-
-        Claim → analyzing → cv_analyze → analyzed → Web Push.
-        Runs under the same semaphore as RSS-triggered analysis to cap LLM concurrency.
-        """
-        from tools.cv_analyze import cv_analyze
-
-        rows = await database.list_vacancies(
-            status="analysis_queued",
-            user_id=self._deps.user_id,
-        )
-        if not rows:
-            return
-
-        log.info("RSSWatcher: %d vacancy(s) in analysis_queued", len(rows))
-
-        for row in rows:
-            await database.update_vacancy_status(row["id"], "analyzing")
-
-        async def _run_analysis(vacancy_id: int) -> None:
-            ctx = _Ctx(deps=self._deps)
-            async with self._sem:
-                try:
-                    await cv_analyze(ctx, vacancy_id)  # type: ignore[arg-type]
-                    log.info("RSSWatcher: analysis done — vacancy_id=%d", vacancy_id)
-                except Exception as exc:
-                    err_msg = str(exc)[:500]
-                    log.error("RSSWatcher: analysis failed v#%d: %s", vacancy_id, err_msg)
-                    await database.set_analysis_error(vacancy_id, err_msg)
-                    return
-            await self._push_result(vacancy_id)
-
-        results = await asyncio.gather(
-            *[_run_analysis(row["id"]) for row in rows],
-            return_exceptions=True,
-        )
-        for row, exc in zip(rows, results):
-            if isinstance(exc, Exception):
-                log.error("RSSWatcher: analyze_queue failed v#%d: %s", row["id"], exc)
 
     async def _push_result(self, vacancy_id: int) -> None:
         """Send Web Push notification with fit result after Phase 1+2 completes."""
@@ -232,7 +193,7 @@ class RSSWatcher:
             await database.update_vacancy_status(vacancy_id, "fetched")
 
             # inbox_first mode: stop after fetch — user triggers analysis manually
-            if self._deps.settings.analysis_mode != "full_auto":
+            if self._settings is None or self._settings.analysis_mode != "full_auto":
                 log.info("RSSWatcher: mode=inbox_first — v#%d fetched, awaiting user", vacancy_id)
                 return
 

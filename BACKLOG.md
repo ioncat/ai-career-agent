@@ -1,8 +1,59 @@
 # career-agent — Backlog
 
-> Last updated: 2026-07-05
+> Last updated: 2026-07-06
 > Epic format: post-pivot epics (13+) live in `docs/delivery/epics/`. This file = priority tracker + status overview.
 > Pre-pivot epics (1–12): `docs/delivery/epics-archive/EPIC-01-12-pre-pivot.md`
+
+---
+
+## ✅ Delivered Features
+
+### 2026-07-06
+- **Flutter — ProcessingWrapper**: cross-cutting `ProcessingWrapper` widget (snake border animation via `CustomPainter` + `PathMetrics` + phase overlay with spinner + label) replaces 4 per-status badge classes in `VacancyCard`; `kActiveStatuses` map in `active_status.dart` is single source of truth — adding a status there auto-enables animation everywhere
+- **Launcher — correct startup order + Monitor ready signal**: Bot starts before Monitor (eliminates webhook race on startup); Monitor ready signal fixed to `"Interval:"` (appears on every run, not just first launch)
+- **Architecture — AnalysisWorker + CVWorker**: immediate asyncio.Queue dispatch replaces 60s polling; shared `LLMSemaphore` (env `LLM_CONCURRENCY`); `_fresh_llm()` reads user_settings from DB per run; RSSWatcher stripped to RSS-only; workers wired via `app.state` into FastAPI
+- **Claude CLI PATH + stdin fix**: `_subprocess_env()` + `shutil.which()` resolves full exe path; prompt passed via stdin (`-p -`) instead of command-line arg — bypasses Windows 32767-char `CreateProcess` limit (`WinError 206`); removes `_find_claude()` which returned `claude.EXE` causing `FileNotFoundError`
+- **cv_generate — LLMError propagation**: Phase 3 + 3.5 now `raise` on `LLMError` instead of returning error string; CVWorker resets status to `analyzed` on exception
+- **Flutter Detail — Tabs UX (T1–T4)**: `VacancyDetailScreen` → `ConsumerStatefulWidget` with `TabController(length: 4)`; tabs: Analysis | CV | Cover | Activity; `_CvTab` + `_CoverTab` — watch `vacancyCvProvider`, show spinner during `cv_queued`/`cv_generating`, content or empty state otherwise; `didUpdateWidget` auto-switch on `cv_generating → cv_generated` + `ref.invalidate(vacancyCvProvider)`; removed `VacancyCvDialog` + "View CV" button; `vacancy_cv_screen.dart` deleted; Web API :8080 added to `launcher.py` SERVICES list
+- **Flutter — Activity Log tab**: second tab in detail screen showing per-call LLM journal (phase · provider · model · effort · elapsed · tokens in→out · cost); DB migration adds `provider` + `thinking_effort` to `llm_usage`; `GET /api/vacancies/{id}/activity` endpoint; `_budget_to_effort()` helper maps budget_tokens → effort label; Pipeline Runs section above LLM Calls
+- **Flutter — Activity tab table layout**: replaced monospace string blocks with `Table` widget (aligned columns, header separator, right-aligned numeric cols); UTC→local timezone conversion via `DateTime.parse(iso).toLocal()`
+- **CLI provider — format fixes**: `_normalize_cli_output()` strips CLI-specific artifacts (progress wrapper lines, decimal scores `6.0/10 → 6/10`) before returning to shared parser; `_GUARD` preamble prevents CLI agent from attempting file writes when prompt says "goes to JD_analysis.md"; debug log `logs/cli_debug.log` streams stdout line-by-line in real time
+- **CLI provider — stderr deadlock fix**: switched from `proc.stderr.read()` (blocks until EOF) to streaming `async for` on both stdout and stderr via `asyncio.gather`; eliminates pipe-buffer deadlock on large stderr output
+- **RSS watcher — `_fresh_llm()`**: reads `user_settings` from DB before each analysis run, builds fresh `ClaudeCodeProvider` / `ClaudeProvider` / `OllamaProvider` with current model + thinking_effort; profile MD re-read from disk; no backend restart required after Settings change; `AgentDeps` type union extended with `ClaudeCodeProvider`
+- **Phase 2 parse-fail surfacing**: when LLM call succeeds but output doesn't match parser (`p2 is None`) → writes `analysis_error` to DB, sets `status='analysis_failed'`, returns user-visible message with 300-char raw snippet; previously silent `log.warning` only
+- **Flutter — unread badge**: "New" badge shown only for vacancies not yet opened by user; tracked via `readVacanciesProvider` (SharedPreferences `Set<int>`); marked read on card tap
+- **Flutter — auto-advance on skip**: after Skip in inbox, automatically selects next unread vacancy instead of showing empty screen; fires only on successful decline
+- **Flutter — starred**: star toggle (⭐) in vacancy card Row 1 (right of date) + detail screen action bar; optimistic state; `PATCH /api/vacancies/{id}/starred`
+- **Flutter — applied**: "Applied?" / "Applied ✓" toggle button in detail screen action bar only; optimistic state; `PATCH /api/vacancies/{id}/applied`
+
+### 2026-07-05
+- **Flutter Settings — dynamic model list**: available models fetched from Anthropic API / Ollama at runtime; 24h TTL cache in `system_kv` table; fallback to hardcoded list on network error
+- **Flutter Settings — thinking effort**: `SegmentedButton` (Off/Low/Med/High/xHigh/Max); hidden for Ollama; `PATCH /api/config`; stored in `user_settings` DB table
+- **Flutter Detail — hover tooltips**: `_TooltipTitle` on all major sections (Fit, Attraction, Quick Overview, Fit Dimensions, Attraction Breakdown, Role Balance)
+- **Flutter Detail — JD always visible**: Job Description section always shown at bottom of detail view; pushed down by analysis, never hidden
+- **Flutter Detail — score dot rows**: Fit + Attraction shown as colored dot rows (≥70% green / 40–69% amber / <40% red) in `_VacancyHero`
+- **Flutter Detail — sections collapsed by default**: Fit Dimensions, Attraction Breakdown, Role Balance collapsed; Job Description expanded
+
+### 2026-07-03
+- **Flutter Inbox — Analyze / Skip / Restore**: action buttons in JD view; Skip → `declined`; Restore from archive → inbox
+- **Flutter Inbox — queue animation**: "In queue" badge with pulse animation; "Analyzing..." spinner badge
+- **Flutter Inbox — analysis error surfacing**: `analysis_failed` state shown with error message + Retry button
+- **Flutter Inbox — markdown JD render**: `flutter_markdown` in JD view and JD section of detail screen
+
+### 2026-07-01
+- **Flutter Detail — CV / Cover preview**: `VacancyCvDialog` — side-by-side CV.md + Cover.md with markdown render; Generate CV button in action bar
+- **Flutter Detail — full analysis view**: `_VacancyHero`, `_QuickOverviewCard`, `_FitDimsTable`, `_VacScoreTable`, `_RoleBalanceBar`, `_CollapsibleSection`
+
+### 2026-06-30
+- **Flutter Inbox — vacancy list with polling**: 30s polling, cache in SharedPreferences, status-based folder routing (inbox / in_progress / applied / archive)
+- **Flutter Inbox — filter panel**: status chips + date range picker
+- **Flutter Inbox — search**: role + company full-text filter
+
+### 2026-06-20
+- **Flutter MVP scaffold**: app shell, navigation rail, VacancyCard, VacancyInboxScreen master-detail layout
+- **RSS watcher → Web Push**: after Phase 1+2 analysis completes, push notification sent to Flutter via VAPID
+
+---
 
 ---
 
@@ -12,7 +63,7 @@
 
 **Status:** Phase C complete (2026-07-05). Flutter MVP done: VacancyCard + detail redesign, VerdictCard, analysis error surfacing, settings screen, EPIC-23 provider display, EPIC-24 T5/T6/T8 evidence injection. Next: Phase D (Telegram removal, FSM orchestrator) or EPIC-24 T7 after real pipeline test.
 
-**Сводный план (все эпики, строгая очерёдность):** `docs/delivery/INBOX-FIRST-FLOW.md` → секция "Сводный план"
+**Full delivery plan (all epics, strict order):** `docs/delivery/INBOX-FIRST-FLOW.md` → section "Delivery Plan"
 
 **Critical path:** Phase A (auto-pipeline) → Phase B (JSON contracts + EPIC-21 Tasks 2–3) → Phase C (Flutter MVP) → Phase D (polish + Telegram removal).
 
@@ -20,11 +71,11 @@
 
 ## ✅ P1 — [EPIC-23](docs/delivery/Epics/EPIC-23-claudecode-provider.md) — Claude Code CLI Provider (done 2026-07-05)
 
-**Цель:** тестировать полный pipeline через Flutter без расхода API credits. `LLM_PROVIDER=claude_cli` → вызовы идут через `claude -p` subprocess → используется подписка Claude Code, стоимость $0.
+**Goal:** test the full pipeline via Flutter without consuming API credits. `LLM_PROVIDER=claude_cli` → calls go through `claude -p` subprocess → uses Claude Code subscription, cost $0.
 
-**Статус:** ✅ All 5 tasks done. `ClaudeCodeProvider` реализован + протестирован. Flutter Settings показывает активный провайдер.
+**Status:** ✅ All 5 tasks done. `ClaudeCodeProvider` implemented + tested. Flutter Settings shows active provider.
 
-**Активация:** `LLM_PROVIDER=claude_cli` в `.env`.
+**Activation:** `LLM_PROVIDER=claude_cli` in `.env`.
 
 ---
 
@@ -45,7 +96,7 @@
 After EPIC-21 lands: audit all docs and diagrams for staleness vs. implemented FSM.
 
 - `docs/diagrams/EPIC-21-pipeline-fsm.html` — verify FSM states + sequence match final implementation
-- `ARCHITECTURE.md` — update pipeline phases table, mode comparison table (Режим 4 description changes with Task 6)
+- `ARCHITECTURE.md` — update pipeline phases table, mode comparison table (Mode 4 description changes with Task 6)
 - `CLAUDE.md` — update "Current phase" status line
 - `docs/local-app.md`, `docs/system-flow.md` — verify they reflect FSM orchestrator, not agent-driven steps
 - `README.md` — pipeline descriptions, any architecture diagrams
@@ -83,30 +134,69 @@ After EPIC-21 lands: audit all docs and diagrams for staleness vs. implemented F
 
 ---
 
+## 🟡 P2 — Worker-Critic Pipeline (added 2026-07-06)
+
+**Idea:** Two-agent loop per phase. Worker produces output → Critic reviews it as a demanding client → Worker revises → repeat until Critic approves or max iterations reached.
+
+**Goal:** Measurably improve content quality of each pipeline phase without manual intervention. Phase 3.5 (CV self-review) is an early version of this pattern — generalize it.
+
+**Scope:**
+- Phase 1+2 (JD analysis + fit) — Critic checks: are barriers honest? is fit score calibrated? any hallucinations?
+- Phase 3 (CV draft) — Critic checks: tailoring to JD, no contamination from other vacancies, no generic filler
+- Phase 4 (cover letter) — Critic checks: positioning, no evidence leaks, tone matches role seniority
+- Phase 3.5 already exists as a single self-review pass — Worker-Critic replaces/extends it with an adversarial loop
+
+**Design:**
+```
+Worker prompt → Worker output
+                      ↓
+              Critic prompt (role: "demanding hiring manager / senior recruiter")
+              + Worker output + original JD + PROFILE.md
+                      ↓
+              Critic verdict: APPROVED | NEEDS_REVISION + critique notes
+                      ↓ (if NEEDS_REVISION, max 2 iterations)
+              Worker revision prompt + critique notes → revised output
+                      ↓
+              Critic re-review → APPROVED
+```
+
+**Key decisions before implementation:**
+1. Same model for Worker + Critic, or different models? (Critic could be cheaper/faster)
+2. Max iterations: 1 or 2 revision rounds? (each round = 2 LLM calls + cost)
+3. Critic persona prompt: generic "demanding client" or role-specific (PM hiring manager vs. tech lead)?
+4. Storage: save Critic notes to `analysis_json.critic_notes[]` per phase for Activity log visibility
+5. Feature-flag: `CRITIC_ENABLED=true/false` in `.env` — off by default until validated
+
+**Experiment plan:** run same vacancy through pipeline with Critic off vs. on → compare output quality manually → decide if cost is justified.
+
+**Estimated cost impact:** +50–100% per phase (one extra Critic call + possible revision call). Worth it only if quality delta is significant.
+
+---
+
 ## 🟡 P1 — Phase 2.5 Objection Handling (added 2026-06-05)
 
-New pipeline step formalized in `skill/SKILL.md` → "Phase 2.5 — Objection Handling": when Key Barriers ≠ нет, resolve weaknesses interactively BEFORE CV draft; resolved evidence appended to PROFILE.md + JD_analysis.md.
+New pipeline step formalized in `skill/SKILL.md` → "Phase 2.5 — Objection Handling": when Key Barriers ≠ none, resolve weaknesses interactively BEFORE CV draft; resolved evidence appended to PROFILE.md + JD_analysis.md.
 **Follow-up:** dedicated `prompts/[skill_type]/phase2_5_objections.md` prompt file (currently spec lives in SKILL.md). Optional DB `analysis_json.p2_5`.
 
 ---
 
 ## 🟡 P1 — [EPIC-24](docs/delivery/Epics/EPIC-24-progressive-profile.md): Progressive Profile — Structured DB Profile + Onboarding (updated 2026-07-05)
 
-**Центральный элемент pipeline.** PROFILE.md = уже отфильтрованный CV. Phase 3 не может найти сигналы которых нет в контексте.
+**Central pipeline element.** PROFILE.md = pre-filtered CV. Phase 3 cannot find signals that are absent from context.
 
-**Решение — два слоя профиля:**
+**Solution — two profile layers:**
 
 ```
-users.progressive_profile (SQLite) ← DB profile: rich structured roles, все детали опыта
-                                     Phase 3 читает нужные секции → богатый контекст
-                                     Flutter читает через /api/users/{id}/progressive_profile
+users.progressive_profile (SQLite) ← DB profile: rich structured roles, all experience details
+                                     Phase 3 reads required sections → rich context
+                                     Flutter reads via /api/users/{id}/progressive_profile
 
-PROFILE.md                         ← только: Settings, Name variants, Contacts,
+PROFILE.md                         ← only: Settings, Name variants, Contacts,
                                      Archetype, Vacancy Preferences, Honest Gaps
-                                     Опыт вынесен в DB profile
+                                     Experience moved to DB profile
 ```
 
-**Схема `progressive_profile` (Tasks 1-4 ✅ реализована):**
+**`progressive_profile` schema (Tasks 1–4 ✅ implemented):**
 ```json
 {
   "meta": { "schema_version": 1, "last_updated": "2026-07-02" },
@@ -116,7 +206,7 @@ PROFILE.md                         ← только: Settings, Name variants, Co
       "company": "HostiServer.com",
       "title": "Product Owner — Platform & Operational Systems",
       "dates": "Jan 2018 – Oct 2021",
-      "narrative": "Полный нарратив роли — всё что делал, контекст, кейсы...",
+      "narrative": "Full role narrative — everything done, context, case studies...",
       "key_results": ["Improved NPS from +19 to +48", "Reduced billing errors by ~95%"],
       "framing": [{"label": "Founder Proxy", "emphasis": "...", "de_emphasis": "..."}],
       "caveats": ["Support team not on LinkedIn — disclose selectively"],
@@ -126,21 +216,70 @@ PROFILE.md                         ← только: Settings, Name variants, Co
 }
 ```
 
-**Переключение профиля** — в `/analyze` Step 0: `[4] Профиль: Markdown → DB`.
-Переменная `PROFILE_SOURCE = md|db`. DB профиль: читается `SELECT progressive_profile FROM users WHERE id=[id]`.
+**Profile switch** — in `/analyze` Step 0: `[4] Profile: Markdown → DB`.
+Variable `PROFILE_SOURCE = md|db`. DB profile: read via `SELECT progressive_profile FROM users WHERE id=[id]`.
 
-**Статус:**
-- Tasks 1–4 + A: ✅ Done 2026-07-02. 4 роли засеяны. Toggle `[4]` в `/analyze` Step 0.
+**Status:**
+- Tasks 1–4 + A: ✅ Done 2026-07-02. 4 roles seeded. Toggle `[4]` in `/analyze` Step 0.
 - Task 5: ✅ Done 2026-07-05. `scripts/profile_merge.py` + `prompts/pm/phase2_5_writeback.md` + SKILL.md call.
-- Task 6: ✅ Done 2026-07-05. `progressive_profile` roles[] инжектируются в Phase 3 user message как "Candidate Evidence (DB Profile)".
-- Task 7: 🟡 Pending — ждём реального pipeline теста с DB evidence перед trim PROFILE.md.
-- Task 8: ✅ Done 2026-07-05. `GET /api/users/{id}/progressive_profile` + 3 теста.
+- Task 6: ✅ Done 2026-07-05. `progressive_profile` roles[] injected into Phase 3 user message as "Candidate Evidence (DB Profile)".
+- Task 7: 🟡 Pending — waiting for real pipeline test with DB evidence before trimming PROFILE.md.
+- Task 8: ✅ Done 2026-07-05. `GET /api/users/{id}/progressive_profile` + 3 tests.
 
-**Следующие шаги:**
-- **Task 7:** Trim PROFILE.md — убрать Experience + Additional Evidence (после реального pipeline теста T6)
+**Next steps:**
+- **Task 7:** Trim PROFILE.md — remove Experience + Additional Evidence (after real pipeline test T6)
 - **Task 9:** Onboarding interview flow (LLM-driven, EPIC-17 Phase 2)
 
-**Design doc:** `docs/discovery/progressive-profile.md` (gitignored) — схема, поля, rationale.
+**Design doc:** `docs/discovery/progressive-profile.md` (gitignored) — schema, fields, rationale.
+
+---
+
+## 🟠 P1 — Архитектура: мгновенный запуск задач вместо polling (added 2026-07-06)
+
+**Проблема:** Анализ и генерация CV запускаются через polling loop (RSSWatcher, 60s интервал). Пользователь нажимает кнопку — ждёт до 60 сек до начала обработки. Неприемлемо.
+
+**Принцип:** Команда пользователя должна выполняться немедленно. Поллер не должен управлять пользовательскими действиями.
+
+**Правильная архитектура:**
+- `RSSWatcher` — только RSS: следит за новыми вакансиями из внешних источников. Больше ничего.
+- Анализ / генерация CV — отдельный `TaskRunner` с `asyncio.Queue`. API-эндпоинт кладёт задачу в очередь → воркер немедленно подхватывает и выполняет.
+
+**Дизайн TaskRunner:**
+```python
+class TaskRunner:
+    def __init__(self): self._queue = asyncio.Queue()
+    async def enqueue(self, task): await self._queue.put(task)
+    async def _run(self):
+        while True:
+            task = await self._queue.get()  # ждёт мгновенно, без polling
+            await task()
+```
+
+**Scope:**
+- [ ] Создать `core/task_runner.py` — `TaskRunner` с `asyncio.Queue`
+- [ ] `web/api.py` — `/analyze` и `/generate-cv` кладут задачу в `TaskRunner.enqueue()`, не меняют только статус
+- [ ] `core/rss_watcher.py` — убрать `_poll_analyze_queue()` и `_poll_cv_queue()`, оставить только RSS fetch
+- [ ] `agent.py` — инициализировать `TaskRunner` рядом с `RSSWatcher`
+- [ ] Тесты
+
+---
+
+## 🟡 P1 — Flutter UX: Card Processing Animation (added 2026-07-06)
+
+**Идея:** Визуальная обратная связь когда над вакансией ведётся работа — пользователь должен чётко понимать что происходит без заглядывания в логи.
+
+**Дизайн:**
+- **Border animation (змейка):** по периметру карточки бежит подсвеченная линия (CSS border-gradient animation или Flutter custom painter) пока статус = `analyzing` / `cv_generating`
+- **Phase overlay:** поверх карточки полупрозрачный текст с названием текущей фазы — не номер, а человеческое описание:
+  - `analyzing` → "Analyzing job description..."
+  - `cv_generating` → "Generating CV..."
+  - `analysis_queued` → "In queue..."
+- Оверлей не блокирует клик по карточке — просто декоративный
+
+**Scope:**
+- [ ] Flutter: кастомный `AnimatedBorder` painter на карточке для active-статусов
+- [ ] Flutter: `Stack` поверх карточки с `PhaseOverlay` виджетом
+- [ ] Тексты фаз — отдельный маппинг `status → human label`
 
 ---
 
@@ -154,7 +293,7 @@ PROFILE.md                         ← только: Settings, Name variants, Co
 ### Vacancy List & Cards
 - **Return to inbox from archive** — user must be able to move any archived vacancy back to inbox. Currently no such action exists.
 - **"In queue" card state** — text is grey, invisible, zero animation. Needs pulse/shimmer animation + non-grey color (e.g. amber). Easy visual win, makes queue state obvious.
-- **Queue journal / log panel** — when vacancy enters analysis queue, a visible log panel should appear showing all queued vacancies + their status. Useful especially for batch. Consider async parallel processing of queued items.
+- **Queue journal / log panel** — when a vacancy enters the analysis queue, a visible log panel should appear showing all queued vacancies and their status. Useful especially for batch. Consider async parallel processing of queued items.
 
 ### JD Text Display
 - **Markdown not rendered** — JD text shown for fetched vacancies, but raw markdown (asterisks, etc.) not parsed. Need `flutter_markdown` or equivalent widget.
@@ -165,7 +304,7 @@ PROFILE.md                         ← только: Settings, Name variants, Co
   - Pre-flight health check before sending analyze request (confirm backend alive)
   - Show some in-progress indicator (timer, phase label, or heartbeat)
   - Surface backend errors to user — e.g. token exhaustion, LLM timeout — must not silently fail
-- **Comment:** "якщо backend реально аналізує" — this UX gap is a known complaint. Defer to dedicated issue but track here.
+- **Comment:** "is the backend actually analyzing?" — this UX gap is a known complaint. Defer to dedicated issue but track here.
 
 ### Settings Screen
 - **Model shown as Haiku** — if user wants a different model, no way to change from Flutter. At minimum: show current model from `/api/config`, note that model is set via `.env / LLM_MODEL`. Future: dropdown in settings.
@@ -217,12 +356,43 @@ PROFILE.md                         ← только: Settings, Name variants, Co
 ## ✅ P1 — Inbox deduplication (2026-06-02)
 
 - `skill/SKILL.md` — Sequential Mode: step a.5 dedup (URL grep → skip/reprocess prompt)
-- `skill/SKILL.md` — Batch Mode: silent dedup, `♻️ уже обработана` in table
+- `skill/SKILL.md` — Batch Mode: silent dedup, `♻️ already processed` in table
 - `.claude/commands/analyze.md` — step 3 dedup note added before inbox menu
 
 ---
 
 ## P1 — Testing & Operations
+
+### 🟢 Tech Debt — Переименовать RSSWatcher → BackgroundWorker (added 2026-07-06)
+
+**Why:** `RSSWatcher` исторически начинался как RSS-поллер, но сейчас это общий планировщик фоновых задач: fetch JD + analysis queue + CV generation queue. Название вводит в заблуждение — новый разработчик будет искать CV-генерацию не там. Рефактор чисто механический (rename class + file).
+
+**Scope:**
+- [ ] `core/rss_watcher.py` → `core/background_worker.py`, class `RSSWatcher` → `BackgroundWorker`
+- [ ] `agent.py` — обновить импорт и инстанциирование
+- [ ] `tests/test_rss_watcher.py` → `tests/test_background_worker.py`
+- [ ] CLAUDE.md — обновить структуру проекта
+
+---
+
+### 🔴 Job Monitor — Error Alerting (added 2026-07-06)
+
+**Why:** Monitor is first stage. Silent failure kills entire pipeline. No current alerting — errors only in logs.
+
+**Design:**
+1. **Per-feed failure counter** — `seen_jobs.json` → `_feed_health[feed_name]` = `{consecutive_failures, last_success, last_error}`
+2. **Telegram alert threshold** — `consecutive_failures >= 3` → POST `/api/alert` or direct Telegram message
+3. **Recovery alert** — first success after failure streak → "Feed recovered" notification
+4. **`health_check.py`** — reads `_feed_health` from state file; flags feeds with `consecutive_failures >= 3` OR `last_success` older than 2h
+
+**Scope:**
+- [ ] `services/job-monitor/monitor.py` — failure counter per feed, alert on threshold, reset on success
+- [ ] `services/job-monitor/monitor.py` — `_feed_health` section written to `seen_jobs.json` after each poll cycle
+- [ ] `scripts/health_check.py` — `--monitor` flag: read state file, check feed health, exit 1 on stale/failed feeds
+
+**Alert channel:** Telegram (already used by health_check.py). Direct bot API call from monitor (no career-agent dependency).
+
+---
 
 ### 🟡 e2e_test.py — integration verification
 
@@ -306,25 +476,25 @@ Feature: cost estimate sent to user before full pipeline run.
 Trigger: after `cv_fetch_jd` — JD.md is known, size is known.
 
 ```
-💰 Оценка бюджета — [Vacancy title]
-Phase 1 (анализ):    ~$0.04
-Phase 2 (фит):       ~$0.06
+💰 Cost estimate — [Vacancy title]
+Phase 1 (analysis):  ~$0.04
+Phase 2 (fit):       ~$0.06
 Phase 3 (CV draft):  ~$0.05
 Phase 3.5 (review):  ~$0.07
 Phase 4 (cover):     ~$0.05
 ──────────────────────────
-Итого:               ~$0.27
+Total:               ~$0.27
 
-Запустить полный pipeline? [Да] [Только анализ] [Отмена]
+Run full pipeline? [Yes] [Analysis only] [Cancel]
 ```
 
 - [ ] `tools/cv_estimate.py` — token estimate per phase + cost calc
 - [ ] Fallback to baseline averages from `docs/discovery/Tokenomics.md` if no DB history
-- [ ] Telegram inline keyboard: [Да] [Только анализ] [Отмена]
+- [ ] Telegram inline keyboard: [Yes] [Analysis only] [Cancel]
 
 ---
 
-## ~~P1 — Детерминированный pipeline~~ → folded into [EPIC-21](docs/delivery/Epics/EPIC-21-deterministic-vs-cognitive-pipeline.md)
+## ~~P1 — Deterministic pipeline~~ → folded into [EPIC-21](docs/delivery/Epics/EPIC-21-deterministic-vs-cognitive-pipeline.md)
 
 Merged 2026-06-15. The "agent generates content, code applies fixed template" principle and its checklist (strict JD_analysis.md / CV templates, inbox-flow extraction, SKILL.md step review) are now EPIC-21 Tasks 1–4 + 6.
 
@@ -338,14 +508,14 @@ Merged 2026-06-15. Engine decision resolved: **weasyprint** (HTML/Jinja2 + CSS �
 
 ## 🟡 Docker deploy on VM — next session
 
-`docker-compose.yml` готов (5 сервисов). WeasyPrint требует GTK — только в Docker (Linux контейнер).
+`docker-compose.yml` ready (5 services). WeasyPrint requires GTK — Linux container only.
 
 **Plan:**
-1. На VM: `git pull && docker compose up --build`
-2. Порты биндятся на `0.0.0.0` — доступно по IP виртуалки
-3. Из Windows: `http://VM_IP:8080` (трекер), бот через Telegram
+1. On VM: `git pull && docker compose up --build`
+2. Ports bind to `0.0.0.0` — accessible via VM IP
+3. From Windows: `http://VM_IP:8080` (tracker), bot via Telegram
 
-**launcher.py** — локальный запуск без Docker (все 5 сервисов в одном окне, sequential start, Ctrl+C убивает всё). PDF сервис на Windows без GTK не работает — только через Docker.
+**launcher.py** — local startup without Docker (all 5 services in one window, sequential start, Ctrl+C kills all). PDF service on Windows without GTK not functional — Docker only.
 
 ---
 
@@ -424,7 +594,7 @@ Merged 2026-06-15. Engine decision resolved: **weasyprint** (HTML/Jinja2 + CSS �
 
 ## ✅ start.vbs → launcher.py (2026-06-16)
 
-Заменён на `launcher.py` — Python-оркестратор в одном CMD окне.
+Replaced by `launcher.py` — Python orchestrator in a single CMD window.
 
 ---
 

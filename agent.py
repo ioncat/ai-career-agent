@@ -26,6 +26,9 @@ import uvicorn
 from adapters.cv_adapter import CVAdapter
 from adapters.parser_adapter import ParserAdapter
 from core.deps import AgentDeps
+from core.analysis_worker import AnalysisWorker
+from core.cv_worker import CVWorker
+from core.cover_worker import CoverWorker
 from core.rss_watcher import RSSWatcher
 from core.settings import ConfigError, load_settings
 from core.llm_client import ClaudeProvider, OllamaProvider, ClaudeCodeProvider
@@ -206,12 +209,19 @@ async def main() -> None:
         default_user_id=default_user_id,
     )
 
-    # ── 7. RSS Watcher ────────────────────────────────────────────────────────
+    # ── 7. Workers + RSS Watcher ──────────────────────────────────────────────
+    llm_sem = asyncio.Semaphore(settings.llm_concurrency)
+
+    analysis_worker = AnalysisWorker(deps=deps, settings=settings, llm_sem=llm_sem)
+    cv_worker = CVWorker(deps=deps, settings=settings, llm_sem=llm_sem)
+    cover_worker = CoverWorker(deps=deps, settings=settings, llm_sem=llm_sem)
+
     watcher = RSSWatcher(
         deps=deps,
         telegram_bot=bot,
         poll_interval=settings.rss_poll_interval,
         concurrency=settings.rss_concurrency,
+        settings=settings,
     )
 
     # ── 8. Web tracker (FastAPI) ──────────────────────────────────────────────
@@ -223,6 +233,9 @@ async def main() -> None:
         _probe.bind(("127.0.0.1", settings.web_port))
         _probe.close()
         from web.api import app as _web_app  # import after database.configure()
+        _web_app.state.analysis_worker = analysis_worker
+        _web_app.state.cv_worker = cv_worker
+        _web_app.state.cover_worker = cover_worker
         _web_cfg = uvicorn.Config(
             _web_app,
             host="127.0.0.1",
@@ -258,6 +271,9 @@ async def main() -> None:
         except NotImplementedError:
             pass  # Windows — signals handled via KeyboardInterrupt
 
+    await analysis_worker.start()
+    await cv_worker.start()
+    await cover_worker.start()
     await watcher.start()
     try:
         await bot.start()
@@ -269,6 +285,9 @@ async def main() -> None:
         if _web_task is not None:
             await _web_task
         await watcher.stop()
+        await cover_worker.stop()
+        await cv_worker.stop()
+        await analysis_worker.stop()
         await bot.stop()
         llm.log_session_summary()
         log.info("career-agent stopped")

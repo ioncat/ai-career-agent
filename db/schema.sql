@@ -103,6 +103,9 @@ CREATE TABLE IF NOT EXISTS llm_usage (
     elapsed_ms           INTEGER NOT NULL DEFAULT 0,   -- wall-clock API call duration
     -- Cost
     cost_usd             REAL    NOT NULL DEFAULT 0.0,
+    -- Provider + effort (activity log)
+    provider             TEXT    NOT NULL DEFAULT 'claude_api', -- 'claude_api'|'claude_cli'|'ollama_api'
+    thinking_effort      TEXT    NOT NULL DEFAULT '',           -- 'off'|'low'|'medium'|'high'|'xhigh'|'max'|''
     created_at           TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 

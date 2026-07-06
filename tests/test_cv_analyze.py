@@ -22,6 +22,25 @@ from tools.cv_analyze import (
 
 # ── Fixtures / helpers ────────────────────────────────────────────────────────
 
+# Minimal Phase 2 output that satisfies all parser requirements
+_VALID_PHASE2 = (
+    "## Quick Scan\n"
+    "**Fit score:** 7/10\n"
+    "**Recommendation:** apply\n"
+    "**Category:** Strong match\n"
+    "**Key Barriers:** none\n"
+    "**Hidden Risks:** none\n"
+    "**Warnings:** none\n\n"
+    "## Internal Analysis\n"
+    "| Domain fit | 7 | ok |\n"
+    "| Execution fit | 7 | ok |\n"
+    "| Strategy fit | 7 | ok |\n"
+    "| Systems fit | 7 | ok |\n"
+    "| Stakeholder fit | 7 | ok |\n"
+    "| Overall fit | 7 | ok |\n"
+)
+
+
 def _make_llm(side_effect=None, return_value="LLM output") -> AsyncMock:
     """Build mock ClaudeProvider.complete."""
     llm = AsyncMock()
@@ -84,6 +103,8 @@ def _mock_db(
     mock_db.update_vacancy_status = AsyncMock()
     mock_db.update_vacancy_fields = AsyncMock()
     mock_db.insert_llm_usage = AsyncMock()
+    mock_db.set_analysis_error = AsyncMock()
+    mock_db.patch_analysis_json = AsyncMock()
     return mock_db
 
 
@@ -186,7 +207,7 @@ async def test_analyze_updates_db_title_when_phase1_has_header(tmp_path):
     jd_path = _write_jd(tmp_path)
     vacancy_row = _make_vacancy_row(jd_path)
     phase1_with_header = "**Role:** Product Lead\n**Company:** Involve.software\n\nRest of analysis."
-    llm = _make_llm(side_effect=[phase1_with_header, "Phase 2 output"])
+    llm = _make_llm(side_effect=[phase1_with_header, _VALID_PHASE2])
     ctx = _make_ctx(tmp_path, llm)
     mock_db = _mock_db(vacancy_row=vacancy_row)
 
@@ -202,7 +223,7 @@ async def test_analyze_skips_title_update_when_no_header(tmp_path):
     """When Phase 1 output has no structured header, title is not updated."""
     jd_path = _write_jd(tmp_path)
     vacancy_row = _make_vacancy_row(jd_path)
-    llm = _make_llm(side_effect=["Plain Phase 1 output without header.", "Phase 2 output"])
+    llm = _make_llm(side_effect=["Plain Phase 1 output without header.", _VALID_PHASE2])
     ctx = _make_ctx(tmp_path, llm)
     mock_db = _mock_db(vacancy_row=vacancy_row)
 
@@ -218,10 +239,7 @@ async def test_analyze_skips_title_update_when_no_header(tmp_path):
 async def test_analyze_happy_path(tmp_path):
     jd_path = _write_jd(tmp_path)
     vacancy_row = _make_vacancy_row(jd_path)
-    llm = _make_llm(side_effect=[
-        "Phase 1 output",
-        "## Quick Scan\n\n**Fit score:** 8/10\n**Recommendation:** подавать\n\n## Detailed\n\nStuff",
-    ])
+    llm = _make_llm(side_effect=["Phase 1 output", _VALID_PHASE2])
     ctx = _make_ctx(tmp_path, llm)
     mock_db = _mock_db(vacancy_row=vacancy_row)
 
@@ -231,7 +249,7 @@ async def test_analyze_happy_path(tmp_path):
     assert "✅" in result
     assert "Backend Dev" in result
     assert "Quick Scan" in result
-    assert "8/10" in result
+    assert "7/10" in result
 
 
 @pytest.mark.asyncio
@@ -287,7 +305,7 @@ async def test_analyze_phase2_receives_phase1_output(tmp_path):
 async def test_analyze_updates_status_to_analyzed(tmp_path):
     jd_path = _write_jd(tmp_path)
     vacancy_row = _make_vacancy_row(jd_path)
-    llm = _make_llm(return_value="output")
+    llm = _make_llm(side_effect=["Phase 1 output", _VALID_PHASE2])
     ctx = _make_ctx(tmp_path, llm)
     mock_db = _mock_db(vacancy_row=vacancy_row)
 

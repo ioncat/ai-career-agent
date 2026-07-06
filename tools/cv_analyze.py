@@ -149,6 +149,7 @@ async def cv_analyze(ctx: RunContext[AgentDeps], vacancy_id: int) -> str:
     )
 
     # ── Parse + save analysis_json ────────────────────────────────────────────
+    aj = AnalysisJson()
     try:
         aj = _build_analysis_json(phase1_output, phase2_output)
         if aj.p1:
@@ -158,6 +159,26 @@ async def cv_analyze(ctx: RunContext[AgentDeps], vacancy_id: int) -> str:
         log.info("cv_analyze: analysis_json saved (phases=%s)", aj.phases_done())
     except Exception as exc:
         log.warning("cv_analyze: analysis_json parse failed (non-fatal): %s", exc)
+
+    # ── Surface parse failures to user ───────────────────────────────────────
+    if aj.p2 is None:
+        # Phase 2 LLM call succeeded but output didn't match expected format.
+        # Extract first 400 chars of phase2 output as diagnostic snippet.
+        snippet = phase2_output[:400].strip().replace("\n", " ")
+        error_msg = (
+            f"Phase 2 output did not match expected format "
+            f"(missing **Fit score:** or **Recommendation:** fields). "
+            f"Raw start: {snippet!r}"
+        )
+        log.error("cv_analyze: p2 parse failed — %s", error_msg[:200])
+        await database.set_analysis_error(vacancy_id, error_msg)
+        await database.update_pipeline_run(run2_id, status="error", error_message="p2 parse failed — format mismatch")
+        return (
+            f"⚠️ Phase 2 завершилась, но не удалось распознать структуру ответа LLM.\n"
+            f"Возможно, провайдер не следует формату промпта.\n"
+            f"Попробуй другой провайдер или провери JD_analysis.md вручную.\n\n"
+            f"<code>{snippet[:300]}</code>"
+        )
 
     # ── Update vacancy status ─────────────────────────────────────────────────
     await database.update_vacancy_status(vacancy_id, "analyzed")

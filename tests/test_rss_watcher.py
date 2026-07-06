@@ -24,10 +24,11 @@ from core.rss_watcher import RSSWatcher, _extract_salary
 def _make_watcher(poll_interval: int = 1) -> tuple[RSSWatcher, MagicMock]:
     deps = MagicMock()
     deps.user_id = 1
-    deps.settings.analysis_mode = "inbox_first"  # default
+    settings = MagicMock()
+    settings.analysis_mode = "inbox_first"  # default
     bot = MagicMock()
     bot.send_message = AsyncMock()
-    watcher = RSSWatcher(deps=deps, telegram_bot=bot, poll_interval=poll_interval)
+    watcher = RSSWatcher(deps=deps, telegram_bot=bot, poll_interval=poll_interval, settings=settings)
     return watcher, bot
 
 
@@ -48,6 +49,7 @@ def _mock_db(queued_rows: list) -> MagicMock:
     db = MagicMock()
     db.list_vacancies = AsyncMock(return_value=queued_rows)
     db.update_vacancy_status = AsyncMock()
+    db.get_user_settings = AsyncMock(return_value=None)
     return db
 
 
@@ -292,7 +294,7 @@ async def test_process_inbox_first_skips_analysis():
 async def test_process_full_auto_runs_analysis():
     """ANALYSIS_MODE=full_auto: Phase 1+2 runs automatically after fetch."""
     watcher, _ = _make_watcher()
-    watcher._deps.settings.analysis_mode = "full_auto"
+    watcher._settings.analysis_mode = "full_auto"
     mock_analyze = AsyncMock()
     mock_db = _mock_db([])
 
@@ -440,55 +442,4 @@ async def test_semaphore_concurrency_2_allows_two_parallel():
     assert concurrent_peak == 2, f"Expected max 2 concurrent fetches, got {concurrent_peak}"
 
 
-# ── _poll_analyze_queue ────────────────────────────────────────────────────────
-
-@pytest.mark.asyncio
-async def test_poll_analyze_queue_runs_analysis():
-    """_poll_analyze_queue: analysis_queued vacancy → cv_analyze called → status=analyzed."""
-    watcher, _ = _make_watcher()
-    row = _make_row(vacancy_id=10, url="https://djinni.co/jobs/10/", status="analysis_queued")
-    mock_analyze = AsyncMock()
-    mock_db = _mock_db([])
-    mock_db.list_vacancies = AsyncMock(return_value=[row])
-
-    with patch("core.rss_watcher.database", mock_db), \
-         patch("tools.cv_analyze.cv_analyze", mock_analyze), \
-         patch("core.rss_watcher.RSSWatcher._push_result", AsyncMock()):
-        await watcher._poll_analyze_queue()
-
-    mock_db.update_vacancy_status.assert_any_await(10, "analyzing")
-    mock_analyze.assert_awaited_once()
-
-
-@pytest.mark.asyncio
-async def test_poll_analyze_queue_empty_does_nothing():
-    """_poll_analyze_queue: no analysis_queued vacancies → no calls."""
-    watcher, _ = _make_watcher()
-    mock_analyze = AsyncMock()
-    mock_db = _mock_db([])
-    mock_db.list_vacancies = AsyncMock(return_value=[])
-
-    with patch("core.rss_watcher.database", mock_db), \
-         patch("tools.cv_analyze.cv_analyze", mock_analyze):
-        await watcher._poll_analyze_queue()
-
-    mock_analyze.assert_not_awaited()
-
-
-@pytest.mark.asyncio
-async def test_poll_analyze_queue_failure_sets_analysis_failed():
-    """_poll_analyze_queue: cv_analyze raises → set_analysis_error called with error message."""
-    watcher, _ = _make_watcher()
-    row = _make_row(vacancy_id=11, url="https://djinni.co/jobs/11/", status="analysis_queued")
-    mock_db = _mock_db([])
-    mock_db.list_vacancies = AsyncMock(return_value=[row])
-    mock_db.set_analysis_error = AsyncMock()
-
-    with patch("core.rss_watcher.database", mock_db), \
-         patch("tools.cv_analyze.cv_analyze", AsyncMock(side_effect=RuntimeError("LLM error"))):
-        await watcher._poll_analyze_queue()
-
-    mock_db.set_analysis_error.assert_awaited_once()
-    call_args = mock_db.set_analysis_error.await_args
-    assert call_args[0][0] == 11
-    assert "LLM error" in call_args[0][1]
+# ── _poll_analyze_queue removed — analysis now via AnalysisWorker (immediate queue) ──

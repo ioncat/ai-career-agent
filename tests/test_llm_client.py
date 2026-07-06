@@ -391,11 +391,34 @@ async def test_ollama_last_call_usage_updates_on_second_call():
 # ── ClaudeCodeProvider ────────────────────────────────────────────────────────
 
 
+class _AsyncByteLines:
+    """Async-iterable over newline-split bytes — replaces proc.stdout/stderr mock."""
+    def __init__(self, data: bytes) -> None:
+        self._lines = data.splitlines(keepends=True) if data else []
+        self._idx = 0
+
+    def __aiter__(self) -> "_AsyncByteLines":
+        return self
+
+    async def __anext__(self) -> bytes:
+        if self._idx >= len(self._lines):
+            raise StopAsyncIteration
+        line = self._lines[self._idx]
+        self._idx += 1
+        return line
+
+
 def _make_proc(stdout: bytes, returncode: int = 0, stderr: bytes = b"") -> AsyncMock:
     proc = AsyncMock()
     proc.returncode = returncode
-    proc.communicate = AsyncMock(return_value=(stdout, stderr))
+    proc.stdout = _AsyncByteLines(stdout)
+    proc.stderr = _AsyncByteLines(stderr)
+    proc.wait = AsyncMock()
     proc.kill = MagicMock()
+    proc.stdin = AsyncMock()
+    proc.stdin.write = MagicMock()
+    proc.stdin.drain = AsyncMock()
+    proc.stdin.close = MagicMock()
     return proc
 
 
@@ -414,17 +437,22 @@ async def test_claudecode_no_system():
     proc = _make_proc(b"OK\n")
     with patch("asyncio.create_subprocess_exec", return_value=proc) as mock_exec:
         await provider.complete("user only")
+    # Prompt passed via stdin (-p -), not as command-line argument
+    written = proc.stdin.write.call_args[0][0].decode()
+    assert FAKE_PROFILE in written
+    assert "user only" in written
+    # Verify -p - in command
     call_args = mock_exec.call_args[0]
-    prompt = call_args[2]  # 'claude', '-p', <prompt>
-    assert FAKE_PROFILE in prompt
-    assert "user only" in prompt
+    assert "-p" in call_args
+    assert "-" in call_args
 
 
 @pytest.mark.asyncio
 async def test_claudecode_cli_not_found():
     provider = ClaudeCodeProvider(profile_md=FAKE_PROFILE)
-    with patch("asyncio.create_subprocess_exec", side_effect=FileNotFoundError):
-        with pytest.raises(LLMUnavailableError, match="not found in PATH"):
+    with patch("shutil.which", return_value=None), \
+         patch.object(ClaudeCodeProvider, "_subprocess_env", return_value={}):
+        with pytest.raises(LLMUnavailableError, match="not found"):
             await provider.complete("x")
 
 
@@ -447,4 +475,5 @@ async def test_claudecode_last_call_usage_zero_cost():
     assert usage is not None
     assert usage["cost_usd"] == 0.0
     assert usage["input_tokens"] == 0
-    assert usage["model"].startswith("claude_cli/")
+    assert usage["provider"] == "claude_cli"
+    assert "claude_cli/" not in usage["model"]  # model is plain; provider is separate field
