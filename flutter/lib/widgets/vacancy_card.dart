@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/vacancy.dart';
+import '../providers/read_vacancies_provider.dart';
+import '../providers/settings_provider.dart';
+import '../providers/vacancy_list_provider.dart';
+import '../repositories/vacancy_repository.dart';
 import 'fit_score_chip.dart';
 import 'vac_score_badge.dart';
 import 'source_badge.dart';
 
-class VacancyCard extends StatefulWidget {
+class VacancyCard extends ConsumerStatefulWidget {
   final VacancyListItem vacancy;
   final bool selected;
   final VoidCallback onTap;
@@ -17,16 +22,18 @@ class VacancyCard extends StatefulWidget {
   });
 
   @override
-  State<VacancyCard> createState() => _VacancyCardState();
+  ConsumerState<VacancyCard> createState() => _VacancyCardState();
 }
 
-class _VacancyCardState extends State<VacancyCard> {
+class _VacancyCardState extends ConsumerState<VacancyCard> {
   bool _hovered = false;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final v = widget.vacancy;
+    final readIds = ref.watch(readVacanciesProvider).valueOrNull ?? {};
+    final isUnread = v.status == 'fetched' && !readIds.contains(v.id);
 
     final bgColor = widget.selected
         ? cs.surface
@@ -43,7 +50,7 @@ class _VacancyCardState extends State<VacancyCard> {
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
-          margin: const EdgeInsets.only(bottom: 8),
+          margin: EdgeInsets.zero,
           decoration: BoxDecoration(
             color: bgColor,
             borderRadius: borderRadius,
@@ -79,7 +86,7 @@ class _VacancyCardState extends State<VacancyCard> {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   if (v.site.isNotEmpty) SourceBadge(site: v.site),
-                  if (v.status == 'fetched') ...[
+                  if (isUnread) ...[
                     const SizedBox(width: 6),
                     _NewBadge(),
                   ],
@@ -91,6 +98,7 @@ class _VacancyCardState extends State<VacancyCard> {
                             color: cs.secondary,
                           ),
                     ),
+                  _StarButton(vacancyId: v.id, isStarred: v.starred),
                 ],
               ),
               const SizedBox(height: 8),
@@ -140,10 +148,6 @@ class _VacancyCardState extends State<VacancyCard> {
                     ],
                   ],
                 )
-              else if (v.status == 'analysis_queued')
-                _QueuedBadge()
-              else if (v.status == 'analyzing')
-                _AnalyzingBadge()
               else if (v.status == 'analysis_failed')
                 _FailedBadge(),
               // Row 5: key barrier — show if present regardless of status
@@ -222,84 +226,6 @@ class _NewBadge extends StatelessWidget {
   }
 }
 
-class _QueuedBadge extends StatefulWidget {
-  @override
-  State<_QueuedBadge> createState() => _QueuedBadgeState();
-}
-
-class _QueuedBadgeState extends State<_QueuedBadge>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
-  late Animation<double> _anim;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    )..repeat(reverse: true);
-    _anim = Tween<double>(begin: 0.35, end: 1.0).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    const amberColor = Color(0xFFE65100);
-    return FadeTransition(
-      opacity: _anim,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.schedule_outlined, size: 13, color: amberColor),
-          const SizedBox(width: 4),
-          Text(
-            'In queue',
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: amberColor,
-                  fontWeight: FontWeight.w600,
-                ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AnalyzingBadge extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SizedBox(
-          width: 12,
-          height: 12,
-          child: CircularProgressIndicator(
-            strokeWidth: 1.5,
-            color: cs.primary,
-          ),
-        ),
-        const SizedBox(width: 6),
-        Text(
-          'Analyzing',
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: cs.primary,
-              ),
-        ),
-      ],
-    );
-  }
-}
-
 class _FailedBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -317,6 +243,65 @@ class _FailedBadge extends StatelessWidget {
               ),
         ),
       ],
+    );
+  }
+}
+
+// ─── Star toggle ─────────────────────────────────────────────────────────────
+
+class _StarButton extends ConsumerStatefulWidget {
+  final int vacancyId;
+  final bool isStarred;
+
+  const _StarButton({required this.vacancyId, required this.isStarred});
+
+  @override
+  ConsumerState<_StarButton> createState() => _StarButtonState();
+}
+
+class _StarButtonState extends ConsumerState<_StarButton> {
+  late bool _starred;
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _starred = widget.isStarred;
+  }
+
+  @override
+  void didUpdateWidget(_StarButton old) {
+    super.didUpdateWidget(old);
+    if (old.isStarred != widget.isStarred) _starred = widget.isStarred;
+  }
+
+  Future<void> _toggle() async {
+    if (_loading) return;
+    final next = !_starred;
+    setState(() { _starred = next; _loading = true; });
+    try {
+      final apiUrl = ref.read(settingsProvider).valueOrNull?.apiUrl ?? 'http://localhost:8080';
+      await VacancyRepository(baseUrl: apiUrl).setStarred(widget.vacancyId, next);
+      if (mounted) ref.read(vacancyListProvider.notifier).refresh();
+    } catch (_) {
+      if (mounted) setState(() => _starred = !next);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: _toggle,
+      child: Padding(
+        padding: const EdgeInsets.only(left: 4),
+        child: Icon(
+          _starred ? Icons.star_rounded : Icons.star_outline_rounded,
+          size: 18,
+          color: _starred ? const Color(0xFFFFB300) : Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+        ),
+      ),
     );
   }
 }
