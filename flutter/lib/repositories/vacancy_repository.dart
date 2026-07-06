@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/vacancy.dart';
+// ActivityEntry is defined in vacancy.dart
 
 class VacancyRepository {
   final String baseUrl;
@@ -42,6 +43,14 @@ class VacancyRepository {
     final response = await http.post(uri).timeout(const Duration(seconds: 10));
     if (response.statusCode == 404) throw Exception('Vacancy not found');
     if (response.statusCode != 200) throw Exception('Generate CV failed: ${response.statusCode}');
+  }
+
+  Future<void> generateCover(int vacancyId) async {
+    final uri = Uri.parse('$baseUrl/api/vacancies/$vacancyId/generate-cover');
+    final response = await http.post(uri).timeout(const Duration(seconds: 10));
+    if (response.statusCode == 404) throw Exception('Vacancy not found');
+    if (response.statusCode == 409) throw Exception('Already in progress');
+    if (response.statusCode != 200) throw Exception('Generate cover failed: ${response.statusCode}');
   }
 
   Future<VacancyCv> getCv(int vacancyId) async {
@@ -91,11 +100,46 @@ class VacancyRepository {
     if (response.statusCode != 202) throw Exception('Analyze failed: ${response.statusCode}');
   }
 
+  Future<void> setStarred(int vacancyId, bool starred) async {
+    final uri = Uri.parse('$baseUrl/api/vacancies/$vacancyId/starred');
+    final response = await http
+        .patch(uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'starred': starred}))
+        .timeout(const Duration(seconds: 5));
+    if (response.statusCode != 200) throw Exception('Set starred failed: ${response.statusCode}');
+  }
+
+  Future<void> setApplied(int vacancyId, bool applied) async {
+    final uri = Uri.parse('$baseUrl/api/vacancies/$vacancyId/applied');
+    final response = await http
+        .patch(uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'applied': applied}))
+        .timeout(const Duration(seconds: 5));
+    if (response.statusCode != 200) throw Exception('Set applied failed: ${response.statusCode}');
+  }
+
   Future<Map<String, dynamic>> getConfig() async {
     final uri = Uri.parse('$baseUrl/api/config');
     final response = await http.get(uri).timeout(const Duration(seconds: 5));
     if (response.statusCode != 200) throw Exception('Config unavailable');
     return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<({List<PipelineRun> runs, List<ActivityEntry> entries})> getActivity(int vacancyId) async {
+    final uri = Uri.parse('$baseUrl/api/vacancies/$vacancyId/activity');
+    final response = await http.get(uri).timeout(const Duration(seconds: 10));
+    if (response.statusCode == 404) throw Exception('Vacancy not found');
+    if (response.statusCode != 200) throw Exception('Failed to load activity: ${response.statusCode}');
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final runs = (data['pipeline_runs'] as List<dynamic>)
+        .map((e) => PipelineRun.fromJson(e as Map<String, dynamic>))
+        .toList();
+    final entries = (data['entries'] as List<dynamic>)
+        .map((e) => ActivityEntry.fromJson(e as Map<String, dynamic>))
+        .toList();
+    return (runs: runs, entries: entries);
   }
 
   Future<Map<String, dynamic>> patchConfig({

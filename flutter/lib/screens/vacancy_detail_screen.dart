@@ -7,7 +7,7 @@ import '../providers/settings_provider.dart';
 import '../providers/vacancy_detail_provider.dart';
 import '../providers/vacancy_list_provider.dart';
 import '../repositories/vacancy_repository.dart';
-import 'vacancy_cv_screen.dart';
+import '../providers/vacancy_cv_provider.dart';
 
 // ── JD mode — shown for status='fetched' ──────────────────────────────────────
 
@@ -17,12 +17,14 @@ class _JdModeView extends ConsumerStatefulWidget {
   final VacancyListItem? vacancy;
   /// When true: show "Restore to Inbox" instead of Analyze/Skip (used for declined-no-analysis).
   final bool restoreMode;
+  final VoidCallback? onSkipped;
 
   const _JdModeView({
     required this.vacancyId,
     required this.url,
     this.vacancy,
     this.restoreMode = false,
+    this.onSkipped,
   });
 
   @override
@@ -64,7 +66,10 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
     setState(() => _loadingDecline = true);
     try {
       await _repo.decline(widget.vacancyId);
-      if (mounted) ref.read(vacancyListProvider.notifier).refresh();
+      if (mounted) {
+        widget.onSkipped?.call();
+        ref.read(vacancyListProvider.notifier).refresh();
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -329,21 +334,55 @@ class _AnalysisErrorViewState extends ConsumerState<_AnalysisErrorView> {
   }
 }
 
-class VacancyDetailScreen extends ConsumerWidget {
+class VacancyDetailScreen extends ConsumerStatefulWidget {
   final int vacancyId;
   final String url;
   final VacancyListItem? vacancy;
+  final VoidCallback? onSkipped;
 
   const VacancyDetailScreen({
     super.key,
     required this.vacancyId,
     required this.url,
     this.vacancy,
+    this.onSkipped,
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final status = vacancy?.status ?? '';
+  ConsumerState<VacancyDetailScreen> createState() => _VacancyDetailScreenState();
+}
+
+class _VacancyDetailScreenState extends ConsumerState<VacancyDetailScreen>
+    with SingleTickerProviderStateMixin {
+
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 4, vsync: this);
+  }
+
+  @override
+  void didUpdateWidget(VacancyDetailScreen old) {
+    super.didUpdateWidget(old);
+    final oldStatus = old.vacancy?.status;
+    final newStatus = widget.vacancy?.status;
+    if (oldStatus != 'cv_generated' && newStatus == 'cv_generated') {
+      ref.invalidate(vacancyCvProvider(widget.vacancyId));
+      _tabController.animateTo(1);
+    }
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final status = widget.vacancy?.status ?? '';
 
     // analysis_queued / analyzing — spinner only, no point fetching analysis yet
     if (status == 'analysis_queued' || status == 'analyzing') {
@@ -353,24 +392,24 @@ class VacancyDetailScreen extends ConsumerWidget {
     // analysis_failed — show error + retry button
     if (status == 'analysis_failed') {
       return _AnalysisErrorView(
-        vacancyId: vacancyId,
-        errorMessage: vacancy?.analysisError,
+        vacancyId: widget.vacancyId,
+        errorMessage: widget.vacancy?.analysisError,
       );
     }
 
     // For ALL other statuses (fetched, analyzed, declined): try to load analysis.
     // If analysis exists → show it regardless of status (handles restored vacancies,
     // or any status/analysis_json mismatch). If p2 == null → fall back to JD view.
-    final async = ref.watch(vacancyDetailProvider(vacancyId));
+    final async = ref.watch(vacancyDetailProvider(widget.vacancyId));
 
     return async.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) {
         // API error → fall back to JD view with context-appropriate buttons
         if (status == 'declined') {
-          return _JdModeView(vacancyId: vacancyId, url: url, vacancy: vacancy, restoreMode: true);
+          return _JdModeView(vacancyId: widget.vacancyId, url: widget.url, vacancy: widget.vacancy, restoreMode: true);
         }
-        return _JdModeView(vacancyId: vacancyId, url: url, vacancy: vacancy);
+        return _JdModeView(vacancyId: widget.vacancyId, url: widget.url, vacancy: widget.vacancy, onSkipped: widget.onSkipped);
       },
       data: (analysis) {
         final p1 = analysis.p1;
@@ -379,59 +418,81 @@ class VacancyDetailScreen extends ConsumerWidget {
         if (p2 == null) {
           // No analysis yet — show JD view with context-appropriate buttons
           if (status == 'declined') {
-            return _JdModeView(vacancyId: vacancyId, url: url, vacancy: vacancy, restoreMode: true);
+            return _JdModeView(vacancyId: widget.vacancyId, url: widget.url, vacancy: widget.vacancy, restoreMode: true);
           }
-          return _JdModeView(vacancyId: vacancyId, url: url, vacancy: vacancy);
+          return _JdModeView(vacancyId: widget.vacancyId, url: widget.url, vacancy: widget.vacancy, onSkipped: widget.onSkipped);
         }
 
         final role = p1?.role.isNotEmpty == true
             ? p1!.role
-            : vacancy?.role ?? '';
+            : widget.vacancy?.role ?? '';
 
         return Column(
           children: [
             // Sticky action bar
-            _ActionBar(vacancyId: vacancyId, url: url, role: role, status: status),
-            // Scrollable content
+            _ActionBar(vacancyId: widget.vacancyId, url: widget.url, role: role, status: status, vacancy: widget.vacancy, tabController: _tabController),
+            // Tab bar
+            TabBar(
+              controller: _tabController,
+              tabs: const [
+                Tab(text: 'Analysis'),
+                Tab(text: 'CV'),
+                Tab(text: 'Cover'),
+                Tab(text: 'Activity'),
+              ],
+              tabAlignment: TabAlignment.start,
+              isScrollable: true,
+              labelPadding: const EdgeInsets.symmetric(horizontal: 20),
+            ),
+            // Tab content
             Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Hero header
-                    _VacancyHero(p1: p1, p2: p2, vacancyId: vacancyId, vacancy: vacancy),
-                    const SizedBox(height: 24),
-                    // Quick Overview — who they want + barriers + risks + warnings
-                    _QuickOverviewCard(p2: p2),
-                    const SizedBox(height: 16),
-                    // Fit dimensions
-                    if (p2.fitDimensions != null)
-                      _CollapsibleSection(
-                        title: 'Fit Dimensions',
-                        tooltip: 'Fit scored across 5 axes (0–10 each):\ndomain, execution, strategy, systems, stakeholder',
-                        child: _FitDimsTable(dims: p2.fitDimensions!),
-                      ),
-                    if (p1 != null) ...[
-                      const SizedBox(height: 16),
-                      _CollapsibleSection(
-                        title: 'Attraction Breakdown',
-                        tooltip: 'How attractive this vacancy is for you\nacross 8 factors: company tier, seniority,\nscope, compensation and more',
-                        child: _VacScoreTable(dims: p1.vacscoreDims),
-                      ),
-                      const SizedBox(height: 16),
-                      if (p1.roleBalance.isNotEmpty)
-                        _CollapsibleSection(
-                          title: 'Role Balance',
-                          tooltip: 'Estimated split of responsibilities\nin this role (%)',
-                          child: _RoleBalanceBar(balance: p1.roleBalance),
-                        ),
-                    ],
-                    const SizedBox(height: 16),
-                    _JdSection(vacancyId: vacancyId),
-                    const SizedBox(height: 80),
-                  ],
-                ),
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  // Tab 0: Analysis
+                  SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _VacancyHero(p1: p1, p2: p2, vacancyId: widget.vacancyId, vacancy: widget.vacancy),
+                        const SizedBox(height: 24),
+                        _QuickOverviewCard(p2: p2),
+                        const SizedBox(height: 16),
+                        if (p2.fitDimensions != null)
+                          _CollapsibleSection(
+                            title: 'Fit Dimensions',
+                            tooltip: 'Fit scored across 5 axes (0–10 each):\ndomain, execution, strategy, systems, stakeholder',
+                            child: _FitDimsTable(dims: p2.fitDimensions!),
+                          ),
+                        if (p1 != null) ...[
+                          const SizedBox(height: 16),
+                          _CollapsibleSection(
+                            title: 'Attraction Breakdown',
+                            tooltip: 'How attractive this vacancy is for you\nacross 8 factors: company tier, seniority,\nscope, compensation and more',
+                            child: _VacScoreTable(dims: p1.vacscoreDims),
+                          ),
+                          const SizedBox(height: 16),
+                          if (p1.roleBalance.isNotEmpty)
+                            _CollapsibleSection(
+                              title: 'Role Balance',
+                              tooltip: 'Estimated split of responsibilities\nin this role (%)',
+                              child: _RoleBalanceBar(balance: p1.roleBalance),
+                            ),
+                        ],
+                        const SizedBox(height: 16),
+                        _JdSection(vacancyId: widget.vacancyId),
+                        const SizedBox(height: 80),
+                      ],
+                    ),
+                  ),
+                  // Tab 1: CV
+                  _CvTab(vacancyId: widget.vacancyId, status: status),
+                  // Tab 2: Cover
+                  _CoverTab(vacancyId: widget.vacancyId, status: status),
+                  // Tab 3: Activity
+                  _ActivityLogView(vacancyId: widget.vacancyId),
+                ],
               ),
             ),
           ],
@@ -476,17 +537,278 @@ class _JdSection extends ConsumerWidget {
   }
 }
 
+// ── Activity log tab ─────────────────────────────────────────────────────────
+
+class _ActivityLogView extends ConsumerStatefulWidget {
+  final int vacancyId;
+
+  const _ActivityLogView({required this.vacancyId});
+
+  @override
+  ConsumerState<_ActivityLogView> createState() => _ActivityLogViewState();
+}
+
+class _ActivityLogViewState extends ConsumerState<_ActivityLogView> {
+  List<PipelineRun>? _runs;
+  List<ActivityEntry>? _entries;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final apiUrl = ref.read(settingsProvider).valueOrNull?.apiUrl ?? 'http://localhost:8080';
+    try {
+      final result = await VacancyRepository(baseUrl: apiUrl).getActivity(widget.vacancyId);
+      if (mounted) setState(() { _runs = result.runs; _entries = result.entries; _loading = false; });
+    } catch (e) {
+      if (mounted) setState(() { _error = '$e'; _loading = false; });
+    }
+  }
+
+  // Convert ISO UTC string → device local time, formatted MM-DD HH:mm
+  String _fmtTs(String? iso) {
+    if (iso == null || iso.isEmpty) return '—';
+    try {
+      final dt = DateTime.parse(iso).toLocal();
+      final mm  = dt.month.toString().padLeft(2, '0');
+      final dd  = dt.day.toString().padLeft(2, '0');
+      final hh  = dt.hour.toString().padLeft(2, '0');
+      final min = dt.minute.toString().padLeft(2, '0');
+      return '$mm-$dd $hh:$min';
+    } catch (_) {
+      return iso.length >= 16 ? iso.substring(5, 16).replaceAll('T', ' ') : iso;
+    }
+  }
+
+  String _fmtMs(int ms) => ms >= 1000 ? '${(ms / 1000).toStringAsFixed(1)}s' : '${ms}ms';
+  String _k(int n)       => n >= 1000  ? '${(n  / 1000).toStringAsFixed(1)}k' : '$n';
+
+  // ── Shared container ──────────────────────────────────────────────────────────
+
+  Widget _section(BuildContext context, String label, Widget body) {
+    final cs = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: Theme.of(context).textTheme.labelSmall
+            ?.copyWith(color: cs.onSurfaceVariant, letterSpacing: 0.8)),
+        const SizedBox(height: 6),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
+          ),
+          child: body,
+        ),
+      ],
+    );
+  }
+
+  // ── Pipeline Runs table ───────────────────────────────────────────────────────
+
+  Widget _runsTable(BuildContext context, List<PipelineRun> runs) {
+    final cs = Theme.of(context).colorScheme;
+    const hStyle = TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, letterSpacing: 0.4);
+    const dStyle = TextStyle(fontSize: 11.5, height: 1.6);
+
+    Widget hcell(String t, {TextAlign a = TextAlign.left}) => Padding(
+      padding: const EdgeInsets.fromLTRB(4, 2, 14, 5),
+      child: Text(t, style: hStyle.copyWith(color: cs.onSurfaceVariant), textAlign: a),
+    );
+    Widget cell(String t, {TextAlign a = TextAlign.left, Color? color, bool bold = false}) => Padding(
+      padding: const EdgeInsets.fromLTRB(4, 2, 14, 2),
+      child: Text(t,
+        style: dStyle.copyWith(color: color, fontWeight: bold ? FontWeight.w600 : null),
+        textAlign: a),
+    );
+
+    return Table(
+      columnWidths: const {
+        0: IntrinsicColumnWidth(),  // time
+        1: IntrinsicColumnWidth(),  // phase
+        2: IntrinsicColumnWidth(),  // icon
+        3: IntrinsicColumnWidth(),  // status
+        4: IntrinsicColumnWidth(),  // duration
+        5: FlexColumnWidth(),       // error
+      },
+      defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+      children: [
+        TableRow(
+          decoration: BoxDecoration(border: Border(
+            bottom: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
+          )),
+          children: [
+            hcell('Time'), hcell('Phase'), hcell(''), hcell('Status'),
+            hcell('Duration', a: TextAlign.right), hcell('Error'),
+          ],
+        ),
+        ...runs.map((r) {
+          final ok      = r.status == 'done';
+          final isErr   = r.status == 'error';
+          final icon    = ok ? '✓' : (isErr ? '✗' : '·');
+          final icColor = ok ? cs.primary : (isErr ? cs.error : cs.onSurfaceVariant);
+          final err     = (!ok && r.errorMessage != null && r.errorMessage!.isNotEmpty)
+              ? r.errorMessage! : '';
+          return TableRow(children: [
+            cell(_fmtTs(r.startedAt), color: cs.onSurfaceVariant),
+            cell(r.phase, bold: true),
+            cell(icon, color: icColor),
+            cell(r.status),
+            cell(r.durationMs != null ? _fmtMs(r.durationMs!) : '—', a: TextAlign.right),
+            cell(err, color: err.isNotEmpty ? cs.error : null),
+          ]);
+        }),
+      ],
+    );
+  }
+
+  // ── LLM Calls table ──────────────────────────────────────────────────────────
+
+  Widget _entriesTable(BuildContext context, List<ActivityEntry> entries) {
+    final cs = Theme.of(context).colorScheme;
+    const hStyle = TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, letterSpacing: 0.4);
+    const dStyle = TextStyle(fontSize: 11.5, height: 1.6);
+
+    Widget hcell(String t, {TextAlign a = TextAlign.left}) => Padding(
+      padding: const EdgeInsets.fromLTRB(4, 2, 14, 5),
+      child: Text(t, style: hStyle.copyWith(color: cs.onSurfaceVariant), textAlign: a),
+    );
+    Widget cell(String t, {TextAlign a = TextAlign.left, Color? color, bool bold = false}) => Padding(
+      padding: const EdgeInsets.fromLTRB(4, 2, 14, 2),
+      child: Text(t,
+        style: dStyle.copyWith(color: color, fontWeight: bold ? FontWeight.w600 : null),
+        textAlign: a),
+    );
+
+    final totalCost = entries.fold(0.0, (s, e) => s + e.costUsd);
+    final totalMs   = entries.fold(0,   (s, e) => s + e.elapsedMs);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Table(
+          columnWidths: const {
+            0: IntrinsicColumnWidth(),  // time
+            1: IntrinsicColumnWidth(),  // phase
+            2: IntrinsicColumnWidth(),  // provider
+            3: FlexColumnWidth(),       // model
+            4: IntrinsicColumnWidth(),  // elapsed
+            5: IntrinsicColumnWidth(),  // tokens
+            6: IntrinsicColumnWidth(),  // cost
+          },
+          defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+          children: [
+            TableRow(
+              decoration: BoxDecoration(border: Border(
+                bottom: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
+              )),
+              children: [
+                hcell('Time'), hcell('Phase'), hcell('Provider'), hcell('Model'),
+                hcell('Elapsed', a: TextAlign.right),
+                hcell('Tokens',  a: TextAlign.right),
+                hcell('Cost',    a: TextAlign.right),
+              ],
+            ),
+            ...entries.map((e) {
+              final tok = e.provider == 'claude_cli'
+                  ? '—'
+                  : '${_k(e.inputTokens)}→${_k(e.outputTokens)}';
+              final cost      = e.costUsd > 0 ? '\$${e.costUsd.toStringAsFixed(4)}' : '—';
+              final modelText = e.thinkingEffort.isNotEmpty && e.thinkingEffort != 'off'
+                  ? '${e.model}  [${e.thinkingEffort}]'
+                  : e.model;
+              return TableRow(children: [
+                cell(_fmtTs(e.createdAt), color: cs.onSurfaceVariant),
+                cell(e.phase, bold: true),
+                cell(e.provider),
+                cell(modelText),
+                cell(_fmtMs(e.elapsedMs), a: TextAlign.right),
+                cell(tok,  a: TextAlign.right),
+                cell(cost, a: TextAlign.right),
+              ]);
+            }),
+          ],
+        ),
+        const Divider(height: 20),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 0, 4, 2),
+          child: Text(
+            'Total  ${entries.length} calls  ${_fmtMs(totalMs)}  \$${totalCost.toStringAsFixed(4)}',
+            style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_error != null) {
+      return Center(child: Text('Error: $_error', style: TextStyle(color: cs.error)));
+    }
+
+    final runs    = _runs    ?? [];
+    final entries = _entries ?? [];
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (runs.isEmpty && entries.isEmpty)
+            Text(
+              'No activity recorded for this vacancy yet.',
+              style: Theme.of(context).textTheme.bodyMedium
+                  ?.copyWith(color: cs.onSurfaceVariant),
+            )
+          else ...[
+            if (runs.isNotEmpty) ...[
+              _section(context, 'PIPELINE RUNS', _runsTable(context, runs)),
+              const SizedBox(height: 16),
+            ],
+            if (entries.isNotEmpty)
+              _section(context, 'LLM CALLS', _entriesTable(context, entries)),
+          ],
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: () { setState(() { _loading = true; _error = null; }); _load(); },
+            icon: const Icon(Icons.refresh, size: 16),
+            label: const Text('Refresh'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Action bar ────────────────────────────────────────────────────────────────
+
 class _ActionBar extends ConsumerStatefulWidget {
   final int vacancyId;
   final String url;
   final String role;
   final String status;
+  final VacancyListItem? vacancy;
+  final TabController tabController;
 
   const _ActionBar({
     required this.vacancyId,
     required this.url,
     required this.role,
+    required this.tabController,
     this.status = 'analyzed',
+    this.vacancy,
   });
 
   @override
@@ -495,12 +817,59 @@ class _ActionBar extends ConsumerStatefulWidget {
 
 class _ActionBarState extends ConsumerState<_ActionBar> {
   bool _loadingCv = false;
+  bool _loadingAnalyze = false;
   bool _loadingDecline = false;
   bool _loadingRestore = false;
+  late bool _starred;
+  late bool _applied;
+  bool _loadingStar = false;
+  bool _loadingApplied = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _starred = widget.vacancy?.starred ?? false;
+    _applied = widget.vacancy?.applied ?? false;
+  }
+
+  @override
+  void didUpdateWidget(_ActionBar old) {
+    super.didUpdateWidget(old);
+    if (old.vacancy?.starred != widget.vacancy?.starred) _starred = widget.vacancy?.starred ?? false;
+    if (old.vacancy?.applied != widget.vacancy?.applied) _applied = widget.vacancy?.applied ?? false;
+  }
 
   VacancyRepository get _repo {
     final apiUrl = ref.read(settingsProvider).valueOrNull?.apiUrl ?? 'http://localhost:8080';
     return VacancyRepository(baseUrl: apiUrl);
+  }
+
+  Future<void> _toggleStar() async {
+    if (_loadingStar) return;
+    final next = !_starred;
+    setState(() { _starred = next; _loadingStar = true; });
+    try {
+      await _repo.setStarred(widget.vacancyId, next);
+      if (mounted) ref.read(vacancyListProvider.notifier).refresh();
+    } catch (_) {
+      if (mounted) setState(() => _starred = !next);
+    } finally {
+      if (mounted) setState(() => _loadingStar = false);
+    }
+  }
+
+  Future<void> _toggleApplied() async {
+    if (_loadingApplied) return;
+    final next = !_applied;
+    setState(() { _applied = next; _loadingApplied = true; });
+    try {
+      await _repo.setApplied(widget.vacancyId, next);
+      if (mounted) ref.read(vacancyListProvider.notifier).refresh();
+    } catch (_) {
+      if (mounted) setState(() => _applied = !next);
+    } finally {
+      if (mounted) setState(() => _loadingApplied = false);
+    }
   }
 
   Future<void> _generateCv() async {
@@ -522,6 +891,57 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
     } finally {
       if (mounted) setState(() => _loadingCv = false);
     }
+  }
+
+  Future<void> _analyze() async {
+    setState(() => _loadingAnalyze = true);
+    try {
+      await _repo.analyze(widget.vacancyId);
+      if (mounted) {
+        ref.read(vacancyListProvider.notifier).refresh();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Analysis queued'), duration: Duration(seconds: 2)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loadingAnalyze = false);
+    }
+  }
+
+  Future<void> _generateCover() async {
+    setState(() => _loadingCv = true);
+    try {
+      await _repo.generateCover(widget.vacancyId);
+      if (mounted) {
+        ref.read(vacancyListProvider.notifier).refresh();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Cover generation queued'), duration: Duration(seconds: 2)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loadingCv = false);
+    }
+  }
+
+  void _downloadPdf(String type) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${type == 'cv' ? 'CV' : 'Cover'} PDF download — coming soon'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   Future<void> _decline() async {
@@ -561,61 +981,33 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+  Widget _buildCta(BuildContext context, ColorScheme cs, AsyncValue<VacancyCv> cvAsync) {
+    final tab = widget.tabController.index;
     final isDeclined = widget.status == 'declined';
+    final isCvInProgress = widget.status == 'cv_queued' || widget.status == 'cv_generating';
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerLowest.withValues(alpha: 0.9),
-        border: Border(
-          bottom: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.15)),
-        ),
-      ),
-      child: Row(
-        children: [
-          const Spacer(),
-          // Open JD
-          if (widget.url.isNotEmpty)
-            IconButton(
-              icon: Icon(Icons.open_in_new, size: 18, color: cs.onSurfaceVariant),
-              tooltip: 'Open JD',
-              onPressed: () => launchUrl(
-                Uri.parse(widget.url),
-                mode: LaunchMode.externalApplication,
-              ),
-            ),
-          // View CV
-          if (!isDeclined)
-            IconButton(
-              icon: Icon(Icons.article_outlined, size: 18, color: cs.onSurfaceVariant),
-              tooltip: 'View CV',
-              onPressed: () => showDialog<void>(
-                context: context,
-                builder: (_) => VacancyCvDialog(
-                  vacancyId: widget.vacancyId,
-                  role: widget.role,
-                ),
-              ),
-            ),
-          const SizedBox(width: 4),
-          // Archive: Restore to inbox — replaces Decline button
-          if (isDeclined) ...[
-            OutlinedButton.icon(
-              onPressed: _loadingRestore ? null : _restore,
-              icon: _loadingRestore
-                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.inbox_outlined, size: 16),
-              label: const Text('Restore to Inbox'),
-              style: OutlinedButton.styleFrom(
-                side: BorderSide(color: cs.primary.withValues(alpha: 0.5)),
-                foregroundColor: cs.primary,
-              ),
-            ),
-          ] else ...[
-            // Decline
+    if (isDeclined) {
+      if (tab == 0) {
+        return OutlinedButton.icon(
+          onPressed: _loadingRestore ? null : _restore,
+          icon: _loadingRestore
+              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.inbox_outlined, size: 16),
+          label: const Text('Restore to Inbox'),
+          style: OutlinedButton.styleFrom(
+            side: BorderSide(color: cs.primary.withValues(alpha: 0.5)),
+            foregroundColor: cs.primary,
+          ),
+        );
+      }
+      return const SizedBox.shrink();
+    }
+
+    switch (tab) {
+      case 0: // Analysis
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
             OutlinedButton(
               onPressed: _loadingDecline ? null : _decline,
               style: OutlinedButton.styleFrom(
@@ -627,22 +1019,136 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
                   : const Text('Decline'),
             ),
             const SizedBox(width: 8),
-            // Generate CV — primary CTA
             FilledButton.icon(
-              onPressed: _loadingCv ? null : _generateCv,
-              icon: _loadingCv
+              onPressed: _loadingAnalyze ? null : _analyze,
+              icon: _loadingAnalyze
                   ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.description_outlined, size: 16),
-              label: const Text('Generate CV'),
+                  : const Icon(Icons.refresh_rounded, size: 16),
+              label: Text(_loadingAnalyze ? 'Queuing...' : 'Re-analyze'),
             ),
           ],
+        );
+
+      case 1: // CV
+        final hasCv = cvAsync.valueOrNull?.hasCv ?? false;
+        return _SplitButton(
+          label: isCvInProgress ? 'Generating...' : (hasCv ? 'Regenerate CV' : 'Generate CV'),
+          icon: Icons.description_outlined,
+          loading: _loadingCv || isCvInProgress,
+          onPressed: (isCvInProgress || _loadingCv) ? null : _generateCv,
+          menuItems: [
+            MenuItemButton(
+              onPressed: hasCv && !isCvInProgress ? () => _downloadPdf('cv') : null,
+              leadingIcon: const Icon(Icons.picture_as_pdf_outlined, size: 16),
+              child: const Text('Download PDF'),
+            ),
+          ],
+        );
+
+      case 2: // Cover
+        final hasCover = cvAsync.valueOrNull?.hasCover ?? false;
+        final isCoverInProgress = widget.status == 'cover_generating';
+        return _SplitButton(
+          label: isCoverInProgress ? 'Generating...' : (hasCover ? 'Regenerate Cover' : 'Generate Cover'),
+          icon: Icons.mail_outline,
+          loading: _loadingCv || isCoverInProgress,
+          onPressed: (isCoverInProgress || _loadingCv) ? null : _generateCover,
+          menuItems: hasCover
+              ? [
+                  MenuItemButton(
+                    onPressed: () => _downloadPdf('cover'),
+                    leadingIcon: const Icon(Icons.picture_as_pdf_outlined, size: 16),
+                    child: const Text('Download PDF'),
+                  ),
+                ]
+              : [],
+        );
+
+      default: // Activity
+        return const SizedBox.shrink();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final cvAsync = ref.watch(vacancyCvProvider(widget.vacancyId));
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLowest.withValues(alpha: 0.9),
+        border: Border(
+          bottom: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.15)),
+        ),
+      ),
+      child: Row(
+        children: [
+          // Star toggle
+          Tooltip(
+            message: _starred ? 'Remove from favourites' : 'Add to favourites',
+            child: IconButton(
+              icon: Icon(
+                _starred ? Icons.star_rounded : Icons.star_outline_rounded,
+                size: 20,
+                color: _starred ? const Color(0xFFFFB300) : cs.onSurfaceVariant,
+              ),
+              onPressed: _toggleStar,
+              splashRadius: 18,
+            ),
+          ),
+          // Applied toggle
+          Tooltip(
+            message: _applied ? 'Mark as not applied' : 'Mark as applied',
+            child: _applied
+                ? FilledButton.icon(
+                    onPressed: _loadingApplied ? null : _toggleApplied,
+                    icon: const Icon(Icons.check_circle, size: 16),
+                    label: const Text('Applied'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF2E7D32),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      minimumSize: const Size(0, 36),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  )
+                : OutlinedButton.icon(
+                    onPressed: _loadingApplied ? null : _toggleApplied,
+                    icon: const Icon(Icons.check_circle_outline, size: 16),
+                    label: const Text('Applied?'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: cs.onSurfaceVariant,
+                      side: BorderSide(color: cs.outlineVariant),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      minimumSize: const Size(0, 36),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+          ),
+          const Spacer(),
+          // Open JD
+          if (widget.url.isNotEmpty)
+            IconButton(
+              icon: Icon(Icons.open_in_new, size: 18, color: cs.onSurfaceVariant),
+              tooltip: 'Open JD',
+              onPressed: () => launchUrl(
+                Uri.parse(widget.url),
+                mode: LaunchMode.externalApplication,
+              ),
+            ),
+          const SizedBox(width: 4),
+          // Context-sensitive CTA — changes per tab
+          AnimatedBuilder(
+            animation: widget.tabController,
+            builder: (context, _) => _buildCta(context, cs, cvAsync),
+          ),
         ],
       ),
     );
   }
 }
 
-// ── Hero header — role icon + title + verdict card + compact scores ───────────
+// ── Hero header — role icon + title + recommendation card + compact scores ─────
 
 class _VacancyHero extends StatelessWidget {
   final Phase1Data? p1;
@@ -729,8 +1235,8 @@ class _VacancyHero extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 20),
-        // Verdict card — primary go/no-go decision
-        _VerdictCard(
+        // Recommendation card — primary go/no-go decision
+        _RecommendationCard(
           recommendation: p2.recommendation,
           recommendationLabel: p2.recommendationLabel,
           northStar: p1?.northStar,
@@ -825,12 +1331,12 @@ class _ScoreDotsRow extends StatelessWidget {
   }
 }
 
-class _VerdictCard extends StatelessWidget {
+class _RecommendationCard extends StatelessWidget {
   final String recommendation;
   final String recommendationLabel;
   final String? northStar;
 
-  const _VerdictCard({
+  const _RecommendationCard({
     required this.recommendation,
     required this.recommendationLabel,
     this.northStar,
@@ -1411,6 +1917,229 @@ class _CollapsibleSectionState extends State<_CollapsibleSection> {
                 ? CrossFadeState.showSecond
                 : CrossFadeState.showFirst,
             duration: const Duration(milliseconds: 180),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Split action button ───────────────────────────────────────────────────────
+
+class _SplitButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool loading;
+  final VoidCallback? onPressed;
+  final List<MenuItemButton> menuItems;
+
+  const _SplitButton({
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+    this.loading = false,
+    this.menuItems = const [],
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const leftRadius = BorderRadius.only(
+      topLeft: Radius.circular(20),
+      bottomLeft: Radius.circular(20),
+    );
+    const rightRadius = BorderRadius.only(
+      topRight: Radius.circular(20),
+      bottomRight: Radius.circular(20),
+    );
+    const fullRadius = BorderRadius.all(Radius.circular(20));
+
+    final hasMenu = menuItems.isNotEmpty;
+
+    final mainBtn = FilledButton.icon(
+      onPressed: loading ? null : onPressed,
+      icon: loading
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+            )
+          : Icon(icon, size: 16),
+      label: Text(label),
+      style: FilledButton.styleFrom(
+        shape: RoundedRectangleBorder(
+          borderRadius: hasMenu ? leftRadius : fullRadius,
+        ),
+        minimumSize: const Size(0, 36),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+    );
+
+    if (!hasMenu) return mainBtn;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        mainBtn,
+        Container(width: 1, height: 36, color: Colors.white.withValues(alpha: 0.25)),
+        MenuAnchor(
+          menuChildren: menuItems,
+          builder: (context, controller, _) => FilledButton(
+            onPressed: () => controller.isOpen ? controller.close() : controller.open(),
+            style: FilledButton.styleFrom(
+              shape: const RoundedRectangleBorder(borderRadius: rightRadius),
+              minimumSize: const Size(34, 36),
+              maximumSize: const Size(34, 36),
+              padding: EdgeInsets.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Icon(Icons.arrow_drop_down, size: 18, color: Colors.white),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── CV tab ────────────────────────────────────────────────────────────────────
+
+class _CvTab extends ConsumerWidget {
+  final int vacancyId;
+  final String status;
+
+  const _CvTab({required this.vacancyId, required this.status});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cs = Theme.of(context).colorScheme;
+
+    if (status == 'cv_queued' || status == 'cv_generating') {
+      final label = status == 'cv_generating' ? 'Generating CV...' : 'CV in queue...';
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: cs.primary),
+            const SizedBox(height: 20),
+            Text(label, style: Theme.of(context).textTheme.bodyLarge),
+            const SizedBox(height: 8),
+            Text(
+              'Results will appear automatically',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final cvAsync = ref.watch(vacancyCvProvider(vacancyId));
+    return cvAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(
+        child: Text('Failed to load CV: $e', style: TextStyle(color: cs.error)),
+      ),
+      data: (cv) {
+        if (!cv.hasCv) {
+          return const _EmptyTabState(
+            icon: Icons.description_outlined,
+            message: 'CV not generated yet.\nUse Generate CV from the action bar.',
+          );
+        }
+        return Markdown(
+          data: cv.cvMd!,
+          selectable: true,
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+          styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+            p: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: cs.onSurface,
+                  height: 1.6,
+                ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ── Cover tab ─────────────────────────────────────────────────────────────────
+
+class _CoverTab extends ConsumerWidget {
+  final int vacancyId;
+  final String status;
+
+  const _CoverTab({required this.vacancyId, required this.status});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cs = Theme.of(context).colorScheme;
+
+    if (status == 'cv_queued' || status == 'cv_generating') {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: cs.primary),
+            const SizedBox(height: 20),
+            Text('CV in progress...', style: Theme.of(context).textTheme.bodyLarge),
+            const SizedBox(height: 8),
+            Text(
+              'Cover letter will be available after CV is generated',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final cvAsync = ref.watch(vacancyCvProvider(vacancyId));
+    return cvAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(
+        child: Text('Failed to load cover: $e', style: TextStyle(color: cs.error)),
+      ),
+      data: (cv) {
+        if (!cv.hasCover) {
+          return const _EmptyTabState(
+            icon: Icons.mail_outline,
+            message: 'Cover letter not generated yet.',
+          );
+        }
+        return Markdown(
+          data: cv.coverMd!,
+          selectable: true,
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+          styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+            p: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: cs.onSurface,
+                  height: 1.6,
+                ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ── Empty tab state ───────────────────────────────────────────────────────────
+
+class _EmptyTabState extends StatelessWidget {
+  final IconData icon;
+  final String message;
+
+  const _EmptyTabState({required this.icon, required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 48, color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
+          const SizedBox(height: 12),
+          Text(
+            message,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+            textAlign: TextAlign.center,
           ),
         ],
       ),

@@ -21,6 +21,8 @@ class VacancyListItem {
   final String? updatedAt;
   final List<String> keyBarriers;
   final String? analysisError;
+  final bool starred;
+  final bool applied;
 
   const VacancyListItem({
     required this.id,
@@ -38,6 +40,8 @@ class VacancyListItem {
     this.updatedAt,
     this.keyBarriers = const [],
     this.analysisError,
+    this.starred = false,
+    this.applied = false,
   });
 
   factory VacancyListItem.fromJson(Map<String, dynamic> json) {
@@ -58,6 +62,8 @@ class VacancyListItem {
       updatedAt: json['updated_at'] as String?,
       keyBarriers: _parseStringList(json['key_barriers']),
       analysisError: json['analysis_error'] as String?,
+      starred: json['starred'] as bool? ?? false,
+      applied: json['applied'] as bool? ?? false,
     );
   }
 
@@ -77,6 +83,8 @@ class VacancyListItem {
         'updated_at': updatedAt,
         'key_barriers': keyBarriers,
         'analysis_error': analysisError,
+        'starred': starred,
+        'applied': applied,
       };
 }
 
@@ -259,6 +267,77 @@ class FitDimensions {
       systemsFit: (json['systems_fit'] as num?)?.toDouble() ?? 0.0,
       stakeholderFit: (json['stakeholder_fit'] as num?)?.toDouble() ?? 0.0,
       overallFit: (json['overall_fit'] as num?)?.toDouble() ?? 0.0,
+    );
+  }
+}
+
+// ── Pipeline run entry ───────────────────────────────────────────────────────
+
+class PipelineRun {
+  final String phase;
+  final String status;
+  final String? errorMessage;
+  final String? startedAt;
+  final int? durationMs;
+
+  const PipelineRun({
+    required this.phase,
+    required this.status,
+    this.errorMessage,
+    this.startedAt,
+    this.durationMs,
+  });
+
+  factory PipelineRun.fromJson(Map<String, dynamic> json) {
+    return PipelineRun(
+      phase: json['phase'] as String? ?? '',
+      status: json['status'] as String? ?? '',
+      errorMessage: json['error_message'] as String?,
+      startedAt: json['started_at'] as String?,
+      durationMs: json['duration_ms'] as int?,
+    );
+  }
+}
+
+// ── Activity log entry ────────────────────────────────────────────────────────
+
+class ActivityEntry {
+  final String phase;
+  final String provider;
+  final String model;
+  final String thinkingEffort;
+  final int elapsedMs;
+  final int inputTokens;
+  final int outputTokens;
+  final int cacheReadTokens;
+  final double costUsd;
+  final String createdAt;
+
+  const ActivityEntry({
+    required this.phase,
+    required this.provider,
+    required this.model,
+    required this.thinkingEffort,
+    required this.elapsedMs,
+    required this.inputTokens,
+    required this.outputTokens,
+    required this.cacheReadTokens,
+    required this.costUsd,
+    required this.createdAt,
+  });
+
+  factory ActivityEntry.fromJson(Map<String, dynamic> json) {
+    return ActivityEntry(
+      phase: json['phase'] as String? ?? '',
+      provider: json['provider'] as String? ?? 'claude_api',
+      model: json['model'] as String? ?? '',
+      thinkingEffort: json['thinking_effort'] as String? ?? '',
+      elapsedMs: json['elapsed_ms'] as int? ?? 0,
+      inputTokens: json['input_tokens'] as int? ?? 0,
+      outputTokens: json['output_tokens'] as int? ?? 0,
+      cacheReadTokens: json['cache_read_tokens'] as int? ?? 0,
+      costUsd: (json['cost_usd'] as num?)?.toDouble() ?? 0.0,
+      createdAt: json['created_at'] as String? ?? '',
     );
   }
 }

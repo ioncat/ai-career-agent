@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/vacancy.dart';
+import '../providers/read_vacancies_provider.dart';
 import '../providers/vacancy_list_provider.dart';
+import '../widgets/processing_wrapper.dart';
 import '../widgets/vacancy_card.dart';
 import 'vacancy_detail_screen.dart';
 
@@ -21,17 +23,31 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
 
+  void _onSkipped() {
+    final currentId = _selected?.id;
+    if (currentId == null) return;
+    final vacancies = ref.read(folderVacanciesProvider(widget.folder));
+    final filtered = _filter(vacancies);
+    final idx = filtered.indexWhere((v) => v.id == currentId);
+    VacancyListItem? next;
+    if (idx >= 0 && idx < filtered.length - 1) {
+      next = filtered[idx + 1];
+    } else if (idx > 0) {
+      next = filtered[idx - 1];
+    }
+    setState(() => _selected = next);
+  }
+
   bool _filterExpanded = false;
   Set<String> _statusFilter = {};
   DateTime? _dateFrom;
   DateTime? _dateTo;
 
   String get _title => switch (widget.folder) {
-        'inbox' => 'Inbox',
-        'in_progress' => 'In Progress',
+        'inbox'   => 'Inbox',
         'applied' => 'Applied',
         'archive' => 'Archive',
-        _ => 'Vacancies',
+        _         => 'Vacancies',
       };
 
   int get _activeFilterCount =>
@@ -219,7 +235,10 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
                       : _VacancyList(
                           vacancies: filtered,
                           selectedId: _selected?.id,
-                          onSelect: (v) => setState(() => _selected = v),
+                          onSelect: (v) {
+                            setState(() => _selected = v);
+                            ref.read(readVacanciesProvider.notifier).markRead(v.id);
+                          },
                         ),
                 ),
               ],
@@ -241,6 +260,7 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
                     vacancyId: _selected!.id,
                     url: _selected!.url,
                     vacancy: _selected!,
+                    onSkipped: _onSkipped,
                   )
                 : const _NoSelectionPlaceholder(),
           ),
@@ -525,11 +545,17 @@ class _VacancyList extends StatelessWidget {
       itemCount: vacancies.length,
       itemBuilder: (ctx, i) {
         final v = vacancies[i];
-        return VacancyCard(
-          key: ValueKey(v.id),
-          vacancy: v,
-          selected: v.id == selectedId,
-          onTap: () => onSelect(v),
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: ProcessingWrapper(
+            key: ValueKey('pw_${v.id}'),
+            status: v.status,
+            child: VacancyCard(
+              vacancy: v,
+              selected: v.id == selectedId,
+              onTap: () => onSelect(v),
+            ),
+          ),
         );
       },
     );
@@ -568,11 +594,10 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final msg = switch (folder) {
-      'inbox'       => 'No new vacancies.\nThe RSS pipeline will add them automatically.',
-      'in_progress' => 'No vacancies in progress.',
-      'applied'     => 'No applications sent yet.',
-      'archive'     => 'Archive is empty.',
-      _             => 'No vacancies.',
+      'inbox'   => 'No new vacancies.\nThe RSS pipeline will add them automatically.',
+      'applied' => 'No applications sent yet.',
+      'archive' => 'Archive is empty.',
+      _         => 'No vacancies.',
     };
     return Center(
       child: Text(

@@ -185,9 +185,10 @@ bool _folderMatch(String status, String folder) {
           status == 'analysis_queued' ||
           status == 'analyzing' ||
           status == 'analyzed' ||
-          status == 'analysis_failed';
-    case 'in_progress':
-      return status == 'cv_generated' || status == 'cv_queued';
+          status == 'analysis_failed' ||
+          status == 'cv_queued' ||
+          status == 'cv_generating' ||
+          status == 'cv_generated';
     case 'applied':
       return status == 'applied';
     case 'archive':

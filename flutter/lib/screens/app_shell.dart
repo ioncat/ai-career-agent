@@ -15,7 +15,6 @@ import 'settings_screen.dart';
 // Nav destinations
 const _kNavItems = [
   _NavItem(Icons.work,             Icons.work_outline,            'Inbox'),
-  _NavItem(Icons.pending_actions,  Icons.pending_actions_outlined, 'In Prog.'),
   _NavItem(Icons.check_circle,     Icons.check_circle_outline,    'Applied'),
   _NavItem(Icons.archive,          Icons.archive_outlined,         'Archive'),
   _NavItem(Icons.settings,         Icons.settings_outlined,        'Settings'),
@@ -38,7 +37,7 @@ class AppShell extends ConsumerStatefulWidget {
 class _AppShellState extends ConsumerState<AppShell> {
   int _selectedIndex = 0;
 
-  static const _folders = ['inbox', 'in_progress', 'applied', 'archive'];
+  static const _folders = ['inbox', 'applied', 'archive'];
 
 
   @override
