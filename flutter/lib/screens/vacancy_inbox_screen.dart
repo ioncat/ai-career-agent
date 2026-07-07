@@ -104,6 +104,16 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
     if (picked != null) setState(() => _dateTo = picked);
   }
 
+  void _clearAllFilters() {
+    setState(() {
+      _statusFilter = {};
+      _dateFrom = null;
+      _dateTo = null;
+      _searchController.clear();
+      _searchQuery = '';
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final vacancies = ref.watch(folderVacanciesProvider(widget.folder));
@@ -218,6 +228,8 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
                     onPickTo: _pickDateTo,
                     onClearDates: () =>
                         setState(() { _dateFrom = null; _dateTo = null; }),
+                    hasActiveFilters: _activeFilterCount > 0 || _searchQuery.isNotEmpty,
+                    onClearAll: _clearAllFilters,
                   ),
                 Divider(
                   height: 1,
@@ -378,6 +390,8 @@ class _FilterPanel extends StatelessWidget {
   final VoidCallback onPickFrom;
   final VoidCallback onPickTo;
   final VoidCallback onClearDates;
+  final bool hasActiveFilters;
+  final VoidCallback onClearAll;
 
   const _FilterPanel({
     required this.availableStatuses,
@@ -388,6 +402,8 @@ class _FilterPanel extends StatelessWidget {
     required this.onPickFrom,
     required this.onPickTo,
     required this.onClearDates,
+    required this.hasActiveFilters,
+    required this.onClearAll,
   });
 
   static const _statusLabels = <String, String>{
@@ -487,6 +503,25 @@ class _FilterPanel extends StatelessWidget {
               ],
             ],
           ),
+          if (hasActiveFilters) ...[
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: onClearAll,
+                icon: Icon(Icons.filter_list_off, size: 14, color: cs.error),
+                label: Text(
+                  'Clear all filters',
+                  style: labelSmall?.copyWith(color: cs.error),
+                ),
+                style: TextButton.styleFrom(
+                  minimumSize: Size.zero,
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
