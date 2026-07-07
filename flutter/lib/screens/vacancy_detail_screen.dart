@@ -835,6 +835,7 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
   late bool _applied;
   bool _loadingStar = false;
   bool _loadingApplied = false;
+  bool _refreshing = false;
 
   @override
   void initState() {
@@ -853,6 +854,18 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
   VacancyRepository get _repo {
     final apiUrl = ref.read(settingsProvider).valueOrNull?.apiUrl ?? 'http://localhost:8080';
     return VacancyRepository(baseUrl: apiUrl);
+  }
+
+  Future<void> _refresh() async {
+    setState(() => _refreshing = true);
+    try {
+      ref.invalidate(vacancyListProvider);
+      ref.invalidate(vacancyDetailProvider(widget.vacancyId));
+      ref.invalidate(vacancyCvProvider(widget.vacancyId));
+      ref.invalidate(vacancyJdProvider(widget.vacancyId));
+    } finally {
+      if (mounted) setState(() => _refreshing = false);
+    }
   }
 
   Future<void> _toggleStar() async {
@@ -1147,6 +1160,19 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
                 mode: LaunchMode.externalApplication,
               ),
             ),
+          Tooltip(
+            message: 'Refresh vacancy data',
+            child: IconButton(
+              icon: _refreshing
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(Icons.sync_rounded, size: 18, color: cs.onSurfaceVariant),
+              onPressed: _refreshing ? null : _refresh,
+            ),
+          ),
           const SizedBox(width: 4),
           // Context-sensitive CTA — changes per tab
           AnimatedBuilder(
