@@ -1454,13 +1454,11 @@ class _RecommendationCard extends StatelessWidget {
                 ),
                 if (northStar != null && northStar!.isNotEmpty) ...[
                   const SizedBox(height: 4),
-                  Text(
+                  SelectableText(
                     northStar!,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: cs.onSurface.withValues(alpha: 0.65),
                         ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ],
@@ -1761,8 +1759,8 @@ class _OverviewRow extends StatelessWidget {
           const SizedBox(width: 5),
         ],
         Expanded(
-          child: RichText(
-            text: TextSpan(
+          child: SelectableText.rich(
+            TextSpan(
               children: [
                 TextSpan(
                   text: '$label: ',
