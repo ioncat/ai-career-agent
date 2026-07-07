@@ -23,6 +23,7 @@ class VacancyListItem {
   final String? analysisError;
   final bool starred;
   final bool applied;
+  final String? salary;
 
   const VacancyListItem({
     required this.id,
@@ -42,6 +43,7 @@ class VacancyListItem {
     this.analysisError,
     this.starred = false,
     this.applied = false,
+    this.salary,
   });
 
   factory VacancyListItem.fromJson(Map<String, dynamic> json) {
@@ -64,6 +66,7 @@ class VacancyListItem {
       analysisError: json['analysis_error'] as String?,
       starred: json['starred'] as bool? ?? false,
       applied: json['applied'] as bool? ?? false,
+      salary: json['salary'] as String?,
     );
   }
 
@@ -85,6 +88,7 @@ class VacancyListItem {
         'analysis_error': analysisError,
         'starred': starred,
         'applied': applied,
+        'salary': salary,
       };
 }
 

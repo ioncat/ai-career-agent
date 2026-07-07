@@ -455,7 +455,18 @@ class _VacancyDetailScreenState extends ConsumerState<VacancyDetailScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _VacancyHero(p1: p1, p2: p2, vacancyId: widget.vacancyId, vacancy: widget.vacancy),
+                        _VacancyHero(
+                          p1: p1,
+                          p2: p2,
+                          vacancyId: widget.vacancyId,
+                          vacancy: widget.vacancy,
+                          salary: widget.vacancy?.salary,
+                          onSalaryChanged: (v) async {
+                            final apiUrl = ref.read(settingsProvider).valueOrNull?.apiUrl ?? 'http://localhost:8080';
+                            await VacancyRepository(baseUrl: apiUrl).updateSalary(widget.vacancyId, v);
+                            ref.invalidate(vacancyListProvider);
+                          },
+                        ),
                         const SizedBox(height: 24),
                         _QuickOverviewCard(p2: p2),
                         const SizedBox(height: 16),
@@ -1155,8 +1166,17 @@ class _VacancyHero extends StatelessWidget {
   final Phase2Data p2;
   final VacancyListItem? vacancy;
   final int vacancyId;
+  final String? salary;
+  final Future<void> Function(String)? onSalaryChanged;
 
-  const _VacancyHero({required this.p1, required this.p2, required this.vacancyId, this.vacancy});
+  const _VacancyHero({
+    required this.p1,
+    required this.p2,
+    required this.vacancyId,
+    this.vacancy,
+    this.salary,
+    this.onSalaryChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1229,6 +1249,9 @@ class _VacancyHero extends StatelessWidget {
                           ),
                     ),
                   ],
+                  const SizedBox(height: 6),
+                  if (onSalaryChanged != null)
+                    _SalaryInline(salary: salary, onSave: onSalaryChanged!),
                 ],
               ),
             ),
@@ -1438,6 +1461,141 @@ class _PostedChip extends StatelessWidget {
                 ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Salary inline edit ────────────────────────────────────────────────────────
+
+class _SalaryInline extends StatefulWidget {
+  final String? salary;
+  final Future<void> Function(String) onSave;
+
+  const _SalaryInline({this.salary, required this.onSave});
+
+  @override
+  State<_SalaryInline> createState() => _SalaryInlineState();
+}
+
+class _SalaryInlineState extends State<_SalaryInline> {
+  bool _editing = false;
+  bool _saving = false;
+  late TextEditingController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: widget.salary ?? '');
+  }
+
+  @override
+  void didUpdateWidget(_SalaryInline old) {
+    super.didUpdateWidget(old);
+    if (old.salary != widget.salary && !_editing) {
+      _ctrl.text = widget.salary ?? '';
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    try {
+      await widget.onSave(_ctrl.text.trim());
+    } finally {
+      if (mounted) setState(() { _saving = false; _editing = false; });
+    }
+  }
+
+  void _cancel() {
+    setState(() { _editing = false; _ctrl.text = widget.salary ?? ''; });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    if (_editing) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.attach_money, size: 14, color: cs.primary),
+          const SizedBox(width: 4),
+          SizedBox(
+            width: 200,
+            child: TextField(
+              controller: _ctrl,
+              autofocus: true,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurface),
+              decoration: InputDecoration(
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                hintText: 'e.g. \$3k–5k USD/mo',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+              ),
+              onSubmitted: (_) => _save(),
+            ),
+          ),
+          const SizedBox(width: 4),
+          if (_saving)
+            const SizedBox(
+              width: 16, height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else ...[
+            IconButton(
+              icon: const Icon(Icons.check, size: 16),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+              onPressed: _save,
+              tooltip: 'Save',
+            ),
+            IconButton(
+              icon: const Icon(Icons.close, size: 16),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+              onPressed: _cancel,
+              tooltip: 'Cancel',
+            ),
+          ],
+        ],
+      );
+    }
+
+    final hasSalary = widget.salary?.isNotEmpty == true;
+    return Tooltip(
+      message: 'Click to edit salary',
+      child: GestureDetector(
+        onTap: () => setState(() => _editing = true),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.attach_money,
+              size: 14,
+              color: hasSalary ? cs.primary : cs.onSurfaceVariant.withValues(alpha: 0.45),
+            ),
+            const SizedBox(width: 3),
+            Text(
+              hasSalary ? widget.salary! : 'Add salary…',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: hasSalary
+                        ? cs.onSurfaceVariant
+                        : cs.onSurfaceVariant.withValues(alpha: 0.45),
+                    fontStyle: hasSalary ? FontStyle.normal : FontStyle.italic,
+                  ),
+            ),
+            if (hasSalary) ...[
+              const SizedBox(width: 4),
+              Icon(Icons.edit, size: 11, color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
+            ],
+          ],
+        ),
       ),
     );
   }
