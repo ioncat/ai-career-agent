@@ -13,17 +13,18 @@ flowchart TD
     P1 --> VS["VScore — Vacancy Attractiveness\n8 dims: tier · seniority · domain · remote · comp…"]
     P1 --> P2["Phase 2 — Fit Scoring\nFit × VScore matrix · Barriers · Adaptation Plan"]
     VS --> P2
-    P2 --> QS["Quick Scan → Telegram\nFit / VScore / Recommendation / Barriers / Warnings"]
+    P2 --> QS["Quick Scan → Flutter Inbox\nFit / VScore / Recommendation / Barriers / Warnings"]
 
     QS -->|"apply / take a chance"| P25["Phase 2.5 — Objection Handling\nresolve barriers before CV · updates PROFILE.md"]
     QS -->|"decline"| Z["❌ Pipeline stops"]
     P25 --> P3["Phase 3 — CV Draft\nhidden from user"]
     P3 --> P35["Phase 3.5 — Self-Review\nword freq · tools gap · tone · Adaptation Plan check"]
-    P35 --> PDF["CV.pdf → Telegram\nuser approves"]
-    PDF --> P4["Phase 4 — Cover Letter → Telegram\ntwo variants · user picks"]
+    P35 --> CVFL["CV preview → Flutter\nuser downloads PDF"]
+    CVFL --> P4["Phase 4 — Cover Letter\nCover preview → Flutter · user downloads PDF"]
 ```
 
 **3-way recommendation:** `apply` · `take a chance` · `decline` — driven by Fit × VScore matrix  
 **VScore (1–10):** vacancy attractiveness — company tier, seniority, market scope, domain fit, remote policy, compensation  
 **Fit Breakdown:** per-requirement ✅/⚠️/❌ — pet-projects never equal commercial experience  
-**Archetype-aware:** Founder Proxy vs Executor signal → different CV framing per vacancy
+**Archetype-aware:** Founder Proxy vs Executor signal → different CV framing per vacancy  
+**Output language:** English (all analysis content, CV, Cover)
