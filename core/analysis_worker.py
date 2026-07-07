@@ -36,16 +36,21 @@ class AnalysisWorker:
         self._llm_sem = llm_sem
         self._queue: asyncio.Queue[int] = asyncio.Queue()
         self._task: asyncio.Task | None = None
+        self._recovery_task: asyncio.Task | None = None
 
     async def start(self) -> None:
         self._task = asyncio.create_task(self._run(), name="analysis-worker")
+        self._recovery_task = asyncio.create_task(
+            self._recover_queued(), name="analysis-worker-recovery"
+        )
         log.info("AnalysisWorker: started")
 
     async def stop(self) -> None:
-        if self._task:
-            self._task.cancel()
-            with suppress(asyncio.CancelledError):
-                await self._task
+        for task in (self._task, self._recovery_task):
+            if task:
+                task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await task
         log.info("AnalysisWorker: stopped")
 
     async def enqueue(self, vacancy_id: int) -> None:
@@ -55,6 +60,23 @@ class AnalysisWorker:
         log.info("AnalysisWorker: enqueued v#%d", vacancy_id)
 
     # ── Internal ──────────────────────────────────────────────────────────────
+
+    async def _recover_queued(self) -> None:
+        """On startup: re-enqueue any analysis_queued vacancies left from a prior crash/restart.
+
+        DB init already resets stuck 'analyzing' → 'analysis_queued' before workers start,
+        so this catches both mid-run crashes and clean restarts with pending work.
+        """
+        try:
+            rows = await database.list_vacancies(
+                status="analysis_queued", user_id=None, limit=50
+            )
+            for row in rows:
+                vid = row["id"]
+                log.info("AnalysisWorker: recovery — re-enqueuing v#%d", vid)
+                await self.enqueue(vid)
+        except Exception as exc:
+            log.warning("AnalysisWorker: recovery scan failed: %s", exc)
 
     async def _run(self) -> None:
         while True:

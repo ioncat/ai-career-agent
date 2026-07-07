@@ -149,7 +149,11 @@ async def init_db() -> None:
             except Exception:
                 pass  # column already exists — ignore
 
-    # Recovery: vacancies stuck at 'analyzing' (process was killed mid-run) → re-queue.
+    log.info("DB initialised at %s", _db_path)
+
+
+async def reset_stuck_statuses() -> None:
+    """Reset in-progress statuses left by a prior crash. Call once at agent startup, before workers start."""
     async with aiosqlite.connect(_db_path) as db:
         cur = await db.execute(
             "UPDATE vacancies SET status = 'analysis_queued' WHERE status = 'analyzing'"
@@ -163,8 +167,6 @@ async def init_db() -> None:
         await db.commit()
         if cur2.rowcount:
             log.warning("DB recovery: reset %d stuck 'cv_generating' → 'cv_queued'", cur2.rowcount)
-
-    log.info("DB initialised at %s", _db_path)
 
 
 @asynccontextmanager
