@@ -2,7 +2,7 @@
 
 **AI job search counselor for PdM · PO**
 
-> **Status: active development** — core pipeline live, new features added regularly.
+> **Status: active development** — Flutter MVP complete, pipeline live, new features added regularly.
 
 Reads vacancies deeply, scores honest fit, and generates targeted CVs — so candidates apply to the right roles and win them.
 
@@ -41,7 +41,7 @@ When fit is real: a targeted CV from actual experience, cross-checked against th
 
 ## How it works
 
-**1. JD Discovery & Extraction** — automatic via RSS push, or manual (URL / JD paste in Telegram).
+**1. JD Discovery & Extraction** — automatic via RSS push, or manual (URL paste in Flutter).
 
 **2. Deep Analysis (Phase 1)** — employer's real pain, hidden requirements, role archetype, **VScore** (vacancy attractiveness, 8 dims).
 
@@ -61,7 +61,7 @@ When fit is real: a targeted CV from actual experience, cross-checked against th
 
 | | |
 |-|-|
-| [User Journey](docs/diagrams/user-journey.md) | RSS → Telegram → approve/skip flow |
+| [User Journey](docs/diagrams/user-journey.md) | RSS → auto-analysis → Flutter → approve/skip flow |
 | [AI Pipeline](docs/diagrams/ai-pipeline.md) | 6-phase pipeline — VScore, Fit × VScore, decision gates |
 | [Architecture](docs/diagrams/architecture.md) | Service topology — career-agent · parser · pdf · job-monitor |
 | [System Flow](docs/system-flow.md) | Full decision logic end-to-end |
