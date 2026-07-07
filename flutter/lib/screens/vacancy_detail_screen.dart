@@ -35,6 +35,19 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
   bool _loadingAnalyze = false;
   bool _loadingDecline = false;
   bool _loadingRestore = false;
+  bool _refreshing = false;
+
+  Future<void> _refresh() async {
+    setState(() => _refreshing = true);
+    try {
+      ref.invalidate(vacancyListProvider);
+      ref.invalidate(vacancyDetailProvider(widget.vacancyId));
+      ref.invalidate(vacancyCvProvider(widget.vacancyId));
+      ref.invalidate(vacancyJdProvider(widget.vacancyId));
+    } finally {
+      if (mounted) setState(() => _refreshing = false);
+    }
+  }
 
   VacancyRepository get _repo {
     final apiUrl = ref.read(settingsProvider).valueOrNull?.apiUrl ?? 'http://localhost:8080';
@@ -150,6 +163,15 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                   onPressed: () => launchUrl(Uri.parse(widget.url),
                       mode: LaunchMode.externalApplication),
                 ),
+              Tooltip(
+                message: 'Refresh vacancy data',
+                child: IconButton(
+                  icon: _refreshing
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : Icon(Icons.sync_rounded, size: 18, color: cs.onSurfaceVariant),
+                  onPressed: _refreshing ? null : _refresh,
+                ),
+              ),
               if (widget.restoreMode) ...[
                 OutlinedButton.icon(
                   onPressed: _loadingRestore ? null : _restore,
@@ -371,6 +393,10 @@ class _VacancyDetailScreenState extends ConsumerState<VacancyDetailScreen>
     if (oldStatus != 'cv_generated' && newStatus == 'cv_generated') {
       ref.invalidate(vacancyCvProvider(widget.vacancyId));
       _tabController.animateTo(1);
+    }
+    if ((oldStatus == 'analysis_queued' || oldStatus == 'analyzing') &&
+        newStatus == 'analyzed') {
+      ref.invalidate(vacancyDetailProvider(widget.vacancyId));
     }
   }
 
