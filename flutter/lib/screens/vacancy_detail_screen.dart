@@ -1482,10 +1482,12 @@ class _SalaryInlineState extends State<_SalaryInline> {
   bool _editing = false;
   bool _saving = false;
   late TextEditingController _ctrl;
+  String? _committedSalary; // tracks last saved value locally
 
   @override
   void initState() {
     super.initState();
+    _committedSalary = widget.salary;
     _ctrl = TextEditingController(text: widget.salary ?? '');
   }
 
@@ -1493,6 +1495,7 @@ class _SalaryInlineState extends State<_SalaryInline> {
   void didUpdateWidget(_SalaryInline old) {
     super.didUpdateWidget(old);
     if (old.salary != widget.salary && !_editing) {
+      _committedSalary = widget.salary;
       _ctrl.text = widget.salary ?? '';
     }
   }
@@ -1504,16 +1507,18 @@ class _SalaryInlineState extends State<_SalaryInline> {
   }
 
   Future<void> _save() async {
+    final value = _ctrl.text.trim();
     setState(() => _saving = true);
     try {
-      await widget.onSave(_ctrl.text.trim());
+      await widget.onSave(value);
+      if (mounted) setState(() => _committedSalary = value.isEmpty ? null : value);
     } finally {
       if (mounted) setState(() { _saving = false; _editing = false; });
     }
   }
 
   void _cancel() {
-    setState(() { _editing = false; _ctrl.text = widget.salary ?? ''; });
+    setState(() { _editing = false; _ctrl.text = _committedSalary ?? ''; });
   }
 
   @override
@@ -1567,7 +1572,7 @@ class _SalaryInlineState extends State<_SalaryInline> {
       );
     }
 
-    final hasSalary = widget.salary?.isNotEmpty == true;
+    final hasSalary = _committedSalary?.isNotEmpty == true;
     return Tooltip(
       message: 'Click to edit salary',
       child: GestureDetector(
@@ -1582,7 +1587,7 @@ class _SalaryInlineState extends State<_SalaryInline> {
             ),
             const SizedBox(width: 3),
             Text(
-              hasSalary ? widget.salary! : 'Add salary…',
+              hasSalary ? _committedSalary! : 'Add salary…',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: hasSalary
                         ? cs.onSurfaceVariant
