@@ -109,6 +109,7 @@ async def main() -> None:
     # ── 2. Database ───────────────────────────────────────────────────────────
     database.configure(settings.db_path)
     await database.init_db()
+    await database.reset_stuck_statuses()  # must run before workers start
 
     # Seed default user from TELEGRAM_CHAT_ID on first run; returns existing id on subsequent runs.
     default_user_id = await database.get_or_create_default_user(

@@ -1,12 +1,17 @@
 # career-agent — Backlog
 
-> Last updated: 2026-07-06
+> Last updated: 2026-07-07
 > Epic format: post-pivot epics (13+) live in `docs/delivery/epics/`. This file = priority tracker + status overview.
 > Pre-pivot epics (1–12): `docs/delivery/epics-archive/EPIC-01-12-pre-pivot.md`
 
 ---
 
 ## ✅ Delivered Features
+
+### 2026-07-07
+- **AnalysisWorker — DB recovery on startup**: `_recover_queued()` runs once at AnalysisWorker start; picks up `analysis_queued` vacancies left from crash or restart and re-enqueues immediately (no polling delay)
+- **launcher.py — removed standalone Web API**: `Web API :8080` entry removed from SERVICES; agent.py now owns the embedded FastAPI server with workers in the same process → `app.state.analysis_worker` always set → Flutter Analyze button hits real worker directly
+- **db.reset_stuck_statuses() — isolated from init_db()**: DB crash-recovery (`analyzing → analysis_queued`, `cv_generating → cv_queued`) moved out of `init_db()` into separate `reset_stuck_statuses()`; called explicitly in agent.py before workers start; web API lifespan `init_db()` no longer clobbers active work on startup
 
 ### 2026-07-06
 - **Flutter — ProcessingWrapper**: cross-cutting `ProcessingWrapper` widget (snake border animation via `CustomPainter` + `PathMetrics` + phase overlay with spinner + label) replaces 4 per-status badge classes in `VacancyCard`; `kActiveStatuses` map in `active_status.dart` is single source of truth — adding a status there auto-enables animation everywhere
@@ -175,6 +180,32 @@ Worker prompt → Worker output
 **Experiment plan:** run same vacancy through pipeline with Critic off vs. on → compare output quality manually → decide if cost is justified.
 
 **Estimated cost impact:** +50–100% per phase (one extra Critic call + possible revision call). Worth it only if quality delta is significant.
+
+---
+
+## 🟡 P2 — Annotated CV Revision (added 2026-07-07)
+
+**Idea:** User selects a block in the CV or Cover markdown preview → adds an annotation comment → submits → AI produces a revised version with that block rewritten to match the note.
+
+**Goal:** Let the user give targeted feedback on generated documents ("make this bullet more concrete", "this sounds too salesy", "add the HostiServer migration here") without re-running the full Phase 3 pipeline.
+
+**Flutter UX:**
+- CV tab + Cover tab: long-press or tap-and-hold on a paragraph/section → annotation panel slides up
+- User types note in annotation panel → "Request revision" button → sends `{section_text, user_note}` to backend
+- Backend responds with revised section text → replaces block in viewer; user can Accept or Undo
+- Multiple annotations supported in one round (GitHub code review style)
+
+**Backend:**
+- New endpoint: `POST /api/vacancies/{id}/cv-revision` — accepts `{annotations: [{section, note}]}`, returns `{revised_cv_md}`
+- Revision prompt: Phase 3.5-style self-review but driven by `user_annotations` instead of word-frequency heuristics
+- Saves revised markdown back to DB (same fields as Phase 3 output)
+- Activity log entry: `phase=cv_revision`, `model`, `tokens`, `cost`
+
+**Key decisions before implementation:**
+1. Section granularity: paragraph-level or heading-level? (paragraph = more precise, harder to anchor)
+2. Replace full CV or inject diffs? (full replacement = simpler, diffs = preserve user review position)
+3. Revision model: same as Phase 3 or cheaper model? (notes are short; cheaper model may suffice)
+4. Max annotations per round: 1 or many? (many = one LLM call, all context at once)
 
 ---
 

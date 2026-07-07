@@ -49,14 +49,6 @@ SERVICES = [
         "verbose": False,
     },
     {
-        "name": "Web API  :8080",
-        "cmd": [PY, "-m", "uvicorn", "web.api:app", "--port", "8080"],
-        "cwd": ROOT,
-        "ready": "Application startup complete",
-        "log": "webapi.log",
-        "verbose": False,
-    },
-    {
         "name": "Bot",
         "cmd": [PY, str(ROOT / "agent.py")],
         "cwd": ROOT,
