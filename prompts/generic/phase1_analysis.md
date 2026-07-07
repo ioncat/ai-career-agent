@@ -23,11 +23,9 @@ Do NOT soften gaps. Realistic critique produces better Phase 2 output.
 ---
 
 **Output rules:**
-- Language: use the language specified in the active user's PROFILE.md → `## Settings` → `language` field. Default: Russian.
+- Language: English. All content values in English.
 - Tone: analytical and objective — state conclusions directly, avoid speculation and emotional language
 - All six sections required. Do not skip. Do not add extra sections.
-- **Label/content split:** Section and field labels are English structural markers — keep as-is. ALL content and values following those labels MUST be in the output language.
-- **Jargon rule: never translate English HR/professional jargon.** Use borrowed forms: "скрин" (not "экран"), "оффер", "онбординг", "фидбэк", "хайринг-менеджер", "стартап" etc. When in doubt — keep English jargon or use Russified transliteration, never literal translation.
 
 ## Output Format
 

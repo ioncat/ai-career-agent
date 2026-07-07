@@ -14,11 +14,10 @@ User will provide:
 ---
 
 **Output rules:**
-- Language: use the language specified in the active user's PROFILE.md → `## Settings` → `language` field. Default: Russian.
+- Language: English. All content values in English.
 - Tone: analytical and objective — state conclusions directly, avoid speculation and emotional language
 - Be critical and realistic. Do not soften gaps. A pet-project is NOT commercial experience.
 - Output exactly four sections in this order, using the exact headers shown below. Do not skip. Do not add extra sections.
-- **Jargon rule: never translate English HR/professional jargon.** Use the borrowed form as it exists in Russian-speaking professional community. Examples: "скрин" (not "экран"), "оффер" (not "предложение"), "онбординг" (not "введение в должность"), "фидбэк" (not "обратная связь"), "хайринг-менеджер" (not "нанимающий менеджер"). When in doubt — keep English jargon as-is or use the Russified transliteration, never a literal translation.
 
 ---
 
@@ -39,9 +38,9 @@ Output this block exactly as shown, filling in the placeholders.
 **Category:** [Primary role type from Phase 1 section 1.4] · [Remote / On-site / Hybrid]
 **Who they want:** [1 sentence — the ideal candidate this vacancy targets]
 
-**Key Barriers:** нет / [hard gaps between JD requirements and candidate — name the gap and the evidence]
-**Hidden Risks:** нет / [contextual risks from role/company — NOT candidate gaps]
-**Warnings:** нет / [application process risks only — see rules below]
+**Key Barriers:** none / [hard gaps between JD requirements and candidate — name the gap and the evidence]
+**Hidden Risks:** none / [contextual risks from role/company — NOT candidate gaps]
+**Warnings:** none / [application process risks only — see rules below]
 
 ---
 
@@ -111,7 +110,7 @@ Valid warnings:
 - No public info about company
 
 If career track diverges significantly from candidate's target role type:
-add: `**Track note:** роль отличается от целевого трека — [1 sentence on the nature of difference]`
+add: `**Track note:** role diverges from candidate's target track — [1 sentence on the nature of difference]`
 
 ---
 
@@ -121,9 +120,9 @@ Mandatory table. Assess the 6–10 most significant JD requirements.
 
 ## Fit Breakdown
 
-| Требование из JD | Статус | Опыт кандидата |
-|-----------------|--------|----------------|
-| [requirement] | ✅ / ⚠️ / ❌ | [specific evidence from profile, or "нет данных"] |
+| JD Requirement | Status | Candidate Evidence |
+|----------------|--------|-------------------|
+| [requirement] | ✅ / ⚠️ / ❌ | [specific evidence from profile, or "no evidence"] |
 
 **Status rules — be strict:**
 - ✅ = direct commercial experience confirmed in profile
@@ -165,7 +164,7 @@ Format each action as:
 
 ### Fit Dimensions
 
-| Измерение | Оценка /10 | Комментарий |
+| Dimension | Score /10 | Comment |
 |-----------|-----------|---------|
 | Domain fit | | |
 | Execution fit | | |
@@ -176,23 +175,23 @@ Format each action as:
 
 ### Detailed Assessment
 
-**Сильные совпадения** — где кандидат чётко попадает в цель:
-- [конкретные совпадения с доказательствами]
+**Strong matches** — where candidate clearly hits the target:
+- [specific matches with evidence]
 
-**Слабые места** — пробелы и недостающий опыт:
-- [список пробелов]
+**Weak spots** — gaps and missing experience:
+- [list of gaps]
 
-**Transferable experience** — реальный опыт, который можно переформатировать:
-- [список с конкретными примерами]
+**Transferable experience** — real experience that can be reframed:
+- [list with specific examples]
 
-**Likely recruiter objections** — что вызовет сомнение на скрине:
-- [список возражений]
+**Likely recruiter objections** — what will cause hesitation at screening:
+- [list of objections]
 
 **Best narrative for positioning:**
-[1–2 предложения: лучший угол позиционирования для этой конкретной вакансии]
+[1–2 sentences: best positioning angle for this specific vacancy]
 
 ### Summary
 
-- **Кого реально ищет компания:** [1 предложение]
-- **Почему кандидат подходит / не подходит:** [1 предложение]
-- **Как должно выглядеть идеальное CV для этой вакансии:** [2–3 предложения]
+- **Who the company is actually looking for:** [1 sentence]
+- **Why the candidate fits / does not fit:** [1 sentence]
+- **What the ideal CV for this vacancy should look like:** [2–3 sentences]
