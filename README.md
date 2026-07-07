@@ -8,6 +8,10 @@ Reads vacancies deeply, scores honest fit, and generates targeted CVs — so can
 
 ---
 
+![Career Agent — Flutter Desktop UI](docs/screenshots/Flutter%20Main%20Screen.png)
+
+---
+
 ## Who it's for
 
 **Primary ICP:** PdM (Product Manager) · PO (Product Owner)
