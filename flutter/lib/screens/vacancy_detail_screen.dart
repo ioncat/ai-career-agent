@@ -731,11 +731,17 @@ class _ActivityLogViewState extends ConsumerState<_ActivityLogView> {
     }
   }
 
+  // DB stores UTC as naive strings (no 'Z'). Force UTC so .toLocal() gives correct offset.
+  static DateTime _asUtc(String iso) {
+    final s = (iso.endsWith('Z') || iso.contains('+')) ? iso : '${iso}Z';
+    return DateTime.parse(s).toLocal();
+  }
+
   // Convert ISO UTC string → device local time, formatted DD.MM.YYYY HH:mm
   String _fmtTs(String? iso) {
     if (iso == null || iso.isEmpty) return '—';
     try {
-      final dt  = DateTime.parse(iso).toLocal();
+      final dt  = _asUtc(iso);
       final dd  = dt.day.toString().padLeft(2, '0');
       final mm  = dt.month.toString().padLeft(2, '0');
       final yy  = dt.year.toString();
@@ -1636,9 +1642,14 @@ class _PostedChip extends StatelessWidget {
 
   const _PostedChip({required this.publishedAt, required this.cs});
 
+  static DateTime _asUtc(String iso) {
+    final s = (iso.endsWith('Z') || iso.contains('+')) ? iso : '${iso}Z';
+    return DateTime.parse(s).toLocal();
+  }
+
   String _relativeTime() {
     try {
-      final dt = DateTime.parse(publishedAt);
+      final dt = _asUtc(publishedAt);
       final diff = DateTime.now().difference(dt);
       if (diff.inDays > 0) return '${diff.inDays}d ago';
       if (diff.inHours > 0) return '${diff.inHours}h ago';
@@ -1682,9 +1693,14 @@ class _AnalyzedChip extends StatelessWidget {
 
   const _AnalyzedChip({required this.updatedAt, required this.cs});
 
+  static DateTime _asUtc(String iso) {
+    final s = (iso.endsWith('Z') || iso.contains('+')) ? iso : '${iso}Z';
+    return DateTime.parse(s).toLocal();
+  }
+
   String _fmtLocal() {
     try {
-      final dt  = DateTime.parse(updatedAt).toLocal();
+      final dt  = _asUtc(updatedAt);
       final dd  = dt.day.toString().padLeft(2, '0');
       final mm  = dt.month.toString().padLeft(2, '0');
       final yy  = dt.year.toString();
