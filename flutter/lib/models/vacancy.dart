@@ -24,6 +24,7 @@ class VacancyListItem {
   final bool starred;
   final bool applied;
   final String? salary;
+  final List<String> roleTags;
 
   const VacancyListItem({
     required this.id,
@@ -44,6 +45,7 @@ class VacancyListItem {
     this.starred = false,
     this.applied = false,
     this.salary,
+    this.roleTags = const [],
   });
 
   factory VacancyListItem.fromJson(Map<String, dynamic> json) {
@@ -67,6 +69,7 @@ class VacancyListItem {
       starred: json['starred'] as bool? ?? false,
       applied: json['applied'] as bool? ?? false,
       salary: json['salary'] as String?,
+      roleTags: _parseStringList(json['role_tags']),
     );
   }
 
@@ -89,6 +92,7 @@ class VacancyListItem {
         'starred': starred,
         'applied': applied,
         'salary': salary,
+        'role_tags': roleTags,
       };
 }
 
