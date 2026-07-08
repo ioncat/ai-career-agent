@@ -1,6 +1,6 @@
 # career-agent — Backlog
 
-> Last updated: 2026-07-07
+> Last updated: 2026-07-08
 > Epic format: post-pivot epics (13+) live in `docs/delivery/epics/`. This file = priority tracker + status overview.
 > Pre-pivot epics (1–12): `docs/delivery/epics-archive/EPIC-01-12-pre-pivot.md`
 
@@ -9,6 +9,7 @@
 ## ✅ Delivered Features
 
 ### 2026-07-08
+- **Telegram stripped to push-only**: `core/router.py` deleted; `core/telegram.py` rewritten (469→65 lines) — Dispatcher, FSM, onboarding (`/start`, `/update_profile`, `/set_skill`, PDF upload), inline keyboards, `on_message`/`on_callback`, `multi_user_enabled` all removed; `agent.py` main loop now uses `stop_event.wait()` instead of long polling; TelegramBot init simplified to `token + chat_id`; closes last direct-API leak source (Router used `AnthropicProvider` for every incoming Telegram command)
 - **Bug fix — API leak: claude_cli billing via ANTHROPIC_API_KEY**: `ClaudeCodeProvider._subprocess_env()` was copying full `os.environ` including `ANTHROPIC_API_KEY` into the `claude` subprocess — CLI used the key for direct API billing instead of its OAuth subscription, causing unauthorized charges (38K–41K input tokens per analysis call observed in Anthropic dashboard). Fix: `env.pop("ANTHROPIC_API_KEY", None)` before passing env to subprocess. Second leak: `web/api._get_available_models()` was calling `_fetch_anthropic_models()` (HTTP GET `/v1/models` with API key) for `claude_cli` provider — now restricted to `claude_api` only; CLI uses `_FALLBACK_MODELS` entry. See `docs/discovery/retrospective.md`.
 
 ### 2026-07-07 (pipeline runs)
