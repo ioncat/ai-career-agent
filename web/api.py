@@ -324,7 +324,7 @@ async def _get_available_models(provider: str) -> list[str]:
             pass  # bad cache entry — refetch
 
     # Cache miss or expired — fetch fresh
-    if provider in ("claude_api", "claude_cli"):
+    if provider == "claude_api":
         api_key = os.getenv("ANTHROPIC_API_KEY", "")
         models = await _fetch_anthropic_models(api_key) if api_key else []
         if not models:
@@ -333,7 +333,7 @@ async def _get_available_models(provider: str) -> list[str]:
         base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
         models = await _fetch_ollama_models(base_url)
     else:
-        models = []
+        models = _FALLBACK_MODELS.get(provider, [])
 
     if models:
         await database.set_kv(cache_key, json.dumps(models))

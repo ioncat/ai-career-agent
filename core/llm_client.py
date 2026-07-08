@@ -550,6 +550,8 @@ class ClaudeCodeProvider:
         import os as _os
         from pathlib import Path as _Path
         env = _os.environ.copy()
+        # Remove API key so claude CLI uses its OAuth subscription, not direct billing.
+        env.pop("ANTHROPIC_API_KEY", None)
         extra = [
             _Path.home() / ".local" / "bin",
             _Path(_os.environ.get("APPDATA", "")) / "npm",
