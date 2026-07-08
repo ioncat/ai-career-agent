@@ -192,6 +192,48 @@ Worker prompt → Worker output
 
 ---
 
+## 🟡 P2 — PDF Download + Auto-Refresh CV Tab (added 2026-07-08)
+
+### PDF Download ("Save As")
+
+**Current state:** `_downloadPdf()` in `vacancy_detail_screen.dart` is a stub — shows SnackBar "coming soon", no file transfer.
+
+**Correct flow:**
+```
+User clicks "Download PDF"
+    → Flutter: GET /api/vacancies/{id}/cv-pdf
+    → Backend: reads Oleksii_Bondarenko_CV.pdf from disk → FileResponse(bytes, application/pdf)
+    → Flutter: receives bytes → FilePicker.platform.saveFile(bytes, fileName)
+    → OS "Save As" dialog → user picks folder
+```
+Same for Cover PDF via `GET /api/vacancies/{id}/cover-pdf`.
+
+**Open design question — PDF staleness:**
+If the user regenerates the CV (new markdown) or edits it manually, the existing `.pdf` on disk is stale. Three options:
+1. **Auto-detect**: compare `mtime(CV.md)` vs `mtime(CV.pdf)` → if md is newer, regenerate PDF on-the-fly before serving (transparent to user, adds latency)
+2. **Always regenerate on Download**: simplest logic, always fresh, ~1–2s delay — acceptable for "Save As" flow
+3. **Separate "Regenerate PDF" button**: explicit user action; split button becomes `Generate CV ▾ → Download PDF → Regenerate PDF`
+
+**Recommended: option 2** — always call pdf-service on Download request. PDF-service is fast (~1s), result is guaranteed fresh. No version-tracking complexity. Backend endpoint regenerates + serves in one request.
+
+**Scope:**
+- [ ] `web/api.py` — `GET /api/vacancies/{id}/cv-pdf`: find CV.md in vacancy folder → POST to pdf-service → stream bytes as FileResponse
+- [ ] `web/api.py` — `GET /api/vacancies/{id}/cover-pdf`: same for Cover.md
+- [ ] Flutter `vacancy_repository.dart` — `getCvPdfBytes(id)` / `getCoverPdfBytes(id)` → `Uint8List`
+- [ ] Flutter `vacancy_detail_screen.dart` — `_downloadPdf()`: call repo → `FilePicker.platform.saveFile()`
+- [ ] Add `file_picker` to `pubspec.yaml`
+
+### Auto-Refresh CV Tab
+
+**Problem:** after "Generate CV" is triggered, the CV tab stays blank until user manually hits Refresh. Status transitions `cv_generating → cv_generated` happen server-side but Flutter doesn't know.
+
+**Solution:** same polling pattern as analysis — when vacancy status is `cv_generating`, poll every 5s; on `cv_generated` → `ref.invalidate(vacancyCvProvider)` + auto-switch to CV tab.
+
+**Scope:**
+- [ ] Flutter `vacancy_detail_screen.dart` — `_StatusPoller` extended (or new `_CvStatusPoller`): watches for `cv_generating` → `cv_generated` transition, invalidates providers, switches tab
+
+---
+
 ## 🟡 P2 — Annotated CV Revision (added 2026-07-07)
 
 **Idea:** User selects a block in the CV or Cover markdown preview → adds an annotation comment → submits → AI produces a revised version with that block rewritten to match the note.
