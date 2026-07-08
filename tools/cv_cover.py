@@ -32,6 +32,19 @@ log = logging.getLogger(__name__)
 _PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
 
 
+def _next_version_path(base_path: Path) -> Path:
+    """Return base_path if it doesn't exist; else base_path with _v2/_v3/... suffix."""
+    if not base_path.exists():
+        return base_path
+    stem, suffix, parent = base_path.stem, base_path.suffix, base_path.parent
+    n = 2
+    while True:
+        candidate = parent / f"{stem}_v{n}{suffix}"
+        if not candidate.exists():
+            return candidate
+        n += 1
+
+
 async def cv_cover(ctx: RunContext[AgentDeps], vacancy_id: int) -> str:
     """Generate a tailored cover message for a vacancy that has an approved CV.
 
@@ -71,12 +84,13 @@ async def cv_cover(ctx: RunContext[AgentDeps], vacancy_id: int) -> str:
         )
 
     safe_name = re.sub(r"[^\w\-]", "_", ctx.deps.candidate_name)
-    cv_path = jd_path.parent / f"{safe_name}_CV.md"
-    if not cv_path.exists():
+    cv_candidates = sorted(jd_path.parent.glob(f"{safe_name}_CV*.md"))
+    if not cv_candidates:
         return (
             f"⚠️ {safe_name}_CV.md не найден. "
             f"Сначала сгенерируй CV для вакансии #{vacancy_id}."
         )
+    cv_path = cv_candidates[-1]
 
     jd_text = jd_path.read_text(encoding="utf-8")
     analysis_text = analysis_path.read_text(encoding="utf-8")
@@ -109,8 +123,8 @@ async def cv_cover(ctx: RunContext[AgentDeps], vacancy_id: int) -> str:
         log.error("cv_cover: Phase 4 LLM error: %s", exc)
         return f"⚠️ Ошибка Claude на фазе 4:\n{exc}"
 
-    # ── Save [Name]_Cover.md ──────────────────────────────────────────────────
-    cover_md_path = jd_path.parent / f"{safe_name}_Cover.md"
+    # ── Save [Name]_Cover.md (versioned if already exists) ───────────────────
+    cover_md_path = _next_version_path(jd_path.parent / f"{safe_name}_Cover.md")
     cover_md_path.write_text(cover_text, encoding="utf-8")
     log.info("cv_cover: saved Cover.md → %s", cover_md_path)
 

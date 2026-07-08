@@ -13,7 +13,7 @@ import pytest
 
 from adapters.cv_adapter import CVAdapter, CVAdapterError
 from core.llm_client import LLMError
-from tools.cv_generate import _split_review_and_cv, cv_generate
+from tools.cv_generate import _next_version_path, _split_review_and_cv, cv_generate
 
 
 # ── Fixtures / helpers ────────────────────────────────────────────────────────
@@ -191,6 +191,48 @@ async def test_generate_saves_cv_md(tmp_path):
     content = cv_path.read_text()
     assert "SUMMARY" in content
     assert "Oleksii Bondarenko" in content
+
+
+# ── _next_version_path ────────────────────────────────────────────────────────
+
+def test_next_version_path_returns_base_when_missing(tmp_path):
+    base = tmp_path / "Alex_CV.md"
+    assert _next_version_path(base) == base
+
+
+def test_next_version_path_increments_on_conflict(tmp_path):
+    base = tmp_path / "Alex_CV.md"
+    base.write_text("v1", encoding="utf-8")
+    assert _next_version_path(base) == tmp_path / "Alex_CV_v2.md"
+
+    (tmp_path / "Alex_CV_v2.md").write_text("v2", encoding="utf-8")
+    assert _next_version_path(base) == tmp_path / "Alex_CV_v3.md"
+
+
+@pytest.mark.asyncio
+async def test_generate_saves_versioned_cv_on_regen(tmp_path):
+    """Second generation writes _v2.md instead of overwriting."""
+    jd_path, _ = _write_vacancy_files(tmp_path)
+    vacancy_row = _make_vacancy_row(jd_path)
+    ctx = _make_ctx(tmp_path, _make_llm(side_effect=[_PHASE3_DRAFT, _PHASE35_SAMPLE]))
+    mock_db = _mock_db(vacancy_row=vacancy_row, run_ids=[1, 2])
+
+    # First generation
+    with patch("tools.cv_generate.database", mock_db):
+        await cv_generate(ctx, 1)
+
+    base = jd_path.parent / "Oleksii_Bondarenko_CV.md"
+    assert base.exists()
+
+    # Second generation — base file now exists
+    ctx2 = _make_ctx(tmp_path, _make_llm(side_effect=[_PHASE3_DRAFT, _PHASE35_SAMPLE]))
+    mock_db2 = _mock_db(vacancy_row=vacancy_row, run_ids=[3, 4])
+    with patch("tools.cv_generate.database", mock_db2):
+        await cv_generate(ctx2, 1)
+
+    v2 = jd_path.parent / "Oleksii_Bondarenko_CV_v2.md"
+    assert v2.exists()
+    assert base.exists()  # original untouched
 
 
 @pytest.mark.asyncio

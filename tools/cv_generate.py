@@ -172,9 +172,9 @@ async def cv_generate(
         log.warning("cv_generate: could not extract CV from Phase 3.5 output — using full output")
         final_cv = phase35_output
 
-    # ── Save [Name]_CV.md ─────────────────────────────────────────────────────
+    # ── Save [Name]_CV.md (versioned if already exists) ──────────────────────
     safe_name = re.sub(r"[^\w\-]", "_", ctx.deps.candidate_name)
-    cv_md_path = jd_path.parent / f"{safe_name}_CV.md"
+    cv_md_path = _next_version_path(jd_path.parent / f"{safe_name}_CV.md")
     cv_md_path.write_text(final_cv, encoding="utf-8")
     log.info("cv_generate: saved CV.md → %s", cv_md_path)
 
@@ -210,6 +210,19 @@ async def cv_generate(
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _next_version_path(base_path: Path) -> Path:
+    """Return base_path if it doesn't exist; else base_path with _v2/_v3/... suffix."""
+    if not base_path.exists():
+        return base_path
+    stem, suffix, parent = base_path.stem, base_path.suffix, base_path.parent
+    n = 2
+    while True:
+        candidate = parent / f"{stem}_v{n}{suffix}"
+        if not candidate.exists():
+            return candidate
+        n += 1
+
 
 def _format_pp_evidence(roles: list) -> str:
     """Format progressive_profile roles[] into a structured evidence block for Phase 3."""
