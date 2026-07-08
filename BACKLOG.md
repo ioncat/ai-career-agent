@@ -8,6 +8,14 @@
 
 ## ✅ Delivered Features
 
+### 2026-07-08
+- **Bug fix — API leak: claude_cli billing via ANTHROPIC_API_KEY**: `ClaudeCodeProvider._subprocess_env()` was copying full `os.environ` including `ANTHROPIC_API_KEY` into the `claude` subprocess — CLI used the key for direct API billing instead of its OAuth subscription, causing unauthorized charges (38K–41K input tokens per analysis call observed in Anthropic dashboard). Fix: `env.pop("ANTHROPIC_API_KEY", None)` before passing env to subprocess. Second leak: `web/api._get_available_models()` was calling `_fetch_anthropic_models()` (HTTP GET `/v1/models` with API key) for `claude_cli` provider — now restricted to `claude_api` only; CLI uses `_FALLBACK_MODELS` entry. See `docs/discovery/retrospective.md`.
+
+### 2026-07-07 (pipeline runs)
+- **Vacancy #543 — Kiss My Apps (AI Learning Platform)**: Fit 6/10 · VScore 8.8 · take a chance — premium opportunity; CV EN + UA generated; Application_answers.md (Djinni); PROFILE.md updated (feature adoption rate evidence + 2-component AI paragraph EN+UA)
+- **Vacancy #545 — RedCore (PM Finance)**: Fit 7/10 · VScore 7.9 · apply — strong match; CV EN + Cover generated; BOS-from-scratch positioning; ERP-like framing
+- **CV markdown bug fix**: blank line required before bullet lists after `**Key results:**` — Python markdown parser collapses to inline without it
+
 ### 2026-07-07
 - **AnalysisWorker — DB recovery on startup**: `_recover_queued()` runs once at AnalysisWorker start; picks up `analysis_queued` vacancies left from crash or restart and re-enqueues immediately (no polling delay)
 - **launcher.py — removed standalone Web API**: `Web API :8080` entry removed from SERVICES; agent.py now owns the embedded FastAPI server with workers in the same process → `app.state.analysis_worker` always set → Flutter Analyze button hits real worker directly
