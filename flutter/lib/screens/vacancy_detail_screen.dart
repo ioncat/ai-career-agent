@@ -358,6 +358,94 @@ class _AnalysisErrorViewState extends ConsumerState<_AnalysisErrorView> {
   }
 }
 
+// ── Analysis error banner — compact dismissible strip for retry-failed state ──
+
+class _AnalysisErrorBanner extends ConsumerStatefulWidget {
+  final int vacancyId;
+  final String? errorMessage;
+  final VoidCallback onDismiss;
+
+  const _AnalysisErrorBanner({
+    required this.vacancyId,
+    required this.onDismiss,
+    this.errorMessage,
+  });
+
+  @override
+  ConsumerState<_AnalysisErrorBanner> createState() => _AnalysisErrorBannerState();
+}
+
+class _AnalysisErrorBannerState extends ConsumerState<_AnalysisErrorBanner> {
+  bool _retrying = false;
+
+  Future<void> _retry() async {
+    setState(() => _retrying = true);
+    try {
+      final apiUrl = ref.read(settingsProvider).valueOrNull?.apiUrl ?? 'http://localhost:8080';
+      await VacancyRepository(baseUrl: apiUrl).analyze(widget.vacancyId);
+      if (mounted) {
+        ref.read(vacancyListProvider.notifier).refresh();
+        widget.onDismiss();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+        setState(() => _retrying = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: cs.errorContainer.withValues(alpha: 0.35),
+        border: Border(bottom: BorderSide(color: cs.error.withValues(alpha: 0.25))),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.error_outline_rounded, size: 16, color: cs.error),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              widget.errorMessage?.isNotEmpty == true
+                  ? 'Analysis failed: ${widget.errorMessage}'
+                  : 'Analysis failed — previous results shown',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: _retrying ? null : _retry,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: _retrying
+                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Text('Retry'),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close_rounded, size: 16),
+            onPressed: widget.onDismiss,
+            padding: const EdgeInsets.all(4),
+            constraints: const BoxConstraints(),
+            tooltip: 'Dismiss',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class VacancyDetailScreen extends ConsumerStatefulWidget {
   final int vacancyId;
   final String url;
@@ -381,6 +469,7 @@ class _VacancyDetailScreenState extends ConsumerState<VacancyDetailScreen>
 
   late TabController _tabController;
   Timer? _cvPollingTimer;
+  bool _errorBannerDismissed = false;
 
   static bool _needsPolling(String? status) =>
       status == 'cv_queued' || status == 'cv_generating' || status == 'cover_generating';
@@ -420,6 +509,9 @@ class _VacancyDetailScreenState extends ConsumerState<VacancyDetailScreen>
         newStatus == 'analyzed') {
       ref.invalidate(vacancyDetailProvider(widget.vacancyId));
     }
+    if (newStatus == 'analysis_failed' && oldStatus != 'analysis_failed') {
+      setState(() => _errorBannerDismissed = false);
+    }
     _startPollingIfNeeded(newStatus);
   }
 
@@ -439,8 +531,9 @@ class _VacancyDetailScreenState extends ConsumerState<VacancyDetailScreen>
       return _AnalyzingView(status: status);
     }
 
-    // analysis_failed — show error + retry button
-    if (status == 'analysis_failed') {
+    // analysis_failed — full blocker only when no prior data; otherwise fall through
+    // to normal view and show a dismissible banner (previous analysis data remains visible)
+    if (status == 'analysis_failed' && widget.vacancy?.fitScore == null) {
       return _AnalysisErrorView(
         vacancyId: widget.vacancyId,
         errorMessage: widget.vacancy?.analysisError,
@@ -479,6 +572,13 @@ class _VacancyDetailScreenState extends ConsumerState<VacancyDetailScreen>
 
         return Column(
           children: [
+            // Error banner for retry-failed state (has prior data, so show tabs)
+            if (status == 'analysis_failed' && !_errorBannerDismissed)
+              _AnalysisErrorBanner(
+                vacancyId: widget.vacancyId,
+                errorMessage: widget.vacancy?.analysisError,
+                onDismiss: () => setState(() => _errorBannerDismissed = true),
+              ),
             // Sticky action bar
             _ActionBar(vacancyId: widget.vacancyId, url: widget.url, role: role, status: status, vacancy: widget.vacancy, tabController: _tabController),
             // Tab bar
@@ -631,18 +731,19 @@ class _ActivityLogViewState extends ConsumerState<_ActivityLogView> {
     }
   }
 
-  // Convert ISO UTC string → device local time, formatted MM-DD HH:mm
+  // Convert ISO UTC string → device local time, formatted DD.MM.YYYY HH:mm
   String _fmtTs(String? iso) {
     if (iso == null || iso.isEmpty) return '—';
     try {
-      final dt = DateTime.parse(iso).toLocal();
-      final mm  = dt.month.toString().padLeft(2, '0');
+      final dt  = DateTime.parse(iso).toLocal();
       final dd  = dt.day.toString().padLeft(2, '0');
+      final mm  = dt.month.toString().padLeft(2, '0');
+      final yy  = dt.year.toString();
       final hh  = dt.hour.toString().padLeft(2, '0');
       final min = dt.minute.toString().padLeft(2, '0');
-      return '$mm-$dd $hh:$min';
+      return '$dd.$mm.$yy $hh:$min';
     } catch (_) {
-      return iso.length >= 16 ? iso.substring(5, 16).replaceAll('T', ' ') : iso;
+      return iso.length >= 16 ? iso.substring(0, 16).replaceAll('T', ' ') : iso;
     }
   }
 
@@ -1284,6 +1385,7 @@ class _VacancyHero extends StatelessWidget {
     final role    = p1?.role.isNotEmpty == true ? p1!.role : (vacancy?.role ?? '');
     final company = p1?.company.isNotEmpty == true ? p1!.company : (vacancy?.company ?? '');
     final publishedAt = vacancy?.publishedAt;
+    final updatedAt   = vacancy?.updatedAt;
     // category moves to Quick Overview block, not used in hero
 
     return Column(
@@ -1387,9 +1489,19 @@ class _VacancyHero extends StatelessWidget {
                 ],
               ),
             ),
-            if (publishedAt != null) ...[
+            if (publishedAt != null || updatedAt != null) ...[
               const SizedBox(width: 8),
-              _PostedChip(publishedAt: publishedAt, cs: cs),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (publishedAt != null)
+                    _PostedChip(publishedAt: publishedAt, cs: cs),
+                  if (updatedAt != null) ...[
+                    if (publishedAt != null) const SizedBox(height: 4),
+                    _AnalyzedChip(updatedAt: updatedAt, cs: cs),
+                  ],
+                ],
+              ),
             ],
           ],
         ),
@@ -1554,6 +1666,53 @@ class _PostedChip extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             'Posted ${_relativeTime()}',
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AnalyzedChip extends StatelessWidget {
+  final String updatedAt;
+  final ColorScheme cs;
+
+  const _AnalyzedChip({required this.updatedAt, required this.cs});
+
+  String _fmtLocal() {
+    try {
+      final dt  = DateTime.parse(updatedAt).toLocal();
+      final dd  = dt.day.toString().padLeft(2, '0');
+      final mm  = dt.month.toString().padLeft(2, '0');
+      final yy  = dt.year.toString();
+      final hh  = dt.hour.toString().padLeft(2, '0');
+      final min = dt.minute.toString().padLeft(2, '0');
+      return '$dd.$mm.$yy $hh:$min';
+    } catch (_) {
+      return updatedAt;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 28,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainer,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.analytics_outlined, size: 14, color: cs.onSurfaceVariant),
+          const SizedBox(width: 4),
+          Text(
+            'Analyzed ${_fmtLocal()}',
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
                   color: cs.onSurfaceVariant,
                 ),
