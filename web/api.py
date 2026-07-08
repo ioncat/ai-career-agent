@@ -18,7 +18,7 @@ from urllib.parse import urlparse
 import httpx
 import markdown as md_lib
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
@@ -742,6 +742,62 @@ async def api_vacancy_cv(vacancy_id: int):
         result["cover_md"] = cover_files[-1].read_text(encoding="utf-8")
 
     return result
+
+
+async def _render_doc_pdf(vacancy_id: int, glob_pattern: str, not_found_msg: str) -> Response:
+    """Shared helper: find a markdown doc in the vacancy folder, render via pdf-service, return bytes."""
+    row = await database.get_vacancy_by_id(vacancy_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Vacancy not found")
+
+    md_path = row["markdown_path"] if "markdown_path" in row.keys() else None
+    if not md_path:
+        raise HTTPException(status_code=404, detail=not_found_msg)
+
+    folder = (_PROJECT_ROOT / md_path).parent
+    files = sorted(folder.glob(glob_pattern))
+    if not files:
+        raise HTTPException(status_code=404, detail=not_found_msg)
+
+    md_file = files[-1]
+    markdown_text = md_file.read_text(encoding="utf-8")
+    pdf_name = md_file.stem + ".pdf"
+
+    pdf_service_url = os.getenv("PDF_SERVICE_URL", "http://localhost:8002")
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.post(f"{pdf_service_url}/render", json={"markdown": markdown_text})
+    except (httpx.ConnectError, httpx.TimeoutException) as exc:
+        raise HTTPException(status_code=503, detail=f"pdf-service unavailable: {exc}")
+
+    if resp.status_code != 200:
+        raise HTTPException(status_code=502, detail=f"pdf-service error {resp.status_code}")
+
+    return Response(
+        content=resp.content,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{pdf_name}"'},
+    )
+
+
+@app.get("/api/vacancies/{vacancy_id}/cv-pdf")
+async def api_vacancy_cv_pdf(vacancy_id: int):
+    """Render CV.md to PDF via pdf-service and return for Save As download.
+
+    Always re-renders from latest *_CV.md so PDF is always fresh.
+    503 if pdf-service is down. 404 if CV not yet generated.
+    """
+    return await _render_doc_pdf(vacancy_id, "*_CV.md", "CV not yet generated")
+
+
+@app.get("/api/vacancies/{vacancy_id}/cover-pdf")
+async def api_vacancy_cover_pdf(vacancy_id: int):
+    """Render Cover.md to PDF via pdf-service and return for Save As download.
+
+    Always re-renders from latest *Cover.md so PDF is always fresh.
+    503 if pdf-service is down. 404 if Cover not yet generated.
+    """
+    return await _render_doc_pdf(vacancy_id, "*Cover.md", "Cover not yet generated")
 
 
 @app.post("/api/vacancies/{vacancy_id}/analyze", status_code=202)

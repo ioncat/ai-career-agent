@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import '../models/vacancy.dart';
 // ActivityEntry is defined in vacancy.dart
@@ -170,5 +171,23 @@ class VacancyRepository {
       throw Exception('Config update failed: ${response.statusCode}');
     }
     return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Uint8List> getCvPdfBytes(int vacancyId) async {
+    final uri = Uri.parse('$baseUrl/api/vacancies/$vacancyId/cv-pdf');
+    final response = await http.get(uri).timeout(const Duration(seconds: 60));
+    if (response.statusCode == 404) throw Exception('CV not yet generated');
+    if (response.statusCode == 503) throw Exception('PDF service unavailable');
+    if (response.statusCode != 200) throw Exception('PDF download failed: ${response.statusCode}');
+    return response.bodyBytes;
+  }
+
+  Future<Uint8List> getCoverPdfBytes(int vacancyId) async {
+    final uri = Uri.parse('$baseUrl/api/vacancies/$vacancyId/cover-pdf');
+    final response = await http.get(uri).timeout(const Duration(seconds: 60));
+    if (response.statusCode == 404) throw Exception('Cover not yet generated');
+    if (response.statusCode == 503) throw Exception('PDF service unavailable');
+    if (response.statusCode != 200) throw Exception('PDF download failed: ${response.statusCode}');
+    return response.bodyBytes;
   }
 }
