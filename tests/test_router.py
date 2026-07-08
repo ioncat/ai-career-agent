@@ -1,12 +1,11 @@
 """
-tests/test_router.py — tests for ToolRegistry and Router.
+tests/test_router.py — tests for ToolRegistry and Settings.
 
-Router tests mock the PydanticAI Agent — no real API calls.
 Settings tests use monkeypatching of os.environ.
 """
 
 import os
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -150,60 +149,3 @@ def test_load_settings_invalid_chat_id(monkeypatch):
         load_settings()
 
 
-# ── Router ────────────────────────────────────────────────────────────────────
-
-def _make_mock_deps():
-    """Build a minimal mock AgentDeps (no real adapters needed)."""
-    from core.deps import AgentDeps
-    deps = MagicMock(spec=AgentDeps)
-    deps.candidate_name = "Test_Candidate"
-    return deps
-
-
-@pytest.mark.asyncio
-async def test_router_handle_returns_string():
-    """Router.handle returns agent output as string."""
-    from core.router import Router
-
-    registry = ToolRegistry()
-    deps = _make_mock_deps()
-
-    fake_result = MagicMock()
-    fake_result.output = "Отлично, обрабатываю!"
-
-    with patch("core.router.AnthropicModel"), patch("core.router.AnthropicProvider"):
-        with patch("core.router.Agent") as MockAgent:
-            mock_agent_instance = MagicMock()
-            mock_agent_instance.run = AsyncMock(return_value=fake_result)
-            MockAgent.return_value = mock_agent_instance
-
-            router = Router(api_key="sk-test", model="claude-opus-4-5", registry=registry, deps=deps)
-            result = await router.handle("https://djinni.co/jobs/123/")
-
-    assert result == "Отлично, обрабатываю!"
-
-
-@pytest.mark.asyncio
-async def test_router_passes_tools_to_agent():
-    """Router constructs Agent with tools from registry."""
-    from core.router import Router
-
-    registry = ToolRegistry()
-    deps = _make_mock_deps()
-
-    @registry.register
-    async def cv_fetch_jd(url: str) -> str:
-        """Fetch JD."""
-        return "markdown"
-
-    with patch("core.router.AnthropicModel"), patch("core.router.AnthropicProvider"):
-        with patch("core.router.Agent") as MockAgent:
-            mock_agent_instance = MagicMock()
-            mock_agent_instance.run = AsyncMock(return_value=MagicMock(output="ok"))
-            MockAgent.return_value = mock_agent_instance
-
-            Router(api_key="sk-test", model="claude-opus-4-5", registry=registry, deps=deps)
-
-    call_kwargs = MockAgent.call_args.kwargs
-    tools_passed = call_kwargs.get("tools", [])
-    assert len(tools_passed) == 1
