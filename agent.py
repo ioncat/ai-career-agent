@@ -4,11 +4,10 @@ agent.py — career-agent entry point.
 Startup sequence:
 1. Load Settings from env
 2. Configure + initialise SQLite DB
-3. Build ClaudeProvider (loads PROFILE.md for prompt caching)
-4. Build ToolRegistry + register domain tools
-5. Build Router (PydanticAI Agent)
-6. Build TelegramBot (with FSM onboarding + MULTI_USER_ENABLED flag)
-7. Start long polling (blocks until Ctrl-C or SIGTERM)
+3. Build LLM client (ClaudeCodeProvider / OllamaProvider / ClaudeProvider)
+4. Build AgentDeps + workers (AnalysisWorker, CVWorker, CoverWorker)
+5. Build TelegramBot (push notifications only — no incoming message routing)
+6. Start RSS Watcher + workers + FastAPI; block on stop_event
 
 Run:
     python agent.py
@@ -32,8 +31,6 @@ from core.cover_worker import CoverWorker
 from core.rss_watcher import RSSWatcher
 from core.settings import ConfigError, load_settings
 from core.llm_client import ClaudeProvider, OllamaProvider, ClaudeCodeProvider
-from core.tool_registry import ToolRegistry
-from core.router import Router
 from core.telegram import TelegramBot
 from db import database
 
@@ -71,29 +68,6 @@ def _configure_logging() -> None:
 _configure_logging()
 log = logging.getLogger("agent")
 
-
-def _register_tools(registry: ToolRegistry, llm: ClaudeProvider) -> None:
-    """Register all domain tools.
-
-    Tools are imported here to avoid circular imports.
-    Each EPIC (7–11) adds its tools in this function.
-    """
-    from tools.cv_fetch_jd import cv_fetch_jd
-    registry.register(cv_fetch_jd)
-
-    from tools.cv_analyze import cv_analyze
-    registry.register(cv_analyze)
-
-    from tools.cv_generate import cv_generate
-    registry.register(cv_generate)
-
-    from tools.cv_cover import cv_cover
-    registry.register(cv_cover)
-
-    from tools.cv_get_tracker import cv_get_tracker
-    registry.register(cv_get_tracker)
-
-    log.info("ToolRegistry: %d tools registered — %s", len(registry), registry.names())
 
 
 async def main() -> None:
@@ -190,24 +164,10 @@ async def main() -> None:
         profile=profile,
     )
 
-    registry = ToolRegistry()
-    _register_tools(registry, llm)
-
-    # ── 5. Router ─────────────────────────────────────────────────────────────
-    router = Router(
-        api_key=settings.anthropic_api_key,
-        model=settings.llm_model,
-        registry=registry,
-        deps=deps,
-    )
-
-    # ── 6. Telegram bot ───────────────────────────────────────────────────────
+    # ── 5. Telegram bot (push-only) ───────────────────────────────────────────
     bot = TelegramBot(
         token=settings.telegram_token,
-        allowed_chat_id=settings.telegram_chat_id,
-        on_message=router.handle,
-        multi_user_enabled=settings.multi_user_enabled,
-        default_user_id=default_user_id,
+        chat_id=settings.telegram_chat_id,
     )
 
     # ── 7. Workers + RSS Watcher ──────────────────────────────────────────────
@@ -277,8 +237,8 @@ async def main() -> None:
     await cover_worker.start()
     await watcher.start()
     try:
-        await bot.start()
-    except KeyboardInterrupt:
+        await stop_event.wait()
+    except (KeyboardInterrupt, asyncio.CancelledError):
         pass
     finally:
         if _web_server is not None:
