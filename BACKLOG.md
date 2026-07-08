@@ -9,6 +9,8 @@
 ## ✅ Delivered Features
 
 ### 2026-07-08
+- **Versioned CV/Cover file saving**: `cv_generate.py` + `cv_cover.py` — regeneration writes `_v2.md`/`_v3.md` instead of overwriting; first generation keeps base name; `web/api.py` globs updated to `*_CV*.md` / `*Cover*.md` so latest version is always served; `cv_cover.py` reads latest CV via glob (not fixed path); 3 new tests (`_next_version_path` unit + regen integration); 521 tests pass
+- **Cover — vacancy #520 Binotel**: Phase 4 UA cover generated + saved (`Олексій_Бондаренко_Cover.md`)
 - **PDF Download + Auto-Refresh CV/Cover tab**: `GET /api/vacancies/{id}/cv-pdf` + `/cover-pdf` — always re-render from latest markdown via pdf-service (no staleness, no version tracking); Flutter `VacancyRepository.getCvPdfBytes()` / `getCoverPdfBytes()` → `Uint8List`; `_downloadPdf()` real implementation — "Preparing PDF..." SnackBar → `FilePicker.platform.saveFile(bytes: ..., fileName: ...)` → error SnackBar on failure; auto-refresh polling 3s when `cv_queued`/`cv_generating`/`cover_generating` → stops on completion; `didUpdateWidget` auto-switch Cover tab on `cover_generated`; `file_picker: ^8.1.7` added
 - **Telegram stripped to push-only**: `core/router.py` deleted; `core/telegram.py` rewritten (469→65 lines) — Dispatcher, FSM, onboarding (`/start`, `/update_profile`, `/set_skill`, PDF upload), inline keyboards, `on_message`/`on_callback`, `multi_user_enabled` all removed; `agent.py` main loop now uses `stop_event.wait()` instead of long polling; TelegramBot init simplified to `token + chat_id`; closes last direct-API leak source (Router used `AnthropicProvider` for every incoming Telegram command)
 - **Bug fix — API leak: claude_cli billing via ANTHROPIC_API_KEY**: `ClaudeCodeProvider._subprocess_env()` was copying full `os.environ` including `ANTHROPIC_API_KEY` into the `claude` subprocess — CLI used the key for direct API billing instead of its OAuth subscription, causing unauthorized charges (38K–41K input tokens per analysis call observed in Anthropic dashboard). Fix: `env.pop("ANTHROPIC_API_KEY", None)` before passing env to subprocess. Second leak: `web/api._get_available_models()` was calling `_fetch_anthropic_models()` (HTTP GET `/v1/models` with API key) for `claude_cli` provider — now restricted to `claude_api` only; CLI uses `_FALLBACK_MODELS` entry. See `docs/discovery/retrospective.md`.
@@ -193,6 +195,56 @@ Worker prompt → Worker output
 
 ---
 
+## 🟡 P2 — Role Tags on Vacancy Cards (added 2026-07-08)
+
+**Goal:** Show 1–2 role-type hashtags on each vacancy card in Flutter inbox — `#discovery`, `#delivery`, `#ops`, etc. — derived from existing `analysis_json.p1.role_balance` without re-running any LLM.
+
+**Use cases:**
+- Visual signal at a glance: Discovery-heavy vs. Delivery-heavy role
+- Quick reuse: find existing vacancy with similar role type to reuse CV instead of regenerating
+- Future: filter inbox by role tag
+
+### Classification logic
+
+Source: `analysis_json.p1.role_balance` — dict with keys: `strategy`, `discovery`, `execution`, `coordination`, `ops` (values sum to 100%).
+
+Mapping to tags:
+| key | tag |
+|---|---|
+| `discovery` | `#discovery` |
+| `strategy` | `#strategy` |
+| `execution` | `#delivery` |
+| `ops` | `#ops` |
+| `coordination` | `#coord` |
+
+**Rule:** Take all dimensions ≥ 25%. If none reach 25% — take top-1. Cap output at 2 tags, ordered by value descending.
+
+**Rationale for 25% threshold:** most roles have 1–2 dominant dimensions above 25%; below that, the dimension is background noise, not a defining characteristic. The cap of 2 tags keeps cards readable.
+
+**Examples:**
+```
+GlobalLogic (#451): ops=45, execution=25 → #ops #delivery
+Binotel (#520):     discovery=30, strategy=25 → #discovery #strategy
+JustMarkets:        execution=35, strategy=20 → #delivery (only one ≥25%)
+```
+
+**Vacancies without `p1`** (not yet analyzed): no tags shown — field returns `[]`.
+
+### Implementation
+
+**Backend (`web/api.py`):**
+- `_role_tags(role_balance: dict) -> list[str]` — pure function, ~10 lines
+- Add `role_tags: list[str]` to `GET /api/vacancies` response per vacancy
+
+**Flutter:**
+- `VacancyListItem` — add `List<String> roleTags`
+- `VacancyCard` — show tags row below role/company in muted small text
+- Search (`vacancy_inbox_screen.dart`) — extend to also match `#tag` queries against `roleTags`
+
+**No DB migration needed** — computed on-the-fly from existing `analysis_json`.
+
+---
+
 ## 🟡 P2 — PDF Download + Auto-Refresh CV Tab (added 2026-07-08)
 
 ### PDF Download ("Save As")
@@ -232,6 +284,31 @@ If the user regenerates the CV (new markdown) or edits it manually, the existing
 
 **Scope:**
 - [ ] Flutter `vacancy_detail_screen.dart` — `_StatusPoller` extended (or new `_CvStatusPoller`): watches for `cv_generating` → `cv_generated` transition, invalidates providers, switches tab
+
+---
+
+## 🟡 P2 — CV/Cover Language Selection in Flutter (added 2026-07-08)
+
+**Problem:** `CVWorker` calls `cv_generate(ctx, vacancy_id)` without `language` param → always generates in English. User has no control from Flutter.
+
+**Design:** Auto from JD + explicit override via split-button menu.
+- Main "Generate CV" button → `language="auto"` → backend detects from JD (Cyrillic → Ukrainian, else English)
+- `▾` menu adds: **Generate in English** / **Generate in Ukrainian**
+- Same applies to Cover letter (matches CV language by default)
+
+**Stack changes:**
+
+| # | File | Change |
+|---|------|--------|
+| 1 | `core/cv_worker.py` | `enqueue(vacancy_id, language="auto")` — pass to `cv_generate()` |
+| 2 | `tools/cv_generate.py` | `language="auto"` → detect from JD text (any Cyrillic → Ukrainian) |
+| 3 | `web/api.py` | `POST /generate-cv` accept JSON `{"language": "en"\|"uk"\|"auto"}` |
+| 4 | `flutter/.../vacancy_repository.dart` | `generateCv(id, {String language = 'auto'})` |
+| 5 | `flutter/.../vacancy_detail_screen.dart` | Split-button menu: Generate in English / Generate in Ukrainian |
+
+Same pattern for `generate-cover` + `CoverWorker`.
+
+**Scope:** ~5 files, all connected. No DB changes needed.
 
 ---
 

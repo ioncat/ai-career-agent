@@ -136,6 +136,16 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
+              if (v.roleTags.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  v.roleTags.join('  '),
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: cs.secondary.withValues(alpha: 0.65),
+                        letterSpacing: 0.2,
+                      ),
+                ),
+              ],
               const SizedBox(height: 10),
               // Row 4: scores or status badge — show scores if present regardless of status
               if (v.fitScore != null || v.vacancyScore != null)

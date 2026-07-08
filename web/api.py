@@ -100,6 +100,36 @@ def _rec_label(rec: str) -> str:
     return {"apply": "apply — strong match", "take_a_chance": "take a chance — worth trying", "decline": "decline — not worth the effort"}.get(rec, rec)
 
 
+_ROLE_TAG_MAP: dict[str, str] = {
+    "discovery": "#discovery",
+    "strategy": "#strategy",
+    "execution": "#delivery",
+    "ops": "#ops",
+    "coordination": "#coord",
+}
+
+
+def _role_tags(role_balance: dict) -> list[str]:
+    """Derive 1–2 role hashtags from role_balance dict (values are percentages summing to 100).
+
+    Takes all dimensions >= 25%. If none reach 25%, takes top-1. Capped at 2 tags.
+    Rationale: <25% is background noise; >2 tags clutters the card.
+    """
+    if not role_balance:
+        return []
+    candidates = sorted(
+        [(v, k) for k, v in role_balance.items() if isinstance(v, (int, float)) and v >= 25],
+        reverse=True,
+    )
+    if not candidates:
+        try:
+            top = max(role_balance.items(), key=lambda kv: kv[1])
+            candidates = [(top[1], top[0])]
+        except ValueError:
+            return []
+    return [_ROLE_TAG_MAP[k] for _, k in candidates[:2] if k in _ROLE_TAG_MAP]
+
+
 def _parse_quick_scan_field(markdown_path: str | None, field: str) -> str:
     """Extract **Field:** value from ## Quick Scan section of JD_analysis.md."""
     if not markdown_path:
@@ -183,6 +213,7 @@ def _parse_analysis_summary(analysis_json_str: str | None) -> dict:
             out["primary_archetype"] = aj.p1.primary_archetype
             out["role"] = aj.p1.role
             out["company"] = aj.p1.company
+            out["role_tags"] = _role_tags(aj.p1.role_balance)
         return out
     except Exception:
         pass
@@ -205,6 +236,7 @@ def _parse_analysis_summary(analysis_json_str: str | None) -> dict:
         if p1:
             out["vacancy_score"] = p1.get("vacancy_score")
             out["primary_archetype"] = p1.get("role_archetype", "")
+            out["role_tags"] = _role_tags(p1.get("role_balance", {}))
         return out
     except Exception:
         return {}
@@ -733,11 +765,11 @@ async def api_vacancy_cv(vacancy_id: int):
 
     result: dict = {}
 
-    cv_files = sorted(folder.glob("*_CV.md"))
+    cv_files = sorted(folder.glob("*_CV*.md"))
     if cv_files:
         result["cv_md"] = cv_files[-1].read_text(encoding="utf-8")
 
-    cover_files = sorted(folder.glob("*Cover.md"))
+    cover_files = sorted(folder.glob("*Cover*.md"))
     if cover_files:
         result["cover_md"] = cover_files[-1].read_text(encoding="utf-8")
 
@@ -788,7 +820,7 @@ async def api_vacancy_cv_pdf(vacancy_id: int):
     Always re-renders from latest *_CV.md so PDF is always fresh.
     503 if pdf-service is down. 404 if CV not yet generated.
     """
-    return await _render_doc_pdf(vacancy_id, "*_CV.md", "CV not yet generated")
+    return await _render_doc_pdf(vacancy_id, "*_CV*.md", "CV not yet generated")
 
 
 @app.get("/api/vacancies/{vacancy_id}/cover-pdf")
