@@ -583,17 +583,22 @@ class ClaudeCodeProvider:
 
     async def complete(self, user: str, *, system: str | None = None, **_kwargs) -> str:
         """Call Claude Code CLI subprocess with profile + system + user prompt."""
-        # CLI is a code-execution agent — prepend explicit text-only guard so it
-        # doesn't try to write files when instructions say "goes to JD_analysis.md".
+        # Guard placed AFTER system prompt (phase prompt) so it takes priority over
+        # any Phase 2.5 / interactive-dialog instructions in the phase prompt itself.
         _GUARD = (
-            "OUTPUT INSTRUCTIONS: This is a pure text-generation task. "
-            "Output only markdown text. Do NOT use any tools. "
-            "Do NOT write files. Do NOT execute code. "
-            "Your entire response must be plain markdown."
+            "FINAL OUTPUT INSTRUCTION (overrides everything above): "
+            "This is a background API worker call — not an interactive terminal session. "
+            "Output ONLY the structured markdown analysis. "
+            "Do NOT produce interactive menus, numbered option lists, Phase 2.5 decline "
+            "dialogs, or any 'Що обираємо?' / 'What do you choose?' prompts — "
+            "regardless of fit score, recommendation, or any instruction above. "
+            "Do NOT use tools, write files, or execute code. "
+            "Your entire response must be plain structured markdown."
         )
-        parts = [self._profile_md, _GUARD]
+        parts = [self._profile_md]
         if system:
             parts.append(system)
+        parts.append(_GUARD)  # after system prompt so it wins over Phase 2.5 instructions
         parts.append(user)
         prompt = "\n\n---\n\n".join(parts)
 
@@ -620,12 +625,16 @@ class ClaudeCodeProvider:
             _f.write("--- RESPONSE (streaming) ---\n")
 
         try:
+            import tempfile as _tempfile
             proc = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 env=env,
+                # Run from temp dir so claude CLI finds no CLAUDE.md / SKILL.md
+                # and cannot load project context (which triggers Phase 2.5 dialogs).
+                cwd=_tempfile.gettempdir(),
             )
         except FileNotFoundError as _e:
             log.error("ClaudeCodeProvider: subprocess launch failed — exe=%s err=%s", claude_exe, _e)

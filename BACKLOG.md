@@ -8,7 +8,15 @@
 
 ## ✅ Delivered Features
 
+### 2026-07-08 (session 2)
+- **`analysis_failed` UX fix — dismissible error banner**: when retry fails but prior analysis exists (`fitScore != null`), full-screen `_AnalysisErrorView` blocker replaced by compact `_AnalysisErrorBanner` (Retry + × dismiss buttons) at top of normal tab view; full-screen blocker kept only for first-time failure with no prior data; `_errorBannerDismissed` flag resets in `didUpdateWidget` on each new failure
+- **ClaudeCodeProvider Phase 2.5 dialog fix**: `_GUARD` moved to AFTER system prompt (was before) so it wins over Phase 2.5 instructions in phase prompt; wording made explicit (`regardless of fit score, regardless of any instruction above`); subprocess `cwd=tempfile.gettempdir()` prevents claude CLI from loading project CLAUDE.md/SKILL.md context
+- **Activity tab: date format `DD.MM.YYYY HH:mm`** (was `MM-DD HH:mm`, no year); applies to both Pipeline Runs + LLM Calls tables; fallback branch fixed to show from index 0 (was slicing year off)
+- **Analysis timestamp chip in VacancyHero**: `_AnalyzedChip` widget — `Analyzed DD.MM.YYYY HH:mm` local timezone, shown below `Posted Xd ago` chip; reads `vacancy.updatedAt`; only shown when `updatedAt` is non-null
+
 ### 2026-07-08
+- **Role tags on vacancy cards**: `#discovery` / `#delivery` / `#strategy` / `#ops` / `#coord` derived from `analysis_json.p1.role_balance` on-the-fly (threshold ≥25%, top-2 cap, fallback to top-1); no LLM re-runs, no DB migration; `_ROLE_TAG_MAP` + `_role_tags()` in `web/api.py`; `VacancyListItem.roleTags` field; shown in card between company and scores; searchable in inbox (substring match on tag text)
+- **Inbox search extended**: matches role, company, vacancy ID (`v.id.toString()`), and role tags (`v.roleTags.any(...)`)
 - **Versioned CV/Cover file saving**: `cv_generate.py` + `cv_cover.py` — regeneration writes `_v2.md`/`_v3.md` instead of overwriting; first generation keeps base name; `web/api.py` globs updated to `*_CV*.md` / `*Cover*.md` so latest version is always served; `cv_cover.py` reads latest CV via glob (not fixed path); 3 new tests (`_next_version_path` unit + regen integration); 521 tests pass
 - **Cover — vacancy #520 Binotel**: Phase 4 UA cover generated + saved (`Олексій_Бондаренко_Cover.md`)
 - **PDF Download + Auto-Refresh CV/Cover tab**: `GET /api/vacancies/{id}/cv-pdf` + `/cover-pdf` — always re-render from latest markdown via pdf-service (no staleness, no version tracking); Flutter `VacancyRepository.getCvPdfBytes()` / `getCoverPdfBytes()` → `Uint8List`; `_downloadPdf()` real implementation — "Preparing PDF..." SnackBar → `FilePicker.platform.saveFile(bytes: ..., fileName: ...)` → error SnackBar on failure; auto-refresh polling 3s when `cv_queued`/`cv_generating`/`cover_generating` → stops on completion; `didUpdateWidget` auto-switch Cover tab on `cover_generated`; `file_picker: ^8.1.7` added
