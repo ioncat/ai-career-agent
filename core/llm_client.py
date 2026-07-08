@@ -584,28 +584,30 @@ class ClaudeCodeProvider:
     async def complete(self, user: str, *, system: str | None = None, **_kwargs) -> str:
         """Call Claude Code CLI subprocess with profile + system + user prompt.
 
-        Uses --system-prompt-file to provide profile + phase prompt + guard as the
-        CLI system prompt, completely replacing Claude Code's default system prompt
-        (which would otherwise load CLAUDE.md / SKILL.md and trigger Phase 2.5 dialogs).
-        User content (JD + phase output) is sent via stdin.
+        Everything is sent via stdin (profile → phase prompt → guard → user content)
+        to avoid Windows 32767-char command-line limit.
+        --no-session-persistence prevents the subprocess from inheriting session
+        context from previous claude-p calls (which caused Phase 2.5 dialogs).
+        cwd=tempdir prevents project CLAUDE.md / SKILL.md from being loaded.
         """
         _GUARD = (
-            "CRITICAL: This is a background API worker — NOT an interactive terminal session. "
-            "Output ONLY the structured markdown analysis described above. "
+            "CRITICAL — BACKGROUND WORKER: Output ONLY the structured markdown analysis "
+            "described in the instructions above. "
             "NEVER produce interactive menus, numbered choice options ([1]/[2]), "
             "Phase 2.5 decline dialogs, 'Що обираємо?', 'What do you choose?', "
             "or any decision prompts — regardless of fit score or recommendation. "
+            "NEVER ask for more input. NEVER reference prior sessions. "
             "NEVER use tools, write files, or execute code. "
-            "Your response must be plain structured markdown and nothing else."
+            "Respond with plain structured markdown only."
         )
 
-        # Build system prompt: profile + phase prompt + guard.
-        # Written to a temp file to bypass Windows 32767-char command-line limit.
-        sys_parts = [self._profile_md]
+        # Full prompt via stdin: profile → phase prompt → guard → user content
+        parts = [self._profile_md]
         if system:
-            sys_parts.append(system)
-        sys_parts.append(_GUARD)
-        system_prompt_text = "\n\n---\n\n".join(sys_parts)
+            parts.append(system)
+        parts.append(_GUARD)
+        parts.append(user)
+        prompt = "\n\n---\n\n".join(parts)
 
         env = self._subprocess_env()
         import shutil as _shutil
@@ -614,127 +616,112 @@ class ClaudeCodeProvider:
             raise LLMUnavailableError("claude CLI not found in PATH — install Claude Code CLI")
 
         import tempfile as _tempfile
-        sys_file = _tempfile.NamedTemporaryFile(
-            mode="w", suffix=".txt", delete=False, encoding="utf-8"
-        )
+
+        # --no-session-persistence: each subprocess call is fully isolated —
+        # no session history from previous calls bleeds into context.
+        # cwd=tempdir: no project CLAUDE.md / SKILL.md picked up.
+        cmd = [claude_exe, "-p", "-", "--model", self._model, "--no-session-persistence"]
+        if self._effort and self._effort != "off":
+            cmd += ["--effort", self._effort]
+
+        debug_log = Path("logs/cli_debug.log")
+        debug_log.parent.mkdir(exist_ok=True)
+
+        t0 = time.monotonic()
+        import datetime as _dt
+        ts = _dt.datetime.now().strftime("%m-%d %H:%M:%S")
+        with debug_log.open("a", encoding="utf-8") as _f:
+            _f.write(f"\n{'='*60}\n[{ts}] CLI call — model={self._model} effort={self._effort}\n")
+            _f.write(f"--- PROMPT ({len(prompt)} chars) ---\n{prompt[:2000]}{'...[truncated]' if len(prompt) > 2000 else ''}\n")
+            _f.write("--- RESPONSE (streaming) ---\n")
+
         try:
-            sys_file.write(system_prompt_text)
-            sys_file.flush()
-            sys_file.close()
-
-            # --system-prompt-file overrides Claude Code's default system prompt entirely
-            # (no CLAUDE.md, no SKILL.md, no Phase 2.5 context loaded from project).
-            # User content passed via stdin to avoid Windows command-line length limit.
-            cmd = [claude_exe, "-p", "-", "--model", self._model,
-                   "--system-prompt-file", sys_file.name]
-            if self._effort and self._effort != "off":
-                cmd += ["--effort", self._effort]
-
-            debug_log = Path("logs/cli_debug.log")
-            debug_log.parent.mkdir(exist_ok=True)
-
-            t0 = time.monotonic()
-            import datetime as _dt
-            ts = _dt.datetime.now().strftime("%m-%d %H:%M:%S")
-            with debug_log.open("a", encoding="utf-8") as _f:
-                _f.write(f"\n{'='*60}\n[{ts}] CLI call — model={self._model} effort={self._effort}\n")
-                _f.write(f"--- SYSTEM ({len(system_prompt_text)} chars) ---\n{system_prompt_text[:1000]}{'...[truncated]' if len(system_prompt_text) > 1000 else ''}\n")
-                _f.write(f"--- USER ({len(user)} chars) ---\n{user[:500]}{'...[truncated]' if len(user) > 500 else ''}\n")
-                _f.write("--- RESPONSE (streaming) ---\n")
-
-            try:
-                proc = await asyncio.create_subprocess_exec(
-                    *cmd,
-                    stdin=asyncio.subprocess.PIPE,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                    env=env,
-                    cwd=_tempfile.gettempdir(),
-                )
-            except FileNotFoundError as _e:
-                log.error("ClaudeCodeProvider: subprocess launch failed — exe=%s err=%s", claude_exe, _e)
-                raise LLMUnavailableError("claude CLI not found in PATH — install Claude Code CLI")
-            except OSError as _e:
-                log.error("ClaudeCodeProvider: subprocess OSError — exe=%s err=%s", claude_exe, _e)
-                raise LLMUnavailableError(f"claude CLI OSError: {_e}")
-
-            # Write user content to stdin and close
-            assert proc.stdin is not None
-            proc.stdin.write(user.encode("utf-8", errors="replace"))
-            await proc.stdin.drain()
-            proc.stdin.close()
-
-            # Stream stdout line-by-line so debug log shows real-time progress.
-            output_lines: list[str] = []
-            async def _read_stdout() -> None:
-                assert proc.stdout is not None
-                with debug_log.open("a", encoding="utf-8") as _f:
-                    async for raw_line in proc.stdout:
-                        line = raw_line.decode(errors="replace")
-                        output_lines.append(line)
-                        _f.write(line)
-                        _f.flush()
-
-            try:
-                # Read stderr line-by-line (not read() to EOF) to avoid pipe-buffer deadlock
-                # when CLI writes large stderr while stdout is also streaming.
-                stderr_lines: list[str] = []
-                async def _read_stderr() -> None:
-                    assert proc.stderr is not None
-                    async for raw_line in proc.stderr:
-                        stderr_lines.append(raw_line.decode(errors="replace"))
-
-                await asyncio.wait_for(
-                    asyncio.gather(_read_stdout(), _read_stderr()),
-                    timeout=self._timeout,
-                )
-            except asyncio.TimeoutError:
-                proc.kill()
-                raise LLMUnavailableError(f"claude CLI timed out after {self._timeout}s")
-
-            await proc.wait()
-
-            elapsed_sec = time.monotonic() - t0
-            with debug_log.open("a", encoding="utf-8") as _f:
-                _f.write(f"--- END (rc={proc.returncode}, {elapsed_sec:.1f}s) ---\n")
-
-            if proc.returncode != 0:
-                err = "".join(stderr_lines)[:300]
-                raise LLMError(f"claude CLI error (rc={proc.returncode}): {err}")
-
-            text = self._normalize_cli_output("".join(output_lines).strip())
-            if not text:
-                raise LLMError("claude CLI returned empty response")
-
-            elapsed_ms = int(elapsed_sec * 1000)
-            self._sess_calls += 1
-            self._last_call_usage = {
-                "model": self._model,
-                "provider": "claude_cli",
-                "thinking_effort": self._effort if self._effort != "off" else "",
-                "profile_tokens": len(self._profile_md) // 4,
-                "prompt_tokens": len(system) // 4 if system else 0,
-                "user_tokens": len(user) // 4,
-                "input_tokens": 0,
-                "output_tokens": 0,
-                "cache_write_tokens": 0,
-                "cache_read_tokens": 0,
-                "budget_tokens": 0,
-                "thinking_tokens": 0,
-                "elapsed_ms": elapsed_ms,
-                "cost_usd": 0.0,
-            }
-            log.info(
-                "ClaudeCodeProvider: model=%s elapsed=%dms session_calls=%d",
-                self._model, elapsed_ms, self._sess_calls,
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env=env,
+                cwd=_tempfile.gettempdir(),
             )
-            return text
-        finally:
-            import os as _os
-            try:
-                _os.unlink(sys_file.name)
-            except OSError:
-                pass
+        except FileNotFoundError as _e:
+            log.error("ClaudeCodeProvider: subprocess launch failed — exe=%s err=%s", claude_exe, _e)
+            raise LLMUnavailableError("claude CLI not found in PATH — install Claude Code CLI")
+        except OSError as _e:
+            log.error("ClaudeCodeProvider: subprocess OSError — exe=%s err=%s", claude_exe, _e)
+            raise LLMUnavailableError(f"claude CLI OSError: {_e}")
+
+        # Write full prompt to stdin and close
+        assert proc.stdin is not None
+        proc.stdin.write(prompt.encode("utf-8", errors="replace"))
+        await proc.stdin.drain()
+        proc.stdin.close()
+
+        # Stream stdout line-by-line so debug log shows real-time progress.
+        output_lines: list[str] = []
+        async def _read_stdout() -> None:
+            assert proc.stdout is not None
+            with debug_log.open("a", encoding="utf-8") as _f:
+                async for raw_line in proc.stdout:
+                    line = raw_line.decode(errors="replace")
+                    output_lines.append(line)
+                    _f.write(line)
+                    _f.flush()
+
+        try:
+            # Read stderr line-by-line (not read() to EOF) to avoid pipe-buffer deadlock
+            # when CLI writes large stderr while stdout is also streaming.
+            stderr_lines: list[str] = []
+            async def _read_stderr() -> None:
+                assert proc.stderr is not None
+                async for raw_line in proc.stderr:
+                    stderr_lines.append(raw_line.decode(errors="replace"))
+
+            await asyncio.wait_for(
+                asyncio.gather(_read_stdout(), _read_stderr()),
+                timeout=self._timeout,
+            )
+        except asyncio.TimeoutError:
+            proc.kill()
+            raise LLMUnavailableError(f"claude CLI timed out after {self._timeout}s")
+
+        await proc.wait()
+
+        elapsed_sec = time.monotonic() - t0
+        with debug_log.open("a", encoding="utf-8") as _f:
+            _f.write(f"--- END (rc={proc.returncode}, {elapsed_sec:.1f}s) ---\n")
+
+        if proc.returncode != 0:
+            err = "".join(stderr_lines)[:300]
+            raise LLMError(f"claude CLI error (rc={proc.returncode}): {err}")
+
+        text = self._normalize_cli_output("".join(output_lines).strip())
+        if not text:
+            raise LLMError("claude CLI returned empty response")
+
+        elapsed_ms = int(elapsed_sec * 1000)
+        self._sess_calls += 1
+        self._last_call_usage = {
+            "model": self._model,
+            "provider": "claude_cli",
+            "thinking_effort": self._effort if self._effort != "off" else "",
+            "profile_tokens": len(self._profile_md) // 4,
+            "prompt_tokens": len(system) // 4 if system else 0,
+            "user_tokens": len(user) // 4,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "cache_write_tokens": 0,
+            "cache_read_tokens": 0,
+            "budget_tokens": 0,
+            "thinking_tokens": 0,
+            "elapsed_ms": elapsed_ms,
+            "cost_usd": 0.0,
+        }
+        log.info(
+            "ClaudeCodeProvider: model=%s elapsed=%dms session_calls=%d",
+            self._model, elapsed_ms, self._sess_calls,
+        )
+        return text
 
     @property
     def model(self) -> str:
