@@ -13,7 +13,7 @@ import re
 from collections import Counter
 from contextlib import asynccontextmanager
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import quote as _url_quote, urlparse
 
 import httpx
 import markdown as md_lib
@@ -773,10 +773,11 @@ async def _render_doc_pdf(vacancy_id: int, glob_pattern: str, not_found_msg: str
     if resp.status_code != 200:
         raise HTTPException(status_code=502, detail=f"pdf-service error {resp.status_code}")
 
+    pdf_name_encoded = _url_quote(pdf_name.encode("utf-8"), safe="")
     return Response(
         content=resp.content,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{pdf_name}"'},
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{pdf_name_encoded}"},
     )
 
 
