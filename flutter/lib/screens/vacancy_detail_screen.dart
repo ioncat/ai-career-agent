@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -378,11 +380,27 @@ class _VacancyDetailScreenState extends ConsumerState<VacancyDetailScreen>
     with SingleTickerProviderStateMixin {
 
   late TabController _tabController;
+  Timer? _cvPollingTimer;
+
+  static bool _needsPolling(String? status) =>
+      status == 'cv_queued' || status == 'cv_generating' || status == 'cover_generating';
+
+  void _startPollingIfNeeded(String? status) {
+    if (_needsPolling(status)) {
+      _cvPollingTimer ??= Timer.periodic(const Duration(seconds: 3), (_) {
+        if (mounted) ref.read(vacancyListProvider.notifier).refresh();
+      });
+    } else {
+      _cvPollingTimer?.cancel();
+      _cvPollingTimer = null;
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    _startPollingIfNeeded(widget.vacancy?.status);
   }
 
   @override
@@ -394,14 +412,20 @@ class _VacancyDetailScreenState extends ConsumerState<VacancyDetailScreen>
       ref.invalidate(vacancyCvProvider(widget.vacancyId));
       _tabController.animateTo(1);
     }
+    if (oldStatus == 'cover_generating' && newStatus == 'cover_generated') {
+      ref.invalidate(vacancyCvProvider(widget.vacancyId));
+      _tabController.animateTo(2);
+    }
     if ((oldStatus == 'analysis_queued' || oldStatus == 'analyzing') &&
         newStatus == 'analyzed') {
       ref.invalidate(vacancyDetailProvider(widget.vacancyId));
     }
+    _startPollingIfNeeded(newStatus);
   }
 
   @override
   void dispose() {
+    _cvPollingTimer?.cancel();
     _tabController.dispose();
     super.dispose();
   }
@@ -985,13 +1009,37 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
     }
   }
 
-  void _downloadPdf(String type) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${type == 'cv' ? 'CV' : 'Cover'} PDF download — coming soon'),
-        duration: const Duration(seconds: 2),
-      ),
+  Future<void> _downloadPdf(String type) async {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Preparing PDF...'), duration: Duration(minutes: 1)),
     );
+    try {
+      final bytes = type == 'cv'
+          ? await _repo.getCvPdfBytes(widget.vacancyId)
+          : await _repo.getCoverPdfBytes(widget.vacancyId);
+      messenger.hideCurrentSnackBar();
+      if (!mounted) return;
+      final label = type == 'cv' ? 'CV' : 'Cover Letter';
+      final fileName = '${type == 'cv' ? 'CV' : 'Cover'}_${widget.vacancyId}.pdf';
+      await FilePicker.platform.saveFile(
+        dialogTitle: 'Save $label PDF',
+        fileName: fileName,
+        type: FileType.custom,
+        allowedExtensions: ['pdf'],
+        bytes: bytes,
+      );
+    } catch (e) {
+      messenger.hideCurrentSnackBar();
+      if (mounted) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('PDF error: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _decline() async {

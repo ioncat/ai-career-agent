@@ -32,6 +32,9 @@ dependencies:
   # URL launcher
   url_launcher: ^6.3.1
 
+  # File save dialog (PDF download)
+  file_picker: ^8.1.7
+
   # Typography: Hanken Grotesk + Inter + JetBrains Mono
   google_fonts: ^6.2.1
 
