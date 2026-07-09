@@ -81,7 +81,7 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Row 1: source badge + "New" badge | date right-aligned
+              // Row 1: source badge + "New" badge + dedup/republish badges | date right-aligned
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -89,6 +89,14 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
                   if (isUnread) ...[
                     const SizedBox(width: 6),
                     _NewBadge(),
+                  ],
+                  if (v.republishedAt != null) ...[
+                    const SizedBox(width: 6),
+                    _RepublishedBadge(),
+                  ],
+                  if (v.duplicateOf != null) ...[
+                    const SizedBox(width: 6),
+                    _DuplicateBadge(originalId: v.duplicateOf!),
                   ],
                   const Spacer(),
                   if (v.publishedAt != null)
@@ -253,6 +261,54 @@ class _FailedBadge extends StatelessWidget {
               ),
         ),
       ],
+    );
+  }
+}
+
+class _RepublishedBadge extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF8E1),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFFFFCA28), width: 0.8),
+      ),
+      child: Text(
+        '↑ Republished',
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: const Color(0xFFF57F17),
+              fontWeight: FontWeight.w700,
+              fontSize: 10,
+            ),
+      ),
+    );
+  }
+}
+
+class _DuplicateBadge extends StatelessWidget {
+  final int originalId;
+  const _DuplicateBadge({required this.originalId});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: cs.outlineVariant, width: 0.8),
+      ),
+      child: Text(
+        'Dup #$originalId',
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: cs.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+              fontSize: 10,
+            ),
+      ),
     );
   }
 }

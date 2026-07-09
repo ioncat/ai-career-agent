@@ -653,7 +653,7 @@ async def list_vacancies(
         params.append(limit)
 
         cursor = await db.execute(
-            f"SELECT * FROM vacancies {where} ORDER BY created_at DESC LIMIT ?",
+            f"SELECT * FROM vacancies {where} ORDER BY published_at DESC NULLS LAST, id ASC LIMIT ?",
             params,
         )
         return await cursor.fetchall()
