@@ -50,6 +50,8 @@
 - **Flutter Detail — split button fix**: `tapTargetSize: shrinkWrap` + explicit `minimumSize`/`maximumSize: Size(34, 36)` on both halves; `Container(1px, white@25%)` divider instead of `SizedBox` gap — eliminates M3 invisible tap-padding misalignment
 - **Cover generation end-to-end**: `CoverWorker` (Phase 4 background queue, mirrors `CVWorker`); `POST /api/vacancies/{id}/generate-cover`; `generateCover()` in `VacancyRepository`; Cover tab CTA wired; status `cover_generating → cover_generated`; error rollback to `cv_generated`
 - **cv_generate — CV split Strategy 4**: H1 heading anchor `^# [A-Z]` as final fallback in `_split_review_and_cv()`; Phase 3.5 prompts: FULL OUTPUT ORDER block + mandatory `---CV---` separator with parser warning; review tables (Word Frequency, Tools & Tech) stay in `JD_analysis.md` only, never in CV.md
+- **cv_generate — Cyrillic split fix**: Strategy 4 regex extended to `[A-ZЀ-ӿ]`; Phase 3.5 output with Ukrainian name (`# Олексій`) previously fell through all 4 strategies; Phase 3.5 prompts updated — `---CV---` must be plain text, not inside code block; 5 new tests (vacancy #570 reproducer)
+- **CV/Cover Language Selection**: `CVWorker.enqueue(language="auto")`; `cv_generate` auto-detects Cyrillic → Ukrainian else English; `POST /generate-cv` accepts `{"language": "en"|"uk"|"auto"}`; Flutter split-button: main = auto, ▾ menu = English / Ukrainian; `vacancy_repository.generateCv({language})`
 - **Flutter — Activity Log tab**: second tab in detail screen showing per-call LLM journal (phase · provider · model · effort · elapsed · tokens in→out · cost); DB migration adds `provider` + `thinking_effort` to `llm_usage`; `GET /api/vacancies/{id}/activity` endpoint; `_budget_to_effort()` helper maps budget_tokens → effort label; Pipeline Runs section above LLM Calls
 - **Flutter — Activity tab table layout**: replaced monospace string blocks with `Table` widget (aligned columns, header separator, right-aligned numeric cols); UTC→local timezone conversion via `DateTime.parse(iso).toLocal()`
 - **CLI provider — format fixes**: `_normalize_cli_output()` strips CLI-specific artifacts (progress wrapper lines, decimal scores `6.0/10 → 6/10`) before returning to shared parser; `_GUARD` preamble prevents CLI agent from attempting file writes when prompt says "goes to JD_analysis.md"; debug log `logs/cli_debug.log` streams stdout line-by-line in real time
@@ -390,31 +392,6 @@ If the user regenerates the CV (new markdown) or edits it manually, the existing
 
 **Scope:**
 - [ ] Flutter `vacancy_detail_screen.dart` — `_StatusPoller` extended (or new `_CvStatusPoller`): watches for `cv_generating` → `cv_generated` transition, invalidates providers, switches tab
-
----
-
-## 🟡 P2 — CV/Cover Language Selection in Flutter (added 2026-07-08)
-
-**Problem:** `CVWorker` calls `cv_generate(ctx, vacancy_id)` without `language` param → always generates in English. User has no control from Flutter.
-
-**Design:** Auto from JD + explicit override via split-button menu.
-- Main "Generate CV" button → `language="auto"` → backend detects from JD (Cyrillic → Ukrainian, else English)
-- `▾` menu adds: **Generate in English** / **Generate in Ukrainian**
-- Same applies to Cover letter (matches CV language by default)
-
-**Stack changes:**
-
-| # | File | Change |
-|---|------|--------|
-| 1 | `core/cv_worker.py` | `enqueue(vacancy_id, language="auto")` — pass to `cv_generate()` |
-| 2 | `tools/cv_generate.py` | `language="auto"` → detect from JD text (any Cyrillic → Ukrainian) |
-| 3 | `web/api.py` | `POST /generate-cv` accept JSON `{"language": "en"\|"uk"\|"auto"}` |
-| 4 | `flutter/.../vacancy_repository.dart` | `generateCv(id, {String language = 'auto'})` |
-| 5 | `flutter/.../vacancy_detail_screen.dart` | Split-button menu: Generate in English / Generate in Ukrainian |
-
-Same pattern for `generate-cover` + `CoverWorker`.
-
-**Scope:** ~5 files, all connected. No DB changes needed.
 
 ---
 
