@@ -474,6 +474,13 @@ async def api_new_vacancy(req: NewVacancyRequest):
     """
     existing = await database.get_vacancy_by_url(req.url)
     if existing is not None:
+        # Re-publish detection: declined/skipped vacancy reappears in RSS feed
+        if existing["status"] in ("declined", "skipped") and req.published_at:
+            existing_pub = existing["published_at"] or ""
+            if req.published_at > existing_pub:
+                await database.on_vacancy_republished(existing["id"], req.published_at)
+                log.info("api/new-vacancy: republished v#%d url=%s", existing["id"], req.url)
+                return {"vacancy_id": existing["id"], "status": "republished"}
         raise HTTPException(status_code=409, detail="duplicate")
     try:
         vacancy_id = await database.insert_vacancy(

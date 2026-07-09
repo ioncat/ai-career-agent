@@ -25,6 +25,8 @@ class VacancyListItem {
   final bool applied;
   final String? salary;
   final List<String> roleTags;
+  final int? duplicateOf;
+  final String? republishedAt;
 
   const VacancyListItem({
     required this.id,
@@ -46,6 +48,8 @@ class VacancyListItem {
     this.applied = false,
     this.salary,
     this.roleTags = const [],
+    this.duplicateOf,
+    this.republishedAt,
   });
 
   factory VacancyListItem.fromJson(Map<String, dynamic> json) {
@@ -70,6 +74,8 @@ class VacancyListItem {
       applied: json['applied'] as bool? ?? false,
       salary: json['salary'] as String?,
       roleTags: _parseStringList(json['role_tags']),
+      duplicateOf: json['duplicate_of'] as int?,
+      republishedAt: json['republished_at'] as String?,
     );
   }
 
@@ -93,6 +99,8 @@ class VacancyListItem {
         'applied': applied,
         'salary': salary,
         'role_tags': roleTags,
+        'duplicate_of': duplicateOf,
+        'republished_at': republishedAt,
       };
 }
 

@@ -43,6 +43,13 @@ def _make_doc(title="Backend Dev", markdown="## Job\nGreat role.") -> ParsedDocu
     )
 
 
+def _mock_dedup(mock_db) -> None:
+    """Add EPIC-26 dedup async mocks to a patched database mock."""
+    mock_db.find_duplicate = AsyncMock(return_value=None)
+    mock_db.set_content_hash = AsyncMock()
+    mock_db.set_duplicate_of = AsyncMock()
+
+
 def _vacancy_row(
     vacancy_id: int = 42,
     title: str = "Backend Dev",
@@ -121,6 +128,7 @@ async def test_fetch_jd_returns_vacancy_id(tmp_path):
         mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
         mock_db.insert_vacancy = AsyncMock(return_value=77)
         mock_db.update_vacancy_fields = AsyncMock()
+        _mock_dedup(mock_db)
 
         result = await fetch_jd(deps, "https://djinni.co/jobs/123/")
 
@@ -181,6 +189,7 @@ async def test_fetch_jd_writes_jd_md(tmp_path):
         mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
         mock_db.insert_vacancy = AsyncMock(return_value=5)
         mock_db.update_vacancy_fields = AsyncMock()
+        _mock_dedup(mock_db)
 
         await fetch_jd(deps, "https://djinni.co/jobs/456/")
 
@@ -203,6 +212,7 @@ async def test_fetch_jd_processes_queued_vacancy(tmp_path):
     with patch("tools.cv_fetch_jd.database") as mock_db:
         mock_db.get_vacancy_by_url = AsyncMock(return_value=queued)
         mock_db.update_vacancy_fields = AsyncMock()
+        _mock_dedup(mock_db)
 
         result = await fetch_jd(deps, "https://djinni.co/jobs/555/")
 
@@ -227,6 +237,7 @@ async def test_cv_fetch_jd_happy_path_returns_string(tmp_path):
         mock_db.get_vacancy_by_id = AsyncMock(
             return_value=_vacancy_row(vacancy_id=42, title="Backend Dev")
         )
+        _mock_dedup(mock_db)
 
         result = await cv_fetch_jd(ctx, "https://djinni.co/jobs/123-backend/")
 
@@ -249,6 +260,7 @@ async def test_cv_fetch_jd_saves_file(tmp_path):
         mock_db.get_vacancy_by_id = AsyncMock(
             return_value=_vacancy_row(vacancy_id=1, title="Backend Dev")
         )
+        _mock_dedup(mock_db)
 
         await cv_fetch_jd(ctx, "https://djinni.co/jobs/123-backend/")
 
@@ -273,6 +285,7 @@ async def test_cv_fetch_jd_correct_folder_structure(tmp_path):
         mock_db.get_vacancy_by_id = AsyncMock(
             return_value=_vacancy_row(vacancy_id=1, title="Backend Dev")
         )
+        _mock_dedup(mock_db)
 
         await cv_fetch_jd(ctx, "https://djinni.co/jobs/123-backend/")
 
@@ -297,6 +310,7 @@ async def test_cv_fetch_jd_calls_db_insert(tmp_path):
         mock_db.get_vacancy_by_id = AsyncMock(
             return_value=_vacancy_row(vacancy_id=5, title="Python Dev")
         )
+        _mock_dedup(mock_db)
 
         await cv_fetch_jd(ctx, "https://djinni.co/jobs/456-python/")
 
@@ -370,6 +384,7 @@ async def test_cv_fetch_jd_path_scoped_to_user_id(tmp_path):
         mock_db.get_vacancy_by_id = AsyncMock(
             return_value=_vacancy_row(vacancy_id=10, title="Backend Dev")
         )
+        _mock_dedup(mock_db)
 
         await cv_fetch_jd(ctx, "https://djinni.co/jobs/777-senior/")
 
@@ -394,6 +409,7 @@ async def test_cv_fetch_jd_passes_user_id_to_db(tmp_path):
         mock_db.get_vacancy_by_id = AsyncMock(
             return_value=_vacancy_row(vacancy_id=99, title="Backend Dev")
         )
+        _mock_dedup(mock_db)
 
         await cv_fetch_jd(ctx, "https://djinni.co/jobs/999-test/")
 
@@ -416,6 +432,7 @@ async def test_cv_fetch_jd_queued_vacancy_updates_not_inserts(tmp_path):
         mock_db.get_vacancy_by_id = AsyncMock(
             return_value=_vacancy_row(vacancy_id=55, title="Queued PM Role")
         )
+        _mock_dedup(mock_db)
 
         result = await cv_fetch_jd(ctx, "https://djinni.co/jobs/555/")
 
@@ -439,3 +456,65 @@ async def test_cv_fetch_jd_non_queued_duplicate_skips_fetch(tmp_path):
 
     assert "ℹ️" in result
     ctx.deps.parser_adapter.fetch_markdown.assert_not_called()
+
+
+# ── EPIC-26: dedup + content hash ─────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_fetch_jd_sets_content_hash(tmp_path):
+    doc = _make_doc()
+    parser = AsyncMock()
+    parser.fetch_markdown = AsyncMock(return_value=doc)
+    deps = _make_deps(tmp_path, parser)
+
+    with patch("tools.cv_fetch_jd.database") as mock_db:
+        mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
+        mock_db.insert_vacancy = AsyncMock(return_value=10)
+        mock_db.update_vacancy_fields = AsyncMock()
+        _mock_dedup(mock_db)
+
+        await fetch_jd(deps, "https://djinni.co/jobs/123/")
+
+    mock_db.set_content_hash.assert_awaited_once()
+    call_args = mock_db.set_content_hash.call_args
+    assert call_args.args[0] == 10
+    assert isinstance(call_args.args[1], str)
+    assert len(call_args.args[1]) == 64  # sha256 hex digest length
+
+
+@pytest.mark.asyncio
+async def test_fetch_jd_marks_duplicate_when_found(tmp_path):
+    doc = _make_doc()
+    parser = AsyncMock()
+    parser.fetch_markdown = AsyncMock(return_value=doc)
+    deps = _make_deps(tmp_path, parser)
+
+    with patch("tools.cv_fetch_jd.database") as mock_db:
+        mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
+        mock_db.insert_vacancy = AsyncMock(return_value=20)
+        mock_db.update_vacancy_fields = AsyncMock()
+        mock_db.find_duplicate = AsyncMock(return_value=5)  # original found
+        mock_db.set_content_hash = AsyncMock()
+        mock_db.set_duplicate_of = AsyncMock()
+
+        await fetch_jd(deps, "https://djinni.co/jobs/999/")
+
+    mock_db.set_duplicate_of.assert_awaited_once_with(20, 5)
+
+
+@pytest.mark.asyncio
+async def test_fetch_jd_no_duplicate_call_when_none(tmp_path):
+    doc = _make_doc()
+    parser = AsyncMock()
+    parser.fetch_markdown = AsyncMock(return_value=doc)
+    deps = _make_deps(tmp_path, parser)
+
+    with patch("tools.cv_fetch_jd.database") as mock_db:
+        mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
+        mock_db.insert_vacancy = AsyncMock(return_value=30)
+        mock_db.update_vacancy_fields = AsyncMock()
+        _mock_dedup(mock_db)
+
+        await fetch_jd(deps, "https://djinni.co/jobs/888/")
+
+    mock_db.set_duplicate_of.assert_not_awaited()

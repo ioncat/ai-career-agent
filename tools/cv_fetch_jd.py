@@ -15,6 +15,7 @@ Folder layout:
     vacancies/inbox/{user_id}/{id} — {role} — {company}/JD.md
 """
 
+import hashlib
 import logging
 import re
 import time
@@ -116,6 +117,21 @@ async def fetch_jd(deps: AgentDeps, url: str) -> int:
         raise FetchError(f"Не удалось записать JD.md: {exc}") from exc
 
     log.info("fetch_jd: saved JD.md → %s", jd_path)
+
+    # ── EPIC-26: content hash + duplicate detection ───────────────────────────
+    _norm_text = re.sub(r"\s+", " ", doc.markdown.lower())
+    content_hash = hashlib.sha256(_norm_text.encode()).hexdigest()
+    original_id = await database.find_duplicate(
+        deps.user_id,
+        content_hash,
+        database._normalize_title(doc.title or ""),
+        doc.company or "",
+        exclude_id=vacancy_id,
+    )
+    if original_id is not None:
+        log.info("fetch_jd: duplicate of v#%d — marking v#%d", original_id, vacancy_id)
+        await database.set_duplicate_of(vacancy_id, original_id)
+    await database.set_content_hash(vacancy_id, content_hash)
 
     # ── Update DB with final path and parsed fields ───────────────────────────
     markdown_path = str(jd_path)

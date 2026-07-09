@@ -133,6 +133,67 @@ async def test_new_vacancy_minimal_payload(client):
     assert resp.status_code == 201
 
 
+@pytest.mark.asyncio
+async def test_new_vacancy_republish_declined(client):
+    """POST /api/new-vacancy for a declined vacancy with newer published_at returns republished."""
+    uid = await database.insert_user(name="RepubUser", telegram_chat_id=5001, skill_type="pm")
+    url = "https://djinni.co/jobs/400/"
+
+    # Insert with status=declined and old published_at
+    vid = await database.insert_vacancy(url=url, user_id=uid, published_at="2026-06-01T10:00:00")
+    await database.update_vacancy_status(vid, "declined")
+
+    # Re-publish with newer published_at
+    resp = client.post("/api/new-vacancy", json={
+        "url": url,
+        "user_id": uid,
+        "published_at": "2026-07-01T10:00:00",
+    })
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["status"] == "republished"
+    assert data["vacancy_id"] == vid
+
+    # Vacancy should be back to fetched with republished_at set
+    row = await database.get_vacancy_by_id(vid)
+    assert row["status"] == "fetched"
+    assert row["republished_at"] is not None
+
+
+@pytest.mark.asyncio
+async def test_new_vacancy_republish_same_date_returns_409(client):
+    """POST /api/new-vacancy for a declined vacancy with same/older published_at → 409."""
+    uid = await database.insert_user(name="SameDateUser", telegram_chat_id=5002, skill_type="pm")
+    url = "https://djinni.co/jobs/401/"
+
+    vid = await database.insert_vacancy(url=url, user_id=uid, published_at="2026-06-01T10:00:00")
+    await database.update_vacancy_status(vid, "declined")
+
+    resp = client.post("/api/new-vacancy", json={
+        "url": url,
+        "user_id": uid,
+        "published_at": "2026-06-01T10:00:00",  # same date — not a republish
+    })
+    assert resp.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_new_vacancy_analyzed_still_409(client):
+    """POST /api/new-vacancy for an analyzed (non-declined) vacancy still returns 409."""
+    uid = await database.insert_user(name="AnalyzedUser", telegram_chat_id=5003, skill_type="pm")
+    url = "https://djinni.co/jobs/402/"
+
+    vid = await database.insert_vacancy(url=url, user_id=uid, published_at="2026-06-01T10:00:00")
+    await database.update_vacancy_status(vid, "analyzed")
+
+    resp = client.post("/api/new-vacancy", json={
+        "url": url,
+        "user_id": uid,
+        "published_at": "2026-07-01T10:00:00",
+    })
+    assert resp.status_code == 409
+
+
 # ── PATCH /api/vacancies/{id}/applied ─────────────────────────────────────────
 
 @pytest.mark.asyncio
