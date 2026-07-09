@@ -1206,9 +1206,26 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
   }
 
   Future<void> _generateCv() async {
+    final lang = await showDialog<String>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('CV Language'),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, 'en'),
+            child: const Text('English'),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, 'uk'),
+            child: const Text('Ukrainian'),
+          ),
+        ],
+      ),
+    );
+    if (lang == null || !mounted) return;
     setState(() => _loadingCv = true);
     try {
-      await _repo.generateCv(widget.vacancyId);
+      await _repo.generateCv(widget.vacancyId, language: lang);
       if (mounted) {
         ref.read(vacancyListProvider.notifier).refresh();
         ScaffoldMessenger.of(context).showSnackBar(

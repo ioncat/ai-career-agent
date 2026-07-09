@@ -11,6 +11,7 @@ import logging
 import os
 import re
 from collections import Counter
+import contextlib
 from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import quote as _url_quote, urlparse
@@ -675,14 +676,23 @@ async def api_vacancy_restore(vacancy_id: int):
     return {"id": vacancy_id, "status": restore_status}
 
 
+_LANGUAGE_MAP = {"en": "English", "uk": "Ukrainian", "both": "both"}
+
 @app.post("/api/vacancies/{vacancy_id}/generate-cv")
 async def api_vacancy_generate_cv(vacancy_id: int, request: Request):
     """Start Phase 3+3.5 CV generation immediately (Flutter Generate CV button).
 
+    Accepts optional JSON body: {"language": "en"|"uk"|"both"} (default: "en").
     Enqueues into CVWorker — processing starts without polling delay.
     Status transitions: cv_generating → cv_generated.
     Falls back to DB-only status when running without agent.py (standalone tracker).
     """
+    body = {}
+    with contextlib.suppress(Exception):
+        body = await request.json()
+    lang_code = body.get("language", "en")
+    language = _LANGUAGE_MAP.get(lang_code, "English")
+
     row = await database.get_vacancy_by_id(vacancy_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Vacancy not found")
@@ -691,8 +701,8 @@ async def api_vacancy_generate_cv(vacancy_id: int, request: Request):
         raise HTTPException(status_code=409, detail="CV generation already in progress")
     worker = getattr(request.app.state, "cv_worker", None)
     if worker is not None:
-        await worker.enqueue(vacancy_id)
-        return {"id": vacancy_id, "status": "cv_generating"}
+        await worker.enqueue(vacancy_id, language)
+        return {"id": vacancy_id, "status": "cv_generating", "language": language}
     # Standalone fallback
     await database.update_vacancy_status(vacancy_id, "cv_queued")
     return {"id": vacancy_id, "status": "cv_queued"}
