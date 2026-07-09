@@ -13,12 +13,14 @@ class VacancyCard extends ConsumerStatefulWidget {
   final VacancyListItem vacancy;
   final bool selected;
   final VoidCallback onTap;
+  final void Function(int vacancyId)? onTapRelated;
 
   const VacancyCard({
     super.key,
     required this.vacancy,
     required this.onTap,
     this.selected = false,
+    this.onTapRelated,
   });
 
   @override
@@ -96,7 +98,13 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
                   ],
                   if (v.duplicateOf != null) ...[
                     const SizedBox(width: 6),
-                    _DuplicateBadge(originalId: v.duplicateOf!),
+                    GestureDetector(
+                      onTap: widget.onTapRelated != null
+                          ? () => widget.onTapRelated!(v.duplicateOf!)
+                          : null,
+                      behavior: HitTestBehavior.opaque,
+                      child: _DuplicateBadge(originalId: v.duplicateOf!),
+                    ),
                   ],
                   const Spacer(),
                   if (v.publishedAt != null)

@@ -20,10 +20,12 @@ class VacancyInboxScreen extends ConsumerStatefulWidget {
 
 class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
   VacancyListItem? _selected;
+  bool _crossFolderNav = false;
   final _searchController = TextEditingController();
   String _searchQuery = '';
 
   void _onSkipped() {
+    _crossFolderNav = false;
     final currentId = _selected?.id;
     if (currentId == null) return;
     final vacancies = ref.read(folderVacanciesProvider(widget.folder));
@@ -36,6 +38,18 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
       next = filtered[idx - 1];
     }
     setState(() => _selected = next);
+  }
+
+  void _selectByIdAny(int id) {
+    final all = ref.read(vacancyListProvider).valueOrNull?.vacancies ?? [];
+    final target = all.where((v) => v.id == id).firstOrNull;
+    if (target != null) {
+      setState(() {
+        _selected = target;
+        _crossFolderNav = true;
+      });
+      ref.read(readVacanciesProvider.notifier).markRead(id);
+    }
   }
 
   bool _filterExpanded = false;
@@ -137,7 +151,8 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
     });
 
     // Clear selection if selected vacancy no longer in this folder or filtered out
-    if (_selected != null && !filtered.any((v) => v.id == _selected!.id)) {
+    // Skip cleanup during cross-folder navigation (badge → original in Archive, etc.)
+    if (!_crossFolderNav && _selected != null && !filtered.any((v) => v.id == _selected!.id)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) setState(() => _selected = null);
       });
@@ -250,9 +265,13 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
                           vacancies: filtered,
                           selectedId: _selected?.id,
                           onSelect: (v) {
-                            setState(() => _selected = v);
+                            setState(() {
+                              _selected = v;
+                              _crossFolderNav = false;
+                            });
                             ref.read(readVacanciesProvider.notifier).markRead(v.id);
                           },
+                          onTapRelated: _selectByIdAny,
                         ),
                 ),
               ],
@@ -275,6 +294,7 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
                     url: _selected!.url,
                     vacancy: _selected!,
                     onSkipped: _onSkipped,
+                    onNavigateTo: _selectByIdAny,
                   )
                 : const _NoSelectionPlaceholder(),
           ),
@@ -568,11 +588,13 @@ class _VacancyList extends StatelessWidget {
   final List<VacancyListItem> vacancies;
   final int? selectedId;
   final ValueChanged<VacancyListItem> onSelect;
+  final void Function(int vacancyId)? onTapRelated;
 
   const _VacancyList({
     required this.vacancies,
     required this.selectedId,
     required this.onSelect,
+    this.onTapRelated,
   });
 
   @override
@@ -591,6 +613,7 @@ class _VacancyList extends StatelessWidget {
               vacancy: v,
               selected: v.id == selectedId,
               onTap: () => onSelect(v),
+              onTapRelated: onTapRelated,
             ),
           ),
         );
