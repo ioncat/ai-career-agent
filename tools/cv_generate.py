@@ -320,7 +320,8 @@ def _split_review_and_cv(phase35_output: str) -> tuple[str, str]:
 
     # ── Strategy 4: H1 heading — CV always starts with "# FirstName LastName" ─
     # Review sections use ## / ### or plain text; H1 only appears as CV header.
-    m = re.search(r"(?m)^# [A-Z]", phase35_output)
+    # Unicode range Ѐ-ӿ covers Cyrillic uppercase (Ukrainian/Russian names).
+    m = re.search(r"(?m)^# [A-ZЀ-ӿ]", phase35_output)
     if m and m.start() > 0:
         review = phase35_output[: m.start()].strip()
         cv = phase35_output[m.start():].strip()
