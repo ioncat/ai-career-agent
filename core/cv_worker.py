@@ -34,7 +34,7 @@ class CVWorker:
         self._deps = deps
         self._settings = settings
         self._llm_sem = llm_sem
-        self._queue: asyncio.Queue[int] = asyncio.Queue()
+        self._queue: asyncio.Queue[tuple[int, str]] = asyncio.Queue()
         self._task: asyncio.Task | None = None
 
     async def start(self) -> None:
@@ -48,20 +48,20 @@ class CVWorker:
                 await self._task
         log.info("CVWorker: stopped")
 
-    async def enqueue(self, vacancy_id: int) -> None:
+    async def enqueue(self, vacancy_id: int, language: str = "English") -> None:
         """Set status to 'cv_generating' immediately, then queue for processing."""
         await database.update_vacancy_status(vacancy_id, "cv_generating")
-        await self._queue.put(vacancy_id)
-        log.info("CVWorker: enqueued v#%d", vacancy_id)
+        await self._queue.put((vacancy_id, language))
+        log.info("CVWorker: enqueued v#%d language=%s", vacancy_id, language)
 
     # ── Internal ──────────────────────────────────────────────────────────────
 
     async def _run(self) -> None:
         while True:
-            vacancy_id = await self._queue.get()
-            asyncio.create_task(self._execute(vacancy_id))
+            vacancy_id, language = await self._queue.get()
+            asyncio.create_task(self._execute(vacancy_id, language))
 
-    async def _execute(self, vacancy_id: int) -> None:
+    async def _execute(self, vacancy_id: int, language: str) -> None:
         from tools.cv_generate import cv_generate
 
         async with self._llm_sem:
@@ -78,7 +78,7 @@ class CVWorker:
                     profile=self._deps.profile,
                 )
                 ctx = _Ctx(deps=fresh_deps)
-                await cv_generate(ctx, vacancy_id)  # type: ignore[arg-type]
+                await cv_generate(ctx, vacancy_id, language=language)  # type: ignore[arg-type]
                 log.info("CVWorker: done — v#%d", vacancy_id)
             except Exception as exc:
                 err_msg = str(exc)[:500]
