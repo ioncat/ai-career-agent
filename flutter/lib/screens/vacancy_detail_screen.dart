@@ -625,7 +625,9 @@ class _VacancyDetailScreenState extends ConsumerState<VacancyDetailScreen>
                             vacancy: widget.vacancy!,
                             onNavigateTo: widget.onNavigateTo,
                           ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 16),
+                        _WhyCard(p2: p2),
+                        const SizedBox(height: 16),
                         _QuickOverviewCard(p2: p2),
                         const SizedBox(height: 16),
                         if (p2.fitDimensions != null)
@@ -2103,6 +2105,107 @@ class _QuickOverviewCard extends StatelessWidget {
     );
   }
 }
+
+// ── Why apply / Why not apply card ───────────────────────────────────────────
+
+class _WhyCard extends StatelessWidget {
+  final Phase2Data p2;
+  const _WhyCard({required this.p2});
+
+  @override
+  Widget build(BuildContext context) {
+    if (p2.whyApply.isEmpty && p2.whyNotApply.isEmpty) return const SizedBox.shrink();
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+
+    Widget bullets(List<String> items, Color dotColor) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: items
+              .map((item) => Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(top: 5),
+                          child: Container(
+                            width: 5,
+                            height: 5,
+                            decoration: BoxDecoration(
+                              color: dotColor,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: SelectableText(
+                            item,
+                            style: tt.bodySmall?.copyWith(color: cs.onSurface),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ))
+              .toList(),
+        );
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (p2.whyApply.isNotEmpty) ...[
+            Row(children: [
+              Icon(Icons.check_circle_outline_rounded, size: 14, color: const Color(0xFF2E7D32)),
+              const SizedBox(width: 6),
+              Text('Why apply',
+                  style: tt.bodySmall?.copyWith(
+                    color: const Color(0xFF2E7D32),
+                    fontWeight: FontWeight.w700,
+                  )),
+            ]),
+            const SizedBox(height: 8),
+            bullets(p2.whyApply, const Color(0xFF2E7D32)),
+          ],
+          if (p2.whyApply.isNotEmpty && p2.whyNotApply.isNotEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 10),
+              child: Divider(height: 1),
+            ),
+          if (p2.whyNotApply.isNotEmpty) ...[
+            Row(children: [
+              Icon(Icons.cancel_outlined, size: 14, color: cs.error),
+              const SizedBox(width: 6),
+              Text('Why not apply',
+                  style: tt.bodySmall?.copyWith(
+                    color: cs.error,
+                    fontWeight: FontWeight.w700,
+                  )),
+            ]),
+            const SizedBox(height: 8),
+            bullets(p2.whyNotApply, cs.error),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _OverviewRow extends StatelessWidget {
   final String label;
