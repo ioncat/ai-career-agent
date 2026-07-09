@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
@@ -1278,13 +1279,21 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
       if (!mounted) return;
       final label = type == 'cv' ? 'CV' : 'Cover Letter';
       final fileName = '${type == 'cv' ? 'CV' : 'Cover'}_${widget.vacancyId}.pdf';
-      await FilePicker.platform.saveFile(
+      final path = await FilePicker.platform.saveFile(
         dialogTitle: 'Save $label PDF',
         fileName: fileName,
         type: FileType.custom,
         allowedExtensions: ['pdf'],
         bytes: bytes,
       );
+      if (path != null) {
+        await File(path).writeAsBytes(bytes, flush: true);
+        if (mounted) {
+          messenger.showSnackBar(
+            SnackBar(content: Text('Saved: $path'), duration: const Duration(seconds: 3)),
+          );
+        }
+      }
     } catch (e) {
       messenger.hideCurrentSnackBar();
       if (mounted) {
