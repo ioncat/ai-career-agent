@@ -1,12 +1,17 @@
 # career-agent — Backlog
 
-> Last updated: 2026-07-08
+> Last updated: 2026-07-09
 > Epic format: post-pivot epics (13+) live in `docs/delivery/epics/`. This file = priority tracker + status overview.
 > Pre-pivot epics (1–12): `docs/delivery/epics-archive/EPIC-01-12-pre-pivot.md`
 
 ---
 
 ## ✅ Delivered Features
+
+### 2026-07-09
+- **Bug fix — `analysis_failed` stuck in `analyzing`**: `cv_analyze.py` Phase 1 + Phase 2 `except LLMError` blocks now call `set_analysis_error()` before returning; previously LLM timeout / CLI error returned string without status transition → vacancy stuck in `analyzing` forever
+- **Bug fix — `--no-session-persistence` fix confirmed**: ClaudeCodeProvider Phase 2.5 interactive dialog no longer fires; YouControl #98 analyzed clean (fit 5/10); root cause was session history leak between subprocess calls — `--no-session-persistence` + `cwd=tempdir` isolates each call
+- **Bug fix — 11 vacancies `markdown_path` pointing to `JD_analysis.md`**: legacy `import_tracker.py` set paths to `JD_analysis.md` instead of `JD.md` for vacancies without source file; 11 entries updated to correct `JD.md` path; 12 without `JD.md` on disk left as-is (11 already `analyzed`/`declined`, 1 `fetched` without recoverable source)
 
 ### 2026-07-08 (session 2)
 - **`analysis_failed` UX fix — dismissible error banner**: when retry fails but prior analysis exists (`fitScore != null`), full-screen `_AnalysisErrorView` blocker replaced by compact `_AnalysisErrorBanner` (Retry + × dismiss buttons) at top of normal tab view; full-screen blocker kept only for first-time failure with no prior data; `_errorBannerDismissed` flag resets in `didUpdateWidget` on each new failure
@@ -84,6 +89,98 @@
 - **RSS watcher → Web Push**: after Phase 1+2 analysis completes, push notification sent to Flutter via VAPID
 
 ---
+
+## 🟡 P2 — `analyzed_at` — точный timestamp успешного анализа
+
+**Проблема:** `updated_at` обновляется при каждом изменении статуса, включая `analysis_failed`. Чип "Analyzed DD.MM.YYYY HH:mm" показывает время последнего обновления — не последнего успешного анализа. Вводит в заблуждение при retry-failed сценарии.
+
+**Решение:** отдельная колонка `analyzed_at` (DATETIME, nullable), обновляется только при успешном завершении Phase 2 (переход в `analyzed`).
+
+**Scope:**
+- `db/schema.sql`: добавить `analyzed_at DATETIME`
+- `db/database.py`: миграция `ALTER TABLE vacancies ADD COLUMN analyzed_at DATETIME`; обновлять `analyzed_at = datetime('now')` при `status = 'analyzed'`
+- `tools/cv_analyze.py`: при сохранении analysis_json → вызов update с `analyzed_at`
+- `web/api.py`: включить `analyzed_at` в vacancy list response
+- `flutter/lib/models/vacancy.dart`: поле `analyzedAt`
+- `flutter/lib/screens/vacancy_detail_screen.dart`: `_AnalyzedChip` читает `analyzedAt` вместо `updatedAt`
+
+---
+
+## 🟡 P2 — EPIC-26 — Vacancy Deduplication & Re-publish Detection
+
+**Goal:** Eliminate noise from cross-source duplicates (same JD on Djinni + DOU) and surface re-published vacancies that were previously declined or buried.
+
+**Problem 1 — Cross-source duplicates:**
+Same vacancy appears on Djinni and DOU with identical or near-identical text. Currently creates two separate DB entries with no link between them. User wastes time analyzing the same role twice.
+
+**Problem 2 — Re-published/bumped vacancies:**
+A vacancy already in DB (analyzed, declined, or buried) gets re-published or bumped in RSS feed. Current behaviour: URL already exists → silently ignored. User never knows the vacancy is active again. A declined vacancy that was re-posted remains declined and invisible.
+
+---
+
+### Design
+
+**Duplicate detection — combo approach:**
+- `content_hash` = sha256 of normalized JD text (lowercase, collapse whitespace, strip punctuation) — stored at fetch time
+- `normalize(title)` + `company` fuzzy match — checked at insert time against existing DB entries for the same `user_id`
+- Match rule: `content_hash` collision **OR** (normalized_title == normalized_title AND company == company)
+- First entry in DB = original. Second entry = duplicate, `duplicate_of = original_id`
+- Duplicates still created and appear in inbox — marked with badge "Дубль #X"
+- Edge case: whitespace/formatting diff between sources → title+company catches it even if hash differs
+
+**Re-publish detection:**
+- RSS watcher / fetch receives URL already in DB
+- Compare RSS `published_at` with stored `published_at`
+- If `published_at` newer AND vacancy `status` = `declined` / `skipped`:
+  - Update `published_at`, set `republished_at = now()`, transition status → `fetched`
+  - Flutter badge: "↑ Повторно опубликована · Ранее отклонена"
+- If vacancy `status` = `analyzed` / `inbox`: update `published_at` only, no status change, no badge
+- If vacancy `status` = `analyzing` / active: ignore entirely
+
+**Inbox sorting:**
+- Current: `ORDER BY id DESC` (insertion order)
+- New: `ORDER BY published_at DESC, id ASC`
+- `published_at` already stored by RSS watcher; vacancies added manually = `published_at = created_at`
+
+---
+
+### DB changes (migrations)
+
+| Column | Table | Type | Purpose |
+|---|---|---|---|
+| `duplicate_of` | `vacancies` | `INTEGER REFERENCES vacancies(id)` | FK to original if this is a duplicate |
+| `content_hash` | `vacancies` | `TEXT` | sha256 of normalized JD text |
+| `republished_at` | `vacancies` | `DATETIME` | Set when re-published after decline |
+
+---
+
+### Task list
+
+**T1 — DB migrations**
+- `db/schema.sql`: add 3 columns
+- `db/database.py`: migration `ALTER TABLE` for each; helper `find_duplicate(user_id, content_hash, norm_title, company) → int | None`
+
+**T2 — Duplicate detection at fetch**
+- `tools/cv_fetch_jd.py`: compute `content_hash` after JD text parsed; call `find_duplicate`; set `duplicate_of` if match found; log duplicate link
+- `core/rss_watcher.py`: same check at RSS insert time
+
+**T3 — Re-publish detection in RSS watcher**
+- `core/rss_watcher.py`: on URL already-exists case, compare `published_at`; update fields + transition status per design above
+
+**T4 — Inbox sort + API response**
+- `web/api.py`: change vacancy list `ORDER BY` to `published_at DESC, id ASC`; include `duplicate_of` and `republished_at` in list + detail responses
+
+**T5 — Flutter model + UI badges**
+- `flutter/lib/models/vacancy.dart`: add `duplicateOf`, `republishedAt` fields
+- `flutter/lib/widgets/vacancy_card.dart`: "Дубль #X" badge (secondary chip, subtle colour); "↑ Повторно" badge (amber)
+- No separate inbox section — all in same inbox, sorted by date
+
+---
+
+### Out of scope
+- Merging duplicate vacancies (would lose analysis data from both)
+- LLM-based semantic similarity (overkill for this problem)
+- Dedup across users (separate user_id = separate namespace)
 
 ---
 
