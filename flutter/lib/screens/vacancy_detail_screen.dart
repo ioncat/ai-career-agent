@@ -1205,27 +1205,10 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
     }
   }
 
-  Future<void> _generateCv() async {
-    final lang = await showDialog<String>(
-      context: context,
-      builder: (ctx) => SimpleDialog(
-        title: const Text('CV Language'),
-        children: [
-          SimpleDialogOption(
-            onPressed: () => Navigator.pop(ctx, 'en'),
-            child: const Text('English'),
-          ),
-          SimpleDialogOption(
-            onPressed: () => Navigator.pop(ctx, 'uk'),
-            child: const Text('Ukrainian'),
-          ),
-        ],
-      ),
-    );
-    if (lang == null || !mounted) return;
+  Future<void> _generateCv({String language = 'auto'}) async {
     setState(() => _loadingCv = true);
     try {
-      await _repo.generateCv(widget.vacancyId, language: lang);
+      await _repo.generateCv(widget.vacancyId, language: language);
       if (mounted) {
         ref.read(vacancyListProvider.notifier).refresh();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1419,6 +1402,16 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
           loading: _loadingCv || isCvInProgress,
           onPressed: (isCvInProgress || _loadingCv) ? null : _generateCv,
           menuItems: [
+            MenuItemButton(
+              onPressed: (isCvInProgress || _loadingCv) ? null : () => _generateCv(language: 'en'),
+              leadingIcon: const Icon(Icons.translate, size: 16),
+              child: const Text('Generate in English'),
+            ),
+            MenuItemButton(
+              onPressed: (isCvInProgress || _loadingCv) ? null : () => _generateCv(language: 'uk'),
+              leadingIcon: const Icon(Icons.translate, size: 16),
+              child: const Text('Generate in Ukrainian'),
+            ),
             MenuItemButton(
               onPressed: hasCv && !isCvInProgress ? () => _downloadPdf('cv') : null,
               leadingIcon: const Icon(Icons.picture_as_pdf_outlined, size: 16),

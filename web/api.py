@@ -676,7 +676,7 @@ async def api_vacancy_restore(vacancy_id: int):
     return {"id": vacancy_id, "status": restore_status}
 
 
-_LANGUAGE_MAP = {"en": "English", "uk": "Ukrainian", "both": "both"}
+_LANGUAGE_MAP = {"en": "English", "uk": "Ukrainian", "both": "both", "auto": "auto"}
 
 @app.post("/api/vacancies/{vacancy_id}/generate-cv")
 async def api_vacancy_generate_cv(vacancy_id: int, request: Request):

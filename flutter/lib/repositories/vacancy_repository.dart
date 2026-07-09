@@ -39,7 +39,7 @@ class VacancyRepository {
     if (response.statusCode != 200) throw Exception('Decline failed: ${response.statusCode}');
   }
 
-  Future<void> generateCv(int vacancyId, {String language = 'en'}) async {
+  Future<void> generateCv(int vacancyId, {String language = 'auto'}) async {
     final uri = Uri.parse('$baseUrl/api/vacancies/$vacancyId/generate-cv');
     final response = await http.post(
       uri,

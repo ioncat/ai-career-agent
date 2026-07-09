@@ -88,6 +88,11 @@ async def cv_generate(
     jd_text = jd_path.read_text(encoding="utf-8")
     analysis_text = analysis_path.read_text(encoding="utf-8")
 
+    # Auto-detect language from JD: any Cyrillic → Ukrainian, else English
+    if language.lower() == "auto":
+        language = "Ukrainian" if any('Ѐ' <= c <= 'ӿ' for c in jd_text) else "English"
+        log.info("cv_generate: auto-detected language=%s for vacancy_id=%d", language, vacancy_id)
+
     # ── Load progressive_profile evidence (EPIC-24 T6) ───────────────────────
     _pp_evidence: str | None = None
     user_row = await database.get_user_by_id(ctx.deps.user_id)
