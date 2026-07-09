@@ -48,7 +48,7 @@ class CVWorker:
                 await self._task
         log.info("CVWorker: stopped")
 
-    async def enqueue(self, vacancy_id: int, language: str = "English") -> None:
+    async def enqueue(self, vacancy_id: int, language: str = "auto") -> None:
         """Set status to 'cv_generating' immediately, then queue for processing."""
         await database.update_vacancy_status(vacancy_id, "cv_generating")
         await self._queue.put((vacancy_id, language))
