@@ -185,6 +185,8 @@ def _legacy_analysis_dict(raw: dict) -> dict:
             "key_barriers": p2.get("key_barriers", []),
             "hidden_risks": p2.get("hidden_risks", []),
             "warnings": p2.get("warnings", []),
+            "why_apply": p2.get("why_apply", []),
+            "why_not_apply": p2.get("why_not_apply", []),
             "fit_dimensions": _legacy_fit_dims(p2.get("fit_dimensions", {})),
         }
     return result

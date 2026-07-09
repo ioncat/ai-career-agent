@@ -41,6 +41,8 @@ Output this block exactly as shown, filling in the placeholders.
 **Key Barriers:** none / [semicolon-separated short labels: "gap1; gap2; gap3" — max 5 words each, name the competency/tool/metric gap directly, e.g. "A/B testing; consumer product; PSP/POS integrations; MRR/CAC/LTV"]
 **Hidden Risks:** none / [contextual risks from role/company — NOT candidate gaps]
 **Warnings:** none / [application process risks only — see rules below]
+**Why apply:** [2–3 semicolon-separated short phrases — strongest candidate matches for this vacancy, natural language, e.g. "strong delivery track record; B2B SaaS domain fit; autonomous PM experience"]
+**Why not apply:** [2–3 semicolon-separated short phrases — key gaps or risks that could block the candidate, e.g. "no A/B testing experience; analytics-heavy role vs execution background; early-stage chaos risk"]
 
 ---
 

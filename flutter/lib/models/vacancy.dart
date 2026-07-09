@@ -209,6 +209,8 @@ class Phase2Data {
   final List<String> keyBarriers;
   final List<String> hiddenRisks;
   final List<String> warnings;
+  final List<String> whyApply;
+  final List<String> whyNotApply;
   final FitDimensions? fitDimensions;
 
   const Phase2Data({
@@ -220,6 +222,8 @@ class Phase2Data {
     this.keyBarriers = const [],
     this.hiddenRisks = const [],
     this.warnings = const [],
+    this.whyApply = const [],
+    this.whyNotApply = const [],
     this.fitDimensions,
   });
 
@@ -233,6 +237,8 @@ class Phase2Data {
       keyBarriers: _parseStringList(json['key_barriers']),
       hiddenRisks: _parseStringList(json['hidden_risks']),
       warnings: _parseStringList(json['warnings']),
+      whyApply: _parseStringList(json['why_apply']),
+      whyNotApply: _parseStringList(json['why_not_apply']),
       fitDimensions: json['fit_dimensions'] != null
           ? FitDimensions.fromJson(
               json['fit_dimensions'] as Map<String, dynamic>)
