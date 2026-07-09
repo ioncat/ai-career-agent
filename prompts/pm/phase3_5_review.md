@@ -61,15 +61,16 @@ Then output the updated CV draft with all identified changes already applied.
 1. Top-15 Word Frequency table (from § Top-15 Frequency Check below)
 2. Tools & Technologies table (from § Tools & Technologies Check below)
 3. CV SELF-REVIEW block (❌ / ⚠️ / 🔧 / ✅)
-4. This exact line on its own — nothing before or after it on the same line:
+4. This exact line — as plain text, NOT inside a code block:
 
-```
 ---CV---
-```
 
 5. Final updated CV (markdown, starting with `# [Candidate Name]`)
 
-**The `---CV---` separator is MANDATORY. The parser extracts the CV by splitting on it. If it is missing, the entire output including the review tables will be saved as the CV — which is wrong.**
+**The `---CV---` separator is MANDATORY. Rules:**
+- Output it as a **plain text line** — NOT inside backticks or a code block
+- Close all open code blocks before outputting `---CV---`
+- If it is missing or wrapped in backticks, the entire output including the review tables will be saved as the CV — which is wrong
 
 ---
 

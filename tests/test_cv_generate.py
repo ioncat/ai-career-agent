@@ -155,6 +155,54 @@ def test_split_review_contains_all_categories():
     assert "✅" in review
 
 
+def test_split_explicit_separator():
+    """Strategy 1: ---CV--- separator splits correctly."""
+    text = "Some review content\n\n---CV---\n\n# Oleksii Bondarenko\nSUMMARY"
+    review, cv = _split_review_and_cv(text)
+    assert review == "Some review content"
+    assert cv.startswith("# Oleksii Bondarenko")
+
+
+def test_split_cyrillic_h1_strategy4():
+    """Strategy 4 must work for Ukrainian/Russian names (Cyrillic H1)."""
+    text = (
+        "```\nJD top-15 table\n```\n\n"
+        "```\nCV SELF-REVIEW\n❌ remove something\n```\n\n"
+        "# Олексій Бондаренко\nProduct Owner\n\nSUMMARY\n\nContent."
+    )
+    review, cv = _split_review_and_cv(text)
+    assert "Олексій" not in review
+    assert cv.startswith("# Олексій Бондаренко")
+
+
+def test_split_cyrillic_uppercase_letters():
+    """Strategy 4 covers full Cyrillic uppercase range (Ѐ-ӿ)."""
+    text = "Review block\n\n# Іван Петренко\nPO · Kyiv\n\nSUMMARY"
+    review, cv = _split_review_and_cv(text)
+    assert review == "Review block"
+    assert cv.startswith("# Іван Петренко")
+
+
+def test_split_review_excluded_from_cv_cyrillic():
+    """Full Phase 3.5 output with code-block review + Cyrillic CV — review must not leak into CV."""
+    phase35 = (
+        "```\nJD top-15\n1  продукт*\n```\n\n"
+        "```\n🛠️ Tools\nFigma — aligned\n```\n\n"
+        "```\nCV SELF-REVIEW\n❌ remove X\n✅ keep Y\n```\n\n"
+        "# Олексій Бондаренко\n"
+        "Product Owner / Product Manager\n"
+        "email@example.com\n\n"
+        "---\n\n"
+        "PO опис.\n\n"
+        "## ДОСВІД\n"
+    )
+    review, cv = _split_review_and_cv(phase35)
+    assert "продукт*" not in cv
+    assert "CV SELF-REVIEW" not in cv
+    assert cv.startswith("# Олексій Бондаренко")
+    assert "продукт*" in review
+
+
 # ── cv_generate — happy path ──────────────────────────────────────────────────
 
 @pytest.mark.asyncio
