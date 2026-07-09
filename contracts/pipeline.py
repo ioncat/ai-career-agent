@@ -92,6 +92,8 @@ class Phase2Data(BaseModel):
     key_barriers: list[str] = Field(default_factory=list)
     hidden_risks: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+    why_apply: list[str] = Field(default_factory=list)
+    why_not_apply: list[str] = Field(default_factory=list)
     track_note: str | None = None
     fit_dimensions: FitDimensions
 

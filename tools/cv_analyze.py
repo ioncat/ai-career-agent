@@ -135,7 +135,15 @@ async def cv_analyze(ctx: RunContext[AgentDeps], vacancy_id: int) -> str:
     quick_scan = _extract_quick_scan(phase2_output)
 
     # ── Write JD_analysis.md ──────────────────────────────────────────────────
-    analysis_path = jd_path.parent / "JD_analysis.md"
+    # Re-analysis: if file already exists, save to Claude Desktop/ subfolder to
+    # preserve the original without overwriting.
+    normal_path = jd_path.parent / "JD_analysis.md"
+    if normal_path.exists():
+        reanalysis_dir = jd_path.parent / "Claude Desktop"
+        reanalysis_dir.mkdir(exist_ok=True)
+        analysis_path = reanalysis_dir / "JD_analysis.md"
+    else:
+        analysis_path = normal_path
     analysis_content = _build_analysis_file(
         title=title,
         url=vacancy["url"],
@@ -322,6 +330,8 @@ _HIDDEN_RISKS_RE   = re.compile(r"\*\*Hidden Risks:\*\*\s*(.+?)(?:\n|$)", re.IGN
 _WARNINGS_RE       = re.compile(r"\*\*Warnings:\*\*\s*(.+?)(?:\n|$)", re.IGNORECASE)
 _CATEGORY_RE       = re.compile(r"\*\*Category:\*\*\s*(.+?)(?:\n|$)", re.IGNORECASE)
 _WHO_RE            = re.compile(r"\*\*Who they want:\*\*\s*(.+?)(?:\n|$)", re.IGNORECASE)
+_WHY_APPLY_RE      = re.compile(r"\*\*Why apply:\*\*\s*(.+?)(?:\n|$)", re.IGNORECASE)
+_WHY_NOT_APPLY_RE  = re.compile(r"\*\*Why not apply:\*\*\s*(.+?)(?:\n|$)", re.IGNORECASE)
 _TRACK_NOTE_RE     = re.compile(r"\*\*Track note:\*\*\s*(.+?)(?:\n|$)", re.IGNORECASE)
 
 
@@ -450,6 +460,8 @@ def _parse_phase2_data(phase2: str, dims: VacScoreDims | None) -> Phase2Data | N
     warnings_m     = _WARNINGS_RE.search(phase2)
     category_m     = _CATEGORY_RE.search(phase2)
     who_m          = _WHO_RE.search(phase2)
+    why_apply_m    = _WHY_APPLY_RE.search(phase2)
+    why_not_m      = _WHY_NOT_APPLY_RE.search(phase2)
     track_m        = _TRACK_NOTE_RE.search(phase2)
 
     fit_dims = _parse_fit_dimensions(phase2)
@@ -477,6 +489,8 @@ def _parse_phase2_data(phase2: str, dims: VacScoreDims | None) -> Phase2Data | N
             key_barriers=(_split_semicolons(key_barriers_m.group(1)) if key_barriers_m else []),
             hidden_risks=(_split_semicolons(hidden_risks_m.group(1)) if hidden_risks_m else []),
             warnings=(_split_semicolons(warnings_m.group(1)) if warnings_m else []),
+            why_apply=(_split_semicolons(why_apply_m.group(1)) if why_apply_m else []),
+            why_not_apply=(_split_semicolons(why_not_m.group(1)) if why_not_m else []),
             track_note=(track_m.group(1).strip() if track_m else None),
             fit_dimensions=fit_dims,
         )
