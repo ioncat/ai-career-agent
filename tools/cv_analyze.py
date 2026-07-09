@@ -96,6 +96,7 @@ async def cv_analyze(ctx: RunContext[AgentDeps], vacancy_id: int) -> str:
     except LLMError as exc:
         await database.update_pipeline_run(run1_id, status="error", error_message=str(exc))
         log.error("cv_analyze: Phase 1 LLM error: %s", exc)
+        await database.set_analysis_error(vacancy_id, str(exc))
         return f"⚠️ Ошибка Claude на фазе 1:\n{exc}"
 
     await database.update_pipeline_run(run1_id, status="done")
@@ -127,6 +128,7 @@ async def cv_analyze(ctx: RunContext[AgentDeps], vacancy_id: int) -> str:
     except LLMError as exc:
         await database.update_pipeline_run(run2_id, status="error", error_message=str(exc))
         log.error("cv_analyze: Phase 2 LLM error: %s", exc)
+        await database.set_analysis_error(vacancy_id, str(exc))
         return f"⚠️ Ошибка Claude на фазе 2:\n{exc}"
 
     # ── Extract Quick Scan ────────────────────────────────────────────────────
