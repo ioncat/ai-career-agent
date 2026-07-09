@@ -721,6 +721,7 @@ class _RelatedSection extends ConsumerWidget {
                   sublabel: original.company.isNotEmpty ? original.company : null,
                   id: original.id,
                   icon: Icons.arrow_upward_rounded,
+                  tooltip: 'This vacancy is a duplicate — the original posting is #${original.id}.\nTap to open the original.',
                   onTap: onNavigateTo != null ? () => onNavigateTo!(original.id) : null,
                 ),
               for (final dup in duplicates)
@@ -729,6 +730,7 @@ class _RelatedSection extends ConsumerWidget {
                   sublabel: dup.company.isNotEmpty ? dup.company : null,
                   id: dup.id,
                   icon: Icons.copy_rounded,
+                  tooltip: 'The same job was also found on ${dup.site.isNotEmpty ? dup.site : 'another source'} (vacancy #${dup.id}).\nTap to open it.',
                   onTap: onNavigateTo != null ? () => onNavigateTo!(dup.id) : null,
                 ),
             ],
@@ -744,12 +746,14 @@ class _RelatedChip extends StatelessWidget {
   final String? sublabel;
   final int id;
   final IconData icon;
+  final String tooltip;
   final VoidCallback? onTap;
 
   const _RelatedChip({
     required this.label,
     required this.id,
     required this.icon,
+    required this.tooltip,
     this.sublabel,
     this.onTap,
   });
@@ -757,7 +761,10 @@ class _RelatedChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return GestureDetector(
+    return Tooltip(
+      message: tooltip,
+      preferBelow: true,
+      child: GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -799,6 +806,7 @@ class _RelatedChip extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }

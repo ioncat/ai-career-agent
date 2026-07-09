@@ -94,16 +94,24 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
                   ],
                   if (v.republishedAt != null) ...[
                     const SizedBox(width: 6),
-                    _RepublishedBadge(),
+                    Tooltip(
+                      message: 'Re-published by the employer after being declined.\nMoved back to inbox for review.',
+                      preferBelow: false,
+                      child: _RepublishedBadge(),
+                    ),
                   ],
                   if (v.duplicateOf != null) ...[
                     const SizedBox(width: 6),
-                    GestureDetector(
-                      onTap: widget.onTapRelated != null
-                          ? () => widget.onTapRelated!(v.duplicateOf!)
-                          : null,
-                      behavior: HitTestBehavior.opaque,
-                      child: _DuplicateBadge(originalId: v.duplicateOf!),
+                    Tooltip(
+                      message: 'Same job found on another source (duplicate of #${v.duplicateOf}).\nTap to view the original posting.',
+                      preferBelow: false,
+                      child: GestureDetector(
+                        onTap: widget.onTapRelated != null
+                            ? () => widget.onTapRelated!(v.duplicateOf!)
+                            : null,
+                        behavior: HitTestBehavior.opaque,
+                        child: _DuplicateBadge(originalId: v.duplicateOf!),
+                      ),
                     ),
                   ],
                   const Spacer(),
