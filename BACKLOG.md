@@ -9,6 +9,7 @@
 ## ✅ Delivered Features
 
 ### 2026-07-09
+- **EPIC-26 complete** — T1: DB migrations (duplicate_of, content_hash, republished_at); T2: content_hash + find_duplicate in cv_fetch_jd; T3: re-publish detection in `/api/new-vacancy` (declined/skipped + newer published_at → on_vacancy_republished → status=fetched); T4: list_vacancies ORDER BY published_at DESC NULLS LAST, id ASC; T5: Flutter VacancyListItem.duplicateOf/republishedAt + "↑ Republished" amber badge + "Dup #X" muted badge in vacancy_card; 527 tests
 - **Bug fix — `analysis_failed` stuck in `analyzing`**: `cv_analyze.py` Phase 1 + Phase 2 `except LLMError` blocks now call `set_analysis_error()` before returning; previously LLM timeout / CLI error returned string without status transition → vacancy stuck in `analyzing` forever
 - **Bug fix — `--no-session-persistence` fix confirmed**: ClaudeCodeProvider Phase 2.5 interactive dialog no longer fires; YouControl #98 analyzed clean (fit 5/10); root cause was session history leak between subprocess calls — `--no-session-persistence` + `cwd=tempdir` isolates each call
 - **Bug fix — 11 vacancies `markdown_path` pointing to `JD_analysis.md`**: legacy `import_tracker.py` set paths to `JD_analysis.md` instead of `JD.md` for vacancies without source file; 11 entries updated to correct `JD.md` path; 12 without `JD.md` on disk left as-is (11 already `analyzed`/`declined`, 1 `fetched` without recoverable source)
@@ -106,7 +107,7 @@
 
 ---
 
-## 🟡 P2 — EPIC-26 — Vacancy Deduplication & Re-publish Detection
+## ✅ EPIC-26 — Vacancy Deduplication & Re-publish Detection (DONE 2026-07-09)
 
 **Goal:** Eliminate noise from cross-source duplicates (same JD on Djinni + DOU) and surface re-published vacancies that were previously declined or buried.
 
