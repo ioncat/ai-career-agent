@@ -1619,7 +1619,7 @@ class _VacancyHero extends StatelessWidget {
         _RecommendationCard(
           recommendation: p2.recommendation,
           recommendationLabel: p2.recommendationLabel,
-          northStar: p1?.northStar,
+          whoTheyWant: p2.whoTheyWant,
         ),
         const SizedBox(height: 12),
         // Score dot rows + date pinned right
@@ -1724,12 +1724,12 @@ class _ScoreDotsRow extends StatelessWidget {
 class _RecommendationCard extends StatelessWidget {
   final String recommendation;
   final String recommendationLabel;
-  final String? northStar;
+  final String whoTheyWant;
 
   const _RecommendationCard({
     required this.recommendation,
     required this.recommendationLabel,
-    this.northStar,
+    this.whoTheyWant = '',
   });
 
   @override
@@ -1767,13 +1767,17 @@ class _RecommendationCard extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                       ),
                 ),
-                if (northStar != null && northStar!.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  SelectableText(
-                    northStar!,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: cs.onSurface.withValues(alpha: 0.65),
-                        ),
+                if (whoTheyWant.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Tooltip(
+                    message: 'The ideal candidate archetype this vacancy targets',
+                    preferBelow: true,
+                    child: SelectableText(
+                      whoTheyWant,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: cs.onSurface.withValues(alpha: 0.65),
+                          ),
+                    ),
                   ),
                 ],
               ],
@@ -2039,7 +2043,6 @@ class _QuickOverviewCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final hasContent = p2.category.isNotEmpty ||
-        p2.whoTheyWant.isNotEmpty ||
         p2.keyBarriers.isNotEmpty ||
         p2.hiddenRisks.isNotEmpty ||
         p2.warnings.isNotEmpty;
@@ -2059,15 +2062,6 @@ class _QuickOverviewCard extends StatelessWidget {
               icon: Icons.label_outline,
               iconColor: const Color(0xFF2E7D32),
             ),
-          if (p2.whoTheyWant.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            _OverviewRow(
-              label: 'Who they want',
-              text: p2.whoTheyWant,
-              icon: Icons.person_search_outlined,
-              iconColor: const Color(0xFF1565C0),
-            ),
-          ],
           if (p2.keyBarriers.isNotEmpty) ...[
             const SizedBox(height: 10),
             _OverviewRow(
