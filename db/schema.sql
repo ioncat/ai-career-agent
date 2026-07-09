@@ -51,6 +51,11 @@ CREATE TABLE IF NOT EXISTS vacancies (
                                           -- 1 = CV was submitted to this vacancy, 0 = not yet
     starred       INTEGER NOT NULL DEFAULT 0,
                                           -- 1 = marked as favourite, 0 = normal
+    -- EPIC-26: deduplication + re-publish detection
+    duplicate_of  INTEGER REFERENCES vacancies(id),
+                                          -- FK to original vacancy if this is a cross-source duplicate
+    content_hash  TEXT,                   -- sha256(normalize(jd_text)) for content-based dedup
+    republished_at TEXT,                  -- set when a declined/skipped vacancy reappears in RSS
     created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
     updated_at    TEXT    NOT NULL DEFAULT (datetime('now'))
 );

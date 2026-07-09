@@ -141,6 +141,10 @@ async def init_db() -> None:
             # Activity log: provider name + thinking effort per LLM call
             "ALTER TABLE llm_usage ADD COLUMN provider TEXT NOT NULL DEFAULT 'claude_api'",
             "ALTER TABLE llm_usage ADD COLUMN thinking_effort TEXT NOT NULL DEFAULT ''",
+            # EPIC-26: deduplication + re-publish detection
+            "ALTER TABLE vacancies ADD COLUMN duplicate_of INTEGER REFERENCES vacancies(id)",
+            "ALTER TABLE vacancies ADD COLUMN content_hash TEXT",
+            "ALTER TABLE vacancies ADD COLUMN republished_at TEXT",
         ]:
             try:
                 await db.execute(migration)
@@ -481,6 +485,109 @@ async def clear_analysis_error(vacancy_id: int) -> None:
         await db.execute(
             "UPDATE vacancies SET analysis_error = NULL WHERE id = ?",
             (vacancy_id,),
+        )
+        await db.commit()
+
+
+# ── EPIC-26: Deduplication + Re-publish helpers ───────────────────────────────
+
+def _normalize_title(title: str) -> str:
+    """Lowercase + collapse whitespace. Used for title-based duplicate detection."""
+    import re as _re
+    return _re.sub(r"\s+", " ", title.lower().strip())
+
+
+async def find_duplicate(
+    user_id: int,
+    content_hash: str | None,
+    norm_title: str | None,
+    company: str | None,
+    exclude_id: int | None = None,
+) -> int | None:
+    """Return id of first matching vacancy (original), or None if no duplicate found.
+
+    Match rule: content_hash collision OR (normalized title + company both match).
+    exclude_id: vacancy id to skip (avoids self-match during re-fetch).
+    Returns the lowest id (earliest insert = original).
+    """
+    async with get_db() as db:
+        conditions: list[str] = []
+        params: list = []
+
+        if content_hash:
+            conditions.append("content_hash = ?")
+            params.append(content_hash)
+
+        if norm_title and company:
+            conditions.append("(LOWER(TRIM(title)) = ? AND LOWER(TRIM(company)) = ?)")
+            params.append(norm_title.lower())
+            params.append(company.lower().strip())
+
+        if not conditions:
+            return None
+
+        where = f"user_id = ? AND ({' OR '.join(conditions)})"
+        params_full = [user_id] + params
+        if exclude_id is not None:
+            where += " AND id != ?"
+            params_full.append(exclude_id)
+
+        cur = await db.execute(
+            f"SELECT id FROM vacancies WHERE {where} ORDER BY id ASC LIMIT 1",
+            params_full,
+        )
+        row = await cur.fetchone()
+        return row["id"] if row else None
+
+
+async def set_duplicate_of(vacancy_id: int, original_id: int) -> None:
+    """Mark vacancy as a duplicate of original_id."""
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE vacancies SET duplicate_of = ?, updated_at = datetime('now') WHERE id = ?",
+            (original_id, vacancy_id),
+        )
+        await db.commit()
+
+
+async def set_content_hash(vacancy_id: int, content_hash: str) -> None:
+    """Store JD content hash after fetch."""
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE vacancies SET content_hash = ? WHERE id = ?",
+            (content_hash, vacancy_id),
+        )
+        await db.commit()
+
+
+async def on_vacancy_republished(vacancy_id: int, new_published_at: str) -> None:
+    """Handle a declined/skipped vacancy reappearing in RSS.
+
+    Updates published_at, sets republished_at = now(), transitions status → fetched.
+    Called only when prior status was declined/skipped.
+    """
+    async with get_db() as db:
+        await db.execute(
+            """
+            UPDATE vacancies
+            SET published_at    = ?,
+                republished_at  = datetime('now'),
+                status          = 'fetched',
+                analysis_error  = NULL,
+                updated_at      = datetime('now')
+            WHERE id = ?
+            """,
+            (new_published_at, vacancy_id),
+        )
+        await db.commit()
+
+
+async def update_published_at(vacancy_id: int, published_at: str) -> None:
+    """Update published_at only (vacancy bumped in feed but not re-published for our purposes)."""
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE vacancies SET published_at = ?, updated_at = datetime('now') WHERE id = ?",
+            (published_at, vacancy_id),
         )
         await db.commit()
 
