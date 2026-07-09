@@ -101,21 +101,27 @@ Certified AI-Empowered SAFe® Product Owner/Product Manager
 
 **Formatting rules (mandatory):**
 - `# Name` — H1 for candidate name (one per CV)
-- `[Headline]  ` — **two trailing spaces** after headline → line break before contacts
+- `[Headline]  ` — **two trailing spaces** after headline → line break before contacts. Example: `Product Owner / Product Manager  ` (note the two spaces at end)
 - `## SECTION` — H2 for SUMMARY / EXPERIENCE / CERTIFICATIONS
 - `### Role Title` — H3 for each job role title
 - `Key results:` followed by **blank line**, then `- item` list (NOT `•`)
 - `---` between each job entry (rule 17)
-- Contacts: copy verbatim from PROFILE.md → `## Contacts`. Never add GitHub (rule 14).
+- Contacts: **copy verbatim** from PROFILE.md → `## Contacts` — markdown links, exact separators, all four items including portfolio. **NEVER use plain-text URLs. NEVER omit portfolio link.** Never add GitHub (rule 14).
 
 **Headline options:**
 - Default: `Product Owner / Product Manager`
 - Adjust only if role archetype strongly differs (e.g. `Technical Program Manager`)
 
-**AI Tooling Paragraph (always include when vacancy has any AI/product/digital signal):**
-> AI tooling in daily practice (Claude, ChatGPT) — requirements refinement, research synthesis, workflow validation. Hands-on prototyping examples at [portfolio link from PROFILE.md contacts].
+**AI Tooling Paragraph — mandatory for all roles with any AI/product/digital signal:**
 
-> ⚠️ See active user PROFILE.md → ## CV Presentation Rules for extended AI paragraph structure (1-component vs 2-component).
+1-component (most roles — daily practice only):
+> `AI tooling in daily practice (Claude, ChatGPT, Gemini) — requirements refinement, research synthesis, workflow validation. Portfolio at [ioncat.github.io](https://ioncat.github.io/).`
+
+2-component (AI/technical depth roles — explicit AI product ownership, LLM/technical PM, hands-on AI signal required):
+> `AI tooling in daily practice (Claude, ChatGPT, Gemini) — requirements refinement, research synthesis, workflow validation.`
+> `Built LLM pipelines as product components in public portfolio projects: context and token limit management, response quality degradation assessment, UX design around model behavior constraints. Portfolio at [ioncat.github.io](https://ioncat.github.io/).`
+
+**⚠️ Portfolio link is MANDATORY in the AI paragraph — always include `[ioncat.github.io](https://ioncat.github.io/)` at end of last AI sentence.**
 
 ---
 
