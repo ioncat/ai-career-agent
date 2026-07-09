@@ -451,6 +451,7 @@ class VacancyDetailScreen extends ConsumerStatefulWidget {
   final String url;
   final VacancyListItem? vacancy;
   final VoidCallback? onSkipped;
+  final void Function(int vacancyId)? onNavigateTo;
 
   const VacancyDetailScreen({
     super.key,
@@ -458,6 +459,7 @@ class VacancyDetailScreen extends ConsumerStatefulWidget {
     required this.url,
     this.vacancy,
     this.onSkipped,
+    this.onNavigateTo,
   });
 
   @override
@@ -617,6 +619,11 @@ class _VacancyDetailScreenState extends ConsumerState<VacancyDetailScreen>
                             ref.invalidate(vacancyListProvider);
                           },
                         ),
+                        if (widget.vacancy != null)
+                          _RelatedSection(
+                            vacancy: widget.vacancy!,
+                            onNavigateTo: widget.onNavigateTo,
+                          ),
                         const SizedBox(height: 24),
                         _QuickOverviewCard(p2: p2),
                         const SizedBox(height: 16),
@@ -659,6 +666,140 @@ class _VacancyDetailScreenState extends ConsumerState<VacancyDetailScreen>
           ],
         );
       },
+    );
+  }
+}
+
+// ── Related section — duplicates / original cross-links ──────────────────────
+
+class _RelatedSection extends ConsumerWidget {
+  final VacancyListItem vacancy;
+  final void Function(int vacancyId)? onNavigateTo;
+
+  const _RelatedSection({required this.vacancy, this.onNavigateTo});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final all = ref.watch(vacancyListProvider).valueOrNull?.vacancies ?? [];
+
+    final VacancyListItem? original = vacancy.duplicateOf != null
+        ? all.where((v) => v.id == vacancy.duplicateOf).firstOrNull
+        : null;
+
+    final duplicates = all.where((v) => v.duplicateOf == vacancy.id).toList();
+
+    if (original == null && duplicates.isEmpty) return const SizedBox.shrink();
+
+    final cs = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.link_rounded, size: 14, color: cs.onSurfaceVariant),
+              const SizedBox(width: 6),
+              Text(
+                'Related',
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: cs.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              if (original != null)
+                _RelatedChip(
+                  label: 'Original · ${original.role.isNotEmpty ? original.role : '#${original.id}'}',
+                  sublabel: original.company.isNotEmpty ? original.company : null,
+                  id: original.id,
+                  icon: Icons.arrow_upward_rounded,
+                  onTap: onNavigateTo != null ? () => onNavigateTo!(original.id) : null,
+                ),
+              for (final dup in duplicates)
+                _RelatedChip(
+                  label: '${dup.site.isNotEmpty ? dup.site[0].toUpperCase() + dup.site.substring(1) : 'Dup'} · ${dup.role.isNotEmpty ? dup.role : '#${dup.id}'}',
+                  sublabel: dup.company.isNotEmpty ? dup.company : null,
+                  id: dup.id,
+                  icon: Icons.copy_rounded,
+                  onTap: onNavigateTo != null ? () => onNavigateTo!(dup.id) : null,
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RelatedChip extends StatelessWidget {
+  final String label;
+  final String? sublabel;
+  final int id;
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  const _RelatedChip({
+    required this.label,
+    required this.id,
+    required this.icon,
+    this.sublabel,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: onTap != null
+                ? cs.primary.withValues(alpha: 0.35)
+                : cs.outlineVariant,
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 13, color: onTap != null ? cs.primary : cs.onSurfaceVariant),
+            const SizedBox(width: 6),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '$label  #$id',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: onTap != null ? cs.primary : cs.onSurface,
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+                if (sublabel != null)
+                  Text(
+                    sublabel!,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                          fontSize: 10,
+                        ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
