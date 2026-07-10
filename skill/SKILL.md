@@ -262,6 +262,8 @@ Then: full Phase 1 analysis → full Phase 2 fit assessment.
 
 **Recommendation logic:** blockers ≠ нет OR fit < 5 → `decline` always (VScore cannot override). No blockers + fit 5–6: VScore ≥ 7.5 → `take a chance — premium opportunity`; VScore < 5.5 → `decline — not worth the effort`. Fit ≥ 7 + VScore < 5.5 → `apply — limited upside`. DB stores base value only (`apply` / `take a chance` / `decline`).
 
+**Re-analysis (Повторить Phase 1+2):** if `JD_analysis.md` already exists in the vacancy folder, save the new analysis to `[vacancy_folder]/Claude Desktop/JD_analysis.md` — never overwrite the original. Create the subfolder silently.
+
 **Phase 3.5 self-review — append to JD_analysis.md after user approval:**
 
 ```markdown
@@ -637,6 +639,8 @@ Phase done = key present in `analysis_json` (`p2` → Phase 1+2, `p3` → Phase 
 Menu order: first ❌ phase at `[11]`, then remaining phases in reverse order, last = "Заново с нуля".
 
 **"Заново с нуля"** → Phase 1+2 silent → Quick Scan → "Генерируем CV?" → normal pipeline. Use after prompt/rule/SKILL.md changes.
+
+**Re-analysis save rule:** when running "Повторить Phase 1+2" or "Заново с нуля" on a vacancy that already has `JD_analysis.md` — save new analysis to `[vacancy_folder]/Claude Desktop/JD_analysis.md`. Never overwrite original. Same rule applies in cv_analyze.py (Python pipeline).
 
 **JD source:** `[vacancy_folder]/JD.md` → absent → `JD_analysis.md` → absent → ask user.
 

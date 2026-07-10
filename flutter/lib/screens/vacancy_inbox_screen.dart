@@ -54,6 +54,7 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
 
   bool _filterExpanded = false;
   Set<String> _statusFilter = {};
+  bool _starredOnly = false;
   DateTime? _dateFrom;
   DateTime? _dateTo;
 
@@ -65,7 +66,9 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
       };
 
   int get _activeFilterCount =>
-      _statusFilter.length + (_dateFrom != null || _dateTo != null ? 1 : 0);
+      _statusFilter.length +
+      (_starredOnly ? 1 : 0) +
+      (_dateFrom != null || _dateTo != null ? 1 : 0);
 
   @override
   void dispose() {
@@ -87,6 +90,7 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
       if (_statusFilter.isNotEmpty && !_statusFilter.contains(v.status)) {
         return false;
       }
+      if (_starredOnly && !v.starred) return false;
       if (_dateFrom != null || _dateTo != null) {
         final raw = v.publishedAt;
         if (raw == null) return false;
@@ -123,6 +127,7 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
   void _clearAllFilters() {
     setState(() {
       _statusFilter = {};
+      _starredOnly = false;
       _dateFrom = null;
       _dateTo = null;
       _searchController.clear();
@@ -239,6 +244,9 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
                         _statusFilter = Set.from(_statusFilter)..add(s);
                       }
                     }),
+                    starredOnly: _starredOnly,
+                    onToggleStarred: () =>
+                        setState(() => _starredOnly = !_starredOnly),
                     dateFrom: _dateFrom,
                     dateTo: _dateTo,
                     onPickFrom: _pickDateFrom,
@@ -407,6 +415,8 @@ class _FilterPanel extends StatelessWidget {
   final Set<String> availableStatuses;
   final Set<String> selectedStatuses;
   final ValueChanged<String> onStatusToggle;
+  final bool starredOnly;
+  final VoidCallback onToggleStarred;
   final DateTime? dateFrom;
   final DateTime? dateTo;
   final VoidCallback onPickFrom;
@@ -419,6 +429,8 @@ class _FilterPanel extends StatelessWidget {
     required this.availableStatuses,
     required this.selectedStatuses,
     required this.onStatusToggle,
+    required this.starredOnly,
+    required this.onToggleStarred,
     this.dateFrom,
     this.dateTo,
     required this.onPickFrom,
@@ -490,6 +502,21 @@ class _FilterPanel extends StatelessWidget {
             ),
             const SizedBox(height: 10),
           ],
+          FilterChip(
+            avatar: Icon(
+              starredOnly ? Icons.star : Icons.star_border,
+              size: 14,
+              color: starredOnly ? cs.primary : cs.onSurfaceVariant,
+            ),
+            label: Text('Starred',
+                style: Theme.of(context).textTheme.labelSmall),
+            selected: starredOnly,
+            onSelected: (_) => onToggleStarred(),
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+            visualDensity: VisualDensity.compact,
+          ),
+          const SizedBox(height: 10),
           Text('Published',
               style: labelSmall?.copyWith(color: cs.onSurfaceVariant)),
           const SizedBox(height: 6),

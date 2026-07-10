@@ -379,6 +379,26 @@ async def test_analyze_phase1_llm_error(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_analyze_reanalysis_saves_to_claude_desktop_subfolder(tmp_path):
+    """Re-analysis saves to Claude Desktop/ subfolder when JD_analysis.md already exists."""
+    jd_path = _write_jd(tmp_path)
+    (jd_path.parent / "JD_analysis.md").write_text("old analysis", encoding="utf-8")
+    vacancy_row = _make_vacancy_row(jd_path)
+    llm = _make_llm(side_effect=["Phase 1 output", _VALID_PHASE2])
+    ctx = _make_ctx(tmp_path, llm)
+    mock_db = _mock_db(vacancy_row=vacancy_row)
+
+    with patch("tools.cv_analyze.database", mock_db):
+        result = await cv_analyze(ctx, 1)
+
+    assert (jd_path.parent / "JD_analysis.md").read_text(encoding="utf-8") == "old analysis"
+    new_path = jd_path.parent / "Claude Desktop" / "JD_analysis.md"
+    assert new_path.exists()
+    assert "Phase 1 output" in new_path.read_text(encoding="utf-8")
+    assert "✅" in result
+
+
+@pytest.mark.asyncio
 async def test_analyze_phase2_llm_error(tmp_path):
     jd_path = _write_jd(tmp_path)
     vacancy_row = _make_vacancy_row(jd_path)

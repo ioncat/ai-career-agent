@@ -187,10 +187,15 @@ async def cv_generate(
         run35_id, status="done", result_path=str(cv_md_path)
     )
 
-    # ── Append review to JD_analysis.md ──────────────────────────────────────
+    # ── Write review to JD_analysis.md (overwrite — always single latest review) ──
     if review_block:
-        with analysis_path.open("a", encoding="utf-8") as f:
-            f.write(f"\n\n---\n\n## Phase 3.5: CV Self-Review\n\n{review_block}\n")
+        current = analysis_path.read_text(encoding="utf-8")
+        cutoff = current.find("\n\n---\n\n## Phase 3.5:")
+        base = current[:cutoff] if cutoff != -1 else current
+        analysis_path.write_text(
+            base.rstrip() + f"\n\n---\n\n## Phase 3.5: CV Self-Review\n\n{review_block}\n",
+            encoding="utf-8",
+        )
 
     # ── Update vacancy status ─────────────────────────────────────────────────
     await database.update_vacancy_status(vacancy_id, "cv_generated")
