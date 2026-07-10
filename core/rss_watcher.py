@@ -188,6 +188,11 @@ class RSSWatcher:
                 vacancy_id = await fetch_jd(self._deps, url)
             except Exception as exc:
                 log.error("RSSWatcher: fetch failed %s: %s", url, exc)
+                # Reset to queued so the next poll retries automatically.
+                stuck = await database.get_vacancy_by_url(url)
+                if stuck and stuck["status"] == "fetching":
+                    await database.update_vacancy_status(stuck["id"], "queued")
+                    log.info("RSSWatcher: reset v#%d → queued for retry", stuck["id"])
                 return
 
             await database.update_vacancy_status(vacancy_id, "fetched")
