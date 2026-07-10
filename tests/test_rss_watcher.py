@@ -442,4 +442,37 @@ async def test_semaphore_concurrency_2_allows_two_parallel():
     assert concurrent_peak == 2, f"Expected max 2 concurrent fetches, got {concurrent_peak}"
 
 
+# ── fetch failure → reset to queued ──────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_fetch_failure_resets_status_to_queued():
+    """If fetch_jd raises, vacancy is reset to 'queued' for automatic retry."""
+    watcher, _ = _make_watcher()
+    stuck_row = _make_row(601, "https://jobs.dou.ua/companies/viseven/vacancies/365369/", status="fetching")
+    mock_db = _mock_db([])
+    mock_db.get_vacancy_by_url = AsyncMock(return_value=stuck_row)
+
+    with patch("core.rss_watcher.database", mock_db), \
+         patch("tools.cv_fetch_jd.fetch_jd", AsyncMock(side_effect=Exception("parser 404"))):
+        await watcher._process("https://jobs.dou.ua/companies/viseven/vacancies/365369/")
+
+    mock_db.update_vacancy_status.assert_awaited_with(601, "queued")
+
+
+@pytest.mark.asyncio
+async def test_fetch_failure_no_reset_if_not_fetching():
+    """If vacancy already left 'fetching' state (race), do not reset it."""
+    watcher, _ = _make_watcher()
+    row = _make_row(42, "https://djinni.co/jobs/42/", status="analyzed")
+    mock_db = _mock_db([])
+    mock_db.get_vacancy_by_url = AsyncMock(return_value=row)
+
+    with patch("core.rss_watcher.database", mock_db), \
+         patch("tools.cv_fetch_jd.fetch_jd", AsyncMock(side_effect=Exception("oops"))):
+        await watcher._process("https://djinni.co/jobs/42/")
+
+    # update_vacancy_status should NOT be called (vacancy not in 'fetching')
+    mock_db.update_vacancy_status.assert_not_awaited()
+
+
 # ── _poll_analyze_queue removed — analysis now via AnalysisWorker (immediate queue) ──
