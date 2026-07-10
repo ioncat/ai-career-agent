@@ -41,8 +41,8 @@ Left column = Block 1 (`1–10`). Right column = Block 2 (`11–20`). `│` sepa
   ─────────────────────────    │   ──────────────────────────────
   [1] Локально (Claude Code)   │   [11] Загрузить новую вакансию
   [2] API (расход токенов)     │        — вставь JD или URL
-  [3] Другой профиль (-u)      │
-  [4] Профиль: Markdown        │
+  [3] Другой профиль (-u)      │   [12] Вакансия по ID
+  [4] Профиль: Markdown        │        — введи номер
   [5] Профиль: DB              │
 ```
 
@@ -54,6 +54,7 @@ Left column = Block 1 (`1–10`). Right column = Block 2 (`11–20`). `│` sepa
 - **Answer 5** → set `PROFILE_SOURCE = db`. Re-display Step 0 with updated header.
 - **Combined answer** (e.g. `1 5`, `2 11`, `1 5 11`) → set mode AND/OR profile source AND/OR act in one step. Preferred — kills the round-trip. Example: `1 5` = Локально + DB profile; `1 5 11` = Локально + DB + process first inbox item.
 - **Answer 11–1X (a vacancy)** → process that inbox item. `[batch]` = all, `[skip→new]` = пропустить inbox, `[URL]` = вставь JD/URL → старт, `[refresh]` = пересканировать inbox_manual → перерисовать Block 2.
+- **Answer 12 (inbox empty) / `[N+3]` (inbox with items) — "Вакансия по ID"** → ask user "Введи ID вакансии:". User replies with integer ID → proceed exactly as `/analyze -v [id]`: run `vacancy_track.py get --id [id]`, show vacancy combined menu. Not found → show `❌ Вакансия #[id] не найдена в DB.`
 - **Action given without mode** → default `MODE = local` (most common). Show `[Локально]` in status lines.
 - **Action given without mode** → default `MODE = local` (most common). Show `[Локально]` in status lines.
 
@@ -394,12 +395,14 @@ python scripts/inbox_scan.py --user-id [user_id] --json
   [14] пропустить inbox → новая вакансия
   [N+1] Загрузить по URL — вставь JD-ссылку или текст
   [N+2] Обновить inbox — пересканировать inbox_manual
+  [N+3] Вакансия по ID — введи номер
 ```
 
    Multi-select inbox items via any separator: `11`, `11,12`, `11 12`.
 
    **[N+1] Загрузить по URL:** пользователь вставляет URL или текст JD → pipeline стартует как для новой вакансии.
    **[N+2] Обновить inbox:** пересканировать `inbox_manual/` и перерисовать Block 2 с актуальным списком. Полезно если пользователь только что дропнул файл.
+   **[N+3] Вакансия по ID:** спросить "Введи ID вакансии:" → юзер вводит номер → proceed as `-v [id]`.
 
 5. Profile is fixed by `active_user` / `-u` — never re-ask it here.
    *(mode handled by Block 1 — do not ask separately)*

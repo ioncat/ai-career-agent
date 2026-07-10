@@ -30,7 +30,7 @@ Output the following four sections in order. Use the exact `##` headers as shown
 **[OUTPUT SECTION 1 — Quick Scan]**
 
 Output this block exactly as shown, filling in the placeholders.
-**Display rule: Quick Scan is the ONLY section shown in chat. All other sections (Fit Breakdown, Adaptation Plan, Internal Analysis) go to JD_analysis.md only — never shown in chat.**
+**Output rule: Output ALL four sections in full (Quick Scan, Fit Breakdown, Adaptation Plan, Internal Analysis). Do NOT omit or abbreviate any section. The calling system handles display filtering and file storage — your job is to produce the complete structured output.**
 
 ## Quick Scan
 **Fit score:** X/10

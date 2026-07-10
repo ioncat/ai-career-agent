@@ -8,6 +8,12 @@
 
 ## ✅ Delivered Features
 
+### 2026-07-10
+- **Bug fix — wrong `PROFILE_MD_PATH`**: `.env` default pointed to `../callback-cv/skill/PROFILE.md` (old sibling repo); subprocess received stale profile without `## Contacts` verbatim line, Portfolio link, or `## Additional Evidence` caveats → CV contacts wrong, portfolio missing. Fixed: `PROFILE_MD_PATH=skill/users/1/PROFILE.md`
+- **Bug fix — `phase2_fit.md` display rule vs `_GUARD` conflict**: old rule said "All other sections go to JD_analysis.md only — never shown in chat" → model tried to use Write tool → `_GUARD` blocked it → model output "File write was denied." → Python saved that text to file. Fixed: rule rewritten to "Output ALL four sections in full. The calling system handles file storage."
+- **Fix — `JD_analysis.md` Phase 3.5 overwrites instead of appends**: each CV re-run was appending a new `## Phase 3.5: CV Self-Review` block to `JD_analysis.md`; after N reruns: N review blocks in file → context bloat + signal pollution in next Phase 3 run. Now: read file → strip existing Phase 3.5 block → write Phase 1+2 base + single latest review. Always exactly one review, always current.
+- **Flutter — starred-only filter chip in inbox**: `_starredOnly` flag + `FilterChip` with star avatar in `_FilterPanel`; counts toward `_activeFilterCount`; resets with `_clearAllFilters()`; `/analyze` skill: added `[N+3] Вакансия по ID` option to inbox menu + routing rule
+
 ### 2026-07-09
 - **EPIC-26 complete** — T1: DB migrations (duplicate_of, content_hash, republished_at); T2: content_hash + find_duplicate in cv_fetch_jd; T3: re-publish detection in `/api/new-vacancy` (declined/skipped + newer published_at → on_vacancy_republished → status=fetched); T4: list_vacancies ORDER BY published_at DESC NULLS LAST, id ASC; T5: Flutter VacancyListItem.duplicateOf/republishedAt + "↑ Republished" amber badge + "Dup #X" muted badge; clickable badges → cross-navigation (card Dup#X tap + detail _RelatedSection with Original/Dup chips, _crossFolderNav flag); hover tooltips on all dedup/republish badges; 527 tests
 - **Bug fix — `analysis_failed` stuck in `analyzing`**: `cv_analyze.py` Phase 1 + Phase 2 `except LLMError` blocks now call `set_analysis_error()` before returning; previously LLM timeout / CLI error returned string without status transition → vacancy stuck in `analyzing` forever
