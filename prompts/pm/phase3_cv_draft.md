@@ -118,8 +118,8 @@ Certified AI-Empowered SAFe® Product Owner/Product Manager
 > `AI tooling in daily practice (Claude, ChatGPT, Gemini) — requirements refinement, research synthesis, workflow validation. Portfolio at [ioncat.github.io](https://ioncat.github.io/).`
 
 2-component (AI/technical depth roles — explicit AI product ownership, LLM/technical PM, hands-on AI signal required):
-> `AI tooling in daily practice (Claude, ChatGPT, Gemini) — requirements refinement, research synthesis, workflow validation.`
-> `Built LLM pipelines as product components in public portfolio projects: context and token limit management, response quality degradation assessment, UX design around model behavior constraints. Portfolio at [ioncat.github.io](https://ioncat.github.io/).`
+> `Built LLM pipelines hands-on — prompt architecture, context window management, response quality assessment — and applied that implementation depth to writing AI requirement specs complete enough for engineers to ship from. Active daily practice, not a side project. Portfolio at [ioncat.github.io](https://ioncat.github.io/).`
+> `AI tooling across PM workflows (Claude, ChatGPT, Gemini) — requirements refinement, research synthesis, workflow validation.`
 
 **⚠️ Portfolio link is MANDATORY in the AI paragraph — always include `[ioncat.github.io](https://ioncat.github.io/)` at end of last AI sentence.**
 
