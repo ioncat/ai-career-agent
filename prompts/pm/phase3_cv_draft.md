@@ -87,6 +87,8 @@ Key results:
 - [Metric/outcome]
 - [Metric/outcome]
 
+**Multi-role at same company (e.g. HostiServer PO + PM):** each role gets its own `### Role Title` + `Company | Dates` line independently. NEVER create a parent company block (e.g. `### HostiServer · 6 years`) above two roles — it breaks PDF layout. Both roles follow the same flat pattern.
+
 ---
 
 [...repeat for all roles, reverse chronological, default cutoff 2017...]
