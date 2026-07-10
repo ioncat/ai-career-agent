@@ -66,6 +66,7 @@ class RSSWatcher:
         self._task: asyncio.Task | None = None
         self._sem = asyncio.Semaphore(concurrency)
         self._settings = settings
+        self._fetch_alerted: set[int] = set()  # vacancy IDs already notified on failure
 
     async def start(self) -> None:
         """Launch background polling task."""
@@ -191,8 +192,18 @@ class RSSWatcher:
                 # Reset to queued so the next poll retries automatically.
                 stuck = await database.get_vacancy_by_url(url)
                 if stuck and stuck["status"] == "fetching":
-                    await database.update_vacancy_status(stuck["id"], "queued")
-                    log.info("RSSWatcher: reset v#%d → queued for retry", stuck["id"])
+                    vid = stuck["id"]
+                    await database.update_vacancy_status(vid, "queued")
+                    log.info("RSSWatcher: reset v#%d → queued for retry", vid)
+                    # Alert only on first failure — subsequent retries are silent.
+                    if vid not in self._fetch_alerted:
+                        self._fetch_alerted.add(vid)
+                        await self._bot.send_message(
+                            f"⚠️ <b>Не удалось получить вакансию</b>\n"
+                            f'<a href="{url}">{display}</a>\n'
+                            f"Причина: <code>{str(exc)[:200]}</code>\n"
+                            f"Повтор автоматически — появится в Flutter когда сервис восстановится."
+                        )
                 return
 
             await database.update_vacancy_status(vacancy_id, "fetched")

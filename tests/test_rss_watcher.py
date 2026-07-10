@@ -447,7 +447,7 @@ async def test_semaphore_concurrency_2_allows_two_parallel():
 @pytest.mark.asyncio
 async def test_fetch_failure_resets_status_to_queued():
     """If fetch_jd raises, vacancy is reset to 'queued' for automatic retry."""
-    watcher, _ = _make_watcher()
+    watcher, bot = _make_watcher()
     stuck_row = _make_row(601, "https://jobs.dou.ua/companies/viseven/vacancies/365369/", status="fetching")
     mock_db = _mock_db([])
     mock_db.get_vacancy_by_url = AsyncMock(return_value=stuck_row)
@@ -457,6 +457,28 @@ async def test_fetch_failure_resets_status_to_queued():
         await watcher._process("https://jobs.dou.ua/companies/viseven/vacancies/365369/")
 
     mock_db.update_vacancy_status.assert_awaited_with(601, "queued")
+    # Two messages: initial "new vacancy" notify + failure alert
+    assert bot.send_message.await_count == 2
+    alert_msg = bot.send_message.call_args_list[1][0][0]
+    assert "Не удалось" in alert_msg
+    assert "parser 404" in alert_msg
+
+
+@pytest.mark.asyncio
+async def test_fetch_failure_alert_sent_only_once():
+    """Second fetch failure for same vacancy_id sends no additional alert."""
+    watcher, bot = _make_watcher()
+    stuck_row = _make_row(601, "https://jobs.dou.ua/companies/viseven/vacancies/365369/", status="fetching")
+    mock_db = _mock_db([])
+    mock_db.get_vacancy_by_url = AsyncMock(return_value=stuck_row)
+
+    with patch("core.rss_watcher.database", mock_db), \
+         patch("tools.cv_fetch_jd.fetch_jd", AsyncMock(side_effect=Exception("still down"))):
+        await watcher._process("https://jobs.dou.ua/companies/viseven/vacancies/365369/")
+        await watcher._process("https://jobs.dou.ua/companies/viseven/vacancies/365369/")
+
+    # 2 notify + 1 alert (not 2 alerts)
+    assert bot.send_message.await_count == 3
 
 
 @pytest.mark.asyncio
