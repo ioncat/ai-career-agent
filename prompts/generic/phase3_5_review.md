@@ -15,6 +15,7 @@ User will provide:
 1. JD text
 2. JD_analysis.md content (Phase 1 + Phase 2)
 3. The CV draft generated in Phase 3
+4. Pre-computed metrics block (Top-15 Word Frequency table, Tools & Technologies table, Repeated Terms list)
 
 ---
 
@@ -76,42 +77,24 @@ Then output the updated CV draft with all identified changes already applied.
 
 ## Top-15 Frequency Check (internal only — output as table in review)
 
-Compare word frequency between JD and CV draft. Identify signal mismatches.
+The pre-computed Top-15 word frequency table is provided in the user message under `### Top-15 Word Frequency`. **Include it verbatim at output position 1** (before the CV SELF-REVIEW block).
 
-**Output order (standard):**
-1. Top-15 table — shown first, as a standalone visible block (pure data, no interpretation)
-2. CV Self-Review sections (❌/⚠️/🔧/✅) — follow immediately after, incorporating Top-15 findings into the relevant flags
-
-**Steps:**
-1. Extract top-15 content words from JD (exclude stopwords: articles, prepositions, conjunctions, pronouns, auxiliary verbs, company name)
-2. Extract top-15 content words from CV draft (same stoplist)
-3. Output side-by-side table:
-
-```
-JD top-15                     CV top-15
-──────────────────────────────────────────────────
-N  word                   N   word     [flag]
-...
-```
-
-Flag column:
+Flag legend:
 - 👻 `missing` — word is top-5 in JD but rank >15 or absent in CV (signal ghosted)
 - 📉 `weak` — word is top-10 in JD but rank >10 in CV (signal fading)
 - 📣 `overloaded` — word is top-3 in CV but not in JD top-10 (shouting at nobody)
 
 **Then — in the CV Self-Review sections below:**
-- Words `← missing` from JD top-5 → add to 🔧 with specific placement suggestion
-- Words `← overloaded` in CV → add to ⚠️ with suggestion to vary
-
-**Default N = 15.** Can be adjusted to 20 for longer JDs (2000+ words).
+- Words flagged `missing` from JD top-5 → add to 🔧 with specific placement suggestion
+- Words flagged `overloaded` in CV → add to ⚠️ with suggestion to vary
 
 ---
 
 ## 🛠️ Tools & Technologies Check (output as table in review, after Top-15 table)
 
-Scan JD and CV for named tools and technologies. Compare presence.
+The pre-computed 🛠️ Tools & Technologies table is provided in the user message under `### Tools & Technologies`. **Include it verbatim at output position 2** (after Top-15 table, before CV SELF-REVIEW block).
 
-**Tool registry by category (expandable — add tools from new vacancies):**
+Tool registry (for context — use to interpret `implied` flags and catch unlisted tools from JD):
 
 | Category | Tools |
 |---|---|
@@ -124,25 +107,13 @@ Scan JD and CV for named tools and technologies. Compare presence.
 | AI / LLM | Claude, ChatGPT, OpenAI API, Anthropic API, Vertex AI, LangChain, n8n |
 | Automation | Zapier, Make (Integromat), n8n, Workato |
 
-**Steps:**
-1. Scan JD for named tools from registry above (also catch unlisted tools)
-2. Scan CV draft for named tools
-3. Output 🛠️ table in review:
-
-```
-🛠️ Tools & Technologies
-──────────────────────────────────────────────────
-JD requires / mentions    CV has           Signal
-[tool or category]        [tool or —]      [flag]
-```
-
 **Flags:**
-- 👻 `missing` — tool named in JD, candidate has experience, absent from CV → add to 🔧
+- 👻 `missing` — tool named in JD, absent from CV → add to 🔧
 - ✅ `aligned` — tool in JD, present in CV
 - 📣 `extra` — tool in CV, not in JD (neutral — shows working method, do not remove)
-- ⚠️ `implied` — JD says "analytics" / "data-driven" / "A/B testing" generically — note category; if CV has a tool in that category → show it; if absent → add to 🔧
+- ⚠️ `implied` — JD says "analytics"/"data-driven"/"A/B testing" generically but names no tool; if CV has a tool in that category → note it; if absent → add to 🔧
 
-**If JD names zero tools:** output one line — `JD names no specific tools — generic categories only` — then list CV tools as `📣 extra (neutral)`.
+**If table shows "JD names no specific tools":** scan JD for generic category mentions and handle as `implied`.
 
 ---
 
