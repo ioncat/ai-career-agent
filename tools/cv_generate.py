@@ -34,6 +34,13 @@ from pathlib import Path
 from pydantic_ai import RunContext
 
 from adapters.cv_adapter import CVAdapterError
+from core.cv_metrics import (
+    detect_repetition,
+    format_freq_table,
+    format_tools_table,
+    scan_tools,
+    top_n_words,
+)
 from core.deps import AgentDeps
 from core.llm_client import LLMError
 from db import database
@@ -150,12 +157,31 @@ async def cv_generate(
     run35_id = await database.insert_pipeline_run(vacancy_id, phase="phase3_5")
     await database.update_pipeline_run(run35_id, status="running")
 
+    # Pre-compute metrics for Phase 3.5 (replaces LLM-side compute instructions)
+    _jd_freq = top_n_words(jd_text, n=15)
+    _cv_freq = top_n_words(phase3_draft, n=15)
+    _freq_table = format_freq_table(_jd_freq, _cv_freq)
+    _tool_rows = scan_tools(jd_text, phase3_draft)
+    _tools_table = format_tools_table(_tool_rows)
+    _repetitions = detect_repetition(phase3_draft)
+    _rep_str = (
+        ", ".join(f"`{w}`" for w in _repetitions) if _repetitions else "_none detected_"
+    )
+
     phase35_user = (
         f"JD Text:\n\n{jd_text}\n\n"
         f"---\n\n"
         f"JD Analysis:\n\n{analysis_text}\n\n"
         f"---\n\n"
-        f"CV Draft:\n\n{phase3_draft}"
+        f"CV Draft:\n\n{phase3_draft}\n\n"
+        f"---\n\n"
+        f"## Pre-computed Metrics\n\n"
+        f"### Top-15 Word Frequency\n\n"
+        f"```\n{_freq_table}\n```\n\n"
+        f"### Tools & Technologies\n\n"
+        f"```\n{_tools_table}\n```\n\n"
+        f"### Repeated Terms (3+ occurrences across CV body)\n\n"
+        f"{_rep_str}"
     )
 
     try:
