@@ -272,6 +272,9 @@ async def api_vacancies(
         # Pass analysis_error through (None when no error)
         if 'analysis_error' not in item:
             item['analysis_error'] = None
+        # folder_path: parent dir of JD.md — used by Flutter to open folder in Explorer
+        md_path = item.get("markdown_path")
+        item["folder_path"] = str(Path(md_path).parent) if md_path else None
         result.append(item)
     return result
 
