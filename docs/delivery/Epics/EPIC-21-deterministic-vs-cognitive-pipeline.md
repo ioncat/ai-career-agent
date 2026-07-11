@@ -1,14 +1,15 @@
 # EPIC-21 — Deterministic vs Cognitive pipeline split
 
-**Status:** 📋 Planned
+**Status:** 🚧 In Progress
 **Priority:** P0
-**Last updated:** 2026-06-15 (rev 2 — re-audited against current code; see Revision log)
+**Last updated:** 2026-07-11 (rev 3 — status update + three-mode clarification; see Revision log)
 **Source:** `docs/discovery/hypotheses/H-002-pipeline-optimization-cognitive_vs_determined.md`
 
 ---
 
 ## Revision log
 
+- **rev 3 (2026-07-11):** Status → In Progress. Tasks 1–2 done. Task 3 partial (VScore + rec matrix ✅; freq/tools/repetition still in prompts). Three-mode table added (CLI mode = same boundary as API). Tasks 4–6 remaining.
 - **rev 2 (2026-06-15):** Re-audited against live code after VScore (06-14) and Phase 2.5 (06-05) landed. Changes:
   - Phase 2.5 Objection Handling added to classification as **interactive cognitive** (not a single structured call).
   - VScore composite formula + Fit×VScore recommendation matrix added to deterministic list (Task 3) — currently computed by the LLM by hand (arithmetic + decision table).
@@ -48,17 +49,23 @@ Result: high latency (agent reasoning + redundant LLM), `Python→AI→Python→
 
 ---
 
-## Local vs API reality (scope boundary)
+## Execution modes (scope boundary)
 
-| | Local (desktop Claude Code) | API / headless |
-|---|---|---|
-| Orchestrator | the agent (reasoning ALWAYS present) | Python (0 reasoning) |
-| Glue (FS/DB/menu) | agent turns (can only be *thinned*) | pure code |
-| LLM calls | agent itself = LLM (continuous reasoning, no discrete "calls") | discrete calls only on cognitive phases |
-| "Merge calls" benefit (Task 5) | **n/a** — local reasons continuously; nothing to merge | real — fewer round-trips |
-| Reasoning floor | **cannot be removed** | removed for glue |
+Three modes exist; the deterministic/cognitive boundary applies differently to each:
 
-**Consequence:** the full deterministic win lands in **API mode**. Local mode can only *thin* the agent (delegate to scripts), never zero its reasoning loop. Task 5 (merge calls) is **API-only**; Task 6 (local delegates to scripts) is the only local lever. The skeleton is shared so local benefits where it can.
+| | Local (`/analyze` skill) | API (`claude_api`) | CLI (`claude_cli`) |
+|---|---|---|---|
+| Entry point | Claude Code skill | `cv_analyze.py` → ClaudeProvider | `cv_analyze.py` → ClaudeCodeProvider |
+| Orchestrator | the agent (reasoning always present) | Python (0 reasoning) | Python (0 reasoning) |
+| Glue (FS/DB/menu) | agent turns (can only be *thinned*) | pure code | pure code |
+| LLM calls | agent itself = LLM (continuous) | discrete structured calls | `claude --print` subprocess per call |
+| Merge calls benefit (Task 5) | **n/a** | real — fewer round-trips | real — fewer subprocesses |
+| Reasoning floor | **cannot be removed** | removed for glue | removed for glue |
+| Implementation path | Task 6 (thin delegation) | Task 4 FSM + Task 5 | Task 4 FSM + Task 5 |
+
+**CLI and API modes share the same `cv_analyze.py` pipeline** — the cognitive/deterministic boundary is identical for both. ClaudeCodeProvider (`claude_cli`) is a drop-in LLM backend; it doesn't change the orchestration model. Any FSM improvement lands in both API and CLI simultaneously.
+
+**Consequence:** the full deterministic win lands in **API + CLI modes**. Local (`/analyze` skill) can only *thin* the agent (Task 6), never zero its reasoning loop. The skeleton is shared so local benefits where it can.
 
 ---
 
@@ -168,16 +175,16 @@ So that the process is fast, predictable, cheap, and error-free — especially i
 
 ## Tasks (blocker-ordered)
 
-| # | Task | Severity | Depends on |
-|---|------|----------|-----------|
-| 0 | **Re-trace current happy-path** — honest step inventory on today's pipeline (inbox_scan collapsed, Phase 4 included, Phase 2.5 conditional). Replaces the stale H-002 49-step count. Output: corrected baseline table. | 🟠 | — |
-| 1 | **Deterministic PDF templating (weasyprint)** — CV-template + cover-template (Jinja2 HTML + CSS → weasyprint). Content slots in; no markdown line-shape guessing. Replaces fpdf2 `render_md`. Emoji/colour/spacing all in CSS. | 🔴 BLOCKER | — |
-| 2 | **Structured JSON contracts per cognitive phase** (Phase 1+2, Phase 3+3.5, Phase 4) — Pydantic models in `contracts/`. LLM returns JSON; orchestrator renders. P1+2 schema includes 8 vscore dim-scores, fit, barrier presence (NOT the composite or recommendation — those are Python). | 🔴 BLOCKER | — |
-| 3 | **Move deterministic metrics to Python** — VScore composite formula, Fit×VScore recommendation matrix, Top-15 freq, Tools registry scan, repetition check, `Role — Company` extraction, JD language detection, Quick Scan render. Strip these instructions from prompts. | 🟠 | Task 2 |
-| 4 | **Python orchestrator (FSM)** — drives the skeleton, calls LLM only on cognitive phases, models Phase 2.5 as a conditional pause-state. Shared local + API. | 🟠 | Task 2 |
-| 5 | **Merge cognitive calls (API only)** — Phase 1+2 = one call, Phase 3+3.5 = one call (metrics pre-computed, passed in). Reduce flip-flops. No-op for local mode. | 🟡 | Tasks 2, 4 |
-| 6 | **Local mode delegates to orchestrator/scripts** — Claude Code calls scripts thinly instead of hand-doing glue (vscore, recommendation, render, Quick Scan). | 🟡 | Task 4 |
-| 7 | **Measure latency + cost** before/after (per-phase timing in ClaudeProvider; add orchestrator timing). | 🟢 | Tasks 4, 5 |
+| # | Task | Severity | Depends on | Status |
+|---|------|----------|-----------|--------|
+| 0 | **Re-trace current happy-path** — honest step inventory on today's pipeline (inbox_scan collapsed, Phase 4 included, Phase 2.5 conditional). Replaces the stale H-002 49-step count. Output: corrected baseline table. | 🟠 | — | ❌ |
+| 1 | **Deterministic PDF templating (weasyprint)** — CV-template + cover-template (Jinja2 HTML + CSS → weasyprint). Content slots in; no markdown line-shape guessing. Replaces fpdf2 `render_md`. Emoji/colour/spacing all in CSS. | 🔴 BLOCKER | — | ✅ Done 2026-06-15 |
+| 2 | **Structured JSON contracts per cognitive phase** (Phase 1+2, Phase 3+3.5, Phase 4) — Pydantic models in `contracts/`. LLM returns JSON; orchestrator renders. P1+2 schema includes 8 vscore dim-scores, fit, barrier presence (NOT the composite or recommendation — those are Python). | 🔴 BLOCKER | — | ✅ Done (EPIC-22 B1) |
+| 3 | **Move deterministic metrics to Python** — VScore composite formula, Fit×VScore recommendation matrix, Top-15 freq, Tools registry scan, repetition check, `Role — Company` extraction, JD language detection, Quick Scan render. Strip these instructions from prompts. | 🟠 | Task 2 | ⚠️ Partial: VScore + rec matrix ✅ (`core/vacscore.py`); freq/tools/repetition/lang still in prompts |
+| 4 | **Python orchestrator (FSM)** — drives the skeleton, calls LLM only on cognitive phases, models Phase 2.5 as a conditional pause-state. Shared for API + CLI modes; Local mode delegates via Task 6. | 🟠 | Task 2 | ❌ |
+| 5 | **Merge cognitive calls (API + CLI)** — Phase 1+2 = one call, Phase 3+3.5 = one call (metrics pre-computed, passed in). Applies to both `claude_api` and `claude_cli` (same `cv_analyze.py` path). No-op for local `/analyze` skill. | 🟡 | Tasks 2, 4 | ❌ |
+| 6 | **Local mode delegates to orchestrator/scripts** — Claude Code calls scripts thinly instead of hand-doing glue (vscore, recommendation, render, Quick Scan). | 🟡 | Task 4 | ❌ |
+| 7 | **Measure latency + cost** before/after (per-phase timing in ClaudeProvider; add orchestrator timing). | 🟢 | Tasks 4, 5 | ⚠️ Partial: `pipeline_runs` timing exists; formal before/after comparison pending |
 
 > **Task 1 = cleanest "remove from AI contour" win.** Independent of the rest — can land first.
 > **Task 0** should run alongside Task 1 to give honest before/after numbers for Task 7.
