@@ -134,6 +134,23 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
 
 CREATE INDEX IF NOT EXISTS idx_push_user ON push_subscriptions (user_id);
 
+-- ── notifications ──────────────────────────────────────────────────────────────
+-- Pipeline event log for Flutter polling. Inserted by core/notifier.py.
+-- event values match core/notifier.PipelineEvent (analysis_done, cv_failed, etc.)
+
+CREATE TABLE IF NOT EXISTS notifications (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    vacancy_id  INTEGER REFERENCES vacancies(id) ON DELETE SET NULL,
+    event       TEXT    NOT NULL,
+    title       TEXT    NOT NULL DEFAULT '',
+    body        TEXT    NOT NULL DEFAULT '',
+    read        INTEGER NOT NULL DEFAULT 0,
+    created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications (user_id, created_at);
+
 -- ── user_settings ─────────────────────────────────────────────────────────────
 -- Per-user overrides for LLM model and thinking effort.
 -- NULL columns fall back to env-var defaults (LLM_MODEL, etc.).
