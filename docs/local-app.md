@@ -83,6 +83,7 @@ vacancies/
     └── Acme Corp — Product Manager/          ← создаётся при обработке
         ├── JD.md                             ← JD (из URL или вставлен вручную)
         ├── JD_analysis.md                    ← Phase 1 + 2 + 3.5 self-review
+        ├── analysis.json                     ← зеркало analysis_json из DB (только /analyze skill)
         ├── [Name]_CV.md                      ← английское CV
         ├── [Name]_CV_UA.md                   ← украинское CV (если запрошено)
         ├── [Name]_CV.pdf                     ← PDF
@@ -120,16 +121,16 @@ skill/
 
 ## PDF-генерация
 
-**Сейчас** (до EPIC-14 на локальной машине):
+Claude Code делает это автоматически — POST markdown → `http://localhost:8002/render` → PDF bytes.
+
 ```bash
-CAREER_AGENT_FONTS=fonts/ python ../callback-cv/cv_to_pdf.py vacancies/[user_id]/[Company — Role]/[Name]_CV.md
+# Нужен запущенный pdf-service:
+docker compose up pdf-service -d
+# или локально:
+cd services/pdf && uvicorn app:app --port 8002
 ```
 
-**После EPIC-14** (`services/pdf` запущен):
-```bash
-# Claude Code делает это автоматически — POST markdown → http://localhost:8002/render → PDF bytes
-docker compose up pdf-service -d
-```
+Если сервис недоступен — skill сообщит об ошибке, `[Name]_CV.md` уже будет сохранён.
 
 ---
 
@@ -149,16 +150,21 @@ docker compose up pdf-service -d
 
 ---
 
-## Отличие от Telegram-бота
+## Отличие от Flutter-пайплайна
 
-| | Claude Code skill | Telegram bot |
-|--|------------------|-------------|
-| Триггер | `/analyze` или фраза | RSS / команда в Telegram |
-| Профиль | `skill/users/[id]/PROFILE.md` | DB (после EPIC-17) |
-| Запись в DB | ❌ нет | ✅ да |
-| PDF | subprocess / HTTP (EPIC-14) | CVAdapter → HTTP |
-| Мультипользователь | `users.yaml` + `active_user` | DB `users` table |
-| Когда использовать | быстрый разбор, без инфраструктуры | полный prod-pipeline |
+Два пути анализа вакансии — разные артефакты на диске:
+
+| | `/analyze` skill (Claude Code) | Flutter "Analyze" / RSSWatcher |
+|--|-------------------------------|-------------------------------|
+| Триггер | `/analyze` в Claude Code | кнопка в UI или автоматически |
+| Пишет `JD_analysis.md` | ✅ | ✅ |
+| Пишет `analysis.json` | ✅ (зеркало DB на диск) | ❌ только в DB |
+| Пишет в DB `analysis_json` | ✅ через `vacancy_track.py update-json` | ✅ через `cv_analyze.py` напрямую |
+| Профиль | `skill/users/[id]/PROFILE.md` | DB / PROFILE.md (настраивается) |
+| PDF | `services/pdf` HTTP | `services/pdf` HTTP |
+| Когда использовать | ручной разбор, без запущенного бэкенда | основной prod-pipeline |
+
+**`analysis.json`** — JSON-зеркало `analysis_json` колонки DB. Содержит `p1` (vacancy score, архетип, баланс ролей) и `p2` (fit score, recommendation, barriers). Пишется только через `/analyze` skill. Flutter читает эти данные напрямую из DB через API — файл ему не нужен.
 
 ---
 
