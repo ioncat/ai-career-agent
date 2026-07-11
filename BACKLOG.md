@@ -219,11 +219,14 @@ A vacancy already in DB (analyzed, declined, or buried) gets re-published or bum
 
 **Goal:** Draw the boundary — deterministic work in Python (FSM orchestrator), LLM only for irreducible cognitive phases. Source: `docs/discovery/hypotheses/H-002`.
 
-**Re-audited rev 2 (2026-06-15):** classification updated for VScore (composite formula + recommendation matrix → Python) and Phase 2.5 (interactive cognitive pause-state). PDF engine decided: **weasyprint**. Two older backlog items folded in (see below).
+**Re-audited rev 3 (2026-07-11):** Three execution modes clarified — `/analyze` skill (agent-driven), `claude_api`, `claude_cli`. API and CLI share the same `cv_analyze.py` pipeline; cognitive/deterministic boundary is identical for both. FSM improvements land in both simultaneously.
 
-**Task 1 (weasyprint PDF) — ✅ Done (2026-06-15).** `services/pdf/render.py` rewritten: 520-line fpdf2 parser → 50-line weasyprint pipeline. Jinja2 A4 template, font-face CSS, interface preserved. Docker system libs added.
+**Done:**
+- Task 1 (weasyprint PDF) — ✅ 2026-06-15. `services/pdf/render.py`: fpdf2 → weasyprint, Jinja2 HTML/CSS templates.
+- Task 2 (Pydantic contracts) — ✅ EPIC-22 B1. `contracts/pipeline.py`: Phase1/2/3/4Data, AnalysisJson, VacScoreDims.
+- Task 3 (partial) — ✅ VScore composite + Fit×VScore recommendation matrix in `core/vacscore.py`. ❌ Top-15 freq / tools scan / repetition check still in Phase 3.5 prompts.
 
-**Next up:** Task 2 — Pydantic JSON contracts for cognitive phases (P1+2, P3+3.5, P4) in `contracts/`. Task 0 — re-trace happy-path step count (H-002 baseline stale). See EPIC-21 for full task list.
+**Remaining:** Task 4 (FSM orchestrator) → Task 5 (merge calls, API+CLI) → Task 6 (local delegates) → Task 0 (re-trace baseline). See EPIC-21 for full task list.
 
 ---
 
@@ -595,7 +598,7 @@ class TaskRunner:
 | EPIC-18 | Rename agent-hub → career-agent | ✅ Done (2026-06-01) |
 | [EPIC-19](docs/delivery/epics/EPIC-19-local-execution.md) | Local execution mode (web UI) | 📋 Planned |
 | [EPIC-20](docs/delivery/Epics/EPIC-20-vacancy-path-standard.md) | Unified vacancy path standard | 📋 Planned |
-| [EPIC-21](docs/delivery/Epics/EPIC-21-deterministic-vs-cognitive-pipeline.md) | Deterministic vs Cognitive pipeline split | 📋 Planned (P0 — Task 1 tomorrow) |
+| [EPIC-21](docs/delivery/Epics/EPIC-21-deterministic-vs-cognitive-pipeline.md) | Deterministic vs Cognitive pipeline split | 🚧 In Progress (T1✅ T2✅ T3⚠️ — FSM pending) |
 
 ---
 
