@@ -27,6 +27,7 @@ class VacancyListItem {
   final List<String> roleTags;
   final int? duplicateOf;
   final String? republishedAt;
+  final String? folderPath;
 
   const VacancyListItem({
     required this.id,
@@ -50,6 +51,7 @@ class VacancyListItem {
     this.roleTags = const [],
     this.duplicateOf,
     this.republishedAt,
+    this.folderPath,
   });
 
   factory VacancyListItem.fromJson(Map<String, dynamic> json) {
@@ -76,6 +78,7 @@ class VacancyListItem {
       roleTags: _parseStringList(json['role_tags']),
       duplicateOf: json['duplicate_of'] as int?,
       republishedAt: json['republished_at'] as String?,
+      folderPath: json['folder_path'] as String?,
     );
   }
 

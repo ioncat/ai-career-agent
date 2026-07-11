@@ -166,6 +166,12 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                   onPressed: () => launchUrl(Uri.parse(widget.url),
                       mode: LaunchMode.externalApplication),
                 ),
+              if (widget.vacancy?.folderPath != null)
+                IconButton(
+                  icon: Icon(Icons.folder_open_outlined, size: 18, color: cs.onSurfaceVariant),
+                  tooltip: 'Open folder',
+                  onPressed: () => Process.run('explorer.exe', [widget.vacancy!.folderPath!]),
+                ),
               Tooltip(
                 message: 'Refresh vacancy data',
                 child: IconButton(
@@ -1510,6 +1516,13 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
                 Uri.parse(widget.url),
                 mode: LaunchMode.externalApplication,
               ),
+            ),
+          // Open vacancy folder in Explorer
+          if (widget.vacancy?.folderPath != null)
+            IconButton(
+              icon: Icon(Icons.folder_open_outlined, size: 18, color: cs.onSurfaceVariant),
+              tooltip: 'Open folder',
+              onPressed: () => Process.run('explorer.exe', [widget.vacancy!.folderPath!]),
             ),
           Tooltip(
             message: 'Refresh vacancy data',
