@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/health.dart';
 import '../providers/health_provider.dart';
+import '../providers/notification_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/vacancy_list_provider.dart';
 import '../services/notification_service.dart';
@@ -60,7 +61,41 @@ class _AppShellState extends ConsumerState<AppShell> {
       }
     });
 
+    // Pipeline event notifications — show SnackBar + OS notification for each fresh event
+    ref.listen<AsyncValue<NotificationState>>(notificationProvider,
+        (prev, next) {
+      final state = next.valueOrNull;
+      if (state == null || state.fresh.isEmpty) return;
+      if (!(settings?.notificationsEnabled ?? true)) return;
+
+      for (final n in state.fresh) {
+        // OS-level desktop notification
+        NotificationService.showPipelineEvent(n);
+
+        // In-app SnackBar (non-blocking)
+        if (context.mounted) {
+          final color = n.isFailure
+              ? Theme.of(context).colorScheme.error
+              : Theme.of(context).colorScheme.primary;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                n.title.isNotEmpty ? n.title : n.event,
+                style: const TextStyle(fontSize: 13),
+              ),
+              backgroundColor: color.withValues(alpha: 0.9),
+              duration: const Duration(seconds: 4),
+              behavior: SnackBarBehavior.floating,
+              margin: const EdgeInsets.all(16),
+            ),
+          );
+        }
+      }
+    });
+
     final inboxCount = ref.watch(folderVacanciesProvider('inbox')).length;
+    final notifState = ref.watch(notificationProvider).valueOrNull;
+    final unreadNotifCount = notifState?.unreadCount ?? 0;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -90,6 +125,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                           _AppNavRail(
                             selectedIndex: _selectedIndex,
                             inboxCount: inboxCount,
+                            unreadNotifCount: unreadNotifCount,
                             onSelected: (i) => setState(() => _selectedIndex = i),
                           ),
                           // Thin divider
@@ -176,11 +212,13 @@ class _FloatingContentBlock extends StatelessWidget {
 class _AppNavRail extends StatelessWidget {
   final int selectedIndex;
   final int inboxCount;
+  final int unreadNotifCount;
   final ValueChanged<int> onSelected;
 
   const _AppNavRail({
     required this.selectedIndex,
     required this.inboxCount,
+    required this.unreadNotifCount,
     required this.onSelected,
   });
 
@@ -219,11 +257,16 @@ class _AppNavRail extends StatelessWidget {
               final i = e.key;
               final item = e.value;
               final selected = selectedIndex == i;
-              final showBadge = i == 0 && inboxCount > 0;
+              // Inbox badge = unread vacancies; Settings badge = unread pipeline events
+              final badgeCount = i == 0
+                  ? inboxCount
+                  : i == 3
+                      ? unreadNotifCount
+                      : 0;
               return _NavRailItem(
                 item: item,
                 selected: selected,
-                badgeCount: showBadge ? inboxCount : 0,
+                badgeCount: badgeCount,
                 onTap: () => onSelected(i),
               );
             }),

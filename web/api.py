@@ -966,3 +966,42 @@ async def api_set_salary(vacancy_id: int, req: SalaryUpdate):
         raise HTTPException(status_code=404, detail="Vacancy not found")
     await database.set_vacancy_salary(vacancy_id, req.salary)
     return {"vacancy_id": vacancy_id, "salary": req.salary}
+
+
+# ── Notifications (EPIC-21 C5) ────────────────────────────────────────────────
+
+@app.get("/api/notifications")
+async def api_notifications(
+    user_id: int = 1,
+    since: str | None = None,
+    unread_only: bool = False,
+    limit: int = 50,
+):
+    """Return pipeline event notifications for a user.
+
+    Used by Flutter NotificationProvider (polls every 30s).
+    Params:
+      user_id: user to fetch notifications for (default 1).
+      since: ISO 8601 datetime — return only notifications created after this.
+      unread_only: if true, return only unread notifications.
+      limit: max rows (default 50, max 200).
+    """
+    limit = min(limit, 200)
+    rows = await database.list_notifications(
+        user_id=user_id, since=since, unread_only=unread_only, limit=limit
+    )
+    return rows
+
+
+@app.post("/api/notifications/{notification_id}/read", status_code=200)
+async def api_mark_notification_read(notification_id: int):
+    """Mark a single notification as read."""
+    await database.mark_notification_read(notification_id)
+    return {"id": notification_id, "read": True}
+
+
+@app.post("/api/notifications/read-all", status_code=200)
+async def api_mark_all_notifications_read(user_id: int = 1):
+    """Mark all unread notifications for a user as read."""
+    await database.mark_all_notifications_read(user_id)
+    return {"ok": True}

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import '../models/vacancy.dart';
+import '../models/pipeline_notification.dart';
 // ActivityEntry is defined in vacancy.dart
 
 class VacancyRepository {
@@ -156,6 +157,42 @@ class VacancyRepository {
         .map((e) => ActivityEntry.fromJson(e as Map<String, dynamic>))
         .toList();
     return (runs: runs, entries: entries);
+  }
+
+  Future<List<PipelineNotification>> fetchNotifications({
+    int userId = 1,
+    String? since,
+    bool unreadOnly = false,
+    int limit = 50,
+  }) async {
+    final params = <String, String>{
+      'user_id': '$userId',
+      'limit': '$limit',
+      if (unreadOnly) 'unread_only': 'true',
+      if (since != null) 'since': since,
+    };
+    final uri = Uri.parse('$baseUrl/api/notifications')
+        .replace(queryParameters: params);
+    final response = await http.get(uri).timeout(const Duration(seconds: 10));
+    if (response.statusCode != 200) {
+      throw Exception('Failed to load notifications: ${response.statusCode}');
+    }
+    final List<dynamic> data = jsonDecode(response.body) as List<dynamic>;
+    return data
+        .map((e) => PipelineNotification.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> markNotificationRead(int notificationId) async {
+    final uri =
+        Uri.parse('$baseUrl/api/notifications/$notificationId/read');
+    await http.post(uri).timeout(const Duration(seconds: 5));
+  }
+
+  Future<void> markAllNotificationsRead({int userId = 1}) async {
+    final uri = Uri.parse('$baseUrl/api/notifications/read-all')
+        .replace(queryParameters: {'user_id': '$userId'});
+    await http.post(uri).timeout(const Duration(seconds: 5));
   }
 
   Future<Map<String, dynamic>> patchConfig({

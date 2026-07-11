@@ -145,6 +145,18 @@ async def init_db() -> None:
             "ALTER TABLE vacancies ADD COLUMN duplicate_of INTEGER REFERENCES vacancies(id)",
             "ALTER TABLE vacancies ADD COLUMN content_hash TEXT",
             "ALTER TABLE vacancies ADD COLUMN republished_at TEXT",
+            # EPIC-21 C2: pipeline event log for Flutter notification polling
+            """CREATE TABLE IF NOT EXISTS notifications (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                vacancy_id  INTEGER REFERENCES vacancies(id) ON DELETE SET NULL,
+                event       TEXT    NOT NULL,
+                title       TEXT    NOT NULL DEFAULT '',
+                body        TEXT    NOT NULL DEFAULT '',
+                read        INTEGER NOT NULL DEFAULT 0,
+                created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+            )""",
+            "CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications (user_id, created_at)",
         ]:
             try:
                 await db.execute(migration)
@@ -952,3 +964,75 @@ async def get_pipeline_runs(vacancy_id: int) -> list[aiosqlite.Row]:
             (vacancy_id,),
         )
         return await cursor.fetchall()
+
+
+# ── Notification helpers ──────────────────────────────────────────────────────
+
+async def insert_notification(
+    user_id: int,
+    event: str,
+    vacancy_id: int | None = None,
+    title: str = "",
+    body: str = "",
+) -> int:
+    """Insert a pipeline event notification. Returns new row id."""
+    async with get_db() as db:
+        cursor = await db.execute(
+            """
+            INSERT INTO notifications (user_id, vacancy_id, event, title, body)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (user_id, vacancy_id, event, title, body),
+        )
+        await db.commit()
+        return cursor.lastrowid  # type: ignore[return-value]
+
+
+async def list_notifications(
+    user_id: int,
+    since: str | None = None,
+    unread_only: bool = False,
+    limit: int = 50,
+) -> list[dict]:
+    """Return notifications for user_id, newest first.
+
+    since: ISO 8601 datetime — only rows where created_at >= since.
+    unread_only: filter to read=0 rows only.
+    """
+    conditions = ["user_id = ?"]
+    params: list = [user_id]
+    if since:
+        conditions.append("created_at >= ?")
+        params.append(since)
+    if unread_only:
+        conditions.append("read = 0")
+    where = " AND ".join(conditions)
+    params.append(limit)
+
+    async with get_db() as db:
+        cursor = await db.execute(
+            f"SELECT * FROM notifications WHERE {where} ORDER BY created_at DESC LIMIT ?",
+            params,
+        )
+        rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
+
+
+async def mark_notification_read(notification_id: int) -> None:
+    """Mark a single notification as read."""
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE notifications SET read = 1 WHERE id = ?",
+            (notification_id,),
+        )
+        await db.commit()
+
+
+async def mark_all_notifications_read(user_id: int) -> None:
+    """Mark all unread notifications for user as read."""
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE notifications SET read = 1 WHERE user_id = ? AND read = 0",
+            (user_id,),
+        )
+        await db.commit()
