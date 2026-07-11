@@ -182,6 +182,17 @@ So that the process is fast, predictable, cheap, and error-free — especially i
 | 2 | **Structured JSON contracts per cognitive phase** (Phase 1+2, Phase 3+3.5, Phase 4) — Pydantic models in `contracts/`. LLM returns JSON; orchestrator renders. P1+2 schema includes 8 vscore dim-scores, fit, barrier presence (NOT the composite or recommendation — those are Python). | 🔴 BLOCKER | — | ✅ Done (EPIC-22 B1) |
 | 3 | **Move deterministic metrics to Python** — VScore composite formula, Fit×VScore recommendation matrix, Top-15 freq, Tools registry scan, repetition check, `Role — Company` extraction, JD language detection, Quick Scan render. Strip these instructions from prompts. | 🟠 | Task 2 | ⚠️ Partial: VScore + rec matrix ✅ (`core/vacscore.py`); freq/tools/repetition/lang still in prompts |
 | 4 | **Python orchestrator (FSM)** — drives the skeleton, calls LLM only on cognitive phases, models Phase 2.5 as a conditional pause-state. Shared for API + CLI modes; Local mode delegates via Task 6. | 🟠 | Task 2 | ❌ |
+
+**Task 4 implementation plan (2026-07-11):**
+
+| Chunk | File | What | Effort |
+|-------|------|------|--------|
+| 4-C1 | `core/pipeline_fsm.py` | `VacancyState` enum + `VALID_TRANSITIONS` dict + `fsm_transition(vacancy_id, target)` — validates and writes to DB. No orchestration yet. Tests: all legal/illegal transitions. | ~2h |
+| 4-C2 | `core/pipeline_runner.py` | `run_analyze()`, `run_generate_cv()`, `run_generate_cover()` — each: pre-condition check → fsm_transition → call tool → fsm_transition (or failed). API endpoints and rss_watcher become thin wrappers. Tests: runner under various starting DB states. | ~4h |
+| 4-C3 | `core/cv_metrics.py` | Task 3 remainder: `top_n_words()`, `scan_tools()`, `detect_repetition()` — pre-computed and injected into Phase 3.5 prompt. Strip compute-instructions from `phase3_5_review.md`. Tests: metric functions on real CV samples. | ~3h |
+| 4-C4 | Phase 2.5 pause-state | Present barriers → await user → classify resolved/gap. Needs Flutter UI. **Deferred** — separate task, does not block 4-C1/C2/C3. | TBD |
+
+**Order:** 4-C1 (no breakage, new file only) → 4-C2 (runner alongside old code, then switch endpoints) → 4-C3 (prompt + code change).|
 | 5 | **Merge cognitive calls (API + CLI)** — Phase 1+2 = one call, Phase 3+3.5 = one call (metrics pre-computed, passed in). Applies to both `claude_api` and `claude_cli` (same `cv_analyze.py` path). No-op for local `/analyze` skill. | 🟡 | Tasks 2, 4 | ❌ |
 | 6 | **Local mode delegates to orchestrator/scripts** — Claude Code calls scripts thinly instead of hand-doing glue (vscore, recommendation, render, Quick Scan). | 🟡 | Task 4 | ❌ |
 | 7 | **Measure latency + cost** before/after (per-phase timing in ClaudeProvider; add orchestrator timing). | 🟢 | Tasks 4, 5 | ⚠️ Partial: `pipeline_runs` timing exists; formal before/after comparison pending |
