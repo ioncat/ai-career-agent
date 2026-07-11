@@ -2,13 +2,14 @@
 
 **Status:** 🚧 In Progress
 **Priority:** P0
-**Last updated:** 2026-07-11 (rev 3 — status update + three-mode clarification; see Revision log)
+**Last updated:** 2026-07-11 (rev 4 — Task 4 implementation plan expanded; notification strategy added; 4-C5 Flutter global notifier chunk added)
 **Source:** `docs/discovery/hypotheses/H-002-pipeline-optimization-cognitive_vs_determined.md`
 
 ---
 
 ## Revision log
 
+- **rev 4 (2026-07-11):** Task 4 chunks re-scoped. C2 expanded to include centralized notifier (`core/notifier.py`). C5 added: Flutter global notification mechanism (NotificationProvider + `/api/notifications` endpoint). Notification strategy finalized: Telegram = new vacancy only; Web Push = frozen as-is; Flutter in-app = primary; OS notifications = future C5 extension.
 - **rev 3 (2026-07-11):** Status → In Progress. Tasks 1–2 done. Task 3 partial (VScore + rec matrix ✅; freq/tools/repetition still in prompts). Three-mode table added (CLI mode = same boundary as API). Tasks 4–6 remaining.
 - **rev 2 (2026-06-15):** Re-audited against live code after VScore (06-14) and Phase 2.5 (06-05) landed. Changes:
   - Phase 2.5 Objection Handling added to classification as **interactive cognitive** (not a single structured call).
@@ -85,9 +86,9 @@ Three modes exist; the deterministic/cognitive boundary applies differently to e
 | JD language detection (en/uk/ru) | `langdetect` / heuristic | ⏳ in prompt |
 | **VScore composite formula (1.7)** | **arithmetic from 8 LLM dim-scores** | ⏳ **LLM does it by hand** |
 | **Fit×VScore recommendation matrix** | **decision table from fit + blockers + vscore** | ⏳ **LLM does it by hand** |
-| Top-15 frequency check (3.5) | `collections.Counter` | ⏳ in prompt |
-| Tools & Technologies scan (3.5) | dict match over registry | ⏳ in prompt |
-| Repetition check (3.5) | n-gram frequency | ⏳ in prompt |
+| Top-15 frequency check (3.5) | `collections.Counter` | ✅ `core/cv_metrics.top_n_words()` |
+| Tools & Technologies scan (3.5) | dict match over registry | ✅ `core/cv_metrics.scan_tools()` |
+| Repetition check (3.5) | n-gram frequency | ✅ `core/cv_metrics.detect_repetition()` |
 
 ### 🔴 Cognitive — LLM, irreducible
 | Phase | Type | Why irreducible |
@@ -180,7 +181,7 @@ So that the process is fast, predictable, cheap, and error-free — especially i
 | 0 | **Re-trace current happy-path** — honest step inventory on today's pipeline (inbox_scan collapsed, Phase 4 included, Phase 2.5 conditional). Replaces the stale H-002 49-step count. Output: corrected baseline table. | 🟠 | — | ❌ |
 | 1 | **Deterministic PDF templating (weasyprint)** — CV-template + cover-template (Jinja2 HTML + CSS → weasyprint). Content slots in; no markdown line-shape guessing. Replaces fpdf2 `render_md`. Emoji/colour/spacing all in CSS. | 🔴 BLOCKER | — | ✅ Done 2026-06-15 |
 | 2 | **Structured JSON contracts per cognitive phase** (Phase 1+2, Phase 3+3.5, Phase 4) — Pydantic models in `contracts/`. LLM returns JSON; orchestrator renders. P1+2 schema includes 8 vscore dim-scores, fit, barrier presence (NOT the composite or recommendation — those are Python). | 🔴 BLOCKER | — | ✅ Done (EPIC-22 B1) |
-| 3 | **Move deterministic metrics to Python** — VScore composite formula, Fit×VScore recommendation matrix, Top-15 freq, Tools registry scan, repetition check, `Role — Company` extraction, JD language detection, Quick Scan render. Strip these instructions from prompts. | 🟠 | Task 2 | ⚠️ Partial: VScore + rec matrix ✅ (`core/vacscore.py`); freq/tools/repetition/lang still in prompts |
+| 3 | **Move deterministic metrics to Python** — VScore composite formula, Fit×VScore recommendation matrix, Top-15 freq, Tools registry scan, repetition check, `Role — Company` extraction, JD language detection, Quick Scan render. Strip these instructions from prompts. | 🟠 | Task 2 | ⚠️ Partial: VScore + rec matrix ✅ (`core/vacscore.py`); Top-15 freq + tools scan + repetition ✅ (`core/cv_metrics.py`, 4-C3); `Role — Company` extraction + JD lang detection + Quick Scan render still in prompts |
 | 4 | **Python orchestrator (FSM)** — drives the skeleton, calls LLM only on cognitive phases, models Phase 2.5 as a conditional pause-state. Shared for API + CLI modes; Local mode delegates via Task 6. | 🟠 | Task 2 | ❌ |
 
 **Task 4 implementation plan (2026-07-11):**
@@ -188,11 +189,18 @@ So that the process is fast, predictable, cheap, and error-free — especially i
 | Chunk | File | What | Effort |
 |-------|------|------|--------|
 | 4-C1 | `core/pipeline_fsm.py` | `VacancyState` enum + `VALID_TRANSITIONS` dict + `fsm_transition(vacancy_id, target)` — validates and writes to DB. No orchestration yet. Tests: all legal/illegal transitions. | ~2h |
-| 4-C2 | `core/pipeline_runner.py` | `run_analyze()`, `run_generate_cv()`, `run_generate_cover()` — each: pre-condition check → fsm_transition → call tool → fsm_transition (or failed). API endpoints and rss_watcher become thin wrappers. Tests: runner under various starting DB states. | ~4h |
+| 4-C2 | `core/pipeline_runner.py` + `core/notifier.py` | `run_analyze()`, `run_generate_cv()`, `run_generate_cover()` — each: pre-condition check → fsm_transition → call tool → fsm_transition (or failed) → **notify**. Centralized `notifier.py`: every state transition routes through single function → Web Push (errors + success) or Telegram (new vacancy only). Pluggable: `notify(user_id, event, vacancy_id)` → routes by event type. API endpoints and rss_watcher become thin wrappers. Tests: runner states + notifier routing. | ~5h |
 | 4-C3 | `core/cv_metrics.py` | Task 3 remainder: `top_n_words()`, `scan_tools()`, `detect_repetition()` — pre-computed and injected into Phase 3.5 prompt. Strip compute-instructions from `phase3_5_review.md`. Tests: metric functions on real CV samples. | ~3h |
 | 4-C4 | Phase 2.5 pause-state | Present barriers → await user → classify resolved/gap. Needs Flutter UI. **Deferred** — separate task, does not block 4-C1/C2/C3. | TBD |
+| 4-C5 | Flutter: global notification mechanism | Backend: `GET /api/notifications?user_id=&since=` — returns recent pipeline events from `pipeline_runs` (or new `notifications` table). Flutter: `NotificationProvider` (Riverpod) polls this endpoint alongside vacancy polling → routes to: SnackBar (transient success), persistent error banner (failures), badge counter (unread). All system events funnel through single provider — no scattered ad-hoc SnackBar calls in individual screens. | ~4h |
 
-**Order:** 4-C1 (no breakage, new file only) → 4-C2 (runner alongside old code, then switch endpoints) → 4-C3 (prompt + code change).|
+**Notification strategy (finalized):**
+- Telegram → "новая вакансия" only (RSS new vacancy alert). Nothing else.
+- Web Push → **frozen as-is** (`core/push.py`, fires after Phase 1+2 success). Not expanded. Not removed.
+- Flutter in-app → ALL events when app open. Single `NotificationProvider` as global pipeline. Screens subscribe, never call SnackBar directly.
+- OS-level notifications → future extension of C5 via `flutter_local_notifications` (events when Flutter minimized/closed). Not in current scope.
+
+**Order:** 4-C1 → 4-C2 (runner + notifier backend) → 4-C5 (Flutter consumer) → 4-C3 (independent, prompt change).|
 | 5 | **Merge cognitive calls (API + CLI)** — Phase 1+2 = one call, Phase 3+3.5 = one call (metrics pre-computed, passed in). Applies to both `claude_api` and `claude_cli` (same `cv_analyze.py` path). No-op for local `/analyze` skill. | 🟡 | Tasks 2, 4 | ❌ |
 | 6 | **Local mode delegates to orchestrator/scripts** — Claude Code calls scripts thinly instead of hand-doing glue (vscore, recommendation, render, Quick Scan). | 🟡 | Task 4 | ❌ |
 | 7 | **Measure latency + cost** before/after (per-phase timing in ClaudeProvider; add orchestrator timing). | 🟢 | Tasks 4, 5 | ⚠️ Partial: `pipeline_runs` timing exists; formal before/after comparison pending |

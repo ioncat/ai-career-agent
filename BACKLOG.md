@@ -224,9 +224,10 @@ A vacancy already in DB (analyzed, declined, or buried) gets re-published or bum
 **Done:**
 - Task 1 (weasyprint PDF) — ✅ 2026-06-15. `services/pdf/render.py`: fpdf2 → weasyprint, Jinja2 HTML/CSS templates.
 - Task 2 (Pydantic contracts) — ✅ EPIC-22 B1. `contracts/pipeline.py`: Phase1/2/3/4Data, AnalysisJson, VacScoreDims.
-- Task 3 (partial) — ✅ VScore composite + Fit×VScore recommendation matrix in `core/vacscore.py`. ❌ Top-15 freq / tools scan / repetition check still in Phase 3.5 prompts.
+- Task 3 (partial) — ✅ VScore composite + Fit×VScore recommendation matrix in `core/vacscore.py`. ✅ Top-15 freq / tools scan / repetition check → `core/cv_metrics.py` (4-C3, 2026-07-11). ❌ `Role — Company` extraction / JD language detection still in prompts.
+- Task 4 chunks — ✅ 4-C1 (FSM + transitions, 2026-07-11) ✅ 4-C2 (pipeline_runner + notifier backend, 2026-07-11) ✅ 4-C3 (cv_metrics, 2026-07-11) ✅ 4-C5 (Flutter NotificationProvider + /api/notifications, 2026-07-11). ⏳ 4-C4 (Phase 2.5 pause-state) deferred — separate task.
 
-**Remaining:** Task 4 (FSM orchestrator) → Task 5 (merge calls, API+CLI) → Task 6 (local delegates) → Task 0 (re-trace baseline). See EPIC-21 for full task list.
+**Remaining:** Task 5 (merge cognitive calls, API+CLI) → Task 6 (local delegates) → Task 0 (re-trace baseline) → Task 4-C4 (Phase 2.5 pause, separate). See EPIC-21 for full task list.
 
 ---
 
@@ -598,7 +599,7 @@ class TaskRunner:
 | EPIC-18 | Rename agent-hub → career-agent | ✅ Done (2026-06-01) |
 | [EPIC-19](docs/delivery/epics/EPIC-19-local-execution.md) | Local execution mode (web UI) | 📋 Planned |
 | [EPIC-20](docs/delivery/Epics/EPIC-20-vacancy-path-standard.md) | Unified vacancy path standard | 📋 Planned |
-| [EPIC-21](docs/delivery/Epics/EPIC-21-deterministic-vs-cognitive-pipeline.md) | Deterministic vs Cognitive pipeline split | 🚧 In Progress (T1✅ T2✅ T3⚠️ — FSM pending) |
+| [EPIC-21](docs/delivery/Epics/EPIC-21-deterministic-vs-cognitive-pipeline.md) | Deterministic vs Cognitive pipeline split | 🚧 In Progress (T1✅ T2✅ T3⚠️ T4-C1/C2/C3/C5✅ — T5/T6 pending) |
 
 ---
 
