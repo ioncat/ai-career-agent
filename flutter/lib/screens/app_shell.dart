@@ -308,22 +308,13 @@ class _AppNavRail extends StatelessWidget {
                 onTap: () => onSelected(i),
               );
             }),
-            const Spacer(),
-            // Add vacancy button
+            // Add vacancy button — in the same group as nav items
             Padding(
-              padding: const EdgeInsets.fromLTRB(4, 0, 4, 0),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
               child: _AddVacancyButton(onTap: onAddVacancy),
             ),
-            // Separator before Settings
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              child: Divider(
-                height: 1,
-                thickness: 0.5,
-                color: cs.outlineVariant.withValues(alpha: 0.4),
-              ),
-            ),
-            // Settings (index 3)
+            const Spacer(),
+            // Settings (index 3) — at the bottom, rarely used
             _NavRailItem(
               item: _kNavItems[3],
               selected: selectedIndex == 3,
