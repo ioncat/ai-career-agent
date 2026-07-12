@@ -6,6 +6,7 @@ Does not require ANTHROPIC_API_KEY or TELEGRAM_BOT_TOKEN.
 """
 
 import asyncio
+import datetime
 import hashlib
 import json
 import logging
@@ -513,6 +514,56 @@ async def api_new_vacancy(req: NewVacancyRequest):
 _MAX_IMPORT_BYTES = 200_000
 _SAFE_NAME_RE = re.compile(r'[<>:"/\\|?*]')
 
+_SITE_PATTERNS: list[tuple[str, str]] = [
+    ("djinni.co", "djinni"),
+    ("jobs.dou.ua", "dou"),
+    ("dou.ua", "dou"),
+    ("work.ua", "work"),
+    ("linkedin.com", "linkedin"),
+    ("hh.ua", "hh"),
+    ("hh.ru", "hh"),
+    ("rabota.ua", "rabota"),
+    ("jobs.ua", "jobs"),
+    ("grc.ua", "grc"),
+    ("nofluffjobs.com", "nofluffjobs"),
+    ("robota.ua", "robota"),
+]
+
+def _detect_site(content: str) -> str:
+    """Extract first http(s) URL from content and map hostname to a site slug."""
+    for match in re.finditer(r'https?://[^\s<>"\'()]+', content):
+        host = urlparse(match.group()).hostname or ""
+        for pattern, slug in _SITE_PATTERNS:
+            if pattern in host:
+                return slug
+    return "manual"
+
+
+def _extract_title_and_company(content: str, site: str) -> tuple[str, str]:
+    """Parse JD content → (clean_role_title, company). Both may be empty string."""
+    h1_match = re.search(r'^#\s+(.+)$', content, re.MULTILINE)
+    h1 = h1_match.group(1).strip() if h1_match else ""
+
+    if site == "work":
+        # work.ua format: "Вакансія {role}, {location}, компанія {company}"
+        m = re.match(r'(?:Вакансія\s+)?(.+?),.*?компані[яї]\s+(.+)', h1, re.IGNORECASE)
+        if m:
+            return m.group(1).strip(), m.group(2).strip()
+
+    # Generic: "компанія/компания X" anywhere in H1
+    if h1:
+        m = re.search(r'компані[яї]\s+([^\n,]+)', h1, re.IGNORECASE)
+        if m:
+            company = m.group(1).strip()
+            role = re.sub(r',?\s*компані[яї]\s+.+', '', h1, flags=re.IGNORECASE).strip()
+            role = re.sub(r'^(?:Вакансія|Вакансия)\s+', '', role, flags=re.IGNORECASE).strip()
+            return role, company
+        # No company in H1 — strip "Вакансія" prefix and return clean title
+        role = re.sub(r'^(?:Вакансія|Вакансия)\s+', '', h1, flags=re.IGNORECASE).strip()
+        return role, ""
+
+    return "", ""
+
 
 class ImportJdRequest(BaseModel):
     content: str
@@ -542,20 +593,27 @@ async def api_import_jd(req: ImportJdRequest):
     if dup_id is not None:
         raise HTTPException(status_code=409, detail=f"duplicate of #{dup_id}")
 
-    title = req.filename
+    # Filename → fallback title (stripped extension + sanitized)
+    fallback_title = req.filename
     for ext in (".md", ".txt"):
-        if title.lower().endswith(ext):
-            title = title[: -len(ext)]
-    title = _SAFE_NAME_RE.sub("", title).strip(". ").strip() or "Vacancy"
+        if fallback_title.lower().endswith(ext):
+            fallback_title = fallback_title[: -len(ext)]
+    fallback_title = _SAFE_NAME_RE.sub("", fallback_title).strip(". ").strip() or "Vacancy"
+
+    detected_site = _detect_site(req.content)
+    extracted_title, extracted_company = _extract_title_and_company(req.content, detected_site)
+    title = extracted_title or fallback_title
 
     url = f"import://{content_hash}"
     try:
         vacancy_id = await database.insert_vacancy(
             url=url,
             title=title,
-            site="manual",
+            site=detected_site,
             user_id=req.user_id,
-            status="new",
+            status="fetched",
+            published_at=datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            company=extracted_company or None,
         )
     except Exception as exc:
         if "UNIQUE" in str(exc).upper():

@@ -1,12 +1,19 @@
 # career-agent — Backlog
 
-> Last updated: 2026-07-09
+> Last updated: 2026-07-12
 > Epic format: post-pivot epics (13+) live in `docs/delivery/epics/`. This file = priority tracker + status overview.
 > Pre-pivot epics (1–12): `docs/delivery/epics-archive/EPIC-01-12-pre-pivot.md`
 
 ---
 
 ## ✅ Delivered Features
+
+### 2026-07-12
+- **"Add New Vacancy" via file upload**: `POST /api/vacancies/import-jd` endpoint (content_hash dedup, synthetic `import://` URL, folder creation, `JD.md` write); `VacancyRepository.importJd()` in Flutter; FAB triggers `FilePicker.platform.pickFiles(md/txt)`; SnackBar feedback on success/dup/error; 5 new API tests (36 total in test_web_api.py)
+- **NavigationRail Add button — ghost style + snake hover**: `_AddVacancyButton` StatefulWidget with `AnimationController`; ghost `Border.all(outlineVariant)` at rest; on hover → `SnakePainter` animated border + `primaryContainer` bg; `SnakePainter` made public (renamed from `_SnakePainter` in `processing_wrapper.dart`) for cross-file reuse; button placed in nav group above `Spacer` (Inbox/Applied/Archive/Add ↑ Spacer ↓ Settings)
+- **Cursor fixes app-wide**: `SystemMouseCursors.click` on `VacancyCard` `MouseRegion`, `StarToggle`, `DuplicateBadge` (conditional), `RelatedBadge` (conditional), `SalaryDisplay`, `JdSection` `InkWell`; `_NavRailItem` `InkWell.mouseCursor`
+- **`docs/ui/flutter-ui/` directory**: moved from `docs/architecture/flutter-ui/` (git rename, history preserved)
+- **`docs/ui/flutter-screen-anatomy.html`**: annotated anatomy diagram of all named Flutter UI elements; published as Artifact
 
 ### 2026-07-10
 - **Bug fix — wrong `PROFILE_MD_PATH`**: `.env` default pointed to `../callback-cv/skill/PROFILE.md` (old sibling repo); subprocess received stale profile without `## Contacts` verbatim line, Portfolio link, or `## Additional Evidence` caveats → CV contacts wrong, portfolio missing. Fixed: `PROFILE_MD_PATH=skill/users/1/PROFILE.md`
