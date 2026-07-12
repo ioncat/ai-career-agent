@@ -46,6 +46,7 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
     final borderRadius = BorderRadius.circular(12);
 
     return MouseRegion(
+      cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       child: GestureDetector(
@@ -105,12 +106,17 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
                     Tooltip(
                       message: 'Same job found on another source (duplicate of #${v.duplicateOf}).\nTap to view the original posting.',
                       preferBelow: false,
-                      child: GestureDetector(
-                        onTap: widget.onTapRelated != null
-                            ? () => widget.onTapRelated!(v.duplicateOf!)
-                            : null,
-                        behavior: HitTestBehavior.opaque,
-                        child: _DuplicateBadge(originalId: v.duplicateOf!),
+                      child: MouseRegion(
+                        cursor: widget.onTapRelated != null
+                            ? SystemMouseCursors.click
+                            : MouseCursor.defer,
+                        child: GestureDetector(
+                          onTap: widget.onTapRelated != null
+                              ? () => widget.onTapRelated!(v.duplicateOf!)
+                              : null,
+                          behavior: HitTestBehavior.opaque,
+                          child: _DuplicateBadge(originalId: v.duplicateOf!),
+                        ),
                       ),
                     ),
                   ],
@@ -374,14 +380,17 @@ class _StarButtonState extends ConsumerState<_StarButton> {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: _toggle,
-      child: Padding(
-        padding: const EdgeInsets.only(left: 4),
-        child: Icon(
-          _starred ? Icons.star_rounded : Icons.star_outline_rounded,
-          size: 18,
-          color: _starred ? const Color(0xFFFFB300) : Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: _toggle,
+        child: Padding(
+          padding: const EdgeInsets.only(left: 4),
+          child: Icon(
+            _starred ? Icons.star_rounded : Icons.star_outline_rounded,
+            size: 18,
+            color: _starred ? const Color(0xFFFFB300) : Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+          ),
         ),
       ),
     );
