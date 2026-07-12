@@ -322,6 +322,7 @@ class _AppNavRail extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(4, 0, 4, 16),
                 child: InkWell(
                   onTap: onAddVacancy,
+                  mouseCursor: SystemMouseCursors.click,
                   borderRadius: BorderRadius.circular(8),
                   child: Container(
                     width: double.infinity,
@@ -380,6 +381,7 @@ class _NavRailItem extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       child: InkWell(
         onTap: onTap,
+        mouseCursor: SystemMouseCursors.click,
         borderRadius: BorderRadius.circular(8),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
