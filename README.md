@@ -66,6 +66,15 @@ When fit is real: a targeted CV from actual experience, cross-checked against th
 | [Architecture](docs/diagrams/architecture.md) | Service topology — career-agent · parser · pdf · job-monitor |
 | [System Flow](docs/system-flow.md) | Full decision logic end-to-end |
 
+### Project docs
+
+| | |
+|-|-|
+| [Backlog](docs/delivery/BACKLOG.md) | Active work — Now / P0–P2 / Bugs / Icebox + epics overview |
+| [Changelog](docs/delivery/CHANGELOG.md) | Delivered features, reverse-chronological |
+| [Epics](docs/delivery/Epics/) | Design specs for epic-sized work |
+| [Documentation conventions](docs/delivery/documentation-conventions.md) | How backlog / changelog / epics are maintained |
+
 ---
 
 ## Product Decisions
