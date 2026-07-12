@@ -229,6 +229,92 @@ A vacancy already in DB (analyzed, declined, or buried) gets re-published or bum
 
 ---
 
+## 🟠 P1 — Add New Vacancy via File Upload
+
+### User Story
+
+```
+As a job seeker
+I want to add a new vacancy by uploading a JD file (.md or .txt) from my computer
+So that I can start the analysis pipeline for vacancies I found outside RSS feeds
+```
+
+### Acceptance Criteria
+
+**Given** I'm on the inbox screen  
+**When** I tap the "Add Vacancy" button  
+**Then** a file picker opens, filtered to `.md` and `.txt` files only
+
+**Given** I select a valid file  
+**When** the upload completes  
+**Then** the vacancy appears in the inbox with status `fetched` and title derived from the filename (strip extension; e.g. `Product Manager — Acme Corp.md` → `Product Manager — Acme Corp`)
+
+**Given** the vacancy is added  
+**When** I open it  
+**Then** I can see the JD content and tap Analyze to start the pipeline
+
+**Given** the server detects a duplicate (same content hash)  
+**When** upload completes  
+**Then** a SnackBar shows "This vacancy already exists (#X)" and no new entry is created
+
+**Given** the server returns an error  
+**When** upload completes  
+**Then** a SnackBar shows the error message; no vacancy created
+
+### Edge Cases
+
+- File with no H1 or structure → use filename (minus extension) as title
+- Empty file → reject before upload; show "File is empty"
+- File > 200 KB → reject; show "File too large (max 200 KB)"
+- Filename contains `/`, `\`, `:`, `*`, `?`, `"`, `<`, `>`, `|` → sanitize via existing `_safe_folder_name()` in `cv_fetch_jd.py`
+- Duplicate content (same `content_hash`) → return 409 with existing vacancy ID
+
+### Out of Scope
+
+- URL loading (separate lower-priority task)
+- Automatic analysis trigger on upload (user manually taps Analyze)
+- Drag & drop
+- Multiple file selection in one pick
+- Parsing role/company from JD content (filename is the source of truth for title)
+
+### Notes for Engineering
+
+**Backend — new endpoint:**
+```
+POST /api/vacancies/import-jd
+Body: {content: str, filename: str, user_id: int}
+Returns: {vacancy_id: int, title: str}
+Errors: 400 (empty/too large), 409 (duplicate, existing_id in body)
+```
+- Strip extension from filename → title
+- `compute_content_hash(content)` → `find_duplicate()` → 409 if match
+- `insert_vacancy(user_id, title, source_url=None, status='fetched', content_hash=hash)`
+- `_safe_folder_name(f"{vacancy_id} — {title}")` → `mkdir vacancies/inbox/{user_id}/{folder}/`
+- Write `JD.md` with content
+
+**Flutter:**
+- FAB (`+`) bottom-right of `VacancyInboxScreen` — standard Material "add" pattern
+- `FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['md', 'txt'])`
+- Read bytes → UTF-8 decode
+- POST to `/api/vacancies/import-jd`
+- On success → `ref.invalidate(vacancyListProvider)` → vacancy appears with `fetched` badge
+
+**Reuse:**
+- `file_picker` already in `pubspec.yaml`
+- `compute_content_hash()` + `find_duplicate()` already in `db/database.py`
+- `_safe_folder_name()` already in `cv_fetch_jd.py`
+- `insert_vacancy()` already in `db/database.py`
+
+### Tasks
+
+- [ ] `web/api.py` — `POST /api/vacancies/import-jd` endpoint (~50 lines)
+- [ ] `db/database.py` — verify `insert_vacancy` accepts `source_url=None, content_hash`; add if missing
+- [ ] Tests — 5 tests: happy path, empty file, too large, duplicate, server error
+- [ ] Flutter `vacancy_repository.dart` — `importJd(content, filename)` method
+- [ ] Flutter `vacancy_inbox_screen.dart` — FAB + file picker + upload flow + error SnackBar
+
+---
+
 ## 🟠 P1 — Flutter: Batch Analysis Mode (mass queue)
 
 **What:** Multi-select mode in the vacancy inbox — user selects N vacancies → taps "Analyze N" → all N vacancies are queued in `AnalysisWorker` one by one. Queue state visible per card during processing (position badge + existing `ProcessingWrapper` animation).
