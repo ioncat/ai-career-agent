@@ -6,6 +6,7 @@ Does not require ANTHROPIC_API_KEY or TELEGRAM_BOT_TOKEN.
 """
 
 import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -38,6 +39,7 @@ log = logging.getLogger(__name__)
 _DB_PATH = Path(os.getenv("DB_PATH", "db/agent.db"))
 _CANDIDATE_NAME = os.getenv("CANDIDATE_NAME", "Candidate")
 _PROJECT_ROOT = Path(__file__).parent.parent.resolve()
+_VACANCIES_PATH = Path(os.getenv("VACANCIES_PATH", "vacancies"))
 
 _TEMPLATES = Jinja2Templates(directory=Path(__file__).parent / "templates")
 _TEMPLATES.env.filters["markdown"] = lambda text: md_lib.markdown(
@@ -506,6 +508,75 @@ async def api_new_vacancy(req: NewVacancyRequest):
         raise
     log.info("api/new-vacancy: queued vacancy_id=%d url=%s company=%s", vacancy_id, req.url, req.company)
     return {"vacancy_id": vacancy_id, "status": "queued"}
+
+
+_MAX_IMPORT_BYTES = 200_000
+_SAFE_NAME_RE = re.compile(r'[<>:"/\\|?*]')
+
+
+class ImportJdRequest(BaseModel):
+    content: str
+    filename: str
+    user_id: int = 1
+
+
+@app.post("/api/vacancies/import-jd", status_code=201)
+async def api_import_jd(req: ImportJdRequest):
+    """Import a JD from uploaded file content (no URL required).
+
+    Returns 201 {vacancy_id, title} on success.
+    Returns 409 if content already exists (content_hash collision).
+    Returns 413 if file exceeds 200 KB.
+    Returns 422 if content is empty.
+    """
+    stripped = req.content.strip()
+    if not stripped:
+        raise HTTPException(status_code=422, detail="content is empty")
+    if len(req.content.encode()) > _MAX_IMPORT_BYTES:
+        raise HTTPException(status_code=413, detail="file too large (max 200 KB)")
+
+    norm = re.sub(r"\s+", " ", req.content.lower())
+    content_hash = hashlib.sha256(norm.encode()).hexdigest()
+
+    dup_id = await database.find_duplicate(req.user_id, content_hash, None, None)
+    if dup_id is not None:
+        raise HTTPException(status_code=409, detail=f"duplicate of #{dup_id}")
+
+    title = req.filename
+    for ext in (".md", ".txt"):
+        if title.lower().endswith(ext):
+            title = title[: -len(ext)]
+    title = _SAFE_NAME_RE.sub("", title).strip(". ").strip() or "Vacancy"
+
+    url = f"import://{content_hash}"
+    try:
+        vacancy_id = await database.insert_vacancy(
+            url=url,
+            title=title,
+            site="manual",
+            user_id=req.user_id,
+            status="new",
+        )
+    except Exception as exc:
+        if "UNIQUE" in str(exc).upper():
+            raise HTTPException(status_code=409, detail="duplicate")
+        raise
+
+    await database.set_content_hash(vacancy_id, content_hash)
+
+    safe_folder = _SAFE_NAME_RE.sub("", f"{vacancy_id} — {title}").strip(". ")[:80]
+    vacancy_dir = _VACANCIES_PATH / "inbox" / str(req.user_id) / safe_folder
+    try:
+        vacancy_dir.mkdir(parents=True, exist_ok=True)
+        jd_path = vacancy_dir / "JD.md"
+        jd_path.write_text(f"# {title}\n\n---\n\n{req.content}", encoding="utf-8")
+    except OSError as exc:
+        log.error("import-jd: failed to write JD.md: %s", exc)
+        raise HTTPException(status_code=500, detail="failed to write file")
+
+    await database.update_vacancy_fields(vacancy_id, markdown_path=str(jd_path))
+    log.info("api/import-jd: vacancy_id=%d title=%r user=%d", vacancy_id, title, req.user_id)
+    return {"vacancy_id": vacancy_id, "title": title}
 
 
 _BARRIER_FILE_RE = re.compile(r"\*\*Key Barriers:\*\*\s*(.+?)(?:\n|$)", re.IGNORECASE)

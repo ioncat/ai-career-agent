@@ -20,8 +20,8 @@ async def temp_db(tmp_path, monkeypatch):
     db_path = tmp_path / "test.db"
     database.configure(db_path)
     await database.init_db()
-    # Patch the env var read in web/api.py lifespan so it uses the same DB path
     monkeypatch.setenv("DB_PATH", str(db_path))
+    monkeypatch.setenv("VACANCIES_PATH", str(tmp_path / "vacancies"))
     yield
 
 
@@ -460,3 +460,84 @@ async def test_api_vacancies_key_barriers_string_coerced_to_list(client):
     assert target is not None
     assert isinstance(target["key_barriers"], list)
     assert isinstance(target.get("warnings", []), list)
+
+
+# ── POST /api/vacancies/import-jd ─────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_import_jd_happy_path(client, tmp_path):
+    """POST /api/vacancies/import-jd inserts vacancy, writes JD.md, returns 201."""
+    uid = await database.insert_user(name="Importer", telegram_chat_id=9001, skill_type="pm")
+    content = "# Senior PM\n\nWe are looking for a Senior PM with 5+ years experience."
+
+    resp = client.post("/api/vacancies/import-jd", json={
+        "content": content,
+        "filename": "Senior PM — Acme.md",
+        "user_id": uid,
+    })
+    assert resp.status_code == 201
+    data = resp.json()
+    assert "vacancy_id" in data
+    assert data["title"] == "Senior PM — Acme"
+
+    rows = await database.list_vacancies(status="new", user_id=uid)
+    assert len(rows) == 1
+    assert rows[0]["site"] == "manual"
+
+
+@pytest.mark.asyncio
+async def test_import_jd_empty_content(client):
+    """POST /api/vacancies/import-jd with empty content returns 422."""
+    resp = client.post("/api/vacancies/import-jd", json={
+        "content": "   ",
+        "filename": "test.md",
+        "user_id": 1,
+    })
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_import_jd_too_large(client):
+    """POST /api/vacancies/import-jd with content >200 KB returns 413."""
+    big = "x" * 201_000
+    resp = client.post("/api/vacancies/import-jd", json={
+        "content": big,
+        "filename": "huge.md",
+        "user_id": 1,
+    })
+    assert resp.status_code == 413
+
+
+@pytest.mark.asyncio
+async def test_import_jd_duplicate_returns_409(client):
+    """POST /api/vacancies/import-jd with same content twice returns 409."""
+    uid = await database.insert_user(name="DupUser", telegram_chat_id=9002, skill_type="pm")
+    content = "# PM Role\n\nThis is the job description."
+
+    resp1 = client.post("/api/vacancies/import-jd", json={
+        "content": content,
+        "filename": "role.md",
+        "user_id": uid,
+    })
+    assert resp1.status_code == 201
+
+    resp2 = client.post("/api/vacancies/import-jd", json={
+        "content": content,
+        "filename": "role_copy.md",
+        "user_id": uid,
+    })
+    assert resp2.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_import_jd_title_strips_extension(client):
+    """POST /api/vacancies/import-jd strips .md/.txt extension from filename for title."""
+    uid = await database.insert_user(name="ExtUser", telegram_chat_id=9003, skill_type="pm")
+
+    resp = client.post("/api/vacancies/import-jd", json={
+        "content": "# Product Owner\n\nJob description here.",
+        "filename": "Product Owner — StartupXYZ.txt",
+        "user_id": uid,
+    })
+    assert resp.status_code == 201
+    assert resp.json()["title"] == "Product Owner — StartupXYZ"
