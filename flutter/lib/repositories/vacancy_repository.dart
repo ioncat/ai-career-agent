@@ -231,4 +231,28 @@ class VacancyRepository {
     if (response.statusCode != 200) throw Exception('PDF download failed: ${response.statusCode}');
     return response.bodyBytes;
   }
+
+  Future<({int vacancyId, String title})> importJd({
+    required String content,
+    required String filename,
+    int userId = 1,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/vacancies/import-jd');
+    final response = await http
+        .post(
+          uri,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'content': content, 'filename': filename, 'user_id': userId}),
+        )
+        .timeout(const Duration(seconds: 15));
+    if (response.statusCode == 409) throw Exception('This JD is already in your list');
+    if (response.statusCode == 413) throw Exception('File too large (max 200 KB)');
+    if (response.statusCode == 422) throw Exception('File is empty');
+    if (response.statusCode != 201) throw Exception('Import failed: ${response.statusCode}');
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return (
+      vacancyId: data['vacancy_id'] as int,
+      title: data['title'] as String,
+    );
+  }
 }
