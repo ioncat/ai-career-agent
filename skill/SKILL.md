@@ -75,6 +75,16 @@ Phase 3.5: Self-Review     [show to user, ask approval]
   → Save [Name]_CV.md to existing folder (already created after Phase 1+2)
   → Generate PDF via http://localhost:8002/render → save PDF bytes
   → Save p3 to DB analysis_json          [silent — see Analysis JSON section below]
+
+Phase 3.6: Signal Audit    [runs after save, shown to user]
+  → Read saved CV (EXPERIENCE section) + Signal Coverage Table from JD_analysis.md
+  → For each sentence: assess value vs JD requirements (valuable / weak / remove)
+  → Check coverage: all high/medium signals present in at least one role?
+  → Display audit report
+  → If 🗑️ sentences found: confirm with user → remove → re-save CV.md + PDF
+  → If ⚠️ only: present to user, they decide
+  → If clean: proceed
+
   → Display full CV text
   → Ask: "Переходим к cover?"
 
@@ -112,6 +122,13 @@ Resolved: N/N · Genuine gaps: [list]
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ✅ Phase 3+3.5 — CV сгенерирован
 [Name] · [language] · [N] правок · CV.md + CV.pdf
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Phase 3.6 — Signal Audit
+Clean / N sentences removed · CV.md + CV.pdf updated
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
@@ -211,6 +228,7 @@ ALL phases are skill_type-specific. No universal phase files remain in prompts/ 
 | Phase 2.5 | `prompts/[skill_type]/phase2_5_objections.md` | Phase 2 Key Barriers + Fit Breakdown ⚠️/❌ + Adaptation Plan |
 | Phase 3 | `prompts/[skill_type]/phase3_cv_draft.md` | JD text + JD_analysis.md + language + name + **resolved objections** |
 | Phase 3.5 | `prompts/[skill_type]/phase3_5_review.md` | CV draft + JD_analysis.md |
+| Phase 3.6 | `prompts/[skill_type]/phase3_6_signal_audit.md` | Saved CV (EXPERIENCE) + Signal Coverage Table from JD_analysis.md |
 | Phase 4 | `prompts/[skill_type]/phase4_cover.md` | JD text + approved CV + JD_analysis.md |
 
 ---
