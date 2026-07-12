@@ -953,6 +953,91 @@ Merged 2026-06-15. Engine decision resolved: **weasyprint** (HTML/Jinja2 + CSS �
 
 ---
 
+## 🟡 P2 — Phase 3.6 Signal Audit: Flutter UI + Worker orchestration (added 2026-07-12)
+
+**Context:** Phase 3.6 prompt + SKILL.md pipeline already implemented (local/Claude Code mode works). This task wires it into the Flutter/worker pipeline.
+
+### Orchestration (CVWorker)
+
+After saving CV.md + PDF → run Phase 3.6 LLM call (reads saved CV EXPERIENCE + Signal Coverage Table from JD_analysis.md) → store result in `analysis_json.p3_6` → set status `cv_generated`.
+
+**No auto-fix in worker** — changes require user confirmation. Worker only stores findings.
+
+`analysis_json.p3_6` schema:
+```json
+{
+  "status": "clean" | "issues",
+  "signals_covered": "N/N",
+  "findings": [
+    { "verdict": "remove" | "weak", "role": "HostiServer PO", "excerpt": "Managed enterprise...", "reason": "no JD signal" }
+  ]
+}
+```
+
+### Flutter UI
+
+`_SignalAuditCard` widget in CV tab, shown below CV content after `cv_generated`:
+
+- **Clean:** `✅ Signal audit clean` chip
+- **Issues:** expandable card listing 🗑️/⚠️ findings + "Apply fixes" button
+
+"Apply fixes" → `POST /api/vacancies/{id}/apply-audit-fixes` → CVWorker removes 🗑️ sentences from CV.md → re-saves CV.md + PDF → updates p3_6 to `clean`.
+
+**No new vacancy status** — audit runs inside `cv_generating`, ends before `cv_generated`.
+
+### Tasks
+- [ ] CVWorker: add Phase 3.6 step after CV save
+- [ ] `analysis_json.p3_6` schema + `update-json --phase p3_6` support in `vacancy_track.py`
+- [ ] `POST /api/vacancies/{id}/apply-audit-fixes` endpoint
+- [ ] Flutter: `_SignalAuditCard` widget in `_CvTab`
+- [ ] Flutter: `VacancyRepository.applyAuditFixes()`
+
+---
+
+## 🟢 Docs — Mirror 2026-07-12 prompt changes to generic/ + CLAUDE.md bump
+
+**Added:** 2026-07-12
+
+All changes below landed in `prompts/pm/` only. Need to mirror to `prompts/generic/` and update `CLAUDE.md`.
+
+### CLAUDE.md
+- Bump version: 1.19 → 1.20
+- Status section: Signal Coverage Table (phase2_fit.md), Phase 3.6 Signal Audit, JD Language detection in phase1, Rule 24, "Personal portfolio at" wording
+
+### prompts/generic/ — mirror from pm/
+- `phase1_analysis.md` — JD Language detection: section 1.0 header + `**JD Language:**` field in Vacancy Header block
+- `phase2_fit.md` — Signal Coverage Table + Adaptation Plan merged into Section 3 "Signal Coverage & Adaptation"
+- `phase3_cv_draft.md` — Rule 24 ("every sentence must earn its place") + note referencing Phase 3.6
+- `phase3_6_signal_audit.md` — create file (copy from pm/; logic is universal)
+
+### skill/SKILL.md
+Already updated ✅ — Phase 3.6 in Pipeline Flow, phase table, completion report block.
+
+---
+
+## 🐛 BUG: test_web_api.py creates real folders in vacancies/inbox/
+
+**Discovered:** 2026-07-12
+
+**Symptom:**
+Running `pytest` creates garbage user folders (`vacancies/inbox/12`, `13`, `14`, `15`, `16`) with fake vacancy subfolders ("Senior PM", "Role 0", "Product Owner — StartupXYZ" etc). All created within the same second — clearly from a single test run.
+
+**Why it happens:**
+`test_web_api.py` tests hit real API endpoints (e.g. `POST /api/vacancies/import-jd`, `POST /api/new-vacancy`) against a real in-process FastAPI app. These endpoints call the actual business logic: insert user into DB → get auto-incremented user_id → construct `vacancies/inbox/{user_id}/{vacancy_folder}/` path → create folder on disk.
+
+The test DB is ephemeral (in-memory or temp SQLite), so test user IDs start from whatever value the DB assigns (12, 13, 14... — not conflicting with real users 1, 2). But `settings.VACANCIES_DIR` points to the real project folder `vacancies/inbox/`, not a temp dir. So the folder creation lands on disk permanently even though the DB is wiped after the test.
+
+**Affected test files:**
+`test_web_api.py` (confirmed), possibly `test_cv_analyze.py`, `test_cv_fetch_jd.py` (same pattern).
+
+**Impact:**
+Pollutes `vacancies/inbox/` on every `pytest` run. Requires manual cleanup. Harmless to functionality but confusing — folders look like real user data.
+
+**Fix:**
+In the test fixtures that set up the FastAPI test client, monkeypatch `settings.vacancies_dir` (or wherever the path constant lives) to `tmp_path`. All folder creation inside the request handler will then land in the temp directory and be cleaned up automatically by pytest.
+
+---
+
 ## 🟡 Docker deploy on VM — next session
 
 `docker-compose.yml` ready (5 services). WeasyPrint requires GTK — Linux container only.

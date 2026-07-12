@@ -141,9 +141,36 @@ Skip boilerplate requirements (teamwork, communication, responsibility). Focus o
 
 ---
 
-**[OUTPUT SECTION 3 — Adaptation Plan]**
+**[OUTPUT SECTION 3 — Signal Coverage & Adaptation]**
+
+## Signal Coverage Table
+
+Extract all meaningful signals from the JD. For each signal, assess whether it is present in the candidate's profile and assign importance.
+
+| Signal | In Profile | Importance |
+|--------|-----------|------------|
+| [signal] | ✅ / ⚠️ / ❌ | high / medium / low |
+
+**Importance rules (apply in order, first match wins):**
+1. Signal appears in Requirements/Qualifications section AND maps to the role's North Star (section 1.0.5) → **high**
+2. Signal appears in Requirements/Qualifications section → **medium**
+3. Signal mentioned 2+ times across the JD → **medium**
+4. Signal is "nice to have" / "preferably" / "is a plus" / mentioned once in description only → **low**
+
+**In Profile rules:**
+- ✅ = confirmed commercial experience in profile
+- ⚠️ = partial: pet-projects only / adjacent / indirect
+- ❌ = no evidence
+
+**Coverage mandate for Phase 3:**
+Every signal where `importance = high|medium` AND `in_profile = ✅|⚠️` MUST appear explicitly in at least one role entry in the EXPERIENCE section of the CV.
+Signals where `in_profile = ❌` must NOT be fabricated — omit or address honestly.
+
+---
 
 ## Adaptation Plan
+
+Based on the Signal Coverage Table above, provide concrete instructions for CV generation.
 
 **If Recommendation is "decline":**
 
@@ -152,11 +179,13 @@ Focus on gaps that cannot be bridged with reframing alone.
 
 **If Recommendation is "apply" or "take a chance":**
 
-Provide 3–5 concrete reframing actions. Each action = specific and actionable.
+Provide 3–5 concrete reframing actions derived from the signal table. Each action = specific and actionable.
 
 Lead with archetype delta correction if JD archetype ≠ candidate's current CV framing.
 Candidate has dual archetype (Execution + Founder Proxy) — use the matching archetype section
 from the profile to guide which experience to surface.
+
+For each `high` signal where `in_profile = ⚠️` — give explicit framing instruction: how to present partial evidence honestly without overclaiming.
 
 Format each action as:
 - **[Action label]:** [Specific instruction — what to change, what to emphasize, exact framing]

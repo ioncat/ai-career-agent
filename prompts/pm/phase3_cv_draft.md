@@ -39,7 +39,8 @@ User will provide:
 18. **NEVER use plural forms for things built or owned: no "systems", "portals", "platforms".** Name individual items specifically (singular each), or use "product" / "product suite" as a collective. Exception: "products" is allowed only when referring to multiple distinct products in context.
 19. **NEVER use third-person verbs anywhere in the CV** — no "Understands", "Knows", "Applies", "Works", "Brings", "Has". CV language = headline-style (no subject) or past-tense action verbs. Applies to Summary, bullets, and all prose.
 20. **CERTIFICATIONS: include only "Certified AI-Empowered SAFe® Product Owner/Product Manager" by default.** Add others only when directly relevant to the specific vacancy.
-21. **NPS/CSAT — context-dependent.** For technical/platform/AI roles: NPS and CSAT are CX/support metrics — deprioritize or remove; use error reduction %, automation %, delivery velocity instead. Keep for: CX-focused PM, growth PM, customer-success-adjacent roles.
+21. **NPS/CSAT — context-dependent.**
+24. **Every sentence must earn its place.** After drafting each role paragraph, check every sentence against the Signal Coverage Table. Ask: does this deliver value in the context of this JD's requirements, or lead the recruiter in the wrong direction? If a sentence maps to no JD signal (high/medium/low) — cut it. Factual ≠ relevant. (Phase 3.6 will audit the saved CV — but the draft should already pass this check.) For technical/platform/AI roles: NPS and CSAT are CX/support metrics — deprioritize or remove; use error reduction %, automation %, delivery velocity instead. Keep for: CX-focused PM, growth PM, customer-success-adjacent roles.
 22. **CV describes practice, NOT cases.** Role descriptions state what the candidate did as a pattern (approach, method, ongoing responsibility). Specific examples, named projects, and case-study evidence belong in the interview, not the CV. Wrong: "identified an off-hours revenue gap and built an automated flow". Right: "applied gap analysis to identify process discrepancies and defined requirements to close them." The CV proves breadth of practice; the interview proves depth with specifics.
 23. **Years of experience — count ONLY "Product Owner"-titled roles.** Default summary = "Product Owner with 5+ years…". PO-titled roles as of 2026-06: InsulaLabs (5m) + Marketplace PO (14m) + HostiServer PO (46m) = ~65m ≈ 5+ years. Project Manager title ≠ product years — never fold it in. Recompute only if a new PO-titled role is added.
 
@@ -117,10 +118,10 @@ Certified AI-Empowered SAFe® Product Owner/Product Manager
 **AI Tooling Paragraph — mandatory for all roles with any AI/product/digital signal:**
 
 1-component (most roles — daily practice only):
-> `AI tooling in daily practice (Claude, ChatGPT, Gemini) — requirements refinement, research synthesis, workflow validation. Portfolio at [ioncat.github.io](https://ioncat.github.io/).`
+> `AI tooling in daily practice (Claude, ChatGPT, Gemini) — requirements refinement, research synthesis, workflow validation. Personal portfolio at [ioncat.github.io](https://ioncat.github.io/).`
 
 2-component (AI/technical depth roles — explicit AI product ownership, LLM/technical PM, hands-on AI signal required):
-> `Built LLM pipelines hands-on — prompt architecture, context window management, response quality assessment — and applied that implementation depth to writing AI requirement specs complete enough for engineers to ship from. Active daily practice, not a side project. Portfolio at [ioncat.github.io](https://ioncat.github.io/).`
+> `Built LLM pipelines hands-on — prompt architecture, context window management, response quality assessment — and applied that implementation depth to writing AI requirement specs complete enough for engineers to ship from. Active daily practice, not a side project. Personal portfolio at [ioncat.github.io](https://ioncat.github.io/).`
 > `AI tooling across PM workflows (Claude, ChatGPT, Gemini) — requirements refinement, research synthesis, workflow validation.`
 
 **⚠️ Portfolio link is MANDATORY in the AI paragraph — always include `[ioncat.github.io](https://ioncat.github.io/)` at end of last AI sentence.**
@@ -167,3 +168,18 @@ Emphasis = adjust language and which Key Results to surface first. Not deleting 
 address by reframing existing experience. Do NOT fabricate. Do NOT claim ✅ if profile shows ⚠️.
 
 **Fit Breakdown ❌ items**: do not mention, do not fabricate, do not imply.
+
+---
+
+## Signal Coverage Mandate
+
+`JD_analysis.md` contains `## Signal Coverage Table` from Phase 2.
+
+**Before writing any EXPERIENCE content:**
+1. Read the Signal Coverage Table.
+2. Identify all rows where `importance = high|medium` AND `in_profile = ✅ or ⚠️`.
+3. For each such signal — verify it is explicitly reflected in at least one role entry in the EXPERIENCE section.
+4. If a signal is missing from EXPERIENCE: add it to the appropriate role using honest framing from PROFILE.md.
+5. Signals where `in_profile = ❌`: do not mention, do not fabricate.
+
+**This check is mandatory. Skipping it means the CV is incomplete.**

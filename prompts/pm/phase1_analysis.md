@@ -35,9 +35,12 @@ Do NOT soften gaps. Realistic critique produces better Phase 2 output.
 
 **Output this first — machine-readable, exact format:**
 
+Detect the language of the JD body text (requirements and responsibilities sections). Ignore: URL, job board page title, company name, location fields. If the JD mixes languages, use the dominant language of the requirements/responsibilities sections. Output ISO 639-1 code (e.g. `en`, `uk`, `ru`, `es`, `de`). This value is consumed by Phase 3 as the default CV language — accuracy matters.
+
 ```
 **Role:** [exact role title as written in JD]
 **Company:** [company name as written in JD]
+**JD Language:** [ISO 639-1 code of JD body text]
 ```
 
 Do not skip. Do not add extra text. One line per field.
