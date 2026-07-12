@@ -1,1 +1,1 @@
-enum HealthStatus { online, offline, checking }
+enum HealthStatus { online, degraded, offline, checking }

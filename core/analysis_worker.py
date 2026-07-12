@@ -88,6 +88,8 @@ class AnalysisWorker:
                 # (e.g. set via standalone tracker fallback while agent.py wasn't serving)
                 await self._recover_queued()
 
+    _ANALYSIS_TIMEOUT = 600  # 10 minutes — covers slow claude CLI runs
+
     async def _execute(self, vacancy_id: int) -> None:
         from tools.cv_analyze import cv_analyze
 
@@ -105,9 +107,19 @@ class AnalysisWorker:
                     profile=self._deps.profile,
                 )
                 ctx = _Ctx(deps=fresh_deps)
-                await cv_analyze(ctx, vacancy_id)  # type: ignore[arg-type]
+                await asyncio.wait_for(
+                    cv_analyze(ctx, vacancy_id),  # type: ignore[arg-type]
+                    timeout=self._ANALYSIS_TIMEOUT,
+                )
                 log.info("AnalysisWorker: done — v#%d", vacancy_id)
                 await self._push_result(vacancy_id)
+            except asyncio.TimeoutError:
+                log.error(
+                    "AnalysisWorker: timeout v#%d (>%ds)", vacancy_id, self._ANALYSIS_TIMEOUT
+                )
+                await database.set_analysis_error(
+                    vacancy_id, f"Analysis timed out after {self._ANALYSIS_TIMEOUT // 60} minutes"
+                )
             except Exception as exc:
                 err_msg = str(exc)[:500]
                 log.error("AnalysisWorker: failed v#%d: %s", vacancy_id, err_msg)

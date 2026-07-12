@@ -248,6 +248,12 @@ def _parse_analysis_summary(analysis_json_str: str | None) -> dict:
         return {}
 
 
+@app.get("/api/health")
+async def api_health(request: Request):
+    worker = getattr(request.app.state, "analysis_worker", None)
+    return {"status": "ok", "worker_available": worker is not None}
+
+
 @app.get("/api/vacancies")
 async def api_vacancies(
     status: str | None = None,
@@ -1007,6 +1013,28 @@ async def api_vacancy_analyze(vacancy_id: int, request: Request):
     # Standalone fallback (no agent.py running)
     await database.update_vacancy_status(vacancy_id, "analysis_queued")
     return {"id": vacancy_id, "status": "analysis_queued"}
+
+
+@app.post("/api/vacancies/{vacancy_id}/reset", status_code=200)
+async def api_vacancy_reset(vacancy_id: int):
+    """Reset a stuck vacancy back to 'fetched' so the user can re-analyze.
+
+    Allowed for: analyzing, analysis_queued, analysis_failed.
+    Clears any stored error. 400 if status is not resettable.
+    """
+    row = await database.get_vacancy_by_id(vacancy_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Vacancy not found")
+    current_status = row["status"] if "status" in row.keys() else None
+    resettable = {"analyzing", "analysis_queued", "analysis_failed"}
+    if current_status not in resettable:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot reset vacancy in status '{current_status}'",
+        )
+    await database.clear_analysis_error(vacancy_id)
+    await database.update_vacancy_status(vacancy_id, "fetched")
+    return {"id": vacancy_id, "status": "fetched"}
 
 
 @app.get("/api/vacancies/{vacancy_id}/jd")
