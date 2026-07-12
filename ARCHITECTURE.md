@@ -194,7 +194,7 @@ vacancies/
 
 - `docs/local-app.md` — детали Режима 4 (diagrams, команды, профиль)
 - `docs/delivery/PIVOT-PLAN.md` — план фаз разработки
-- `BACKLOG.md` — статус эпиков
+- `docs/delivery/BACKLOG.md` — статус эпиков · `docs/delivery/CHANGELOG.md` — история фич
 - `docs/discovery/core-differentiators.md` — конкурентные преимущества, требующие отдельного дизайна
 
 ---
