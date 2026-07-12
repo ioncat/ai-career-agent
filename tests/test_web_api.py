@@ -35,6 +35,35 @@ def client(tmp_path):
         yield c
 
 
+# ── GET /api/health ────────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_health_no_worker(client):
+    """GET /api/health returns worker_available=False when no worker attached."""
+    resp = client.get("/api/health")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "ok"
+    assert data["worker_available"] is False
+
+
+@pytest.mark.asyncio
+async def test_health_with_worker(client):
+    """GET /api/health returns worker_available=True when worker is on app.state."""
+    from web.api import app
+
+    class _FakeWorker:
+        pass
+
+    app.state.analysis_worker = _FakeWorker()
+    try:
+        resp = client.get("/api/health")
+        assert resp.status_code == 200
+        assert resp.json()["worker_available"] is True
+    finally:
+        app.state.analysis_worker = None
+
+
 # ── GET /api/users ─────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
@@ -330,6 +359,50 @@ async def test_analyze_already_analyzing_returns_409(client):
     vid = await database.insert_vacancy(url="https://djinni.co/jobs/ana3/", status="analyzing")
     resp = client.post(f"/api/vacancies/{vid}/analyze")
     assert resp.status_code == 409
+
+
+# ── POST /api/vacancies/{id}/reset ───────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_reset_analyzing_vacancy(client):
+    """POST /api/vacancies/{id}/reset resets 'analyzing' → 'fetched', returns 200."""
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/rst1/", status="analyzing")
+    resp = client.post(f"/api/vacancies/{vid}/reset")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "fetched"
+    assert data["id"] == vid
+    row = await database.get_vacancy_by_id(vid)
+    assert row["status"] == "fetched"
+
+
+@pytest.mark.asyncio
+async def test_reset_analysis_failed_vacancy(client):
+    """POST /api/vacancies/{id}/reset resets 'analysis_failed' → 'fetched'."""
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/rst2/", status="analysis_failed")
+    resp = client.post(f"/api/vacancies/{vid}/reset")
+    assert resp.status_code == 200
+    row = await database.get_vacancy_by_id(vid)
+    assert row["status"] == "fetched"
+
+
+@pytest.mark.asyncio
+async def test_reset_wrong_status_returns_400(client):
+    """POST /api/vacancies/{id}/reset returns 400 for non-resettable statuses."""
+    for status in ("fetched", "analyzed", "cv_generated", "declined"):
+        vid = await database.insert_vacancy(
+            url=f"https://djinni.co/jobs/rst-{status}/", status=status
+        )
+        resp = client.post(f"/api/vacancies/{vid}/reset")
+        assert resp.status_code == 400, f"expected 400 for status={status}, got {resp.status_code}"
+        assert status in resp.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_reset_not_found(client):
+    """POST /api/vacancies/9999/reset returns 404."""
+    resp = client.post("/api/vacancies/9999/reset")
+    assert resp.status_code == 404
 
 
 # ── GET /api/vacancies/{id}/jd ────────────────────────────────────────────────

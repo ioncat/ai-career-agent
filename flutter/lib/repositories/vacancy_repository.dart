@@ -106,6 +106,17 @@ class VacancyRepository {
     if (response.statusCode != 202) throw Exception('Analyze failed: ${response.statusCode}');
   }
 
+  Future<void> reset(int vacancyId) async {
+    final uri = Uri.parse('$baseUrl/api/vacancies/$vacancyId/reset');
+    final response = await http.post(uri).timeout(const Duration(seconds: 10));
+    if (response.statusCode == 404) throw Exception('Vacancy not found');
+    if (response.statusCode == 400) {
+      final body = jsonDecode(response.body) as Map<String, dynamic>?;
+      throw Exception(body?['detail'] ?? 'Cannot reset');
+    }
+    if (response.statusCode != 200) throw Exception('Reset failed: ${response.statusCode}');
+  }
+
   Future<void> setStarred(int vacancyId, bool starred) async {
     final uri = Uri.parse('$baseUrl/api/vacancies/$vacancyId/starred');
     final response = await http

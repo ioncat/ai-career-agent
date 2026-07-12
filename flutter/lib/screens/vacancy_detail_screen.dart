@@ -6,6 +6,8 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/vacancy.dart';
+import '../models/health.dart';
+import '../providers/health_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/vacancy_detail_provider.dart';
 import '../providers/vacancy_list_provider.dart';
@@ -122,6 +124,8 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
     final jdAsync = ref.watch(vacancyJdProvider(widget.vacancyId));
     final role = widget.vacancy?.role ?? '';
     final company = widget.vacancy?.company ?? '';
+    final health = ref.watch(healthProvider).valueOrNull ?? HealthStatus.checking;
+    final workerAvailable = health == HealthStatus.online;
 
     return Column(
       children: [
@@ -205,12 +209,15 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                       : const Text('Skip'),
                 ),
                 const SizedBox(width: 8),
-                FilledButton.icon(
-                  onPressed: _loadingAnalyze ? null : _analyze,
-                  icon: _loadingAnalyze
-                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Icon(Icons.analytics_outlined, size: 16),
-                  label: const Text('Analyze'),
+                Tooltip(
+                  message: workerAvailable ? '' : 'Analysis worker unavailable — start agent.py',
+                  child: FilledButton.icon(
+                    onPressed: _loadingAnalyze || !workerAvailable ? null : _analyze,
+                    icon: _loadingAnalyze
+                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Icon(Icons.analytics_outlined, size: 16),
+                    label: const Text('Analyze'),
+                  ),
                 ),
               ],
             ],
@@ -297,11 +304,12 @@ class _AnalysisErrorViewState extends ConsumerState<_AnalysisErrorView> {
   Future<void> _retry() async {
     setState(() => _retrying = true);
     try {
+      await _repo.reset(widget.vacancyId);
       await _repo.analyze(widget.vacancyId);
       if (mounted) {
         ref.read(vacancyListProvider.notifier).refresh();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Analysis queued'), duration: Duration(seconds: 2)),
+          const SnackBar(content: Text('Reset & queued for analysis'), duration: Duration(seconds: 2)),
         );
       }
     } catch (e) {
@@ -356,7 +364,7 @@ class _AnalysisErrorViewState extends ConsumerState<_AnalysisErrorView> {
                       child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                     )
                   : const Icon(Icons.refresh_rounded),
-              label: Text(_retrying ? 'Queuing...' : 'Retry Analysis'),
+              label: Text(_retrying ? 'Resetting...' : 'Reset & Retry'),
             ),
           ],
         ),
@@ -389,7 +397,9 @@ class _AnalysisErrorBannerState extends ConsumerState<_AnalysisErrorBanner> {
     setState(() => _retrying = true);
     try {
       final apiUrl = ref.read(settingsProvider).valueOrNull?.apiUrl ?? 'http://localhost:8080';
-      await VacancyRepository(baseUrl: apiUrl).analyze(widget.vacancyId);
+      final repo = VacancyRepository(baseUrl: apiUrl);
+      await repo.reset(widget.vacancyId);
+      await repo.analyze(widget.vacancyId);
       if (mounted) {
         ref.read(vacancyListProvider.notifier).refresh();
         widget.onDismiss();
@@ -438,7 +448,7 @@ class _AnalysisErrorBannerState extends ConsumerState<_AnalysisErrorBanner> {
             ),
             child: _retrying
                 ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Text('Retry'),
+                : const Text('Reset & Retry'),
           ),
           IconButton(
             icon: const Icon(Icons.close_rounded, size: 16),
@@ -1149,6 +1159,7 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
   bool _loadingAnalyze = false;
   bool _loadingDecline = false;
   bool _loadingRestore = false;
+  bool _loadingReset = false;
   late bool _starred;
   late bool _applied;
   bool _loadingStar = false;
@@ -1256,6 +1267,29 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
     }
   }
 
+  Future<void> _resetAndRetry() async {
+    setState(() => _loadingReset = true);
+    try {
+      await _repo.reset(widget.vacancyId);
+      await _repo.analyze(widget.vacancyId);
+      if (mounted) {
+        ref.read(vacancyListProvider.notifier).refresh();
+        ref.invalidate(vacancyDetailProvider(widget.vacancyId));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Reset & queued for analysis'), duration: Duration(seconds: 2)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loadingReset = false);
+    }
+  }
+
   Future<void> _generateCover() async {
     setState(() => _loadingCv = true);
     try {
@@ -1355,7 +1389,7 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
     }
   }
 
-  Widget _buildCta(BuildContext context, ColorScheme cs, AsyncValue<VacancyCv> cvAsync) {
+  Widget _buildCta(BuildContext context, ColorScheme cs, AsyncValue<VacancyCv> cvAsync, {required bool workerAvailable}) {
     final tab = widget.tabController.index;
     final isDeclined = widget.status == 'declined';
     final isCvInProgress = widget.status == 'cv_queued' || widget.status == 'cv_generating';
@@ -1379,27 +1413,45 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
 
     switch (tab) {
       case 0: // Analysis
+        final isStuck = widget.status == 'analyzing';
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            OutlinedButton(
-              onPressed: _loadingDecline ? null : _decline,
-              style: OutlinedButton.styleFrom(
-                side: BorderSide(color: cs.outlineVariant),
-                foregroundColor: cs.onSurfaceVariant,
+            if (!isStuck) ...[
+              OutlinedButton(
+                onPressed: _loadingDecline ? null : _decline,
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: cs.outlineVariant),
+                  foregroundColor: cs.onSurfaceVariant,
+                ),
+                child: _loadingDecline
+                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text('Decline'),
               ),
-              child: _loadingDecline
-                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Text('Decline'),
-            ),
-            const SizedBox(width: 8),
-            FilledButton.icon(
-              onPressed: _loadingAnalyze ? null : _analyze,
-              icon: _loadingAnalyze
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.refresh_rounded, size: 16),
-              label: Text(_loadingAnalyze ? 'Queuing...' : 'Re-analyze'),
-            ),
+              const SizedBox(width: 8),
+              Tooltip(
+                message: workerAvailable ? '' : 'Analysis worker unavailable — start agent.py',
+                child: FilledButton.icon(
+                  onPressed: _loadingAnalyze || !workerAvailable ? null : _analyze,
+                  icon: _loadingAnalyze
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.refresh_rounded, size: 16),
+                  label: Text(_loadingAnalyze ? 'Queuing...' : 'Re-analyze'),
+                ),
+              ),
+            ] else ...[
+              Tooltip(
+                message: 'Reset stuck analysis and retry from scratch',
+                child: FilledButton.icon(
+                  onPressed: _loadingReset ? null : _resetAndRetry,
+                  style: FilledButton.styleFrom(backgroundColor: Colors.orange.shade700),
+                  icon: _loadingReset
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.restart_alt_rounded, size: 16),
+                  label: Text(_loadingReset ? 'Resetting...' : 'Reset & Retry'),
+                ),
+              ),
+            ],
           ],
         );
 
@@ -1457,6 +1509,8 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final cvAsync = ref.watch(vacancyCvProvider(widget.vacancyId));
+    final health = ref.watch(healthProvider).valueOrNull ?? HealthStatus.checking;
+    final workerAvailable = health == HealthStatus.online;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -1544,7 +1598,7 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
           // Context-sensitive CTA — changes per tab
           AnimatedBuilder(
             animation: widget.tabController,
-            builder: (context, _) => _buildCta(context, cs, cvAsync),
+            builder: (context, _) => _buildCta(context, cs, cvAsync, workerAvailable: workerAvailable),
           ),
         ],
       ),
