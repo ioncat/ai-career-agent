@@ -1,8 +1,8 @@
 # EPIC-21 — Deterministic vs Cognitive pipeline split
 
-**Status:** 🚧 In Progress  
+**Status:** ✅ Done  
 **Priority:** P1  
-**Updated:** 2026-07-11  
+**Updated:** 2026-07-12  
 **Source:** `docs/discovery/hypotheses/H-002-pipeline-optimization-cognitive_vs_determined.md`
 
 ---
@@ -16,18 +16,16 @@
 | T3 | Deterministic metrics → Python, strip from prompts | ✅ Done 2026-07-11 |
 | T4 | Python FSM orchestrator + notifier | ✅ Done 2026-07-11 (4-C4 deferred) |
 | T5 | ~~Merge cognitive calls (API + CLI)~~ | 🚫 Dropped — quality risk > latency benefit |
-| T6 | Local mode: thin delegation to scripts | ❌ Low priority |
-| T0 | Re-trace happy-path baseline (replaces stale H-002) | ❌ Nice-to-have |
+| T6 | Local mode: thin delegation to scripts | 🚫 Dropped — saves only 2–3 turns; reasoning floor is architectural, not scriptable |
+| T0 | Re-trace happy-path baseline (replaces stale H-002) | 🚫 Dropped |
 
 ---
 
-## What's left
+## What's left → moved out
 
-**4-C4** (Phase 2.5 pause-state) — FSM pause-state for barrier resolution dialogue. Deferred; needs Flutter UI.
+**4-C4** (Phase 2.5 pause-state) — moved to BACKLOG as standalone 🟠 P1 task. Needs Flutter UI design before implementation.
 
-**T6** — Claude Code skill calls scripts thinly instead of hand-doing glue. Low priority; local mode will always have a reasoning floor.
-
-**T0** — Honest step count for before/after comparison. Nice-to-have.
+All other remaining items dropped. EPIC goal achieved.
 
 ---
 

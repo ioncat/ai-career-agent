@@ -215,22 +215,90 @@ A vacancy already in DB (analyzed, declined, or buried) gets re-published or bum
 
 ---
 
-## 🟠 P1 — [EPIC-21](docs/delivery/Epics/EPIC-21-deterministic-vs-cognitive-pipeline.md) — Deterministic vs Cognitive pipeline split
+## ✅ [EPIC-21](docs/delivery/Epics/EPIC-21-deterministic-vs-cognitive-pipeline.md) — Deterministic vs Cognitive pipeline split (Done 2026-07-12)
 
-**Goal:** Draw the boundary — deterministic work in Python (FSM orchestrator), LLM only for irreducible cognitive phases. Source: `docs/discovery/hypotheses/H-002`.
+**Goal:** Draw the boundary — deterministic work in Python (FSM orchestrator), LLM only for irreducible cognitive phases.
 
-**Done:**
-- ✅ Task 1 (weasyprint PDF) — 2026-06-15. `services/pdf/render.py`: fpdf2 → weasyprint, Jinja2 HTML/CSS.
-- ✅ Task 2 (Pydantic contracts) — EPIC-22 B1. `contracts/pipeline.py`.
-- ⚠️ Task 3 (partial) — VScore + rec matrix ✅ (`core/vacscore.py`). Top-15 freq + tools scan + repetition ✅ (`core/cv_metrics.py`, 2026-07-11). `Role — Company` extraction + JD lang detection + Quick Scan render ❌ still in prompts.
-- ✅ Task 4 — 4-C1 FSM ✅ · 4-C2 pipeline_runner + notifier ✅ · 4-C3 cv_metrics inject ✅ · 4-C5 Flutter NotificationProvider ✅. 4-C4 (Phase 2.5 pause-state) ⏳ deferred.
-- 🚫 Task 5 (merge cognitive calls) — DROPPED. Quality risk > latency benefit; direction = agent-as-judge (more calls, not fewer).
+- ✅ T1 (weasyprint PDF) — 2026-06-15
+- ✅ T2 (Pydantic contracts) — EPIC-22 B1
+- ✅ T3 (metrics → Python) — `core/vacscore.py` + `core/cv_metrics.py`, 2026-07-11
+- ✅ T4 (FSM orchestrator) — 4-C1/C2/C3/C5 done; 4-C4 → BACKLOG P1 task
+- 🚫 T5 (merge cognitive calls) — Dropped. Quality risk > latency benefit.
+- 🚫 T6 (thin delegation) — Dropped. Saves 2–3 turns; reasoning floor architectural.
+- 🚫 T0 (happy-path baseline) — Dropped.
 
-**Remaining:**
-- Task 3 остаток: `Role — Company` extraction + JD lang detection (regex/`langdetect`) — низкий приоритет
-- Task 6: local mode thin delegation — 🟡 низкий приоритет
-- Task 4-C4: Phase 2.5 pause-state — ⏳ отдельный таск, нужен Flutter UI
-- Task 0: re-trace happy-path baseline — 🟠 желательно до закрытия EPIC
+---
+
+## 🟠 P1 — Flutter: Batch Analysis Mode (mass queue)
+
+**What:** Multi-select mode in the vacancy inbox — user selects N vacancies → taps "Analyze N" → all N vacancies are queued in `AnalysisWorker` one by one. Queue state visible per card during processing (position badge + existing `ProcessingWrapper` animation).
+
+**Why needed:** Current UX requires opening each vacancy individually and tapping Analyze. For 5–10 new RSS vacancies, this is mechanical friction on the most common session start: "I have N new vacancies, let me analyze all before deciding which to pursue." Without batch mode, the RSS auto-push value is halved — vacancies appear but analysis doesn't start automatically, so the user must click through each one.
+
+**Expected value:** Eliminates the biggest daily friction point. A "review morning RSS batch" session drops from 10–15 clicks to 2 (select all → analyze). Makes RSS + auto-push actually feel automated rather than "a queue of manual tasks". Directly contributes to the product's core promise: "should you apply?" before you've invested effort.
+
+**Design:**
+- Long-press any vacancy card → enter multi-select mode (checkboxes appear on all cards)
+- Selected cards highlighted; batch action bar slides up from bottom: `Analyze N selected ▸` + Cancel
+- "Analyze N" → calls `POST /api/vacancies/{id}/analyze` sequentially for each selected vacancy → each goes to `AnalysisWorker` queue
+- Queue position badge: "In queue (3rd)" visible on cards waiting
+- `ProcessingWrapper` animation already handles `analyzing` / `analysis_queued` states — no new animation needed
+- After all queued → exit multi-select mode, cards animate normally as each completes
+
+**Scope:**
+- [ ] `VacancyInboxScreen` — `_multiSelectMode` bool + `_selectedIds` Set; long-press on card toggles entry
+- [ ] `VacancyCard` — checkbox overlay in multi-select mode; highlight border on selected
+- [ ] `_BatchActionBar` widget — slides up when `_selectedIds.isNotEmpty`; count label; Analyze button
+- [ ] `VacancyRepository.analyzeVacancy(id)` — if not already exists; reuse from Analyze button flow
+- [ ] Queue position display: `GET /api/queue-status` (or derive from `analysis_queued` count) → badge text
+- [ ] Tests: multi-select state, batch action bar visibility, repository calls
+
+---
+
+## 🟠 P1 — LLM Quality Parity: SKILL.md Rules → API System Prompt
+
+**What:** Audit `skill/SKILL.md` and `skill/users/[id]/SKILL.md` to extract all rules that affect LLM **output quality** (not orchestration/routing). Inject extracted rules into the LLM system prompt for all API/CLI calls as a dedicated block, appended after PROFILE.md.
+
+**Why needed:** Claude Code skill mode operates with SKILL.md fully in context → the model applies nuanced rules holistically across the pipeline: positioning strategy, language calibration, what to flag, per-user preferences, tone guidance. API/CLI mode gets only the phase-specific prompt + PROFILE.md → same model produces more mechanical output, missing subtle guidance that was only ever encoded in SKILL.md. User observed this empirically: "Claude Code works more subtly. CLI feels coarser — it just follows steps."
+
+The root cause: SKILL.md was written as an orchestration document for the skill, not as LLM system context. But it contains a mix of both orchestration rules (Python now handles these via FSM) and quality rules (LLM needs these but never receives them in API mode).
+
+**Expected value:** API/CLI output quality converges toward skill mode quality with zero latency cost (system prompt is cached). Eliminates the need to separately fine-tune CLI prompts to "catch up" with skill quality — one source of truth for quality rules. Specifically: better tone calibration, per-user language rules applied consistently, positioning strategy respected across all phases.
+
+**Implementation plan:**
+
+**Step 1 — Audit (classify every SKILL.md section):**
+
+| Section type | Where it belongs after audit |
+|---|---|
+| Phase orchestration steps (which file to write, when to stop) | Python FSM — already there |
+| Batch/Sequential routing logic | Python — already there |
+| Tone rules ("enterprise vs startup language calibration") | → LLM quality block |
+| Language rules ("all output in English unless...") | → LLM quality block |
+| Profile interpretation guidance ("de-emphasize support team") | → LLM quality block |
+| Positioning strategy ("archetype must match role context") | → LLM quality block |
+| Per-user override rules (Ukrainian scope, exclusions) | → LLM quality block (user-level) |
+
+**Step 2 — Extract:**
+- New file: `prompts/[skill_type]/system_quality_rules.md` — quality-relevant rules extracted from SKILL.md
+- Parallel: `skill/users/[id]/quality_rules.md` — per-user overrides (language, exclusions, preferences)
+
+**Step 3 — Inject:**
+- `core/llm_client.py` — `ClaudeProvider._build_system_prompt()`: load `system_quality_rules.md` + user `quality_rules.md` → append after PROFILE.md as second cached block
+- `ClaudeCodeProvider` — same: pass rules via `--system-prompt` or prepend to user message if system prompt is fixed
+
+**Step 4 — Validate:**
+- Run same vacancy (e.g. #520 Binotel) in skill mode + API mode → compare Phase 2 and Phase 3 output quality
+- Look specifically at: tone calibration, barrier framing, positioning archetype match, language compliance
+
+**Scope:**
+- [ ] Audit `skill/SKILL.md` → classify each section (1–2h manual analysis)
+- [ ] Write `prompts/pm/system_quality_rules.md` + `prompts/generic/system_quality_rules.md`
+- [ ] `core/llm_client.py` — load + inject in system prompt construction
+- [ ] Verify: `ClaudeCodeProvider` can accept additional system context (test with `--system-prompt` or inline)
+- [ ] Quality comparison test on 1–2 real vacancies
+
+**Note:** per-user `skill/users/[id]/SKILL.md` quality sections go into user-level quality rules, not global. This is how the system already works in skill mode — global rules apply to everyone, user-level rules override or extend.
 
 ---
 
@@ -434,10 +502,31 @@ If the user regenerates the CV (new markdown) or edits it manually, the existing
 
 ---
 
-## 🟡 P1 — Phase 2.5 Objection Handling (added 2026-06-05)
+## 🟠 P1 — Phase 2.5 Objection Handling in Flutter (4-C4)
 
-New pipeline step formalized in `skill/SKILL.md` → "Phase 2.5 — Objection Handling": when Key Barriers ≠ none, resolve weaknesses interactively BEFORE CV draft; resolved evidence appended to PROFILE.md + JD_analysis.md.
-**Follow-up:** dedicated `prompts/[skill_type]/phase2_5_objections.md` prompt file (currently spec lives in SKILL.md). Optional DB `analysis_json.p2_5`.
+**What:** When Phase 1+2 analysis finds Key Barriers (e.g., "no Enterprise CRM experience", "no B2B domain"), the pipeline pauses and presents each barrier to the candidate. The candidate responds with evidence or acknowledges the gap. The system classifies each response as `resolved` (barrier mitigated by evidence the candidate can demonstrate) or `gap` (real, unresolvable gap). Classification result feeds Phase 3 — the CV must address resolved barriers directly and avoid overclaiming on real gaps.
+
+**Why critical:** Without this step, CV generation is blind to the candidate's counter-arguments. Phase 3 has no context about whether barriers are real or can be overcome. Result: CV misses key positioning opportunities ("my HostiServer CRM work directly covers this"), or worse, generates generic text that ignores barriers the hiring manager will immediately notice. This step is the most intellectually honest part of the pipeline — it separates "I can overcome this barrier with evidence" from "I genuinely don't have this".
+
+**Expected value:** Measurable CV quality improvement for vacancies rated "take a chance" or "apply — limited upside". User actively participates in the analysis → greater ownership and trust in the output. Eliminates the worst CV failure mode: generic cover of a real gap.
+
+**Current state:** spec lives in `skill/SKILL.md` "Phase 2.5 — Objection Handling". Phase prompt file does not exist yet. No Flutter UI. The skill mode handles it as an interactive dialogue in the conversation; API/Flutter has no equivalent.
+
+**Flutter implementation plan:**
+- After Phase 1+2 completes → check `analysis_json.p2.key_barriers` — if non-empty, show `BarrierResponseScreen`
+- Each barrier shown with title + explanation + free-text response field
+- Submit → LLM call (new `prompts/[skill_type]/phase2_5_objections.md`) classifies each response → `resolved | gap`
+- Result persisted to `analysis_json.p2_5 = [{barrier, response, verdict}]`
+- Phase 3 prompt injection: resolved barriers → "Address directly in CV", gap barriers → "Do not overclaim"
+- If no Key Barriers → skip screen entirely, proceed directly to CV generation
+
+**Backend scope:**
+- `prompts/pm/phase2_5_objections.md` + `prompts/generic/phase2_5_objections.md` — classification prompt
+- `POST /api/vacancies/{id}/barrier-responses` — accepts `{responses: [{barrier_id, text}]}`, returns classified `p2_5`
+- `db/database.py` — save `p2_5` block to `analysis_json`
+- `tools/cv_generate.py` — read `p2_5` from analysis_json, inject resolved/gap context before Phase 3
+
+**Dependency:** needs Flutter UI design for the response screen before backend implementation makes sense. Deferred for this reason as 4-C4.
 
 ---
 
