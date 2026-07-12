@@ -69,7 +69,7 @@ class _ProcessingWrapperState extends State<ProcessingWrapper>
             child: AnimatedBuilder(
               animation: _ctrl,
               builder: (_, _) => CustomPaint(
-                painter: _SnakePainter(
+                painter: SnakePainter(
                   progress: _ctrl.value,
                   color: cs.primary,
                   radius: widget.borderRadius,
@@ -131,7 +131,7 @@ class _ProcessingWrapperState extends State<ProcessingWrapper>
 
 // ─── Snake border painter ─────────────────────────────────────────────────────
 
-class _SnakePainter extends CustomPainter {
+class SnakePainter extends CustomPainter {
   final double progress; // 0.0..1.0, repeating
   final Color color;
   final double radius;
@@ -140,7 +140,7 @@ class _SnakePainter extends CustomPainter {
   static const _strokeWidth = 2.0;
   static const _steps = 20; // gradient segments
 
-  const _SnakePainter({
+  const SnakePainter({
     required this.progress,
     required this.color,
     required this.radius,
@@ -193,6 +193,6 @@ class _SnakePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_SnakePainter old) =>
+  bool shouldRepaint(SnakePainter old) =>
       old.progress != progress || old.color != color;
 }
