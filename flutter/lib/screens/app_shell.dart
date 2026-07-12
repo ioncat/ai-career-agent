@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:ui';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -52,7 +53,10 @@ class _AppShellState extends ConsumerState<AppShell> {
     );
     if (result == null || result.files.isEmpty) return;
     final file = result.files.first;
-    final bytes = file.bytes;
+    var bytes = file.bytes;
+    if (bytes == null && file.path != null) {
+      bytes = await File(file.path!).readAsBytes();
+    }
     if (bytes == null) return;
 
     final content = utf8.decode(bytes, allowMalformed: true);
@@ -72,7 +76,7 @@ class _AppShellState extends ConsumerState<AppShell> {
       if (!mounted) return;
       messenger.showSnackBar(SnackBar(
         content: Text('Imported: $title (#$vacancyId)'),
-        duration: const Duration(seconds: 3),
+        duration: const Duration(seconds: 5),
       ));
     } catch (e) {
       if (!mounted) return;

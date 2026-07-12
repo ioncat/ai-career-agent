@@ -478,9 +478,9 @@ async def test_import_jd_happy_path(client, tmp_path):
     assert resp.status_code == 201
     data = resp.json()
     assert "vacancy_id" in data
-    assert data["title"] == "Senior PM — Acme"
+    assert data["title"] == "Senior PM"  # extracted from H1, not filename
 
-    rows = await database.list_vacancies(status="new", user_id=uid)
+    rows = await database.list_vacancies(status="fetched", user_id=uid)
     assert len(rows) == 1
     assert rows[0]["site"] == "manual"
 
@@ -534,10 +534,67 @@ async def test_import_jd_title_strips_extension(client):
     """POST /api/vacancies/import-jd strips .md/.txt extension from filename for title."""
     uid = await database.insert_user(name="ExtUser", telegram_chat_id=9003, skill_type="pm")
 
+    # No H1 in content → title falls back to filename (extension stripped)
     resp = client.post("/api/vacancies/import-jd", json={
-        "content": "# Product Owner\n\nJob description here.",
+        "content": "Job description without any heading here.",
         "filename": "Product Owner — StartupXYZ.txt",
         "user_id": uid,
     })
     assert resp.status_code == 201
     assert resp.json()["title"] == "Product Owner — StartupXYZ"
+
+
+@pytest.mark.asyncio
+async def test_import_jd_site_detection(client, tmp_path):
+    """POST /api/vacancies/import-jd detects site from URL in content."""
+    uid = await database.insert_user(name="SiteUser", telegram_chat_id=9004, skill_type="pm")
+
+    cases = [
+        ("https://djinni.co/jobs/123-pm", "djinni"),
+        ("https://jobs.dou.ua/companies/acme/vacancies/456", "dou"),
+        ("https://work.ua/jobs/789", "work"),
+        ("No URL here at all.", "manual"),
+    ]
+    for i, (url_in_content, expected_site) in enumerate(cases):
+        content = f"# Role {i}\n\nSource: {url_in_content}\n\nDescription."
+        resp = client.post("/api/vacancies/import-jd", json={
+            "content": content,
+            "filename": f"role_{i}.md",
+            "user_id": uid,
+        })
+        assert resp.status_code == 201, f"case {i}: {resp.text}"
+        vid = resp.json()["vacancy_id"]
+        rows = await database.list_vacancies(user_id=uid)
+        row = next((dict(r) for r in rows if r["id"] == vid), None)
+        assert row is not None
+        assert row["site"] == expected_site, f"case {i}: expected {expected_site}, got {row['site']}"
+
+
+@pytest.mark.asyncio
+async def test_import_jd_title_extraction(client, tmp_path):
+    """POST /api/vacancies/import-jd extracts clean role + company from content."""
+    uid = await database.insert_user(name="TitleUser", telegram_chat_id=9005, skill_type="pm")
+
+    # work.ua format
+    content_work = (
+        "# Вакансія Product Manager, Дистанційно, компанія Deus Robotics\n\n"
+        "https://work.ua/jobs/123\n\nDescription here."
+    )
+    resp = client.post("/api/vacancies/import-jd", json={
+        "content": content_work, "filename": "jd.md", "user_id": uid,
+    })
+    assert resp.status_code == 201
+    assert resp.json()["title"] == "Product Manager"
+
+    rows = await database.list_vacancies(user_id=uid)
+    row = next(dict(r) for r in rows if r["id"] == resp.json()["vacancy_id"])
+    assert row["company"] == "Deus Robotics"
+    assert row["site"] == "work"
+
+    # Generic H1, no company
+    content_generic = "# Senior Product Owner\n\nWe are hiring a Senior PO."
+    resp2 = client.post("/api/vacancies/import-jd", json={
+        "content": content_generic, "filename": "po.md", "user_id": uid,
+    })
+    assert resp2.status_code == 201
+    assert resp2.json()["title"] == "Senior Product Owner"
