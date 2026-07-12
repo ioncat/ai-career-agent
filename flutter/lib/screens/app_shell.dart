@@ -12,6 +12,7 @@ import '../repositories/vacancy_repository.dart';
 import '../services/notification_service.dart';
 import '../widgets/backend_status_dot.dart';
 import '../widgets/polling_progress_bar.dart';
+import '../widgets/processing_wrapper.dart' show SnakePainter;
 import '../widgets/status_line.dart';
 import 'vacancy_inbox_screen.dart';
 import 'settings_screen.dart';
@@ -297,68 +298,158 @@ class _AppNavRail extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            // Nav items
-            ..._kNavItems.asMap().entries.map((e) {
+            // Main nav items: Inbox, Applied, Archive (indices 0–2)
+            ..._kNavItems.take(3).toList().asMap().entries.map((e) {
               final i = e.key;
-              final item = e.value;
-              final selected = selectedIndex == i;
-              // Inbox badge = unread vacancies; Settings badge = unread pipeline events
-              final badgeCount = i == 0
-                  ? inboxCount
-                  : i == 3
-                      ? unreadNotifCount
-                      : 0;
               return _NavRailItem(
-                item: item,
-                selected: selected,
-                badgeCount: badgeCount,
+                item: e.value,
+                selected: selectedIndex == i,
+                badgeCount: i == 0 ? inboxCount : 0,
                 onTap: () => onSelected(i),
               );
             }),
             const Spacer(),
-            Tooltip(
-              message: 'Add new vacancy',
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(4, 0, 4, 16),
-                child: InkWell(
-                  onTap: onAddVacancy,
-                  mouseCursor: SystemMouseCursors.click,
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    decoration: BoxDecoration(
-                      color: cs.primaryContainer,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.note_add_outlined,
-                            color: cs.onPrimaryContainer, size: 22),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Add',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: cs.onPrimaryContainer,
-                            fontFamily: 'Hanken Grotesk',
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+            // Add vacancy button
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 0, 4, 0),
+              child: _AddVacancyButton(onTap: onAddVacancy),
+            ),
+            // Separator before Settings
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              child: Divider(
+                height: 1,
+                thickness: 0.5,
+                color: cs.outlineVariant.withValues(alpha: 0.4),
               ),
             ),
+            // Settings (index 3)
+            _NavRailItem(
+              item: _kNavItems[3],
+              selected: selectedIndex == 3,
+              badgeCount: unreadNotifCount,
+              onTap: () => onSelected(3),
+            ),
+            const SizedBox(height: 12),
           ],
         ),
       ),
     );
   }
 }
+
+// ── Add Vacancy button with snake-on-hover ────────────────────────────────────
+
+class _AddVacancyButton extends StatefulWidget {
+  final VoidCallback onTap;
+  const _AddVacancyButton({required this.onTap});
+
+  @override
+  State<_AddVacancyButton> createState() => _AddVacancyButtonState();
+}
+
+class _AddVacancyButtonState extends State<_AddVacancyButton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  bool _hovered = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2200),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Tooltip(
+      message: 'Add new vacancy',
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) {
+          setState(() => _hovered = true);
+          _ctrl.repeat();
+        },
+        onExit: (_) {
+          setState(() => _hovered = false);
+          _ctrl.stop();
+        },
+        child: GestureDetector(
+          onTap: widget.onTap,
+          child: Stack(
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: _hovered
+                      ? cs.primaryContainer.withValues(alpha: 0.4)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                  border: _hovered
+                      ? null
+                      : Border.all(
+                          color: cs.outlineVariant.withValues(alpha: 0.7),
+                          width: 1.5,
+                        ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.note_add_outlined,
+                      color: _hovered ? cs.primary : cs.onSurfaceVariant,
+                      size: 22,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Add',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: _hovered ? cs.primary : cs.onSurfaceVariant,
+                        fontFamily: 'Hanken Grotesk',
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+              if (_hovered)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: AnimatedBuilder(
+                      animation: _ctrl,
+                      builder: (_, _) => CustomPaint(
+                        painter: SnakePainter(
+                          progress: _ctrl.value,
+                          color: cs.primary,
+                          radius: 8,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _NavRailItem extends StatelessWidget {
   final _NavItem item;
