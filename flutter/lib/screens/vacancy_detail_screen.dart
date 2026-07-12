@@ -773,8 +773,10 @@ class _RelatedChip extends StatelessWidget {
     return Tooltip(
       message: tooltip,
       preferBelow: true,
-      child: GestureDetector(
-      onTap: onTap,
+      child: MouseRegion(
+        cursor: onTap != null ? SystemMouseCursors.click : MouseCursor.defer,
+        child: GestureDetector(
+        onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
@@ -816,6 +818,7 @@ class _RelatedChip extends StatelessWidget {
           ],
         ),
       ),
+        ),
       ),
     );
   }
@@ -2035,7 +2038,9 @@ class _SalaryInlineState extends State<_SalaryInline> {
     final hasSalary = _committedSalary?.isNotEmpty == true;
     return Tooltip(
       message: 'Click to edit salary',
-      child: GestureDetector(
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
         onTap: () => setState(() => _editing = true),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -2060,6 +2065,7 @@ class _SalaryInlineState extends State<_SalaryInline> {
               Icon(Icons.edit, size: 11, color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
             ],
           ],
+        ),
         ),
       ),
     );
@@ -2597,6 +2603,7 @@ class _CollapsibleSectionState extends State<_CollapsibleSection> {
         children: [
           InkWell(
             onTap: () => setState(() => _expanded = !_expanded),
+            mouseCursor: SystemMouseCursors.click,
             borderRadius: BorderRadius.circular(16),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
