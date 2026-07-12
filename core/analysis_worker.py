@@ -80,8 +80,13 @@ class AnalysisWorker:
 
     async def _run(self) -> None:
         while True:
-            vacancy_id = await self._queue.get()
-            asyncio.create_task(self._execute(vacancy_id))
+            try:
+                vacancy_id = await asyncio.wait_for(self._queue.get(), timeout=300)
+                asyncio.create_task(self._execute(vacancy_id))
+            except asyncio.TimeoutError:
+                # Periodic sweep: pick up any analysis_queued vacancies missed by enqueue()
+                # (e.g. set via standalone tracker fallback while agent.py wasn't serving)
+                await self._recover_queued()
 
     async def _execute(self, vacancy_id: int) -> None:
         from tools.cv_analyze import cv_analyze
