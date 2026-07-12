@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'dart:ui';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/health.dart';
@@ -6,6 +8,7 @@ import '../providers/health_provider.dart';
 import '../providers/notification_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/vacancy_list_provider.dart';
+import '../repositories/vacancy_repository.dart';
 import '../services/notification_service.dart';
 import '../widgets/backend_status_dot.dart';
 import '../widgets/polling_progress_bar.dart';
@@ -40,6 +43,45 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   static const _folders = ['inbox', 'applied', 'archive'];
 
+  Future<void> _importJd() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['md', 'txt'],
+      allowMultiple: false,
+    );
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.first;
+    final bytes = file.bytes;
+    if (bytes == null) return;
+
+    final content = utf8.decode(bytes, allowMalformed: true);
+    final settings = ref.read(settingsProvider).valueOrNull;
+    if (settings == null) return;
+    final repo = VacancyRepository(baseUrl: settings.apiUrl);
+
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final (:vacancyId, :title) = await repo.importJd(
+        content: content,
+        filename: file.name,
+        userId: 1,
+      );
+      ref.read(vacancyListProvider.notifier).refresh();
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(
+        content: Text('Imported: $title (#$vacancyId)'),
+        duration: const Duration(seconds: 3),
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(SnackBar(
+        content: Text('Import failed: $e'),
+        backgroundColor: Theme.of(context).colorScheme.error,
+        duration: const Duration(seconds: 4),
+      ));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -127,6 +169,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                             inboxCount: inboxCount,
                             unreadNotifCount: unreadNotifCount,
                             onSelected: (i) => setState(() => _selectedIndex = i),
+                            onAddVacancy: _importJd,
                           ),
                           // Thin divider
                           VerticalDivider(
@@ -214,12 +257,14 @@ class _AppNavRail extends StatelessWidget {
   final int inboxCount;
   final int unreadNotifCount;
   final ValueChanged<int> onSelected;
+  final VoidCallback onAddVacancy;
 
   const _AppNavRail({
     required this.selectedIndex,
     required this.inboxCount,
     required this.unreadNotifCount,
     required this.onSelected,
+    required this.onAddVacancy,
   });
 
   @override
@@ -271,6 +316,42 @@ class _AppNavRail extends StatelessWidget {
               );
             }),
             const Spacer(),
+            Tooltip(
+              message: 'Add new vacancy',
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(4, 0, 4, 16),
+                child: InkWell(
+                  onTap: onAddVacancy,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: cs.primaryContainer,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.note_add_outlined,
+                            color: cs.onPrimaryContainer, size: 22),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Add',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: cs.onPrimaryContainer,
+                            fontFamily: 'Hanken Grotesk',
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),

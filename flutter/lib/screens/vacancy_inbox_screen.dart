@@ -1,12 +1,8 @@
-import 'dart:convert';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/vacancy.dart';
 import '../providers/read_vacancies_provider.dart';
-import '../providers/settings_provider.dart';
 import '../providers/vacancy_list_provider.dart';
-import '../repositories/vacancy_repository.dart';
 import '../widgets/processing_wrapper.dart';
 import '../widgets/vacancy_card.dart';
 import 'vacancy_detail_screen.dart';
@@ -80,51 +76,7 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
     super.dispose();
   }
 
-  Future<void> _importJd() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['md', 'txt'],
-      allowMultiple: false,
-    );
-    if (result == null || result.files.isEmpty) return;
-
-    final file = result.files.first;
-    final bytes = file.bytes;
-    if (bytes == null) return;
-
-    final content = utf8.decode(bytes, allowMalformed: true);
-    final filename = file.name;
-
-    final settings = ref.read(settingsProvider).valueOrNull;
-    if (settings == null) return;
-    final repo = VacancyRepository(baseUrl: settings.apiUrl);
-
-    if (!mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
-
-    try {
-      final (:vacancyId, :title) = await repo.importJd(
-        content: content,
-        filename: filename,
-        userId: 1,
-      );
-      ref.read(vacancyListProvider.notifier).refresh();
-      if (!mounted) return;
-      messenger.showSnackBar(SnackBar(
-        content: Text('Imported: $title (#$vacancyId)'),
-        duration: const Duration(seconds: 3),
-      ));
-    } catch (e) {
-      if (!mounted) return;
-      messenger.showSnackBar(SnackBar(
-        content: Text('Import failed: $e'),
-        backgroundColor: Theme.of(context).colorScheme.error,
-        duration: const Duration(seconds: 4),
-      ));
-    }
-  }
-
-  List<VacancyListItem> _filter(List<VacancyListItem> all) {
+List<VacancyListItem> _filter(List<VacancyListItem> all) {
     final q = _searchQuery;
     return all.where((v) {
       if (q.isNotEmpty) {
@@ -219,9 +171,7 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
         // Master: vacancy list (360px, bg-surface)
         SizedBox(
           width: 360,
-          child: Stack(
-            children: [
-              Container(
+          child: Container(
             color: cs.surface,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -334,20 +284,6 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
                 ),
               ],
             ),
-          ),
-              Positioned(
-                right: 12,
-                bottom: 12,
-                child: Tooltip(
-                  message: 'Add new vacancy',
-                  child: FloatingActionButton(
-                    mini: true,
-                    onPressed: _importJd,
-                    child: const Icon(Icons.add),
-                  ),
-                ),
-              ),
-            ],
           ),
         ),
         // Vertical divider
