@@ -29,8 +29,8 @@ A vacancy already in DB (analyzed, declined, or buried) gets re-published or bum
 - If `published_at` newer AND vacancy `status` = `declined` / `skipped`:
   - Update `published_at`, set `republished_at = now()`, transition status → `fetched`
   - Flutter badge: "↑ Повторно опубликована · Ранее отклонена"
-- If vacancy `status` = `analyzed` / `inbox`: update `published_at` only, no status change, no badge
-- If vacancy `status` = `analyzing` / active: ignore entirely
+- If vacancy `status` = `analyzed` / settled (fetched, analysis_failed, cv_*): update `published_at` only, no status change, no badge → rises in date-sorted inbox (implemented 2026-07-13, see CHANGELOG)
+- If vacancy `status` = `analyzing` / active (queued, generating): ignore entirely, leave untouched
 
 **Inbox sorting:**
 - Old: `ORDER BY id DESC` (insertion order)

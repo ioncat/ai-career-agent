@@ -594,6 +594,21 @@ async def on_vacancy_republished(vacancy_id: int, new_published_at: str) -> None
         await db.commit()
 
 
+async def bump_published_at(vacancy_id: int, new_published_at: str) -> None:
+    """Refresh published_at for a settled vacancy re-published in RSS.
+
+    Used when the vacancy is analyzed/inbox (not declined) — the employer bumped
+    the posting, so it should rise in the date-sorted inbox. No status change,
+    no republished_at badge (that is reserved for declined/skipped re-publishes).
+    """
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE vacancies SET published_at = ? WHERE id = ?",
+            (new_published_at, vacancy_id),
+        )
+        await db.commit()
+
+
 async def update_published_at(vacancy_id: int, published_at: str) -> None:
     """Update published_at only (vacancy bumped in feed but not re-published for our purposes)."""
     async with get_db() as db:

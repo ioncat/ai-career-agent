@@ -207,8 +207,8 @@ async def test_new_vacancy_republish_same_date_returns_409(client):
 
 
 @pytest.mark.asyncio
-async def test_new_vacancy_analyzed_still_409(client):
-    """POST /api/new-vacancy for an analyzed (non-declined) vacancy still returns 409."""
+async def test_new_vacancy_analyzed_bumps_published_at(client):
+    """Analyzed vacancy re-published with newer date → published_at bumped, status unchanged, no badge."""
     uid = await database.insert_user(name="AnalyzedUser", telegram_chat_id=5003, skill_type="pm")
     url = "https://djinni.co/jobs/402/"
 
@@ -220,7 +220,70 @@ async def test_new_vacancy_analyzed_still_409(client):
         "user_id": uid,
         "published_at": "2026-07-01T10:00:00",
     })
+    assert resp.status_code == 201
+    assert resp.json()["status"] == "bumped"
+
+    row = await database.get_vacancy_by_id(vid)
+    assert row["published_at"] == "2026-07-01T10:00:00"  # rises in date-sorted inbox
+    assert row["status"] == "analyzed"                    # no status change
+    assert row["republished_at"] is None                  # no republished badge
+
+
+@pytest.mark.asyncio
+async def test_new_vacancy_bump_null_published_at(client):
+    """Analyzed vacancy with NULL published_at (pre-EPIC-26) gets bumped when RSS sends a date."""
+    uid = await database.insert_user(name="NullPubUser", telegram_chat_id=5004, skill_type="pm")
+    url = "https://jobs.dou.ua/companies/x/vacancies/360603/"
+
+    vid = await database.insert_vacancy(url=url, user_id=uid, published_at=None)
+    await database.update_vacancy_status(vid, "analyzed")
+
+    resp = client.post("/api/new-vacancy", json={
+        "url": url,
+        "user_id": uid,
+        "published_at": "2026-07-13T10:00:00",
+    })
+    assert resp.status_code == 201
+    assert resp.json()["status"] == "bumped"
+    row = await database.get_vacancy_by_id(vid)
+    assert row["published_at"] == "2026-07-13T10:00:00"
+
+
+@pytest.mark.asyncio
+async def test_new_vacancy_analyzed_same_date_returns_409(client):
+    """Analyzed vacancy re-published with same/older date → 409, no change."""
+    uid = await database.insert_user(name="AnalyzedSame", telegram_chat_id=5005, skill_type="pm")
+    url = "https://djinni.co/jobs/403/"
+
+    vid = await database.insert_vacancy(url=url, user_id=uid, published_at="2026-06-01T10:00:00")
+    await database.update_vacancy_status(vid, "analyzed")
+
+    resp = client.post("/api/new-vacancy", json={
+        "url": url,
+        "user_id": uid,
+        "published_at": "2026-06-01T10:00:00",
+    })
     assert resp.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_new_vacancy_active_not_disturbed(client):
+    """Vacancy in-flight (analyzing) is left untouched on re-publish → 409, no date change."""
+    uid = await database.insert_user(name="ActiveUser", telegram_chat_id=5006, skill_type="pm")
+    url = "https://djinni.co/jobs/404/"
+
+    vid = await database.insert_vacancy(url=url, user_id=uid, published_at="2026-06-01T10:00:00")
+    await database.update_vacancy_status(vid, "analyzing")
+
+    resp = client.post("/api/new-vacancy", json={
+        "url": url,
+        "user_id": uid,
+        "published_at": "2026-07-01T10:00:00",
+    })
+    assert resp.status_code == 409
+    row = await database.get_vacancy_by_id(vid)
+    assert row["published_at"] == "2026-06-01T10:00:00"  # untouched
+    assert row["status"] == "analyzing"
 
 
 # ── PATCH /api/vacancies/{id}/applied ─────────────────────────────────────────

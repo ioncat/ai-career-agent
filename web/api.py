@@ -470,6 +470,12 @@ def _site_from_url(url: str) -> str | None:
     return None
 
 
+# Statuses where work is in flight — a re-publish must not disturb them.
+_ACTIVE_STATUSES = frozenset(
+    {"queued", "fetching", "analysis_queued", "analyzing", "cv_queued", "cv_generating", "cover_generating"}
+)
+
+
 class NewVacancyRequest(BaseModel):
     url: str
     title: str | None = None
@@ -489,13 +495,22 @@ async def api_new_vacancy(req: NewVacancyRequest):
     """
     existing = await database.get_vacancy_by_url(req.url)
     if existing is not None:
-        # Re-publish detection: declined/skipped vacancy reappears in RSS feed
-        if existing["status"] in ("declined", "skipped") and req.published_at:
-            existing_pub = existing["published_at"] or ""
-            if req.published_at > existing_pub:
+        # Re-publish detection: employer bumped the posting → it reappears in RSS
+        # with a newer published_at. Two responses depending on prior state:
+        #   declined/skipped → reopen (status→fetched, republished badge)
+        #   settled (analyzed/fetched/failed/cv_*) → bump published_at so it rises
+        #     in the date-sorted inbox; no status change, no badge
+        #   active (analyzing/queued/generating) → leave untouched
+        status = existing["status"]
+        if req.published_at and req.published_at > (existing["published_at"] or ""):
+            if status in ("declined", "skipped"):
                 await database.on_vacancy_republished(existing["id"], req.published_at)
                 log.info("api/new-vacancy: republished v#%d url=%s", existing["id"], req.url)
                 return {"vacancy_id": existing["id"], "status": "republished"}
+            if status not in _ACTIVE_STATUSES:
+                await database.bump_published_at(existing["id"], req.published_at)
+                log.info("api/new-vacancy: bumped v#%d url=%s", existing["id"], req.url)
+                return {"vacancy_id": existing["id"], "status": "bumped"}
         raise HTTPException(status_code=409, detail="duplicate")
     try:
         vacancy_id = await database.insert_vacancy(

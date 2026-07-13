@@ -6,6 +6,10 @@
 
 ---
 
+## 2026-07-13
+
+- **Bug fix — re-publish bump for analyzed vacancies never fired**: EPIC-26 design said a settled (`analyzed`/inbox) vacancy re-published in RSS with a newer `published_at` should update its date and rise in the inbox, but `api_new_vacancy` only handled `declined`/`skipped` (republish) and fell through to `409 duplicate` for everything else — so employer bumps on already-analyzed roles were silently dropped and the vacancy stayed buried (also left pre-EPIC-26 rows with `published_at=NULL` stuck at the bottom, e.g. #73 DOU come-back-agency). Fix: `bump_published_at()` DB helper + new branch — settled statuses → update `published_at` only (no status change, no badge, returns `status=bumped`); active statuses (`analyzing`/queued/generating) left untouched; `declined`/`skipped` still reopen. Rewrote `test_new_vacancy_analyzed_still_409` (locked the buggy behaviour) → `_bumps_published_at`; +3 tests (NULL bump, same-date 409, active-not-disturbed). 684 total
+
 ## 2026-07-12
 
 - **EPIC-21 closed** — Deterministic vs Cognitive pipeline split: T1 (weasyprint PDF), T2 (Pydantic contracts), T3 (metrics → Python: `core/vacscore.py` + `core/cv_metrics.py`), T4 (FSM orchestrator, 4-C1/C2/C3/C5). T5/T6/T0 dropped (quality risk > latency benefit). 4-C4 (Phase 2.5 Flutter) → backlog P1
