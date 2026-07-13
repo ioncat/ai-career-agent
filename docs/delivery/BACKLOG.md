@@ -55,6 +55,20 @@
 **What:** T7 — trim PROFILE.md (remove Experience + Additional Evidence) after real pipeline test with DB evidence; T9 — onboarding interview flow (LLM-driven).
 **Spec:** [Epics/EPIC-24-progressive-profile.md](Epics/EPIC-24-progressive-profile.md)
 
+### Flutter: pipeline phase stepper in detail card (added 2026-07-13)
+**Story:** As a user, I want a strip at the top of the vacancy detail card showing which pipeline phases this vacancy has passed, so I can see at a glance whether every stage ran correctly — a clear health indicator and a strong testing aid.
+**Design:** horizontal stepper of phase chips — Analysis (p1+p2) · CV (p3+p3.5) · Signal Audit (p3.6, if enabled) · Cover (p4). Each chip has a state derived from data, not guessed:
+  - **done** — key present in `analysis_json` (`completed_phases()` already returns `['p1','p2',...]`)
+  - **in progress** — `status` is the active one (`analyzing`/`cv_generating`/`cover_generating`) → pulse
+  - **failed** — `status == 'analysis_failed'` (or cv/cover error) → red on the current phase
+  - **pending** — not reached yet → muted
+**Why testing value:** instantly shows "analysis ran but CV silently skipped", or a phase that failed without surfacing. Reuses existing `ProcessingWrapper` pulse + `analysis_json` keys — no new backend, no DB.
+**Scope:**
+- [ ] `web/api.py` — expose `completed_phases` (or derive client-side from analysis_json already in detail response)
+- [ ] Flutter `_PhaseStepper` widget at top of detail card; state machine done/current/failed/pending
+- [ ] Map status → active phase; red state on `*_failed`
+- [ ] Tooltips per chip (phase name + fit/score if available)
+
 ### Job Monitor — Error Alerting (added 2026-07-06)
 **What:** per-feed failure counter in `seen_jobs.json` → Telegram alert at 3 consecutive failures → recovery alert; `health_check.py --monitor` flag.
 **Why:** monitor is first stage; silent failure kills entire pipeline — errors currently only in logs.
