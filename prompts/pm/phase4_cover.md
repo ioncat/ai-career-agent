@@ -30,10 +30,11 @@ This sentence drives the cover opening. The cover speaks to *their situation*, n
 - First PM / founding PM roles — the core ask is ownership, not execution support
 - Founder-led / startup environments — personal contribution and individual judgment matter
 - Roles where the candidate's autonomy = the primary value delivered
+- **JD explicitly names a company pain or problem** (e.g. "ми масштабуємо поточні проєкти і запускаємо нові", "founder is still the PM", "we need someone to own vision") → use that explicit pain as the hook, regardless of company type (scaleup, enterprise, etc.). Naming their stated pain shows "I read your JD and understand your situation" — strongest possible opener.
 
 **When to use a different angle:**
-- Large enterprise / corp — impersonal scale makes pain-first feel presumptuous; use domain or delivery signal instead
-- Roles where technical depth or delivery metrics are the primary screen
+- Large enterprise / corp where JD states NO explicit pain — impersonal scale makes pain-first feel presumptuous; use domain or delivery signal instead
+- Roles where technical depth or delivery metrics are the primary screen and no pain is mentioned
 
 ---
 
@@ -85,6 +86,26 @@ The CV already contains all evidence. The cover must NOT repeat or reference spe
 - **Short bullets** — one clear fact per bullet, max 2 sentences. No nested clauses.
 - **No narrative** — not "I find this role interesting because..." — show, don't explain interest
 - **Closing must show genuine business interest** — never end with a generic "happy to connect" or "looking forward to hearing from you". One sentence on what makes this domain, product, or problem space genuinely interesting. Then an invitation that shows you want to understand their context specifically — not just get a callback. Model closing: "Would love to understand the software component: what it does today, what's breaking, and where the first sprint of real product ownership would make the most difference."
+
+---
+
+## Cover Message vs Cover Letter
+
+**Cover message** — plain text, no special formatting. Default output. Candidate pastes it anywhere: website form, LinkedIn, Telegram, email body. This is what Phase 4 generates by default.
+
+**Cover letter** — formatted PDF document with candidate header, longer, more structured. Generate only when user explicitly asks for "cover letter" or "PDF cover".
+
+---
+
+## Narrative Variant — Voice Rule (NON-NEGOTIABLE)
+
+When Variant A (narrative) is selected, the text MUST be written in first person.
+
+❌ Wrong: `"Product Owner з 5+ роками досвіду у B2B-платформах..."` — this describes someone, it is not a narrative.
+
+✅ Right: `"Я — Product Owner, який працює з..."` / `"Займаюсь B2B-платформами, де..."` — told from the narrator's (candidate's) perspective.
+
+Narrative = a small story. Even 2–3 sentences must feel like the candidate speaking, not a description of a CV entry. Variant B (bullets) may use a neutral descriptive opener — Variant A never may.
 
 ---
 
