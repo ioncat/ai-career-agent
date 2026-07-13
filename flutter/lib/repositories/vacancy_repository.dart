@@ -207,11 +207,13 @@ class VacancyRepository {
   }
 
   Future<Map<String, dynamic>> patchConfig({
+    String? llmProvider,
     String? model,
     String? thinkingEffort,
   }) async {
     final uri = Uri.parse('$baseUrl/api/config');
     final body = <String, dynamic>{};
+    if (llmProvider != null) body['llm_provider'] = llmProvider;
     if (model != null) body['model'] = model;
     if (thinkingEffort != null) body['thinking_effort'] = thinkingEffort;
     final response = await http

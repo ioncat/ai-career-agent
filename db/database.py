@@ -145,6 +145,8 @@ async def init_db() -> None:
             "ALTER TABLE vacancies ADD COLUMN duplicate_of INTEGER REFERENCES vacancies(id)",
             "ALTER TABLE vacancies ADD COLUMN content_hash TEXT",
             "ALTER TABLE vacancies ADD COLUMN republished_at TEXT",
+            # Settings: per-user LLM provider override (NULL = LLM_PROVIDER env default)
+            "ALTER TABLE user_settings ADD COLUMN llm_provider TEXT",
             # EPIC-21 C2: pipeline event log for Flutter notification polling
             """CREATE TABLE IF NOT EXISTS notifications (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -934,13 +936,14 @@ async def get_user_settings(user_id: int) -> dict:
     """Return user LLM settings. Missing row returns empty dict (caller falls back to env)."""
     async with get_db() as db:
         cursor = await db.execute(
-            "SELECT llm_model, thinking_effort FROM user_settings WHERE user_id = ?",
+            "SELECT llm_provider, llm_model, thinking_effort FROM user_settings WHERE user_id = ?",
             (user_id,),
         )
         row = await cursor.fetchone()
     if row is None:
         return {}
     return {
+        "llm_provider": row["llm_provider"],    # None if not overridden
         "llm_model": row["llm_model"],          # None if not overridden
         "thinking_effort": row["thinking_effort"],
     }
@@ -948,21 +951,23 @@ async def get_user_settings(user_id: int) -> dict:
 
 async def set_user_settings(
     user_id: int,
+    llm_provider: str | None = None,
     llm_model: str | None = None,
     thinking_effort: str = "off",
 ) -> None:
-    """Upsert LLM settings for user. llm_model=None means use env default."""
+    """Upsert LLM settings for user. None provider/model means use env default."""
     async with get_db() as db:
         await db.execute(
             """
-            INSERT INTO user_settings (user_id, llm_model, thinking_effort, updated_at)
-            VALUES (?, ?, ?, datetime('now'))
+            INSERT INTO user_settings (user_id, llm_provider, llm_model, thinking_effort, updated_at)
+            VALUES (?, ?, ?, ?, datetime('now'))
             ON CONFLICT(user_id) DO UPDATE SET
+                llm_provider = excluded.llm_provider,
                 llm_model = excluded.llm_model,
                 thinking_effort = excluded.thinking_effort,
                 updated_at = excluded.updated_at
             """,
-            (user_id, llm_model, thinking_effort),
+            (user_id, llm_provider, llm_model, thinking_effort),
         )
         await db.commit()
 

@@ -169,6 +169,7 @@ CREATE TABLE IF NOT EXISTS system_kv (
 -- ── user_settings ─────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS user_settings (
     user_id         INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    llm_provider    TEXT,                            -- NULL = use LLM_PROVIDER env default
     llm_model       TEXT,                            -- NULL = use LLM_MODEL env default
     thinking_effort TEXT    NOT NULL DEFAULT 'off',  -- 'off'|'low'|'medium'|'high'|'xhigh'|'max'
     updated_at      TEXT    NOT NULL DEFAULT (datetime('now'))

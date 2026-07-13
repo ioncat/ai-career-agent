@@ -210,8 +210,8 @@ class _AiProviderTile extends ConsumerWidget {
         data: (config) => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Provider + analysis mode — read-only
-            _ConfigRow(label: 'Provider', value: config.llmProvider),
+            // Provider — switchable dropdown; analysis mode read-only
+            _ProviderRow(config: config),
             const SizedBox(height: 8),
             _ConfigRow(label: 'Analysis mode', value: config.analysisMode),
             const Divider(height: 24),
@@ -335,6 +335,69 @@ class _EffortControl extends ConsumerWidget {
               Theme.of(context).colorScheme.primaryContainer,
         ),
       ),
+    );
+  }
+}
+
+class _ProviderRow extends ConsumerWidget {
+  final RemoteConfig config;
+
+  const _ProviderRow({required this.config});
+
+  static const _labels = {
+    'claude_api': 'Claude API (billed)',
+    'ollama_api': 'Ollama (local)',
+    'claude_cli': 'Claude CLI (\$0)',
+  };
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cs = Theme.of(context).colorScheme;
+    // Fall back to a single-item list if backend didn't send valid_providers.
+    final providers = config.validProviders.isNotEmpty
+        ? config.validProviders
+        : [config.llmProvider];
+    final current =
+        providers.contains(config.llmProvider) ? config.llmProvider : providers.first;
+
+    return Row(
+      children: [
+        SizedBox(
+          width: 120,
+          child: Text(
+            'Provider',
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: cs.onSurfaceVariant),
+          ),
+        ),
+        Expanded(
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: current,
+              isExpanded: true,
+              isDense: true,
+              borderRadius: BorderRadius.circular(8),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: cs.onSurface,
+                    fontWeight: FontWeight.w600,
+                  ),
+              items: providers
+                  .map((p) => DropdownMenuItem(
+                        value: p,
+                        child: Text(_labels[p] ?? p),
+                      ))
+                  .toList(),
+              onChanged: (p) {
+                if (p != null && p != config.llmProvider) {
+                  ref.read(remoteConfigProvider.notifier).patchProvider(p);
+                }
+              },
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
