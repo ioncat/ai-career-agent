@@ -40,7 +40,16 @@ log = logging.getLogger(__name__)
 _DB_PATH = Path(os.getenv("DB_PATH", "db/agent.db"))
 _CANDIDATE_NAME = os.getenv("CANDIDATE_NAME", "Candidate")
 _PROJECT_ROOT = Path(__file__).parent.parent.resolve()
-_VACANCIES_PATH = Path(os.getenv("VACANCIES_PATH", "vacancies"))
+
+
+def _vacancies_root() -> Path:
+    """Resolve the vacancies dir at call time (not import time).
+
+    Reading VACANCIES_PATH lazily lets tests monkeypatch it to a temp dir —
+    an import-time constant would already be bound to the real project folder,
+    causing pytest to litter vacancies/inbox/ with throwaway user folders.
+    """
+    return Path(os.getenv("VACANCIES_PATH", "vacancies"))
 
 _TEMPLATES = Jinja2Templates(directory=Path(__file__).parent / "templates")
 _TEMPLATES.env.filters["markdown"] = lambda text: md_lib.markdown(
@@ -666,7 +675,7 @@ async def api_import_jd(req: ImportJdRequest):
     await database.set_content_hash(vacancy_id, content_hash)
 
     safe_folder = _SAFE_NAME_RE.sub("", f"{vacancy_id} — {title}").strip(". ")[:80]
-    vacancy_dir = _VACANCIES_PATH / "inbox" / str(req.user_id) / safe_folder
+    vacancy_dir = _vacancies_root() / "inbox" / str(req.user_id) / safe_folder
     try:
         vacancy_dir.mkdir(parents=True, exist_ok=True)
         jd_path = vacancy_dir / "JD.md"

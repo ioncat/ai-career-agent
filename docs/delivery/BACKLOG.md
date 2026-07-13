@@ -143,11 +143,6 @@
 
 ## 🐛 Bugs
 
-### test_web_api.py creates real folders in vacancies/inbox/ (found 2026-07-12)
-**Repro:** run `pytest` → garbage user folders `vacancies/inbox/12..16` with fake vacancy subfolders.
-**Cause:** test DB is ephemeral, but `VACANCIES_PATH` points at the real project dir → endpoint folder creation lands on disk.
-**Fix:** monkeypatch vacancies dir to `tmp_path` in test fixtures. Check same pattern in `test_cv_analyze.py`, `test_cv_fetch_jd.py`.
-
 ### DB data cleanup — NULL published_at + legacy statuses (found 2026-07-13)
 **Context:** 196/578 rows (34%) have `published_at=NULL` (rows created before EPIC-26). Two independent problems, both worth fixing.
 **Part 1 — backfill dates (94 inbox-visible rows):** `analyzed`(80) + `fetched`(7) + `cover_generated`(5) + `cv_generated`(2) sit at the bottom of the date-sorted inbox ordered by `id` (random by date). Backfill `published_at = created_at` → they take their real chronological position. Low urgency (main "newest on top" flow already works — new rows have dates), helps only "find a vacancy I analyzed N days ago".
