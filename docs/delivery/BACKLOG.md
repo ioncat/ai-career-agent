@@ -23,6 +23,29 @@
 
 ## 🟠 P1
 
+### Config single source of truth — LLM provider/model/effort (added 2026-07-13)
+**Problem:** provider currently has two masters — `user_settings.llm_provider` DB override + `.env` `LLM_PROVIDER` snapshot read once at startup. Nobody can answer "who is authoritative now" without checking both; manual `.env` edits are invisible until restart; this is the exact class of the API-leak bug (system "decided" which provider to bill). Safety-critical.
+**Decision:** DB is the single source of truth (industrial-lite). `.env` only **seeds** the value on first run, then is never read for runtime switches. All reads/writes go through one seam so a future move to a config-service/multi-tenant store touches only that module.
+**Design:**
+- `core/config_store.py` — the ONLY module that knows where truth lives: `get_llm_provider()` / `set_llm_provider(v)` (+ model/effort). Docstring: "truth = user_settings DB; on multi-user/SaaS this module swaps to per-tenant store, callers unchanged."
+- Seed: on first startup, if DB has no provider row, write it from `LLM_PROVIDER` env once. Thereafter env ignored for provider.
+- Remove the env-fallback in workers' `_fresh_llm()` — read only via `config_store`.
+- **Consistency guard (drift protection):** any client mutation (Flutter PATCH) carries the provider it believes is active; backend compares with store → mismatch → **409 + "Provider changed — refresh Settings"**, never applies a setting to the wrong provider silently. Flutter re-reads `/api/config` on 409.
+- **Safety log:** every `_fresh_llm` logs `provider=X source=config_store` for incident forensics.
+- Manual override path (dev): a small CLI `scripts/set_provider.py` writes via `config_store` (no hand-editing DB).
+**Scope:**
+- [ ] `core/config_store.py` seam + tests
+- [ ] Seed-from-env once; workers read via store only; drop env fallback
+- [ ] `/api/config` GET/PATCH via store; `expected_provider` guard → 409
+- [ ] Flutter: handle 409 → refresh config + toast
+- [ ] Remove yesterday's env-snapshot reads; keep `.env` as seed only
+**Ties to:** [Epics/EPIC-25-auth-billing.md](Epics/EPIC-25-auth-billing.md) (per-user provider becomes a DB row by definition).
+
+### Architecture note — Flutter is becoming a dual client (user + admin) (added 2026-07-13)
+**Observation:** the Flutter app (Windows/Web) is now both the end-user client (inbox, analysis, CV) AND the system-admin client (Settings: provider/model/effort — billing- and safety-relevant controls). Mixing the two surfaces in one unguarded app is the risk behind the API-leak class: a regular user must never see or flip the provider.
+**Direction (decide in EPIC-25):** either (a) role-gated admin route inside the same app (Settings visible only to `admin` after auth), or (b) a separate admin console entirely. Industrial norm = admin surface is separated or RBAC-gated, never open to every user. Until auth lands, Settings stays visible for single-user dev testing — but treat it as an admin surface, not a user feature.
+**Ties to:** [Epics/EPIC-25-auth-billing.md](Epics/EPIC-25-auth-billing.md), memory `project_settings_access_control`.
+
 ### Flutter: Batch Analysis Mode (mass queue) (added 2026-07-08)
 **What:** multi-select in inbox → "Analyze N" → all queued in AnalysisWorker; queue position badge per card.
 **Why:** biggest daily friction — morning RSS batch drops from 10–15 clicks to 2; makes RSS auto-push feel automated.
