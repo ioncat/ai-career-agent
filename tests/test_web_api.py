@@ -555,6 +555,69 @@ def test_api_config_analysis_mode_full_auto(client, monkeypatch):
     assert resp.json()["analysis_mode"] == "full_auto"
 
 
+def test_api_config_exposes_valid_providers(client):
+    """GET /api/config includes the provider catalog for the Flutter dropdown."""
+    resp = client.get("/api/config")
+    assert resp.status_code == 200
+    assert resp.json()["valid_providers"] == ["claude_api", "claude_cli", "ollama_api"]
+
+
+# ── PATCH /api/config — provider switch ──────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_patch_config_provider_persists(client, monkeypatch):
+    """PATCH llm_provider stores a DB override that GET then reflects."""
+    monkeypatch.setenv("LLM_PROVIDER", "claude_api")
+    await database.insert_user(name="Cfg", telegram_chat_id=7001, skill_type="pm")
+
+    resp = client.patch("/api/config", json={"llm_provider": "claude_cli"})
+    assert resp.status_code == 200
+    assert resp.json()["llm_provider"] == "claude_cli"
+
+    # Persisted — a fresh GET reads the DB override, not the env default
+    assert client.get("/api/config").json()["llm_provider"] == "claude_cli"
+
+
+@pytest.mark.asyncio
+async def test_patch_config_switch_resets_model(client, monkeypatch):
+    """Switching provider drops the stored model → falls back to new provider's env default."""
+    monkeypatch.setenv("LLM_PROVIDER", "claude_api")
+    monkeypatch.setenv("OLLAMA_MODEL", "qwen2.5:32b")
+    await database.insert_user(name="Cfg2", telegram_chat_id=7002, skill_type="pm")
+
+    # Pin a claude model first
+    client.patch("/api/config", json={"model": "claude-opus-4-5"})
+    # Switch to ollama → the claude model must not linger
+    resp = client.patch("/api/config", json={"llm_provider": "ollama_api"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["llm_provider"] == "ollama_api"
+    assert data["model"] == "qwen2.5:32b"
+    row = await database.get_user_settings(1)
+    assert row["llm_model"] is None
+
+
+@pytest.mark.asyncio
+async def test_patch_config_invalid_provider_422(client):
+    """Unknown provider is rejected."""
+    await database.insert_user(name="Cfg3", telegram_chat_id=7003, skill_type="pm")
+    resp = client.patch("/api/config", json={"llm_provider": "gpt5"})
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_patch_config_provider_equal_env_stores_null(client, monkeypatch):
+    """Selecting the provider that equals the env default stores NULL (stays env-driven)."""
+    monkeypatch.setenv("LLM_PROVIDER", "claude_cli")
+    await database.insert_user(name="Cfg4", telegram_chat_id=7004, skill_type="pm")
+
+    resp = client.patch("/api/config", json={"llm_provider": "claude_cli"})
+    assert resp.status_code == 200
+    assert resp.json()["llm_provider"] == "claude_cli"
+    row = await database.get_user_settings(1)
+    assert row["llm_provider"] is None  # no override — tracks env
+
+
 # ── key_barriers string coercion (legacy data guard) ─────────────────────────
 
 @pytest.mark.asyncio

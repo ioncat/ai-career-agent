@@ -314,6 +314,14 @@ async def api_user_progressive_profile(user_id: int):
 
 
 _VALID_EFFORTS = {"off", "low", "medium", "high", "xhigh", "max"}
+_VALID_PROVIDERS = {"claude_api", "ollama_api", "claude_cli"}
+
+
+def _env_model_for(provider: str) -> str:
+    """Default model from env for a given provider."""
+    if provider == "ollama_api":
+        return os.getenv("OLLAMA_MODEL", "qwen2.5:32b")
+    return os.getenv("LLM_MODEL", "claude-opus-4-5")
 
 # Fallback list used when network fetch fails
 _FALLBACK_MODELS: dict[str, list[str]] = {
@@ -395,15 +403,9 @@ async def api_config():
     env vars = global defaults; user_settings DB row for user_id=1 overrides.
     available_models fetched from Anthropic/Ollama API, cached 24h in system_kv.
     """
-    provider = os.getenv("LLM_PROVIDER", "claude_api").lower()
-    env_model = (
-        os.getenv("OLLAMA_MODEL", "qwen2.5:32b")
-        if provider == "ollama_api"
-        else os.getenv("LLM_MODEL", "claude-opus-4-5")
-    )
-
     db_settings = await database.get_user_settings(1)
-    model = db_settings.get("llm_model") or env_model
+    provider = (db_settings.get("llm_provider") or os.getenv("LLM_PROVIDER", "claude_api")).lower()
+    model = db_settings.get("llm_model") or _env_model_for(provider)
     thinking_effort = db_settings.get("thinking_effort", "off") or "off"
     available_models = await _get_available_models(provider)
 
@@ -413,49 +415,69 @@ async def api_config():
         "thinking_effort": thinking_effort,
         "analysis_mode": os.getenv("ANALYSIS_MODE", "inbox_first").lower(),
         "available_models": available_models,
+        "valid_providers": sorted(_VALID_PROVIDERS),
     }
 
 
 class ConfigPatch(BaseModel):
+    llm_provider: str | None = None
     model: str | None = None
     thinking_effort: str | None = None
 
 
 @app.patch("/api/config")
 async def patch_config(body: ConfigPatch):
-    """Update LLM model and/or thinking effort for user_id=1 (admin action).
+    """Update LLM provider, model and/or thinking effort for user_id=1 (admin action).
 
-    Stored in user_settings table — overrides env defaults on next read.
-    Does NOT hot-reload the running agent; restart backend to apply to active sessions.
+    Stored in user_settings table — overrides env defaults. Workers rebuild their LLM
+    from this row before each task, so a change applies to the next queued vacancy
+    without a backend restart. Switching provider resets the model to the new
+    provider's env default (a model of one provider is invalid for another).
     """
-    provider = os.getenv("LLM_PROVIDER", "claude_api").lower()
     db_settings = await database.get_user_settings(1)
+    current_provider = (db_settings.get("llm_provider") or os.getenv("LLM_PROVIDER", "claude_api")).lower()
     current_model = db_settings.get("llm_model")
     current_effort = db_settings.get("thinking_effort", "off") or "off"
 
-    new_model = body.model if body.model is not None else current_model
-    new_effort = body.thinking_effort if body.thinking_effort is not None else current_effort
+    # Provider — validate; switching it invalidates the stored model
+    provider_switched = False
+    new_provider = current_provider
+    if body.llm_provider is not None:
+        new_provider = body.llm_provider.lower()
+        if new_provider not in _VALID_PROVIDERS:
+            raise HTTPException(status_code=422, detail=f"llm_provider must be one of {sorted(_VALID_PROVIDERS)}")
+        provider_switched = new_provider != current_provider
 
+    new_effort = body.thinking_effort if body.thinking_effort is not None else current_effort
     if new_effort not in _VALID_EFFORTS:
         raise HTTPException(status_code=422, detail=f"thinking_effort must be one of {sorted(_VALID_EFFORTS)}")
 
-    allowed = await _get_available_models(provider)
+    # Model — on provider switch, drop the stored model (falls back to new provider's default);
+    # otherwise honour explicit model, validated against the (new) provider's catalog
+    if provider_switched:
+        new_model = None
+    elif body.model is not None:
+        new_model = body.model
+    else:
+        new_model = current_model
+
+    allowed = await _get_available_models(new_provider)
     if new_model and allowed and new_model not in allowed:
-        raise HTTPException(status_code=422, detail=f"model not valid for provider {provider!r}")
+        raise HTTPException(status_code=422, detail=f"model not valid for provider {new_provider!r}")
 
-    await database.set_user_settings(1, llm_model=new_model, thinking_effort=new_effort)
-
-    env_model = (
-        os.getenv("OLLAMA_MODEL", "qwen2.5:32b")
-        if provider == "ollama_api"
-        else os.getenv("LLM_MODEL", "claude-opus-4-5")
+    # Store provider override only when it diverges from env (keeps NULL = env default)
+    provider_to_store = new_provider if new_provider != os.getenv("LLM_PROVIDER", "claude_api").lower() else None
+    await database.set_user_settings(
+        1, llm_provider=provider_to_store, llm_model=new_model, thinking_effort=new_effort
     )
+
     return {
-        "llm_provider": provider,
-        "model": new_model or env_model,
+        "llm_provider": new_provider,
+        "model": new_model or _env_model_for(new_provider),
         "thinking_effort": new_effort,
         "analysis_mode": os.getenv("ANALYSIS_MODE", "inbox_first").lower(),
         "available_models": allowed,
+        "valid_providers": sorted(_VALID_PROVIDERS),
     }
 
 

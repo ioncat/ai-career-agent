@@ -90,7 +90,7 @@ class CoverWorker:
         from core.llm_client import ClaudeCodeProvider, ClaudeProvider, OllamaProvider
 
         db_row = await database.get_user_settings(self._deps.user_id)
-        provider_type = self._settings.llm_provider
+        provider_type = (db_row.get("llm_provider") if db_row else None) or self._settings.llm_provider
 
         model = (
             (db_row.get("llm_model") if db_row else None)

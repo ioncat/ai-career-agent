@@ -8,6 +8,7 @@ class RemoteConfig {
   final String thinkingEffort;
   final String analysisMode;
   final List<String> availableModels;
+  final List<String> validProviders;
 
   const RemoteConfig({
     required this.llmProvider,
@@ -15,6 +16,7 @@ class RemoteConfig {
     required this.thinkingEffort,
     required this.analysisMode,
     required this.availableModels,
+    required this.validProviders,
   });
 
   bool get supportsModelSelection =>
@@ -30,6 +32,13 @@ class RemoteConfigNotifier extends AsyncNotifier<RemoteConfig> {
     final repo = VacancyRepository(baseUrl: settings.apiUrl);
     final data = await repo.getConfig();
     return _fromMap(data);
+  }
+
+  Future<void> patchProvider(String provider) async {
+    final settings = await ref.read(settingsProvider.future);
+    final repo = VacancyRepository(baseUrl: settings.apiUrl);
+    final data = await repo.patchConfig(llmProvider: provider);
+    state = AsyncData(_fromMap(data));
   }
 
   Future<void> patchModel(String model) async {
@@ -51,12 +60,17 @@ class RemoteConfigNotifier extends AsyncNotifier<RemoteConfig> {
     final models = rawModels is List
         ? rawModels.whereType<String>().toList()
         : <String>[];
+    final rawProviders = data['valid_providers'];
+    final providers = rawProviders is List
+        ? rawProviders.whereType<String>().toList()
+        : <String>[];
     return RemoteConfig(
       llmProvider: data['llm_provider'] as String? ?? '',
       model: data['model'] as String? ?? '',
       thinkingEffort: data['thinking_effort'] as String? ?? 'off',
       analysisMode: data['analysis_mode'] as String? ?? '',
       availableModels: models,
+      validProviders: providers,
     );
   }
 }
