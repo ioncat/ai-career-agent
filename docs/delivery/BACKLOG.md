@@ -111,6 +111,14 @@
 **Cause:** test DB is ephemeral, but `VACANCIES_PATH` points at the real project dir → endpoint folder creation lands on disk.
 **Fix:** monkeypatch vacancies dir to `tmp_path` in test fixtures. Check same pattern in `test_cv_analyze.py`, `test_cv_fetch_jd.py`.
 
+### DB data cleanup — NULL published_at + legacy statuses (found 2026-07-13)
+**Context:** 196/578 rows (34%) have `published_at=NULL` (rows created before EPIC-26). Two independent problems, both worth fixing.
+**Part 1 — backfill dates (94 inbox-visible rows):** `analyzed`(80) + `fetched`(7) + `cover_generated`(5) + `cv_generated`(2) sit at the bottom of the date-sorted inbox ordered by `id` (random by date). Backfill `published_at = created_at` → they take their real chronological position. Low urgency (main "newest on top" flow already works — new rows have dates), helps only "find a vacancy I analyzed N days ago".
+  - Fix: `UPDATE vacancies SET published_at = created_at WHERE published_at IS NULL AND status IN ('analyzed','fetched','cv_generated','cover_generated','analysis_failed')`
+**Part 2 — legacy statuses (98 rows, real debt):** `fetching`(47, stuck — process never finished), `new`(30), `done`(13), `queued`(8) are outside the current state machine → invisible in Flutter inbox (`_folderMatch` filters them) but pollute the DB and skew any status analytics.
+  - Investigate: are `fetching`(47) recoverable (re-fetch) or dead? Map legacy → current statuses (`done`→`analyzed`?, `new`→`fetched`?) or purge.
+  - Then backfill their `published_at` too, or delete if dead.
+
 ---
 
 ## 🧊 Icebox (P3+)
