@@ -78,6 +78,19 @@
 **What:** T7 — trim PROFILE.md (remove Experience + Additional Evidence) after real pipeline test with DB evidence; T9 — onboarding interview flow (LLM-driven).
 **Spec:** [Epics/EPIC-24-progressive-profile.md](Epics/EPIC-24-progressive-profile.md)
 
+### Activity: surface claude_cli token estimates + parse real CLI usage (added 2026-07-14)
+**Story:** As a tester comparing providers, I want the Activity tab to show token/cost data for claude_cli runs (currently just "—"), so I can actually compare CLI vs API consumption.
+**Findings (verified in code):** `ClaudeCodeProvider` sets `input_tokens=0/output_tokens=0/cost=0` (CLI `claude -p` returns no usage), but DOES compute + store input estimates `profile_tokens/prompt_tokens/user_tokens = len//4` in `llm_usage`. So input-side estimate exists in DB but is never shown; output is not estimated at all.
+**Two parts:**
+- **Part 1 — surface what we already store:** Activity LLM Calls table falls back to `profile+prompt+user_tokens` (estimated input) when `input_tokens==0`; mark it visually as estimate (e.g. `~12.3k est`). Cheap, no backend change beyond API exposing the fields.
+- **Part 2 — get REAL CLI numbers:** `claude -p --output-format json` returns `usage` + `total_cost_usd` in the result JSON. `ClaudeCodeProvider._run` currently reads stream and discards it → parse the final result JSON, populate real `input_tokens/output_tokens/cost_usd`. Then CLI has exact numbers like the API path. Also estimate output (`len(text)//4`) as fallback if JSON parse fails.
+**Scope:**
+- [ ] `web/api.py` activity endpoint — include profile/prompt/user_tokens; flag estimate vs exact
+- [ ] Flutter Activity table — show estimated input when exact==0, `~est` marker
+- [ ] `ClaudeCodeProvider._run` — `--output-format json`, parse usage → real tokens/cost
+- [ ] Output estimate fallback (`len//4`) when usage missing
+- [ ] Tests: CLI usage parse, estimate fallback
+
 ### Flutter: pipeline phase stepper in detail card (added 2026-07-13)
 **Story:** As a user, I want a strip at the top of the vacancy detail card showing which pipeline phases this vacancy has passed, so I can see at a glance whether every stage ran correctly — a clear health indicator and a strong testing aid.
 **Design:** horizontal stepper of phase chips — Analysis (p1+p2) · CV (p3+p3.5) · Signal Audit (p3.6, if enabled) · Cover (p4). Each chip has a state derived from data, not guessed:
