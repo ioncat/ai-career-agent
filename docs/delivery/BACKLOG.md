@@ -23,6 +23,20 @@
 
 ## 🟠 P1
 
+### Settings: auto-refresh available models on provider switch (added 2026-07-14)
+**Story:** As a user, after switching provider I want the model list to reflect what's actually available right now — especially local Ollama, where I `pull`/`rm` models between runs and a stale list is useless.
+**Problem:** `_get_available_models` caches 24h for ALL providers (`web/api.py:341,375`). Ollama models change instantly but the cache hides new ones for a day; the localhost fetch is cheap (~5s) so caching it barely helps. On provider switch the PATCH returns the cached list, not a fresh fetch.
+**Design:**
+- `_get_available_models(provider, force=False)` + per-provider TTL: `ollama_api → 0 (always fresh)`, `claude_api/claude_cli → 24h`.
+- `PATCH /api/config` on provider switch calls with `force=True` → fresh list for the new provider.
+- `GET /api/config?refresh=true` → explicit force-refresh (for "I just pulled a model, show it without re-switching").
+**Scope:**
+- [ ] `_get_available_models(provider, force)` + per-provider TTL map; Ollama bypasses cache
+- [ ] `patch_config` provider-switch path → `force=True`
+- [ ] `GET /api/config` accepts `refresh` query param
+- [ ] Flutter: "Refresh models" button next to Model dropdown → re-fetch config with refresh
+- [ ] Tests: force bypasses cache, Ollama never cached, Anthropic still cached
+
 ### Config single source of truth — LLM provider/model/effort (added 2026-07-13)
 **Problem:** provider currently has two masters — `user_settings.llm_provider` DB override + `.env` `LLM_PROVIDER` snapshot read once at startup. Nobody can answer "who is authoritative now" without checking both; manual `.env` edits are invisible until restart; this is the exact class of the API-leak bug (system "decided" which provider to bill). Safety-critical.
 **Decision:** DB is the single source of truth (industrial-lite). `.env` only **seeds** the value on first run, then is never read for runtime switches. All reads/writes go through one seam so a future move to a config-service/multi-tenant store touches only that module.
