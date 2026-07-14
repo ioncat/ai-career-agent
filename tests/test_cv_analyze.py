@@ -16,8 +16,39 @@ from tools.cv_analyze import (
     _build_analysis_file,
     _extract_quick_scan,
     _extract_vacancy_title,
+    _parse_phase2_data,
     cv_analyze,
 )
+
+
+# ── Parser robustness across provider formatting variations ───────────────────
+
+def _p2_text(fit: str, rec: str) -> str:
+    return (
+        f"## Quick Scan\n**Fit score:** {fit}/10\n**Recommendation:** {rec}\n"
+        f"**Category:** PM\n**Ideal Candidate Archetype:** X\n"
+    )
+
+
+def test_parse_phase2_decimal_fit_score():
+    """Local/small models emit '8.5/10' — parser rounds instead of failing."""
+    p2 = _parse_phase2_data(_p2_text("8.5", "Apply"), None)
+    assert p2 is not None
+    assert p2.fit_score == 8
+
+
+def test_parse_phase2_capitalised_recommendation():
+    """Provider capitalises 'Apply' — must still parse (case-insensitive)."""
+    p2 = _parse_phase2_data(_p2_text("7", "Apply — strong match"), None)
+    assert p2 is not None
+    assert p2.recommendation == "apply"
+
+
+def test_parse_phase2_integer_still_works():
+    p2 = _parse_phase2_data(_p2_text("6", "decline — not worth it"), None)
+    assert p2 is not None
+    assert p2.fit_score == 6
+    assert p2.recommendation == "decline"
 
 
 # ── Fixtures / helpers ────────────────────────────────────────────────────────

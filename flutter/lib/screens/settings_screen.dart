@@ -282,9 +282,19 @@ class _ModelDropdown extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
-    final current = config.availableModels.contains(config.model)
-        ? config.model
-        : config.availableModels.firstOrNull;
+    final saved = config.availableModels.contains(config.model);
+    final current = saved ? config.model : config.availableModels.firstOrNull;
+
+    // If the DB-saved model isn't in the current list (e.g. provider just
+    // switched → model reset to an env default that isn't a real option),
+    // the dropdown falls back to showing the first model. That display must
+    // be persisted, otherwise the pipeline silently runs the env fallback
+    // model, not the one the user sees selected. Commit it after this frame.
+    if (!saved && current != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(remoteConfigProvider.notifier).patchModel(current);
+      });
+    }
 
     return DropdownButtonHideUnderline(
       child: DropdownButton<String>(

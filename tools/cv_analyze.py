@@ -323,7 +323,8 @@ _ROLE_BALANCE_RE   = {
 }
 _CULTURE_KEYWORDS  = {"speed", "ownership", "alignment", "process", "autonomy", "predictability", "innovation"}
 
-_FIT_SCORE_RE      = re.compile(r"\*\*Fit score:\*\*\s*(\d+)/10", re.IGNORECASE)
+# Accept decimals ("8.5/10") — smaller/local models emit them; rounded in the parser.
+_FIT_SCORE_RE      = re.compile(r"\*\*Fit score:\*\*\s*(\d+(?:\.\d+)?)/10", re.IGNORECASE)
 _RECOMMENDATION_RE = re.compile(r"\*\*Recommendation:\*\*\s*(.+?)(?:\n|$)", re.IGNORECASE)
 _KEY_BARRIERS_RE   = re.compile(r"\*\*Key Barriers:\*\*\s*(.+?)(?:\n|$)", re.IGNORECASE)
 _HIDDEN_RISKS_RE   = re.compile(r"\*\*Hidden Risks:\*\*\s*(.+?)(?:\n|$)", re.IGNORECASE)
@@ -449,7 +450,7 @@ def _parse_phase2_data(phase2: str, dims: VacScoreDims | None) -> Phase2Data | N
     if not (fit_m and rec_m):
         return None
 
-    fit_score      = int(fit_m.group(1))
+    fit_score      = round(float(fit_m.group(1)))  # tolerate "8.5/10" → 8
     rec_label      = rec_m.group(1).strip()
     rec_base       = _rec_label_to_base(rec_label)
     if rec_base is None:
