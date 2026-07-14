@@ -191,6 +191,15 @@ def test_phase2_recommendation_label_must_start_with_base():
         Phase2Data(**_p2(recommendation="apply", recommendation_label="decline — strong"))
 
 
+def test_phase2_recommendation_label_case_insensitive():
+    """Providers vary capitalisation — 'Apply' must validate against base 'apply'."""
+    p = Phase2Data(**_p2(recommendation="apply", recommendation_label="Apply"))
+    assert p.recommendation_label == "Apply"
+    # Also the bare capitalised word (what tripped vacancy #660 with a switched provider)
+    p2 = Phase2Data(**_p2(recommendation="take_a_chance", recommendation_label="Take a chance — premium"))
+    assert p2.recommendation == "take_a_chance"
+
+
 def test_phase2_fit_score_bounds():
     Phase2Data(**_p2(fit_score=1))
     Phase2Data(**_p2(fit_score=10))
