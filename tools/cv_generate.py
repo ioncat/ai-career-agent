@@ -43,6 +43,7 @@ from core.cv_metrics import (
 )
 from core.deps import AgentDeps
 from core.llm_client import LLMError
+from core.translit import safe_filename_stem
 from db import database
 
 log = logging.getLogger(__name__)
@@ -204,7 +205,9 @@ async def cv_generate(
         final_cv = phase35_output
 
     # ── Save [Name]_CV.md (versioned if already exists) ──────────────────────
-    safe_name = re.sub(r"[^\w\-]", "_", ctx.deps.candidate_name)
+    # Filename is always Latin ASCII, even for Ukrainian/Russian CVs (Cyrillic
+    # filenames break filesystems/sync/email); document content stays original.
+    safe_name = safe_filename_stem(ctx.deps.candidate_name)
     cv_md_path = _next_version_path(jd_path.parent / f"{safe_name}_CV.md")
     cv_md_path.write_text(final_cv, encoding="utf-8")
     log.info("cv_generate: saved CV.md → %s", cv_md_path)
