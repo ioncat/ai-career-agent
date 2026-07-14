@@ -123,6 +123,15 @@
 - [ ] Map status → active phase; red state on `*_failed`
 - [ ] Tooltips per chip (phase name + fit/score if available)
 
+### Settings: decide what the "Save" button does (added 2026-07-14)
+**Problem:** Settings has a mixed save model that misled the user into thinking model changes weren't applied. `_save()` persists ONLY apiUrl / pollInterval / notifications. Provider/model/effort save **instantly** via each control's `onChanged` (patchProvider/patchModel/patchEffort) — Save does not touch them. So "pick model → Save" felt like it saved the model; it didn't (see the model-selection bug fixed 2026-07-14).
+**Decision needed — pick one:**
+- **(a) Save saves everything** — collect provider/model/effort into `_save()`, remove instant-apply; single explicit commit. Most intuitive, matches user expectation.
+- **(b) No Save for LLM config** — drop the Save button's relevance to the AI Provider block (or move Save out); make it visually clear LLM settings apply instantly (e.g. inline "✓ applied" per control). Keep Save only for connection settings.
+- **(c) Split** — "Save" only for connection block; AI Provider block shows its own instant-apply affordance.
+**Recommendation:** (b) or (c) — instant-apply already works and is safer (no half-saved state); just remove the misleading Save coupling + add per-control applied feedback.
+**Scope:** decide → implement chosen option; `settings_screen.dart` `_save()` + AI Provider block affordance.
+
 ### Job Monitor — Error Alerting (added 2026-07-06)
 **What:** per-feed failure counter in `seen_jobs.json` → Telegram alert at 3 consecutive failures → recovery alert; `health_check.py --monitor` flag.
 **Why:** monitor is first stage; silent failure kills entire pipeline — errors currently only in logs.
