@@ -17,7 +17,6 @@ Receives shared dependencies via RunContext[AgentDeps].
 """
 
 import logging
-import re
 import time
 from pathlib import Path
 
@@ -25,6 +24,7 @@ from pydantic_ai import RunContext
 
 from core.deps import AgentDeps
 from core.llm_client import LLMError
+from core.translit import safe_filename_stem
 from db import database
 
 log = logging.getLogger(__name__)
@@ -83,7 +83,8 @@ async def cv_cover(ctx: RunContext[AgentDeps], vacancy_id: int) -> str:
             f"Сначала запусти анализ для вакансии #{vacancy_id}."
         )
 
-    safe_name = re.sub(r"[^\w\-]", "_", ctx.deps.candidate_name)
+    # Latin ASCII stem — same rule as cv_generate so the CV glob matches.
+    safe_name = safe_filename_stem(ctx.deps.candidate_name)
     cv_candidates = sorted(jd_path.parent.glob(f"{safe_name}_CV*.md"))
     if not cv_candidates:
         return (

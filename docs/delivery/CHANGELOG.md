@@ -6,6 +6,10 @@
 
 ---
 
+## 2026-07-14
+
+- **Bug fix — Ukrainian CV/Cover files saved with Cyrillic names**: `re.sub(r"[^\w\-]", "_", name)` left Cyrillic intact because Python `\w` is Unicode-aware → `Олексій_Бондаренко_CV.md` (breaks filesystems/sync/email attachments). New `core/translit.py` (`to_latin` UA+RU table, `safe_filename_stem`) → filenames are always Latin ASCII (`Oleksii_Bondarenko_CV.md`); document content stays in its original language. Applied in `cv_generate` + `cv_cover` (same stem so the CV glob still matches; PDF inherits the Latin name from the MD path). 8 new tests (697 total). Note: pre-fix CVs saved with Cyrillic names must be regenerated to get Latin filenames.
+
 ## 2026-07-13
 
 - **Bug fix — pytest littered `vacancies/inbox/` with throwaway user folders**: `web/api.py` bound `_VACANCIES_PATH` at import time from `VACANCIES_PATH` env → the test fixture's `monkeypatch.setenv` ran too late, so `POST /api/vacancies/import-jd` created real folders (`inbox/15..23/…`) under the project dir on every test run (real users are only 1, 2). Fix: replaced the import-time constant with a `_vacancies_root()` helper that reads env at call time → fixture's temp dir now wins. Verified: full 689-test suite leaves `inbox/` with only real users 1, 2. Cleaned 9 stray test folders (15–23) off disk. (`test_cv_analyze`/`test_cv_fetch_jd` were already safe — they use `deps.vacancies_path=tmp`.)
