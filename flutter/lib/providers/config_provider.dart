@@ -19,9 +19,11 @@ class RemoteConfig {
     required this.validProviders,
   });
 
-  bool get supportsModelSelection =>
-      llmProvider != 'ollama_api' && availableModels.isNotEmpty;
+  // Any provider with a fetched model list gets a dropdown — including Ollama,
+  // whose models come from GET /api/tags (refresh button / auto-fetch).
+  bool get supportsModelSelection => availableModels.isNotEmpty;
 
+  // Ollama has no extended-thinking effort control.
   bool get supportsEffort => llmProvider != 'ollama_api';
 }
 

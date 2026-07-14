@@ -33,9 +33,7 @@
 - [x] Flutter: "Refresh" button next to Model label
 - [x] Tests (refresh returns list, force bypasses cache)
 
-**⚠️ Known gap — Ollama model selection not wired.** Refresh fetches Ollama's list, BUT: (a) `RemoteConfig.supportsModelSelection` excludes `ollama_api` → no dropdown shown; (b) `_fresh_llm` ollama branch uses `settings.ollama_model` (env), not the DB `llm_model`. So even after refresh, user can't pick/apply an Ollama model from UI. Fix when doing FULL:
-- [ ] show model dropdown for Ollama when `availableModels` non-empty
-- [ ] `_fresh_llm` ollama → use DB `llm_model` override (analysis/cv/cover), fall back to `ollama_model` env
+**✅ Ollama model selection wired (2026-07-14).** (a) `supportsModelSelection` now = `availableModels.isNotEmpty` (dropdown shows for Ollama too); (b) `_fresh_llm` ollama branch (analysis/cv/cover) uses DB `llm_model` override, falls back to `OLLAMA_MODEL` env. Refresh → pick Ollama model → applies to next run. 2 tests.
 
 **🎯 FULL (deferred) — automatic refresh on provider switch.** Do when it earns its keep, or when a more progressive algorithm emerges.
 - [ ] per-provider TTL: `ollama_api → 0 (always fresh)`, `claude_api/claude_cli → 24h`

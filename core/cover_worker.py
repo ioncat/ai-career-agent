@@ -115,9 +115,12 @@ class CoverWorker:
                 effort=effort,
             )
         if provider_type == "ollama_api":
+            # DB llm_model override wins; fall back to OLLAMA_MODEL env (not llm_model,
+            # which holds a Claude model name irrelevant to Ollama)
+            ollama_model = (db_row.get("llm_model") if db_row else None) or self._settings.ollama_model
             return OllamaProvider(
                 base_url=self._settings.ollama_base_url,
-                model=self._settings.ollama_model,
+                model=ollama_model,
                 profile_md=profile_md,
                 max_tokens=self._settings.max_tokens,
                 timeout=self._settings.ollama_timeout,

@@ -96,6 +96,47 @@ async def test_start_creates_recovery_task():
 
 
 @pytest.mark.asyncio
+async def test_fresh_llm_ollama_uses_db_model():
+    """When provider=ollama_api, _fresh_llm builds OllamaProvider with the DB-selected model."""
+    worker = _make_worker()
+    worker._settings.ollama_base_url = "http://localhost:11434"
+    worker._settings.ollama_model = "qwen2.5:32b"   # env fallback
+    worker._settings.ollama_timeout = 300
+    worker._settings.max_tokens = 4000
+
+    db_row = {"llm_provider": "ollama_api", "llm_model": "qwen3:8b", "thinking_effort": "off"}
+
+    with (
+        patch("core.analysis_worker.database.get_user_settings", new_callable=AsyncMock, return_value=db_row),
+        patch("core.llm_client.OllamaProvider") as MockOllama,
+    ):
+        await worker._fresh_llm()
+
+    # DB-selected model wins over the env default
+    assert MockOllama.call_args.kwargs["model"] == "qwen3:8b"
+
+
+@pytest.mark.asyncio
+async def test_fresh_llm_ollama_falls_back_to_env_model():
+    """No DB model → OllamaProvider uses OLLAMA_MODEL env, not the Claude llm_model."""
+    worker = _make_worker()
+    worker._settings.ollama_base_url = "http://localhost:11434"
+    worker._settings.ollama_model = "qwen2.5:32b"
+    worker._settings.ollama_timeout = 300
+    worker._settings.max_tokens = 4000
+
+    db_row = {"llm_provider": "ollama_api", "llm_model": None, "thinking_effort": "off"}
+
+    with (
+        patch("core.analysis_worker.database.get_user_settings", new_callable=AsyncMock, return_value=db_row),
+        patch("core.llm_client.OllamaProvider") as MockOllama,
+    ):
+        await worker._fresh_llm()
+
+    assert MockOllama.call_args.kwargs["model"] == "qwen2.5:32b"
+
+
+@pytest.mark.asyncio
 async def test_execute_timeout_sets_analysis_error():
     """_execute sets analysis_failed when cv_analyze hangs past _ANALYSIS_TIMEOUT."""
     worker = _make_worker()
