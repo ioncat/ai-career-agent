@@ -119,13 +119,23 @@
 
 ## 🟡 P2
 
-### Phase 3.6 Signal Audit: Flutter UI + Worker orchestration (added 2026-07-12)
-**What:** wire Phase 3.6 (prompt + SKILL.md pipeline already work in local mode) into CVWorker + Flutter.
-**Design:** CVWorker runs Phase 3.6 after CV save → stores findings in `analysis_json.p3_6` (`status: clean|issues`, `findings[]` with `remove|weak` verdicts) → no auto-fix without user confirmation. Flutter `_SignalAuditCard` in CV tab: ✅ clean chip or expandable findings + "Apply fixes" → `POST /api/vacancies/{id}/apply-audit-fixes` → 🗑️ sentences removed, CV+PDF re-saved. No new vacancy status.
-**Scope:**
-- [ ] CVWorker: Phase 3.6 step after CV save; `p3_6` schema + `vacancy_track.py update-json --phase p3_6`
-- [ ] `POST /api/vacancies/{id}/apply-audit-fixes` endpoint
-- [ ] Flutter: `_SignalAuditCard` + `VacancyRepository.applyAuditFixes()`
+### Phase 3.6 Signal Audit: Flutter UI + Worker orchestration (added 2026-07-12, estimated 2026-07-14)
+**What:** wire Phase 3.6 into CVWorker + Flutter. Today it exists ONLY in skill mode — prompt `prompts/pm/phase3_6_signal_audit.md` + SKILL.md orchestration; `p3_6` appears nowhere in `tools/core/web/flutter`. Zero backend/Flutter integration.
+**Design:** CVWorker runs Phase 3.6 after CV save → stores findings in `analysis_json.p3_6` (`status: clean|issues`, `findings[]` with `remove|weak` verdicts) → no auto-fix without user confirmation. Flutter `_SignalAuditCard` in CV tab: ✅ clean chip or expandable findings + "Apply fixes".
+**Estimate: ~2–2.5 days total, split into 2 milestones.**
+
+**M1 — Audit read-only (visibility) · ~1–1.5 days (6–10h) · low risk.** Delivers 80% of value: user *sees* "CV clean / 3 noise sentences" — the testing/quality indicator. No auto-edit. Consider pulling M1 to P1 as a testing tool.
+- [ ] `generic` prompt (copy of `pm` — logic is universal) — trivial
+- [ ] `p3_6` schema in `contracts/pipeline.py` + parse findings from markdown output (like `key_barriers` parsing)
+- [ ] CVWorker: after CV save → read EXPERIENCE + Signal Coverage Table → LLM call 3.6 → store `p3_6` (+1 LLM call in pipeline: latency/tokens)
+- [ ] API: expose `p3_6` in analysis response
+- [ ] Flutter `_SignalAuditCard` (clean chip / expandable findings, display only)
+
+**M2 — Apply fixes (auto-edit) · ~0.5–1 day (4–6h) · ⚠️ medium risk.** Do after M1 is proven and the real findings format is seen.
+- [ ] `POST /api/vacancies/{id}/apply-audit-fixes` — **LLM-driven removal** (send CV + 🗑️ list → model returns cleaned CV whole), NOT regex/string-match: LLM excerpt won't match file text exactly (punctuation/line-wraps) → fragile. Costs one more LLM call but reliable.
+- [ ] Re-save CV.md + re-render PDF; `vacancy_track.py update-json --phase p3_6`
+- [ ] Flutter: "Apply fixes" button + `VacancyRepository.applyAuditFixes()`
+- [ ] Tests: removal keeps non-🗑️ sentences intact (guard against over-deletion)
 
 ### `analyzed_at` — точный timestamp успешного анализа
 **What:** `updated_at` меняется при любом статусе (включая failed) → чип "Analyzed" врёт при retry-failed. Отдельная колонка `analyzed_at`, пишется только при переходе в `analyzed`.
