@@ -102,7 +102,8 @@ class Phase2Data(BaseModel):
     def label_starts_with_recommendation(cls, v: str, info) -> str:
         rec = info.data.get("recommendation", "")
         base = rec.replace("_", " ") if rec else ""
-        if base and not v.startswith(base):
+        # Case-insensitive: providers vary capitalisation ("Apply" vs "apply").
+        if base and not v.lower().startswith(base.lower()):
             raise ValueError(
                 f"recommendation_label '{v}' must start with base recommendation '{base}'"
             )

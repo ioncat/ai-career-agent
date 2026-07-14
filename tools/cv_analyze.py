@@ -176,8 +176,8 @@ async def cv_analyze(ctx: RunContext[AgentDeps], vacancy_id: int) -> str:
         # Extract first 400 chars of phase2 output as diagnostic snippet.
         snippet = phase2_output[:400].strip().replace("\n", " ")
         error_msg = (
-            f"Phase 2 output did not match expected format "
-            f"(missing **Fit score:** or **Recommendation:** fields). "
+            f"Phase 2 output could not be parsed into structured data "
+            f"(missing/misformatted fields, or a validation error — see logs). "
             f"Raw start: {snippet!r}"
         )
         log.error("cv_analyze: p2 parse failed — %s", error_msg[:200])
@@ -494,7 +494,10 @@ def _parse_phase2_data(phase2: str, dims: VacScoreDims | None) -> Phase2Data | N
             track_note=(track_m.group(1).strip() if track_m else None),
             fit_dimensions=fit_dims,
         )
-    except Exception:
+    except Exception as exc:
+        # Don't swallow the real reason — fit/rec parsed fine, so a None here is
+        # almost always a Phase2Data validation error (e.g. label capitalisation).
+        log.warning("cv_analyze: Phase2Data build failed: %s", exc)
         return None
 
 
