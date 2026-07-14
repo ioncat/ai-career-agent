@@ -372,14 +372,18 @@ async def _fetch_ollama_models(base_url: str) -> list[str]:
         return []
 
 
-async def _get_available_models(provider: str) -> list[str]:
-    """Return available models for provider, using 24h DB cache."""
+async def _get_available_models(provider: str, force: bool = False) -> list[str]:
+    """Return available models for provider, using 24h DB cache.
+
+    force=True bypasses the cache and re-fetches from the provider (manual
+    "Refresh models" action — needed for local Ollama where models change often).
+    """
     import datetime
 
     cache_key = f"models:{provider}"
     cached_value, updated_at = await database.get_kv(cache_key)
 
-    if cached_value and updated_at:
+    if not force and cached_value and updated_at:
         try:
             age = datetime.datetime.utcnow() - datetime.datetime.fromisoformat(updated_at)
             if age.total_seconds() < _MODELS_CACHE_TTL_HOURS * 3600:
@@ -488,6 +492,19 @@ async def patch_config(body: ConfigPatch):
         "available_models": allowed,
         "valid_providers": sorted(_VALID_PROVIDERS),
     }
+
+
+@app.post("/api/config/refresh-models")
+async def refresh_models():
+    """Force-refresh the available-models list for the active provider (manual button).
+
+    Bypasses the 24h cache and re-fetches from the provider, then persists.
+    Needed for local Ollama, where models are pulled/removed between runs.
+    """
+    db_settings = await database.get_user_settings(1)
+    provider = (db_settings.get("llm_provider") or os.getenv("LLM_PROVIDER", "claude_api")).lower()
+    models = await _get_available_models(provider, force=True)
+    return {"llm_provider": provider, "available_models": models}
 
 
 def _site_from_url(url: str) -> str | None:
