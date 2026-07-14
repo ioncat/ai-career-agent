@@ -26,16 +26,22 @@
 ### Settings: auto-refresh available models on provider switch (added 2026-07-14)
 **Story:** As a user, after switching provider I want the model list to reflect what's actually available right now — especially local Ollama, where I `pull`/`rm` models between runs and a stale list is useless.
 **Problem:** `_get_available_models` caches 24h for ALL providers (`web/api.py:341,375`). Ollama models change instantly but the cache hides new ones for a day; the localhost fetch is cheap (~5s) so caching it barely helps. On provider switch the PATCH returns the cached list, not a fresh fetch.
-**Design:**
-- `_get_available_models(provider, force=False)` + per-provider TTL: `ollama_api → 0 (always fresh)`, `claude_api/claude_cli → 24h`.
-- `PATCH /api/config` on provider switch calls with `force=True` → fresh list for the new provider.
-- `GET /api/config?refresh=true` → explicit force-refresh (for "I just pulled a model, show it without re-switching").
-**Scope:**
-- [ ] `_get_available_models(provider, force)` + per-provider TTL map; Ollama bypasses cache
-- [ ] `patch_config` provider-switch path → `force=True`
-- [ ] `GET /api/config` accepts `refresh` query param
-- [ ] Flutter: "Refresh models" button next to Model dropdown → re-fetch config with refresh
-- [ ] Tests: force bypasses cache, Ollama never cached, Anthropic still cached
+
+**✅ NOW — manual refresh (temporary, shipped 2026-07-14).** Deliberately simple & robust: user clicks "Refresh models" → force-fetch current provider → write to `system_kv` cache → list updates. No TTL guessing, always works. The full auto-refresh below is NOT dropped — this is a stopgap until a smarter algorithm is worth it.
+- [x] `_get_available_models(provider, force=False)` — `force=True` bypasses cache
+- [x] `POST /api/config/refresh-models` → force-fetch current provider, persist, return list
+- [x] Flutter: "Refresh" button next to Model label
+- [x] Tests (refresh returns list, force bypasses cache)
+
+**⚠️ Known gap — Ollama model selection not wired.** Refresh fetches Ollama's list, BUT: (a) `RemoteConfig.supportsModelSelection` excludes `ollama_api` → no dropdown shown; (b) `_fresh_llm` ollama branch uses `settings.ollama_model` (env), not the DB `llm_model`. So even after refresh, user can't pick/apply an Ollama model from UI. Fix when doing FULL:
+- [ ] show model dropdown for Ollama when `availableModels` non-empty
+- [ ] `_fresh_llm` ollama → use DB `llm_model` override (analysis/cv/cover), fall back to `ollama_model` env
+
+**🎯 FULL (deferred) — automatic refresh on provider switch.** Do when it earns its keep, or when a more progressive algorithm emerges.
+- [ ] per-provider TTL: `ollama_api → 0 (always fresh)`, `claude_api/claude_cli → 24h`
+- [ ] `PATCH /api/config` provider switch → `force=True` (auto, no button needed)
+- [ ] `GET /api/config?refresh=true` query param
+- [ ] Drop/relegate the manual button once auto is reliable
 
 ### Config single source of truth — LLM provider/model/effort (added 2026-07-13)
 **Problem:** provider currently has two masters — `user_settings.llm_provider` DB override + `.env` `LLM_PROVIDER` snapshot read once at startup. Nobody can answer "who is authoritative now" without checking both; manual `.env` edits are invisible until restart; this is the exact class of the API-leak bug (system "decided" which provider to bill). Safety-critical.

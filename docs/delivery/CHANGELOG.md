@@ -8,6 +8,7 @@
 
 ## 2026-07-14
 
+- **Settings — manual "Refresh models" button**: `_get_available_models(provider, force=False)` gained a `force` flag that bypasses the 24h cache; `POST /api/config/refresh-models` force-fetches the active provider's model list, persists to `system_kv`, returns it. Flutter Refresh button next to the Model label (`config_provider.refreshModels()`, `VacancyRepository.refreshModels()`). Deliberate stopgap over auto-refresh-on-switch (temporary; full auto-refresh + per-provider TTL deferred). Needed mainly for local Ollama (`pull`/`rm` between runs). Known gap: Ollama model selection still not wired (no dropdown + `_fresh_llm` uses env model) — tracked in backlog. 2 new tests (699 total).
 - **Bug fix — Ukrainian CV/Cover files saved with Cyrillic names**: `re.sub(r"[^\w\-]", "_", name)` left Cyrillic intact because Python `\w` is Unicode-aware → `Олексій_Бондаренко_CV.md` (breaks filesystems/sync/email attachments). New `core/translit.py` (`to_latin` UA+RU table, `safe_filename_stem`) → filenames are always Latin ASCII (`Oleksii_Bondarenko_CV.md`); document content stays in its original language. Applied in `cv_generate` + `cv_cover` (same stem so the CV glob still matches; PDF inherits the Latin name from the MD path). 8 new tests (697 total). Note: pre-fix CVs saved with Cyrillic names must be regenerated to get Latin filenames.
 
 ## 2026-07-13

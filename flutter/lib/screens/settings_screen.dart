@@ -217,7 +217,13 @@ class _AiProviderTile extends ConsumerWidget {
             const Divider(height: 24),
 
             // Model — dropdown when supported, read-only label for Ollama
-            _ConfigLabel('Model'),
+            Row(
+              children: [
+                _ConfigLabel('Model'),
+                const Spacer(),
+                const _RefreshModelsButton(),
+              ],
+            ),
             const SizedBox(height: 8),
             if (config.supportsModelSelection)
               _ModelDropdown(config: config)
@@ -334,6 +340,58 @@ class _EffortControl extends ConsumerWidget {
           selectedBackgroundColor:
               Theme.of(context).colorScheme.primaryContainer,
         ),
+      ),
+    );
+  }
+}
+
+class _RefreshModelsButton extends ConsumerStatefulWidget {
+  const _RefreshModelsButton();
+
+  @override
+  ConsumerState<_RefreshModelsButton> createState() => _RefreshModelsButtonState();
+}
+
+class _RefreshModelsButtonState extends ConsumerState<_RefreshModelsButton> {
+  bool _loading = false;
+
+  Future<void> _refresh() async {
+    setState(() => _loading = true);
+    try {
+      await ref.read(remoteConfigProvider.notifier).refreshModels();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Model list refreshed'), duration: Duration(seconds: 2)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Refresh failed: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Tooltip(
+      message: 'Re-fetch available models from the provider (needed after ollama pull/rm)',
+      child: TextButton.icon(
+        onPressed: _loading ? null : _refresh,
+        style: TextButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          foregroundColor: cs.primary,
+        ),
+        icon: _loading
+            ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2))
+            : const Icon(Icons.refresh_rounded, size: 14),
+        label: Text(_loading ? 'Refreshing…' : 'Refresh', style: Theme.of(context).textTheme.labelSmall),
       ),
     );
   }

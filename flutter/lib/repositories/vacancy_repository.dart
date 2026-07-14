@@ -206,6 +206,15 @@ class VacancyRepository {
     await http.post(uri).timeout(const Duration(seconds: 5));
   }
 
+  Future<Map<String, dynamic>> refreshModels() async {
+    final uri = Uri.parse('$baseUrl/api/config/refresh-models');
+    final response = await http.post(uri).timeout(const Duration(seconds: 15));
+    if (response.statusCode != 200) {
+      throw Exception('Refresh models failed: ${response.statusCode}');
+    }
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> patchConfig({
     String? llmProvider,
     String? model,

@@ -48,6 +48,26 @@ class RemoteConfigNotifier extends AsyncNotifier<RemoteConfig> {
     state = AsyncData(_fromMap(data));
   }
 
+  /// Force-refresh available models for the active provider, then merge the
+  /// fresh list into the current config (keeps provider/model/effort as-is).
+  Future<void> refreshModels() async {
+    final current = state.valueOrNull;
+    if (current == null) return;
+    final settings = await ref.read(settingsProvider.future);
+    final repo = VacancyRepository(baseUrl: settings.apiUrl);
+    final data = await repo.refreshModels();
+    final raw = data['available_models'];
+    final models = raw is List ? raw.whereType<String>().toList() : <String>[];
+    state = AsyncData(RemoteConfig(
+      llmProvider: current.llmProvider,
+      model: current.model,
+      thinkingEffort: current.thinkingEffort,
+      analysisMode: current.analysisMode,
+      availableModels: models,
+      validProviders: current.validProviders,
+    ));
+  }
+
   Future<void> patchEffort(String effort) async {
     final settings = await ref.read(settingsProvider.future);
     final repo = VacancyRepository(baseUrl: settings.apiUrl);

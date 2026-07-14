@@ -606,6 +606,33 @@ async def test_patch_config_invalid_provider_422(client):
 
 
 @pytest.mark.asyncio
+async def test_refresh_models_returns_list(client, monkeypatch):
+    """POST /api/config/refresh-models force-fetches for the active provider."""
+    monkeypatch.setenv("LLM_PROVIDER", "claude_cli")  # uses _FALLBACK_MODELS, no network
+    # Pin provider deterministically (shared test DB may carry a prior override)
+    await database.set_user_settings(1, llm_provider="claude_cli", llm_model=None, thinking_effort="off")
+    resp = client.post("/api/config/refresh-models")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["llm_provider"] == "claude_cli"
+    assert isinstance(data["available_models"], list)
+    assert len(data["available_models"]) > 0
+
+
+@pytest.mark.asyncio
+async def test_refresh_models_force_bypasses_cache(client, monkeypatch):
+    """force=True re-fetches even when a fresh cache entry exists."""
+    from web.api import _get_available_models
+    monkeypatch.setenv("LLM_PROVIDER", "claude_cli")
+    # Seed a stale cache entry that a normal read would return
+    await database.set_kv("models:claude_cli", '["stale-model"]')
+    normal = await _get_available_models("claude_cli")
+    assert normal == ["stale-model"]  # cache honoured without force
+    forced = await _get_available_models("claude_cli", force=True)
+    assert forced != ["stale-model"]  # force refetched the fallback catalog
+
+
+@pytest.mark.asyncio
 async def test_patch_config_provider_equal_env_stores_null(client, monkeypatch):
     """Selecting the provider that equals the env default stores NULL (stays env-driven)."""
     monkeypatch.setenv("LLM_PROVIDER", "claude_cli")
