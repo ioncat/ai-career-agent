@@ -50,6 +50,10 @@ def _mock_db(queued_rows: list) -> MagicMock:
     db.list_vacancies = AsyncMock(return_value=queued_rows)
     db.update_vacancy_status = AsyncMock()
     db.get_user_settings = AsyncMock(return_value=None)
+    # Default: 1 attempt so far — well under MAX_FETCH_ATTEMPTS, exercises the
+    # "still retrying" path unless a test overrides it to exercise give-up.
+    db.increment_fetch_attempts = AsyncMock(return_value=1)
+    db.give_up_fetch = AsyncMock()
     return db
 
 
@@ -221,6 +225,78 @@ async def test_process_fetch_error_still_notifies():
     # No error surfaced to user
     assert "⚠️" not in msg
     assert "ошибка" not in msg.lower()
+
+
+@pytest.mark.asyncio
+async def test_process_notification_sent_once_per_url_across_retries():
+    """A URL stuck retrying (fetch fails repeatedly) must not re-send the
+    '🆕 Новая вакансия' notify on every retry — only the first _process call
+    for that URL should notify. Root cause of the Telegram-spam incident
+    (2026-07-16): _poll_once() re-picks-up anything still status='queued'."""
+    watcher, bot = _make_watcher()
+    url = "https://djinni.co/jobs/bad/"
+    row = _make_row(1, url, status="fetching")
+
+    with (
+        patch("tools.cv_fetch_jd.fetch_jd", AsyncMock(side_effect=Exception("boom"))),
+        patch("core.rss_watcher.database.get_vacancy_by_url", AsyncMock(return_value=row)),
+        patch("core.rss_watcher.database.increment_fetch_attempts", AsyncMock(return_value=1)),
+        patch("core.rss_watcher.database.update_vacancy_status", AsyncMock()),
+    ):
+        await watcher._process(url)
+        await watcher._process(url)  # simulates the next poll cycle re-picking it up
+
+    notify_calls = [c for c in bot.send_message.call_args_list if "Новая вакансия" in c[0][0]]
+    assert len(notify_calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_process_fetch_retry_below_cap_requeues():
+    """Below MAX_FETCH_ATTEMPTS, a failed fetch resets to 'queued' for another try."""
+    watcher, bot = _make_watcher()
+    url = "https://djinni.co/jobs/bad/"
+    row = _make_row(7, url, status="fetching")
+
+    with (
+        patch("tools.cv_fetch_jd.fetch_jd", AsyncMock(side_effect=Exception("boom"))),
+        patch("core.rss_watcher.database.get_vacancy_by_url", AsyncMock(return_value=row)),
+        patch("core.rss_watcher.database.increment_fetch_attempts", AsyncMock(return_value=2)) as mock_inc,
+        patch("core.rss_watcher.database.update_vacancy_status", AsyncMock()) as mock_status,
+        patch("core.rss_watcher.database.give_up_fetch", AsyncMock()) as mock_giveup,
+    ):
+        await watcher._process(url)
+
+    mock_inc.assert_awaited_once_with(7)
+    mock_status.assert_awaited_once_with(7, "queued")
+    mock_giveup.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_process_fetch_gives_up_after_max_attempts():
+    """At MAX_FETCH_ATTEMPTS, stop retrying — decline instead of looping forever."""
+    from core.rss_watcher import MAX_FETCH_ATTEMPTS
+
+    watcher, bot = _make_watcher()
+    url = "https://djinni.co/jobs/bad/"
+    row = _make_row(8, url, status="fetching")
+
+    with (
+        patch("tools.cv_fetch_jd.fetch_jd", AsyncMock(side_effect=Exception("503"))),
+        patch("core.rss_watcher.database.get_vacancy_by_url", AsyncMock(return_value=row)),
+        patch("core.rss_watcher.database.increment_fetch_attempts", AsyncMock(return_value=MAX_FETCH_ATTEMPTS)),
+        patch("core.rss_watcher.database.update_vacancy_status", AsyncMock()) as mock_status,
+        patch("core.rss_watcher.database.give_up_fetch", AsyncMock()) as mock_giveup,
+    ):
+        await watcher._process(url)
+
+    mock_giveup.assert_awaited_once()
+    assert mock_giveup.call_args[0][0] == 8
+    mock_status.assert_not_awaited()  # never requeued — gave up instead
+
+    give_up_msgs = [c for c in bot.send_message.call_args_list if "❌" in c[0][0]]
+    assert len(give_up_msgs) == 1
+    retry_msgs = [c for c in bot.send_message.call_args_list if "⚠️" in c[0][0]]
+    assert len(retry_msgs) == 0  # gave-up path, not the still-retrying alert
 
 
 @pytest.mark.asyncio
@@ -466,7 +542,10 @@ async def test_fetch_failure_resets_status_to_queued():
 
 @pytest.mark.asyncio
 async def test_fetch_failure_alert_sent_only_once():
-    """Second fetch failure for same vacancy_id sends no additional alert."""
+    """Second fetch failure for same vacancy_id sends no additional alert —
+    AND (2026-07-16 fix) no additional 'new vacancy' notify either, since a
+    URL stuck retrying must not re-spam the initial notification every poll
+    cycle (see test_process_notification_sent_once_per_url_across_retries)."""
     watcher, bot = _make_watcher()
     stuck_row = _make_row(601, "https://jobs.dou.ua/companies/viseven/vacancies/365369/", status="fetching")
     mock_db = _mock_db([])
@@ -477,8 +556,8 @@ async def test_fetch_failure_alert_sent_only_once():
         await watcher._process("https://jobs.dou.ua/companies/viseven/vacancies/365369/")
         await watcher._process("https://jobs.dou.ua/companies/viseven/vacancies/365369/")
 
-    # 2 notify + 1 alert (not 2 alerts)
-    assert bot.send_message.await_count == 3
+    # 1 notify (deduped across both calls) + 1 alert (deduped across both calls)
+    assert bot.send_message.await_count == 2
 
 
 @pytest.mark.asyncio

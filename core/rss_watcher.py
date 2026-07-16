@@ -26,6 +26,12 @@ from db import database
 
 log = logging.getLogger(__name__)
 
+# Fetch retry cap — a structurally-unparseable page (JS-rendered content, site
+# template drift) would otherwise retry every poll cycle forever, spamming
+# Telegram once per cycle and never resolving. See BACKLOG "RSSWatcher retries
+# forever on unparseable pages" (2026-07-16).
+MAX_FETCH_ATTEMPTS = 5
+
 # Salary extraction — matches DOU/Djinni RSS titles embedding salary in plain text.
 # Examples: "$2000", "$1500–2500", "$1500-2500", "$1 500 – 2 500"
 SALARY_RE = re.compile(r"\$\s*\d[\d\s]{0,4}(?:\s*[–—\-]\s*\d[\d\s]{0,4})?")
@@ -67,6 +73,10 @@ class RSSWatcher:
         self._sem = asyncio.Semaphore(concurrency)
         self._settings = settings
         self._fetch_alerted: set[int] = set()  # vacancy IDs already notified on failure
+        self._notified_urls: set[str] = set()  # URLs already sent the "🆕 Новая вакансия" notify —
+        # without this, a URL stuck retrying (queued→fetching→queued) re-sends that
+        # notification every poll cycle, since _poll_once() re-picks-up anything
+        # still in status='queued' and _process() unconditionally notified first.
 
     async def start(self) -> None:
         """Launch background polling task."""
@@ -172,13 +182,19 @@ class RSSWatcher:
         salary = _extract_salary(rss_title) if rss_title else ""
         salary_line = f"💰 <b>{salary}</b>\n" if salary else ""
 
-        # Notify FIRST — user sees the vacancy immediately
-        await self._bot.send_message(  # type: ignore[union-attr]
-            f"🆕 <b>Новая вакансия</b>\n"
-            f"{salary_line}"
-            f"🔍 {source}\n"
-            f'📌 <a href="{url}">{display}</a>'
-        )
+        # Notify FIRST — user sees the vacancy immediately. Only once per URL:
+        # _poll_once() re-picks-up anything still status='queued', including a
+        # URL stuck in the retry loop below — without this guard, a page that
+        # keeps failing to parse would re-send this notification every poll
+        # cycle (every 30s) forever.
+        if url not in self._notified_urls:
+            self._notified_urls.add(url)
+            await self._bot.send_message(  # type: ignore[union-attr]
+                f"🆕 <b>Новая вакансия</b>\n"
+                f"{salary_line}"
+                f"🔍 {source}\n"
+                f'📌 <a href="{url}">{display}</a>'
+            )
 
         # Fetch + Analyze — semaphore limits concurrent parser+LLM load
         log.info("RSSWatcher: fetching JD - %s", url)
@@ -189,21 +205,39 @@ class RSSWatcher:
                 vacancy_id = await fetch_jd(self._deps, url)
             except Exception as exc:
                 log.error("RSSWatcher: fetch failed %s: %s", url, exc)
-                # Reset to queued so the next poll retries automatically.
                 stuck = await database.get_vacancy_by_url(url)
                 if stuck and stuck["status"] == "fetching":
                     vid = stuck["id"]
-                    await database.update_vacancy_status(vid, "queued")
-                    log.info("RSSWatcher: reset v#%d → queued for retry", vid)
-                    # Alert only on first failure — subsequent retries are silent.
-                    if vid not in self._fetch_alerted:
-                        self._fetch_alerted.add(vid)
+                    attempts = await database.increment_fetch_attempts(vid)
+                    if attempts >= MAX_FETCH_ATTEMPTS:
+                        reason = f"Fetch failed {attempts}x — giving up: {str(exc)[:200]}"
+                        await database.give_up_fetch(vid, reason)
+                        log.error(
+                            "RSSWatcher: v#%d gave up after %d attempts — declined. %s",
+                            vid, attempts, reason,
+                        )
                         await self._bot.send_message(
-                            f"⚠️ <b>Не удалось получить вакансию</b>\n"
+                            f"❌ <b>Не удалось получить вакансию</b> — сдался после {attempts} попыток\n"
                             f'<a href="{url}">{display}</a>\n'
                             f"Причина: <code>{str(exc)[:200]}</code>\n"
-                            f"Повтор автоматически — появится в Flutter когда сервис восстановится."
+                            f"Перенесено в Archive."
                         )
+                    else:
+                        # Reset to queued so the next poll retries automatically.
+                        await database.update_vacancy_status(vid, "queued")
+                        log.info(
+                            "RSSWatcher: reset v#%d → queued for retry (%d/%d)",
+                            vid, attempts, MAX_FETCH_ATTEMPTS,
+                        )
+                        # Alert only on first failure — subsequent retries are silent.
+                        if vid not in self._fetch_alerted:
+                            self._fetch_alerted.add(vid)
+                            await self._bot.send_message(
+                                f"⚠️ <b>Не удалось получить вакансию</b>\n"
+                                f'<a href="{url}">{display}</a>\n'
+                                f"Причина: <code>{str(exc)[:200]}</code>\n"
+                                f"Повтор автоматически — появится в Flutter когда сервис восстановится."
+                            )
                 return
 
             await database.update_vacancy_status(vacancy_id, "fetched")

@@ -208,10 +208,20 @@
 
 ## 🐛 Bugs
 
-### RSSWatcher retries forever on unparseable pages — no retry cap (found 2026-07-16, vacancy #703)
-**Repro:** fresh RSS vacancy `https://djinni.co/jobs/837755-product-marketing-manager` — parser fetches real HTML (title extracts fine) but `.job-post__description` isn't present on this listing's page AND the `<body>` fallback also yields empty markdown → `503 parse_failed`. Direct diagnostic fetch (no session/headers) returned an empty body too — likely a JS-rendered or non-standard djinni.co listing template that the static-HTML scraper can't handle at all, not a transient network blip.
-**Impact:** `RSSWatcher._process`'s retry logic (`fetching`→`queued` on any fetch error) has **no attempt cap** — a structurally-unparseable page retries every poll cycle forever, exactly reproducing the 264-row `fetching` pile-up just cleaned up (2026-07-16), one URL at a time, indefinitely. Same root shape as that incident, different trigger (site template variance instead of a broken parser process).
-**Fix direction:** track retry count (new column or reuse `warnings`), cap at N attempts (e.g. 3–5), then auto-transition to `analysis_failed`/`declined` with a visible reason instead of looping forever — surfaces the failure to the user instead of silently piling up invisible retries.
+### ~~RSSWatcher retries forever on unparseable pages — no retry cap~~ — ✅ Fixed 2026-07-16
+**Found via:** fresh RSS vacancy `https://djinni.co/jobs/837755-product-marketing-manager` (#703) — parser fetches real HTML (title extracts fine) but `.job-post__description` isn't present AND the `<body>` fallback also yields empty markdown → `503 parse_failed`, retrying every poll cycle forever. Same root shape as the 264-row `fetching` pile-up cleaned up hours earlier, different trigger (site template variance, not a broken parser process) — confirms this is a recurring failure class, not a one-off.
+**Urgency:** each retry cycle was ALSO re-sending the "🆕 Новая вакансия" Telegram notification (push to phone + desktop) every ~30s — a second, more immediately annoying bug caused by the same unconditional-retry design.
+**Fix:**
+- `vacancies.fetch_attempts` column (migration in `db/database.py`); `increment_fetch_attempts()` / `give_up_fetch()` helpers.
+- `core.rss_watcher.MAX_FETCH_ATTEMPTS = 5` — past the cap, `give_up_fetch()` sets `status='declined'` + records the reason in `analysis_error`, sends one final `❌` Telegram message, and stops retrying (Archive stage, matches "Inbox Zero" — an unparseable page isn't worth indefinite retries).
+- `_notified_urls` dedup set — the "🆕 Новая вакансия" notify now fires once per URL, not once per poll cycle a stuck URL happens to still be `queued`.
+- 5 new tests (2 DB-level, 3 `RSSWatcher._process`-level) + fixed 2 pre-existing tests whose assertions encoded the old (buggy) re-notify-every-retry behavior. 758 total.
+- **Needs `agent.py` restart** to pick up the fix — the running process still has the old unconditional-retry code until restarted.
+
+**Broader design question — not resolved, needs its own pass:** the user reframed this as "not a bug, an exception class — how do we want to handle these going forward." Currently a gave-up vacancy lands in `declined`/Archive, visually indistinguishable from a vacancy the user actively skipped — the `analysis_error` reason is stored but not surfaced anywhere in Flutter for declined items. Open questions for a future design session:
+- Should "system gave up after N fetch attempts" be visually distinct from "user skipped" (e.g. a small ⚠️ badge in Archive, or a separate implicit sub-filter)?
+- Should there be a manual "force retry" action for gave-up vacancies (distinct from the existing Reset & Retry, which assumes a JD already exists)?
+- Does this same retry-cap-and-classify pattern need to apply to OTHER exception classes in the pipeline (LLM timeouts, PDF render failures, etc.), or is fetch-stage the only place unbounded retry is possible?
 
 ### Fetch crashes on empty/malformed company name in folder path (found 2026-07-16)
 **Repro:** JD's parsed company field is empty (DOU shows "вакансія неактивна" instead of company for closed listings) or ends in a stray separator char (djinni.co listing parsed as `"...в Tailored Tech –"`) → the `{id} — {role} — {company}` folder name ends in a trailing `"— "`/dash → Windows rejects the path when writing `JD.md` → `[Errno 2] No such file or directory`.
