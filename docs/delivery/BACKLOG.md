@@ -208,6 +208,12 @@
 
 ## 🐛 Bugs
 
+### job-monitor: Djinni RSS feed returning empty/invalid XML intermittently (found 2026-07-16, watch-only)
+**Symptom:** `services/job-monitor/monitor.py`'s `check_feed()` fails with `xml.etree.ElementTree.ParseError: no element found: line 1, column 0` — all 4 Djinni feeds fail together in the same poll cycle, several times over ~20 min (18:30, 18:31, 18:36, 18:49). DOU feeds unaffected. 207 total "fetch failed" lines in `logs/monitor.log` history (broader pattern, includes an unrelated DNS blip on 07-14).
+**Likely cause:** today's heavy djinni.co traffic from the 264-row fetching cleanup (258 re-fetches + diagnostic requests, all from this machine) may have triggered a temporary rate-limit/bot-block on djinni's RSS endpoint specifically — individual job pages (via `services/parser`) fetched fine all day, only the RSS feed listing endpoint is affected.
+**Severity — lower than it looks:** unlike the RSSWatcher fetch-cap bug, `check_feed()` does NOT accumulate stuck state — on failure it just logs and returns 0 new jobs for that cycle; the next 5-min poll starts clean. Worst case = a blind window where fresh postings are missed until the next successful cycle (self-healing, not a pile-up).
+**Action:** watch, no fix attempted yet — if it persists past today (i.e. isn't just today's self-inflicted rate-limit clearing), revisit: add a retry/backoff in `fetch_jobs()`, or a User-Agent/request-pacing review for the Djinni RSS endpoint specifically.
+
 ### ~~RSSWatcher retries forever on unparseable pages — no retry cap~~ — ✅ Fixed 2026-07-16
 **Found via:** fresh RSS vacancy `https://djinni.co/jobs/837755-product-marketing-manager` (#703) — parser fetches real HTML (title extracts fine) but `.job-post__description` isn't present AND the `<body>` fallback also yields empty markdown → `503 parse_failed`, retrying every poll cycle forever. Same root shape as the 264-row `fetching` pile-up cleaned up hours earlier, different trigger (site template variance, not a broken parser process) — confirms this is a recurring failure class, not a one-off.
 **Urgency:** each retry cycle was ALSO re-sending the "🆕 Новая вакансия" Telegram notification (push to phone + desktop) every ~30s — a second, more immediately annoying bug caused by the same unconditional-retry design.
