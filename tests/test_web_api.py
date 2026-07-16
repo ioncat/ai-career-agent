@@ -11,17 +11,25 @@ import pytest
 import pytest_asyncio
 from fastapi.testclient import TestClient
 
+from core import config_store
 from db import database
 
 
 @pytest_asyncio.fixture(autouse=True)
 async def temp_db(tmp_path, monkeypatch):
-    """Point web/api.py and database module at a fresh temp DB."""
+    """Point web/api.py and database module at a fresh temp DB.
+
+    Also resets config_store's process-wide seed flag — each test gets a
+    fresh DB, so it must also get a fresh "not yet seeded" state, otherwise
+    a provider seeded by an earlier test lingers and env monkeypatches in
+    this test have no effect (config_store only reads env once per process).
+    """
     db_path = tmp_path / "test.db"
     database.configure(db_path)
     await database.init_db()
     monkeypatch.setenv("DB_PATH", str(db_path))
     monkeypatch.setenv("VACANCIES_PATH", str(tmp_path / "vacancies"))
+    config_store._seeded = False
     yield
 
 
@@ -395,6 +403,7 @@ async def test_set_starred_not_found(client):
 @pytest.mark.asyncio
 async def test_set_salary(client):
     """PATCH /api/vacancies/{id}/salary persists value in DB."""
+    await database.insert_user(name="Salary1", telegram_chat_id=7200, skill_type="pm")
     vid = await database.insert_vacancy(url="https://example.com/sal1", title="Salary Test", user_id=1)
     resp = client.patch(f"/api/vacancies/{vid}/salary", json={"salary": "$4500"})
     assert resp.status_code == 200
@@ -406,6 +415,7 @@ async def test_set_salary(client):
 @pytest.mark.asyncio
 async def test_set_salary_clear(client):
     """PATCH /api/vacancies/{id}/salary with empty string clears the field."""
+    await database.insert_user(name="Salary2", telegram_chat_id=7201, skill_type="pm")
     vid = await database.insert_vacancy(url="https://example.com/sal2", title="Salary Clear", user_id=1)
     await database.set_vacancy_salary(vid, "$3000")
     resp = client.patch(f"/api/vacancies/{vid}/salary", json={"salary": ""})
@@ -548,12 +558,19 @@ async def test_vacancy_jd_file_missing_on_disk(client, tmp_path):
 
 
 # ── GET /api/config ────────────────────────────────────────────────────────────
+#
+# config_store seeds llm_provider from env on the first read, and that seed is
+# a real DB write (user_settings FK → users). Each test below needs user_id=1
+# to exist first — in production this is guaranteed by agent.py's startup
+# (get_or_create_default_user); here it must be explicit.
 
-def test_api_config_defaults(client, monkeypatch):
+@pytest.mark.asyncio
+async def test_api_config_defaults(client, monkeypatch):
     """GET /api/config returns llm_provider, model, analysis_mode from env (defaults)."""
     monkeypatch.delenv("LLM_PROVIDER", raising=False)
     monkeypatch.delenv("LLM_MODEL", raising=False)
     monkeypatch.delenv("ANALYSIS_MODE", raising=False)
+    await database.insert_user(name="CfgDefaults", telegram_chat_id=7100, skill_type="pm")
     resp = client.get("/api/config")
     assert resp.status_code == 200
     data = resp.json()
@@ -562,10 +579,12 @@ def test_api_config_defaults(client, monkeypatch):
     assert data["analysis_mode"] == "inbox_first"
 
 
-def test_api_config_custom_provider(client, monkeypatch):
+@pytest.mark.asyncio
+async def test_api_config_custom_provider(client, monkeypatch):
     """GET /api/config reflects LLM_PROVIDER env var, lowercased."""
     monkeypatch.setenv("LLM_PROVIDER", "claude_cli")
     monkeypatch.setenv("LLM_MODEL", "claude-haiku-4-5-20251001")
+    await database.insert_user(name="CfgCustom", telegram_chat_id=7101, skill_type="pm")
     resp = client.get("/api/config")
     assert resp.status_code == 200
     data = resp.json()
@@ -573,24 +592,30 @@ def test_api_config_custom_provider(client, monkeypatch):
     assert data["model"] == "claude-haiku-4-5-20251001"
 
 
-def test_api_config_provider_case_insensitive(client, monkeypatch):
+@pytest.mark.asyncio
+async def test_api_config_provider_case_insensitive(client, monkeypatch):
     """GET /api/config lowercases LLM_PROVIDER value."""
     monkeypatch.setenv("LLM_PROVIDER", "Claude_CLI")
+    await database.insert_user(name="CfgCase", telegram_chat_id=7102, skill_type="pm")
     resp = client.get("/api/config")
     assert resp.status_code == 200
     assert resp.json()["llm_provider"] == "claude_cli"
 
 
-def test_api_config_analysis_mode_full_auto(client, monkeypatch):
+@pytest.mark.asyncio
+async def test_api_config_analysis_mode_full_auto(client, monkeypatch):
     """GET /api/config reflects ANALYSIS_MODE=full_auto."""
     monkeypatch.setenv("ANALYSIS_MODE", "full_auto")
+    await database.insert_user(name="CfgMode", telegram_chat_id=7103, skill_type="pm")
     resp = client.get("/api/config")
     assert resp.status_code == 200
     assert resp.json()["analysis_mode"] == "full_auto"
 
 
-def test_api_config_exposes_valid_providers(client):
+@pytest.mark.asyncio
+async def test_api_config_exposes_valid_providers(client):
     """GET /api/config includes the provider catalog for the Flutter dropdown."""
+    await database.insert_user(name="CfgProviders", telegram_chat_id=7104, skill_type="pm")
     resp = client.get("/api/config")
     assert resp.status_code == 200
     assert resp.json()["valid_providers"] == ["claude_api", "claude_cli", "ollama_api"]
@@ -643,7 +668,8 @@ async def test_patch_config_invalid_provider_422(client):
 async def test_refresh_models_returns_list(client, monkeypatch):
     """POST /api/config/refresh-models force-fetches for the active provider."""
     monkeypatch.setenv("LLM_PROVIDER", "claude_cli")  # uses _FALLBACK_MODELS, no network
-    # Pin provider deterministically (shared test DB may carry a prior override)
+    await database.insert_user(name="RefreshModels", telegram_chat_id=7202, skill_type="pm")
+    # Pin provider deterministically
     await database.set_user_settings(1, llm_provider="claude_cli", llm_model=None, thinking_effort="off")
     resp = client.post("/api/config/refresh-models")
     assert resp.status_code == 200
@@ -667,8 +693,9 @@ async def test_refresh_models_force_bypasses_cache(client, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_patch_config_provider_equal_env_stores_null(client, monkeypatch):
-    """Selecting the provider that equals the env default stores NULL (stays env-driven)."""
+async def test_patch_config_provider_always_stored_explicitly(client, monkeypatch):
+    """Single-source-of-truth seam: DB always holds the real provider value —
+    no more 'store NULL when it equals env' trick from before config_store."""
     monkeypatch.setenv("LLM_PROVIDER", "claude_cli")
     await database.insert_user(name="Cfg4", telegram_chat_id=7004, skill_type="pm")
 
@@ -676,7 +703,81 @@ async def test_patch_config_provider_equal_env_stores_null(client, monkeypatch):
     assert resp.status_code == 200
     assert resp.json()["llm_provider"] == "claude_cli"
     row = await database.get_user_settings(1)
-    assert row["llm_provider"] is None  # no override — tracks env
+    assert row["llm_provider"] == "claude_cli"  # stored explicitly
+
+
+# ── PATCH /api/config — drift guard (expected_provider) ──────────────────────
+
+@pytest.mark.asyncio
+async def test_patch_config_drift_guard_mismatch_409(client, monkeypatch):
+    """Patching model/effort against a stale expected_provider is rejected —
+    never silently attach a setting to a provider the backend already left."""
+    monkeypatch.setenv("LLM_PROVIDER", "claude_api")
+    await database.insert_user(name="Drift1", telegram_chat_id=7005, skill_type="pm")
+
+    # Someone/something switches the backend to claude_cli in the meantime
+    client.patch("/api/config", json={"llm_provider": "claude_cli"})
+
+    # Flutter still thinks claude_api is active and tries to patch effort
+    resp = client.patch("/api/config", json={"thinking_effort": "high", "expected_provider": "claude_api"})
+    assert resp.status_code == 409
+    assert "refresh" in resp.json()["detail"].lower()
+
+    # And nothing was applied
+    assert client.get("/api/config").json()["thinking_effort"] != "high"
+
+
+@pytest.mark.asyncio
+async def test_patch_config_drift_guard_match_succeeds(client, monkeypatch):
+    """expected_provider matching the active one → patch applies normally."""
+    monkeypatch.setenv("LLM_PROVIDER", "claude_api")
+    await database.insert_user(name="Drift2", telegram_chat_id=7006, skill_type="pm")
+
+    resp = client.patch("/api/config", json={"thinking_effort": "high", "expected_provider": "claude_api"})
+    assert resp.status_code == 200
+    assert resp.json()["thinking_effort"] == "high"
+
+
+@pytest.mark.asyncio
+async def test_patch_config_no_expected_provider_skips_guard(client, monkeypatch):
+    """expected_provider is optional — omitting it never triggers 409 (back-compat)."""
+    monkeypatch.setenv("LLM_PROVIDER", "claude_api")
+    await database.insert_user(name="Drift3", telegram_chat_id=7007, skill_type="pm")
+    client.patch("/api/config", json={"llm_provider": "claude_cli"})
+
+    resp = client.patch("/api/config", json={"thinking_effort": "low"})
+    assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_patch_config_switching_provider_ignores_expected_provider(client, monkeypatch):
+    """Explicitly setting llm_provider never needs the guard — you're declaring
+    the new truth, not assuming an old one."""
+    monkeypatch.setenv("LLM_PROVIDER", "claude_api")
+    await database.insert_user(name="Drift4", telegram_chat_id=7008, skill_type="pm")
+
+    resp = client.patch(
+        "/api/config", json={"llm_provider": "claude_cli", "expected_provider": "ollama_api"}
+    )
+    assert resp.status_code == 200
+    assert resp.json()["llm_provider"] == "claude_cli"
+
+
+# ── Seed-once behavior via the API surface ───────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_env_change_after_first_get_is_ignored(client, monkeypatch):
+    """Once seeded via the first GET, a later .env edit has no runtime effect
+    until a fresh process (or explicit provider switch) — this is the whole
+    point of the seam: no ambiguity about who's authoritative."""
+    monkeypatch.setenv("LLM_PROVIDER", "claude_cli")
+    await database.insert_user(name="EnvIgnore", telegram_chat_id=7105, skill_type="pm")
+    first = client.get("/api/config")
+    assert first.json()["llm_provider"] == "claude_cli"
+
+    monkeypatch.setenv("LLM_PROVIDER", "ollama_api")
+    second = client.get("/api/config")
+    assert second.json()["llm_provider"] == "claude_cli"  # unchanged
 
 
 # ── key_barriers string coercion (legacy data guard) ─────────────────────────

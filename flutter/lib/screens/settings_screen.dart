@@ -4,6 +4,28 @@ import '../providers/config_provider.dart';
 import '../providers/settings_provider.dart';
 // RemoteConfig used by _ModelDropdown
 
+/// Runs a config_provider patch (model/effort) and surfaces the result.
+/// ConfigDriftException means the backend's provider changed since this
+/// client last read it — state was already refreshed by the provider layer,
+/// this just tells the user why their change didn't apply as expected.
+Future<void> _patchConfigAndReport(BuildContext context, Future<void> Function() patch) async {
+  try {
+    await patch();
+  } on ConfigDriftException catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$e — settings refreshed'), backgroundColor: Colors.orange.shade700),
+      );
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to update: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+}
+
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
@@ -292,7 +314,10 @@ class _ModelDropdown extends ConsumerWidget {
     // model, not the one the user sees selected. Commit it after this frame.
     if (!saved && current != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        ref.read(remoteConfigProvider.notifier).patchModel(current);
+        _patchConfigAndReport(
+          context,
+          () => ref.read(remoteConfigProvider.notifier).patchModel(current),
+        );
       });
     }
 
@@ -310,7 +335,10 @@ class _ModelDropdown extends ConsumerWidget {
             .toList(),
         onChanged: (m) {
           if (m != null) {
-            ref.read(remoteConfigProvider.notifier).patchModel(m);
+            _patchConfigAndReport(
+              context,
+              () => ref.read(remoteConfigProvider.notifier).patchModel(m),
+            );
           }
         },
       ),
@@ -343,7 +371,10 @@ class _EffortControl extends ConsumerWidget {
         selected: {selected},
         onSelectionChanged: (s) {
           if (s.isNotEmpty) {
-            ref.read(remoteConfigProvider.notifier).patchEffort(s.first);
+            _patchConfigAndReport(
+              context,
+              () => ref.read(remoteConfigProvider.notifier).patchEffort(s.first),
+            );
           }
         },
         style: SegmentedButton.styleFrom(
@@ -459,7 +490,10 @@ class _ProviderRow extends ConsumerWidget {
                   .toList(),
               onChanged: (p) {
                 if (p != null && p != config.llmProvider) {
-                  ref.read(remoteConfigProvider.notifier).patchProvider(p);
+                  _patchConfigAndReport(
+                    context,
+                    () => ref.read(remoteConfigProvider.notifier).patchProvider(p),
+                  );
                 }
               },
             ),

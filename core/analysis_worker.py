@@ -10,6 +10,7 @@ import logging
 from contextlib import suppress
 from dataclasses import dataclass
 
+from core import config_store
 from core.deps import AgentDeps
 from core.settings import Settings
 from db import database
@@ -126,24 +127,20 @@ class AnalysisWorker:
                 await database.set_analysis_error(vacancy_id, err_msg)
 
     async def _fresh_llm(self) -> object:
-        """Build LLM provider from current user_settings DB row on every call."""
+        """Build LLM provider from core.config_store (single source of truth) on every call."""
         from core.llm_client import ClaudeCodeProvider, ClaudeProvider, OllamaProvider
 
-        db_row = await database.get_user_settings(self._deps.user_id)
-        provider_type = (db_row.get("llm_provider") if db_row else None) or self._settings.llm_provider
-
-        model = (
-            (db_row.get("llm_model") if db_row else None)
-            or self._settings.llm_model
-        )
-        effort = (db_row.get("thinking_effort") if db_row else None) or "off"
+        cfg = await config_store.get_config()
+        provider_type = cfg["provider"]
+        model = config_store.effective_model(provider_type, cfg["model"])
+        effort = cfg["thinking_effort"]
 
         profile_md = ""
         if self._settings.profile_md_path.exists():
             profile_md = self._settings.profile_md_path.read_text(encoding="utf-8")
 
         log.info(
-            "AnalysisWorker: building LLM — provider=%s model=%s effort=%s",
+            "AnalysisWorker: building LLM — provider=%s model=%s effort=%s source=config_store",
             provider_type, model, effort,
         )
 
@@ -155,12 +152,9 @@ class AnalysisWorker:
                 effort=effort,
             )
         if provider_type == "ollama_api":
-            # DB llm_model override wins; fall back to OLLAMA_MODEL env (not llm_model,
-            # which holds a Claude model name irrelevant to Ollama)
-            ollama_model = (db_row.get("llm_model") if db_row else None) or self._settings.ollama_model
             return OllamaProvider(
                 base_url=self._settings.ollama_base_url,
-                model=ollama_model,
+                model=model,
                 profile_md=profile_md,
                 max_tokens=self._settings.max_tokens,
                 timeout=self._settings.ollama_timeout,

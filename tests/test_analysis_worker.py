@@ -97,38 +97,38 @@ async def test_start_creates_recovery_task():
 
 @pytest.mark.asyncio
 async def test_fresh_llm_ollama_uses_db_model():
-    """When provider=ollama_api, _fresh_llm builds OllamaProvider with the DB-selected model."""
+    """When provider=ollama_api, _fresh_llm builds OllamaProvider with the
+    config_store-selected model (single source of truth, not self._settings)."""
     worker = _make_worker()
     worker._settings.ollama_base_url = "http://localhost:11434"
-    worker._settings.ollama_model = "qwen2.5:32b"   # env fallback
     worker._settings.ollama_timeout = 300
     worker._settings.max_tokens = 4000
 
-    db_row = {"llm_provider": "ollama_api", "llm_model": "qwen3:8b", "thinking_effort": "off"}
+    cfg = {"provider": "ollama_api", "model": "qwen3:8b", "thinking_effort": "off"}
 
     with (
-        patch("core.analysis_worker.database.get_user_settings", new_callable=AsyncMock, return_value=db_row),
+        patch("core.analysis_worker.config_store.get_config", new_callable=AsyncMock, return_value=cfg),
         patch("core.llm_client.OllamaProvider") as MockOllama,
     ):
         await worker._fresh_llm()
 
-    # DB-selected model wins over the env default
+    # DB-selected model (via config_store) wins over the env default
     assert MockOllama.call_args.kwargs["model"] == "qwen3:8b"
 
 
 @pytest.mark.asyncio
-async def test_fresh_llm_ollama_falls_back_to_env_model():
+async def test_fresh_llm_ollama_falls_back_to_env_model(monkeypatch):
     """No DB model → OllamaProvider uses OLLAMA_MODEL env, not the Claude llm_model."""
     worker = _make_worker()
     worker._settings.ollama_base_url = "http://localhost:11434"
-    worker._settings.ollama_model = "qwen2.5:32b"
     worker._settings.ollama_timeout = 300
     worker._settings.max_tokens = 4000
+    monkeypatch.setenv("OLLAMA_MODEL", "qwen2.5:32b")
 
-    db_row = {"llm_provider": "ollama_api", "llm_model": None, "thinking_effort": "off"}
+    cfg = {"provider": "ollama_api", "model": None, "thinking_effort": "off"}
 
     with (
-        patch("core.analysis_worker.database.get_user_settings", new_callable=AsyncMock, return_value=db_row),
+        patch("core.analysis_worker.config_store.get_config", new_callable=AsyncMock, return_value=cfg),
         patch("core.llm_client.OllamaProvider") as MockOllama,
     ):
         await worker._fresh_llm()
@@ -138,7 +138,14 @@ async def test_fresh_llm_ollama_falls_back_to_env_model():
 
 @pytest.mark.asyncio
 async def test_execute_timeout_sets_analysis_error():
-    """_execute sets analysis_failed when cv_analyze hangs past _ANALYSIS_TIMEOUT."""
+    """_execute sets analysis_failed when cv_analyze hangs past _ANALYSIS_TIMEOUT.
+
+    Mocks config_store.get_config directly (not the DB layer underneath it) —
+    this file's contract is "no real DB needed"; going through the real
+    database.get_user_settings/set_user_settings here would let a missing
+    mock silently seed/write the actual production DB (config_store's seed
+    path calls set_user_settings when the mocked read returns falsy).
+    """
     worker = _make_worker()
     worker._ANALYSIS_TIMEOUT = 0.05  # 50ms for test speed
 
@@ -146,10 +153,11 @@ async def test_execute_timeout_sets_analysis_error():
         await asyncio.sleep(10)  # longer than timeout
 
     error_calls = []
+    cfg = {"provider": "claude_cli", "model": "claude-haiku-4-5-20251001", "thinking_effort": "off"}
 
     with (
         patch("core.analysis_worker.database.update_vacancy_status", new_callable=AsyncMock),
-        patch("core.analysis_worker.database.get_user_settings", new_callable=AsyncMock, return_value=None),
+        patch("core.analysis_worker.config_store.get_config", new_callable=AsyncMock, return_value=cfg),
         patch("core.analysis_worker.database.set_analysis_error", new_callable=AsyncMock) as mock_err,
         patch("tools.cv_analyze.cv_analyze", hanging_analyze),
     ):

@@ -32,14 +32,28 @@ except ImportError:
     pass
 
 from contracts.pipeline import AnalysisJson
+from core import config_store
 from db import database
 from web.reader import build_vacancy_view
 
 log = logging.getLogger(__name__)
 
-_DB_PATH = Path(os.getenv("DB_PATH", "db/agent.db"))
 _CANDIDATE_NAME = os.getenv("CANDIDATE_NAME", "Candidate")
 _PROJECT_ROOT = Path(__file__).parent.parent.resolve()
+
+
+def _db_path() -> Path:
+    """Resolve the DB path at call time (not import time).
+
+    Same reasoning as _vacancies_root(): an import-time constant freezes to
+    whichever DB_PATH was set when web.api was FIRST imported in the process.
+    Since lifespan() re-applies it on every app startup, every test after the
+    first one silently gets its DB reset back to the first test's file — a
+    single accumulating SQLite DB shared across the whole test session,
+    invisible until a test reads process-wide singleton state (like the
+    user_settings row config_store seeds/reads).
+    """
+    return Path(os.getenv("DB_PATH", "db/agent.db"))
 
 
 def _vacancies_root() -> Path:
@@ -64,7 +78,7 @@ def _vapid_public_key() -> str:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    database.configure(_DB_PATH)
+    database.configure(_db_path())
     await database.init_db()
     from core import push as _push
     _push.configure(
@@ -331,16 +345,6 @@ async def api_user_progressive_profile(user_id: int):
         raise HTTPException(status_code=500, detail="Profile data corrupted")
 
 
-_VALID_EFFORTS = {"off", "low", "medium", "high", "xhigh", "max"}
-_VALID_PROVIDERS = {"claude_api", "ollama_api", "claude_cli"}
-
-
-def _env_model_for(provider: str) -> str:
-    """Default model from env for a given provider."""
-    if provider == "ollama_api":
-        return os.getenv("OLLAMA_MODEL", "qwen2.5:32b")
-    return os.getenv("LLM_MODEL", "claude-opus-4-5")
-
 # Fallback list used when network fetch fails
 _FALLBACK_MODELS: dict[str, list[str]] = {
     "claude_api": ["claude-opus-4-5", "claude-sonnet-4-6", "claude-haiku-4-5"],
@@ -422,22 +426,21 @@ async def _get_available_models(provider: str, force: bool = False) -> list[str]
 async def api_config():
     """Return active LLM config for Flutter Settings (EPIC-23 T4).
 
-    env vars = global defaults; user_settings DB row for user_id=1 overrides.
+    Truth lives in core/config_store — see that module's docstring. env vars
+    seed the provider on first run only; after that only the DB is read.
     available_models fetched from Anthropic/Ollama API, cached 24h in system_kv.
     """
-    db_settings = await database.get_user_settings(1)
-    provider = (db_settings.get("llm_provider") or os.getenv("LLM_PROVIDER", "claude_api")).lower()
-    model = db_settings.get("llm_model") or _env_model_for(provider)
-    thinking_effort = db_settings.get("thinking_effort", "off") or "off"
+    cfg = await config_store.get_config()
+    provider = cfg["provider"]
     available_models = await _get_available_models(provider)
 
     return {
         "llm_provider": provider,
-        "model": model,
-        "thinking_effort": thinking_effort,
+        "model": config_store.effective_model(provider, cfg["model"]),
+        "thinking_effort": cfg["thinking_effort"],
         "analysis_mode": os.getenv("ANALYSIS_MODE", "inbox_first").lower(),
         "available_models": available_models,
-        "valid_providers": sorted(_VALID_PROVIDERS),
+        "valid_providers": sorted(config_store.VALID_PROVIDERS),
     }
 
 
@@ -445,61 +448,61 @@ class ConfigPatch(BaseModel):
     llm_provider: str | None = None
     model: str | None = None
     thinking_effort: str | None = None
+    # Drift guard: the provider the client believes is currently active. Only
+    # checked when llm_provider is NOT being set (i.e. patching model/effort
+    # against an assumed-active provider) — a mismatch means the provider
+    # changed on the backend since the client last read it, and applying the
+    # patch would silently attach a model/effort to the wrong provider.
+    expected_provider: str | None = None
 
 
 @app.patch("/api/config")
 async def patch_config(body: ConfigPatch):
-    """Update LLM provider, model and/or thinking effort for user_id=1 (admin action).
+    """Update LLM provider, model and/or thinking effort (admin action).
 
-    Stored in user_settings table — overrides env defaults. Workers rebuild their LLM
-    from this row before each task, so a change applies to the next queued vacancy
-    without a backend restart. Switching provider resets the model to the new
-    provider's env default (a model of one provider is invalid for another).
+    Written through core/config_store — the single source of truth. Workers
+    rebuild their LLM from the store before each task, so a change applies to
+    the next queued vacancy without a backend restart. Switching provider
+    resets the model to the new provider's default (a model of one provider
+    is invalid for another).
     """
-    db_settings = await database.get_user_settings(1)
-    current_provider = (db_settings.get("llm_provider") or os.getenv("LLM_PROVIDER", "claude_api")).lower()
-    current_model = db_settings.get("llm_model")
-    current_effort = db_settings.get("thinking_effort", "off") or "off"
+    current = await config_store.get_config()
 
-    # Provider — validate; switching it invalidates the stored model
-    provider_switched = False
-    new_provider = current_provider
-    if body.llm_provider is not None:
-        new_provider = body.llm_provider.lower()
-        if new_provider not in _VALID_PROVIDERS:
-            raise HTTPException(status_code=422, detail=f"llm_provider must be one of {sorted(_VALID_PROVIDERS)}")
-        provider_switched = new_provider != current_provider
+    if body.expected_provider is not None and body.llm_provider is None:
+        if body.expected_provider.lower() != current["provider"]:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Provider changed on backend (now {current['provider']!r}) — refresh Settings",
+            )
 
-    new_effort = body.thinking_effort if body.thinking_effort is not None else current_effort
-    if new_effort not in _VALID_EFFORTS:
-        raise HTTPException(status_code=422, detail=f"thinking_effort must be one of {sorted(_VALID_EFFORTS)}")
+    # Validate the target provider + model BEFORE persisting anything.
+    target_provider = body.llm_provider.lower() if body.llm_provider is not None else current["provider"]
+    if body.llm_provider is not None and target_provider not in config_store.VALID_PROVIDERS:
+        raise HTTPException(status_code=422, detail=f"llm_provider must be one of {sorted(config_store.VALID_PROVIDERS)}")
+    if body.thinking_effort is not None and body.thinking_effort not in config_store.VALID_EFFORTS:
+        raise HTTPException(status_code=422, detail=f"thinking_effort must be one of {sorted(config_store.VALID_EFFORTS)}")
 
-    # Model — on provider switch, drop the stored model (falls back to new provider's default);
-    # otherwise honour explicit model, validated against the (new) provider's catalog
-    if provider_switched:
-        new_model = None
-    elif body.model is not None:
-        new_model = body.model
-    else:
-        new_model = current_model
+    provider_switched = body.llm_provider is not None and target_provider != current["provider"]
+    allowed = await _get_available_models(target_provider)
+    if not provider_switched and body.model and allowed and body.model not in allowed:
+        raise HTTPException(status_code=422, detail=f"model not valid for provider {target_provider!r}")
 
-    allowed = await _get_available_models(new_provider)
-    if new_model and allowed and new_model not in allowed:
-        raise HTTPException(status_code=422, detail=f"model not valid for provider {new_provider!r}")
+    try:
+        cfg = await config_store.set_config(
+            provider=body.llm_provider, model=body.model, thinking_effort=body.thinking_effort
+        )
+    except config_store.ConfigError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
 
-    # Store provider override only when it diverges from env (keeps NULL = env default)
-    provider_to_store = new_provider if new_provider != os.getenv("LLM_PROVIDER", "claude_api").lower() else None
-    await database.set_user_settings(
-        1, llm_provider=provider_to_store, llm_model=new_model, thinking_effort=new_effort
-    )
+    provider = cfg["provider"]
 
     return {
-        "llm_provider": new_provider,
-        "model": new_model or _env_model_for(new_provider),
-        "thinking_effort": new_effort,
+        "llm_provider": provider,
+        "model": config_store.effective_model(provider, cfg["model"]),
+        "thinking_effort": cfg["thinking_effort"],
         "analysis_mode": os.getenv("ANALYSIS_MODE", "inbox_first").lower(),
         "available_models": allowed,
-        "valid_providers": sorted(_VALID_PROVIDERS),
+        "valid_providers": sorted(config_store.VALID_PROVIDERS),
     }
 
 
@@ -510,8 +513,7 @@ async def refresh_models():
     Bypasses the 24h cache and re-fetches from the provider, then persists.
     Needed for local Ollama, where models are pulled/removed between runs.
     """
-    db_settings = await database.get_user_settings(1)
-    provider = (db_settings.get("llm_provider") or os.getenv("LLM_PROVIDER", "claude_api")).lower()
+    provider = await config_store.get_llm_provider()
     models = await _get_available_models(provider, force=True)
     return {"llm_provider": provider, "available_models": models}
 
