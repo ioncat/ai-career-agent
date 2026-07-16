@@ -202,9 +202,12 @@
 **Context:** 196/578 rows (34%) have `published_at=NULL` (rows created before EPIC-26). Two independent problems, both worth fixing.
 **Part 1 — backfill dates (94 inbox-visible rows):** `analyzed`(80) + `fetched`(7) + `cover_generated`(5) + `cv_generated`(2) sit at the bottom of the date-sorted inbox ordered by `id` (random by date). Backfill `published_at = created_at` → they take their real chronological position. Low urgency (main "newest on top" flow already works — new rows have dates), helps only "find a vacancy I analyzed N days ago".
   - Fix: `UPDATE vacancies SET published_at = created_at WHERE published_at IS NULL AND status IN ('analyzed','fetched','cv_generated','cover_generated','analysis_failed')`
-**Part 2 — legacy statuses (98 rows, real debt):** `fetching`(47, stuck — process never finished), `new`(30), `done`(13), `queued`(8) are outside the current state machine → invisible in Flutter inbox (`_folderMatch` filters them) but pollute the DB and skew any status analytics.
-  - Investigate: are `fetching`(47) recoverable (re-fetch) or dead? Map legacy → current statuses (`done`→`analyzed`?, `new`→`fetched`?) or purge.
+**Part 2 — legacy statuses (grown to 344 rows by 2026-07-16, real debt):** `fetching`(264!), `queued`(35), `new`(30), `done`(15) are outside the current state machine. Update 2026-07-16: since the 5-stage taxonomy shipped, these ARE now visible again (mapped into "Inbox" by `core/vacancy_stage.py`'s legacy-status fallback) — no longer silently hidden, but still garbage cluttering Inbox. `fetching` growing 47→264 in 3 days confirms it's actively accumulating, not a static remnant — something keeps leaving vacancies stuck mid-fetch.
+  - Investigate: are `fetching` rows recoverable (re-fetch) or dead? Why does the count keep growing — a stuck/never-retried fetch path in `core/rss_watcher.py`?
+  - User's plan: bulk-skip via the "Batch Analysis Mode" ticket's Skip N action once shipped, rather than debug root cause first.
   - Then backfill their `published_at` too, or delete if dead.
+**Part 3 — fake "analyzed" rows (found 2026-07-16, vacancy #10):** 58 of 117 `status='analyzed'` rows have EMPTY `analysis_json` (no p1/p2) — the status lies, real analysis never ran or was lost. These will NOT be caught by a legacy-status filter (status is a valid current value) — need a separate check: `status='analyzed' AND (analysis_json empty OR missing p1)`. Root cause likely early-project import artifacts (e.g. #10 is from 2026-05-29, day 1, `markdown_path` points to the old defunct `callback-cv` predecessor project — file doesn't exist on disk anymore).
+  - Fix: reset these to `fetched` (if `markdown_path` file still exists → re-analyzable) or `declined`/purge (if source file gone, like #10).
 
 ---
 
