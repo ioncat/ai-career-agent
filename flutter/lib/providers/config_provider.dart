@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../repositories/vacancy_repository.dart';
+export '../repositories/vacancy_repository.dart' show ConfigDriftException;
 import 'settings_provider.dart';
 
 class RemoteConfig {
@@ -43,11 +44,32 @@ class RemoteConfigNotifier extends AsyncNotifier<RemoteConfig> {
     state = AsyncData(_fromMap(data));
   }
 
+  /// Patch model/effort against a provider the backend might have already
+  /// left — on drift (409), refresh state to the real current config and
+  /// rethrow so the UI can show what happened, instead of silently applying
+  /// the change to the wrong provider or failing invisibly.
+  Future<void> _patchAgainstCurrentProvider(
+    Future<Map<String, dynamic>> Function(String expectedProvider) patch,
+  ) async {
+    final current = state.valueOrNull;
+    try {
+      final data = await patch(current?.llmProvider ?? '');
+      state = AsyncData(_fromMap(data));
+    } on ConfigDriftException {
+      final settings = await ref.read(settingsProvider.future);
+      final repo = VacancyRepository(baseUrl: settings.apiUrl);
+      final fresh = await repo.getConfig();
+      state = AsyncData(_fromMap(fresh));
+      rethrow;
+    }
+  }
+
   Future<void> patchModel(String model) async {
     final settings = await ref.read(settingsProvider.future);
     final repo = VacancyRepository(baseUrl: settings.apiUrl);
-    final data = await repo.patchConfig(model: model);
-    state = AsyncData(_fromMap(data));
+    await _patchAgainstCurrentProvider(
+      (expected) => repo.patchConfig(model: model, expectedProvider: expected),
+    );
   }
 
   /// Force-refresh available models for the active provider, then merge the
@@ -73,8 +95,9 @@ class RemoteConfigNotifier extends AsyncNotifier<RemoteConfig> {
   Future<void> patchEffort(String effort) async {
     final settings = await ref.read(settingsProvider.future);
     final repo = VacancyRepository(baseUrl: settings.apiUrl);
-    final data = await repo.patchConfig(thinkingEffort: effort);
-    state = AsyncData(_fromMap(data));
+    await _patchAgainstCurrentProvider(
+      (expected) => repo.patchConfig(thinkingEffort: effort, expectedProvider: expected),
+    );
   }
 
   static RemoteConfig _fromMap(Map<String, dynamic> data) {

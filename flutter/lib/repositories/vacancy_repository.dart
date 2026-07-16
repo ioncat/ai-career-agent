@@ -5,6 +5,16 @@ import '../models/vacancy.dart';
 import '../models/pipeline_notification.dart';
 // ActivityEntry is defined in vacancy.dart
 
+/// The backend's provider changed since this client last read /api/config —
+/// a model/effort patch would silently attach to the wrong provider if
+/// applied blindly. Callers should refresh config and inform the user.
+class ConfigDriftException implements Exception {
+  final String message;
+  const ConfigDriftException(this.message);
+  @override
+  String toString() => message;
+}
+
 class VacancyRepository {
   final String baseUrl;
 
@@ -219,17 +229,24 @@ class VacancyRepository {
     String? llmProvider,
     String? model,
     String? thinkingEffort,
+    String? expectedProvider,
   }) async {
     final uri = Uri.parse('$baseUrl/api/config');
     final body = <String, dynamic>{};
     if (llmProvider != null) body['llm_provider'] = llmProvider;
     if (model != null) body['model'] = model;
     if (thinkingEffort != null) body['thinking_effort'] = thinkingEffort;
+    if (expectedProvider != null) body['expected_provider'] = expectedProvider;
     final response = await http
         .patch(uri,
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode(body))
         .timeout(const Duration(seconds: 5));
+    if (response.statusCode == 409) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>?;
+      throw ConfigDriftException(
+          data?['detail'] as String? ?? 'Provider changed on backend — refresh Settings');
+    }
     if (response.statusCode != 200) {
       throw Exception('Config update failed: ${response.statusCode}');
     }
