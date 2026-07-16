@@ -271,6 +271,37 @@ async def test_insert_llm_usage_with_user_id():
     assert row_id > 0
 
 
+# ── reset_stuck_statuses ─────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_reset_stuck_statuses_resets_all_three_in_progress_states():
+    """analyzing/cv_generating/fetching left by a prior crash all get reset —
+    fetching→queued closes the gap that let 47→264 rows accumulate across
+    dev-session restarts (RSSWatcher's own retry never runs if the process
+    dies before reaching its except block)."""
+    v1 = await database.insert_vacancy(url="https://djinni.co/jobs/r1/", status="analyzing")
+    v2 = await database.insert_vacancy(url="https://djinni.co/jobs/r2/", status="cv_generating")
+    v3 = await database.insert_vacancy(url="https://djinni.co/jobs/r3/", status="fetching")
+
+    await database.reset_stuck_statuses()
+
+    assert (await database.get_vacancy_by_id(v1))["status"] == "analysis_queued"
+    assert (await database.get_vacancy_by_id(v2))["status"] == "cv_queued"
+    assert (await database.get_vacancy_by_id(v3))["status"] == "queued"
+
+
+@pytest.mark.asyncio
+async def test_reset_stuck_statuses_leaves_other_statuses_untouched():
+    v = await database.insert_vacancy(url="https://djinni.co/jobs/r4/", status="analyzed")
+    await database.reset_stuck_statuses()
+    assert (await database.get_vacancy_by_id(v))["status"] == "analyzed"
+
+
+@pytest.mark.asyncio
+async def test_reset_stuck_statuses_noop_on_empty_db():
+    await database.reset_stuck_statuses()  # must not raise
+
+
 # ── normalize_url ─────────────────────────────────────────────────────────────
 
 class TestNormalizeUrl:

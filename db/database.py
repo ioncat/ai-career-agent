@@ -171,7 +171,17 @@ async def init_db() -> None:
 
 
 async def reset_stuck_statuses() -> None:
-    """Reset in-progress statuses left by a prior crash. Call once at agent startup, before workers start."""
+    """Reset in-progress statuses left by a prior crash. Call once at agent startup, before workers start.
+
+    RSSWatcher._process's own retry logic (fetching → queued on fetch error)
+    only runs if the process survives to the except block — a hard restart
+    mid-fetch (dev-session process kill, crash) skips it and leaves the row
+    stuck in 'fetching' forever, since nothing else ever revisits it. This
+    was the actual root cause behind 47→264 stuck rows accumulating over
+    several heavy dev sessions (2026-06-17 through 07-02) — confirmed by the
+    stuck-row dates matching known high-restart-frequency sessions, and zero
+    new stuck rows since 07-10 once dev activity moved off rss_watcher.py.
+    """
     async with aiosqlite.connect(_db_path) as db:
         cur = await db.execute(
             "UPDATE vacancies SET status = 'analysis_queued' WHERE status = 'analyzing'"
@@ -185,6 +195,12 @@ async def reset_stuck_statuses() -> None:
         await db.commit()
         if cur2.rowcount:
             log.warning("DB recovery: reset %d stuck 'cv_generating' → 'cv_queued'", cur2.rowcount)
+        cur3 = await db.execute(
+            "UPDATE vacancies SET status = 'queued' WHERE status = 'fetching'"
+        )
+        await db.commit()
+        if cur3.rowcount:
+            log.warning("DB recovery: reset %d stuck 'fetching' → 'queued'", cur3.rowcount)
 
 
 @asynccontextmanager
