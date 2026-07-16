@@ -290,9 +290,18 @@ async def api_vacancies(
         # Pass analysis_error through (None when no error)
         if 'analysis_error' not in item:
             item['analysis_error'] = None
-        # folder_path: parent dir of JD.md — used by Flutter to open folder in Explorer
+        # folder_path: parent dir of JD.md — used by Flutter to open folder in Explorer.
+        # markdown_path is stored relative to the backend's CWD (project root) —
+        # must be resolved to absolute here, or explorer.exe (launched from
+        # Flutter's own CWD) silently falls back to the default Documents folder.
         md_path = item.get("markdown_path")
-        item["folder_path"] = str(Path(md_path).parent) if md_path else None
+        if md_path:
+            p = Path(md_path)
+            if not p.is_absolute():
+                p = _PROJECT_ROOT / p
+            item["folder_path"] = str(p.parent.resolve())
+        else:
+            item["folder_path"] = None
         result.append(item)
     return result
 

@@ -6,6 +6,10 @@
 
 ---
 
+## 2026-07-16
+
+- **Bug fix — "Open Folder" opened default Documents instead of the vacancy folder**: `folder_path` returned by `GET /api/vacancies` was `Path(markdown_path).parent` verbatim, but `markdown_path` is stored **relative** to the backend's CWD (`vacancies\inbox\1\554 — ...`). Flutter's `Process.run('explorer.exe', [folderPath])` resolves that relative path against its own CWD (not the project root) → invalid path → Windows Explorer silently falls back to the default Documents folder. Fix: `web/api.py` resolves `markdown_path` against `_PROJECT_ROOT` when it isn't already absolute, before deriving `folder_path`. 2 new tests (707 total).
+
 ## 2026-07-14
 
 - **Bug fix — model selection silently ignored (root cause of "weak model crashes")**: user picked `gemma4:e2b` in Settings + Save, but analysis ran on `cas/aya-expanse-8b` (the `OLLAMA_MODEL` env fallback). Three compounding bugs: (1) `_save()` only persists apiUrl/pollInterval/notifications — provider/model/effort save separately via dropdown `onChanged`, so Save does NOT commit the model (misleading); (2) `_ModelDropdown` showed the first model as "selected" (firstOrNull) when the DB model wasn't in the list, but `onChanged` never fired without a manual click → `user_settings.llm_model` stayed NULL → pipeline used the env fallback; (3) provider switch resets model to NULL, feeding (2). Fix: `_ModelDropdown` now auto-commits the displayed model via post-frame `patchModel` when the saved model isn't in the list → what you see = what's stored = what runs. Requires backend restart to pick up the 006750c `_fresh_llm` DB-model change.
