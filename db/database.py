@@ -147,6 +147,8 @@ async def init_db() -> None:
             "ALTER TABLE vacancies ADD COLUMN republished_at TEXT",
             # Settings: per-user LLM provider override (NULL = LLM_PROVIDER env default)
             "ALTER TABLE user_settings ADD COLUMN llm_provider TEXT",
+            # RSSWatcher retry cap: count failed fetch attempts, give up after N
+            "ALTER TABLE vacancies ADD COLUMN fetch_attempts INTEGER NOT NULL DEFAULT 0",
             # EPIC-21 C2: pipeline event log for Flutter notification polling
             """CREATE TABLE IF NOT EXISTS notifications (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -504,6 +506,35 @@ async def set_analysis_error(vacancy_id: int, error: str | None) -> None:
     async with get_db() as db:
         await db.execute(
             "UPDATE vacancies SET analysis_error = ?, status = 'analysis_failed', updated_at = datetime('now') WHERE id = ?",
+            (error, vacancy_id),
+        )
+        await db.commit()
+
+
+async def increment_fetch_attempts(vacancy_id: int) -> int:
+    """Increment fetch_attempts and return the new count. Called on every RSS fetch failure."""
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE vacancies SET fetch_attempts = fetch_attempts + 1, updated_at = datetime('now') WHERE id = ?",
+            (vacancy_id,),
+        )
+        await db.commit()
+        cursor = await db.execute("SELECT fetch_attempts FROM vacancies WHERE id = ?", (vacancy_id,))
+        row = await cursor.fetchone()
+        return row["fetch_attempts"] if row else 0
+
+
+async def give_up_fetch(vacancy_id: int, error: str | None) -> None:
+    """Stop retrying a vacancy that failed to fetch MAX_FETCH_ATTEMPTS times.
+
+    Sets status='declined' (out of Inbox, matches "Inbox Zero" — an
+    unparseable page isn't worth indefinite retries) and records the last
+    error in analysis_error so the reason is visible, not just silently
+    archived.
+    """
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE vacancies SET status = 'declined', analysis_error = ?, updated_at = datetime('now') WHERE id = ?",
             (error, vacancy_id),
         )
         await db.commit()

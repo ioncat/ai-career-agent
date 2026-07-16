@@ -302,6 +302,26 @@ async def test_reset_stuck_statuses_noop_on_empty_db():
     await database.reset_stuck_statuses()  # must not raise
 
 
+# ── fetch_attempts / give_up_fetch (RSSWatcher retry cap) ───────────────────
+
+@pytest.mark.asyncio
+async def test_increment_fetch_attempts_starts_at_zero_and_counts_up():
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/fa1/", status="fetching")
+    first = await database.increment_fetch_attempts(vid)
+    second = await database.increment_fetch_attempts(vid)
+    assert first == 1
+    assert second == 2
+
+
+@pytest.mark.asyncio
+async def test_give_up_fetch_declines_and_records_reason():
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/fa2/", status="fetching")
+    await database.give_up_fetch(vid, "Fetch failed 5x — giving up: 503")
+    row = await database.get_vacancy_by_id(vid)
+    assert row["status"] == "declined"
+    assert row["analysis_error"] == "Fetch failed 5x — giving up: 503"
+
+
 # ── normalize_url ─────────────────────────────────────────────────────────────
 
 class TestNormalizeUrl:

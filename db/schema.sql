@@ -56,6 +56,9 @@ CREATE TABLE IF NOT EXISTS vacancies (
                                           -- FK to original vacancy if this is a cross-source duplicate
     content_hash  TEXT,                   -- sha256(normalize(jd_text)) for content-based dedup
     republished_at TEXT,                  -- set when a declined/skipped vacancy reappears in RSS
+    fetch_attempts INTEGER NOT NULL DEFAULT 0,
+                                          -- count of failed RSSWatcher fetch attempts; capped
+                                          -- retry gives up after MAX_FETCH_ATTEMPTS (rss_watcher.py)
     created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
     updated_at    TEXT    NOT NULL DEFAULT (datetime('now'))
 );
