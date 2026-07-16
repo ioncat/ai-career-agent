@@ -52,15 +52,16 @@
 **Direction (decide in EPIC-25):** either (a) role-gated admin route inside the same app (Settings visible only to `admin` after auth), or (b) a separate admin console entirely. Industrial norm = admin surface is separated or RBAC-gated, never open to every user. Until auth lands, Settings stays visible for single-user dev testing — but treat it as an admin surface, not a user feature.
 **Ties to:** [Epics/EPIC-25-auth-billing.md](Epics/EPIC-25-auth-billing.md), memory `project_settings_access_control`.
 
-### Flutter: Batch Analysis Mode (mass queue) (added 2026-07-08)
-**What:** multi-select in inbox → "Analyze N" → all queued in AnalysisWorker; queue position badge per card.
-**Why:** biggest daily friction — morning RSS batch drops from 10–15 clicks to 2; makes RSS auto-push feel automated.
+### Flutter: Batch Analysis Mode (mass queue + mass skip) (added 2026-07-08, extended 2026-07-16)
+**What:** multi-select in inbox → "Analyze N" (all queued in AnalysisWorker, queue position badge per card) **or** "Skip N" (bulk decline → archive). Same multi-select UI, two actions.
+**Why:** biggest daily friction — morning RSS batch drops from 10–15 clicks to 2; makes RSS auto-push feel automated. Skip N needed to clear the 344 legacy-status vacancies (`fetching`/`queued`/`new`/`done`) sitting invisible in the DB — user plans to bulk-skip them once this ships rather than debug why `fetching` accumulates.
 **Scope:**
 - [ ] `VacancyInboxScreen` — `_multiSelectMode` + `_selectedIds`; long-press entry
 - [ ] `VacancyCard` — checkbox overlay + selected highlight
-- [ ] `_BatchActionBar` — slides up, count label, Analyze button
+- [ ] `_BatchActionBar` — slides up, count label, **Analyze** + **Skip** buttons
 - [ ] Queue position badge ("In queue (3rd)") — derive from `analysis_queued` count
-- [ ] Tests: multi-select state, action bar visibility, repository calls
+- [ ] `VacancyRepository` — batch decline (loop `PATCH .../decline` or a new bulk endpoint if N is large)
+- [ ] Tests: multi-select state, action bar visibility, repository calls (both actions)
 
 ### LLM Quality Parity: SKILL.md rules → API system prompt (added 2026-07-08)
 **What:** audit SKILL.md → extract output-quality rules (tone, language, positioning, per-user overrides) → inject as cached system-prompt block after PROFILE.md in all API/CLI calls.
