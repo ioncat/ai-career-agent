@@ -365,6 +365,8 @@ Option "Оба" → two CVs + two covers generated sequentially.
 
 ```bash
 python scripts/vacancy_track.py update-json --id $VACANCY_ID --phase p1 --data '{
+  "role": "[exact role title from JD]",
+  "company": "[company name — clean, not a JD text snippet]",
   "company_type": "startup|scaleup|enterprise|founder-led",
   "role_archetype": "[Primary archetype label from 1.4]",
   "role_balance": {"strategy": N, "discovery": N, "execution": N, "coordination": N, "ops": N},
@@ -382,6 +384,9 @@ python scripts/vacancy_track.py update-json --id $VACANCY_ID --phase p1 --data '
     "compensation": N
   }
 }'
+```
+
+> **`role` and `company` are MANDATORY, not optional.** The web tracker list view reads `analysis_json.p1.role` and `.company` (`_parse_analysis_summary` in `web/api.py`). If omitted, the UI silently falls back to the raw DB `company`/`title` columns — which for RSS/scraped vacancies can be a garbage JD-text snippet instead of the actual company name (found on vacancy #690, 2026-07-16: DB company was a scraped mission-statement fragment, not "Solidgate", because `update-json --phase p1` omitted `role`/`company`).
 
 python scripts/vacancy_track.py update-json --id $VACANCY_ID --phase p2 --data '{
   "fit_score": N,
