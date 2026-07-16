@@ -161,6 +161,15 @@
 
 ## 🟡 P2
 
+### Re-analyze UX: vacancy visually "disappears" from Analyzed folder mid-run (found 2026-07-16, vacancy #665)
+**Repro:** vacancy #665 ("Senior Product Manager — MAKEUP", talentC) was `status='analyzed'`, sitting in the Analyzed folder. User triggered a re-analysis (Re-analyze button) without noting the ID first — while it ran, the vacancy was nowhere to be found: not in Analyzed, not in any other folder user checked. It reappeared once analysis completed.
+**Root cause (traced, not yet fixed):** re-analyze transitions status through `analysis_queued`/`analyzing` before landing back on `analyzed`. `core/vacancy_stage.py`'s `stage()` only maps `analyzed`/`analysis_failed` to the "Analyzed" folder — `analyzing`/`analysis_queued` fall through to "Inbox". So mid-re-analysis, the vacancy correctly (per current logic) moves to Inbox — but this is a new, more confusing behavior since the 5-stage taxonomy shipped (2026-07-16): previously Inbox absorbed the whole fetched→cover_generated range, so this transition was invisible (still "Inbox" before and during). Now that Analyzed/Processed are separate folders, a re-analyze is a visible, unexpected folder-jump — not tested when the taxonomy shipped.
+**Needs a design decision, not just a fix:**
+- (a) Accept the move-to-Inbox-during-reanalysis as correct, but make it clearly communicated in UI (e.g. a toast "Moved to Inbox — re-analyzing", or a persistent "🔄 Re-analyzing" badge visible even while it's technically in Inbox)
+- (b) Keep it visually in Analyzed during a *re*-analysis specifically (distinct from a first-time analysis) — `stage()` would need to know "this already has real p1/p2 data, just re-running" vs "never analyzed" — doable (check `analysis_json` content, not just `status`) but adds complexity to what's currently a pure (status, applied) function
+- (c) Something else — needs a proper think, not a quick patch
+**Scope:** repeat the re-analyze scenario end-to-end (trigger on an already-analyzed vacancy, watch folder transitions live in Flutter), decide the intended UX, implement + test. Same question likely applies to re-generating CV/Cover on an already-`processed` vacancy — check if that has the same disappearing-folder issue.
+
 ### Phase 3.6 Signal Audit: Flutter UI + Worker orchestration (added 2026-07-12, estimated 2026-07-14)
 **What:** wire Phase 3.6 into CVWorker + Flutter. Today it exists ONLY in skill mode — prompt `prompts/pm/phase3_6_signal_audit.md` + SKILL.md orchestration; `p3_6` appears nowhere in `tools/core/web/flutter`. Zero backend/Flutter integration.
 **Design:** CVWorker runs Phase 3.6 after CV save → stores findings in `analysis_json.p3_6` (`status: clean|issues`, `findings[]` with `remove|weak` verdicts) → no auto-fix without user confirmation. Flutter `_SignalAuditCard` in CV tab: ✅ clean chip or expandable findings + "Apply fixes".
