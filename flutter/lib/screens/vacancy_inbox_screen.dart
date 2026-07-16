@@ -59,10 +59,12 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
   DateTime? _dateTo;
 
   String get _title => switch (widget.folder) {
-        'inbox'   => 'Inbox',
-        'applied' => 'Applied',
-        'archive' => 'Archive',
-        _         => 'Vacancies',
+        'inbox'     => 'Inbox',
+        'analyzed'  => 'Analyzed',
+        'processed' => 'Processed',
+        'applied'   => 'Applied',
+        'archive'   => 'Archive',
+        _           => 'Vacancies',
       };
 
   int get _activeFilterCount =>
@@ -142,12 +144,13 @@ List<VacancyListItem> _filter(List<VacancyListItem> all) {
     final filtered = _filter(vacancies);
     final availableStatuses = vacancies.map((v) => v.status).toSet();
 
-    // Sync _selected with polling updates (status changes: fetched→analyzing→analyzed)
+    // Sync _selected with polling updates (status changes, or any other field
+    // edited server-side — salary, applied, starred, etc. all bump updated_at).
     ref.listen(folderVacanciesProvider(widget.folder), (_, updated) {
       if (_selected == null) return;
       try {
         final fresh = updated.firstWhere((v) => v.id == _selected!.id);
-        if (fresh.status != _selected!.status) {
+        if (fresh.updatedAt != _selected!.updatedAt) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) setState(() => _selected = fresh);
           });
@@ -681,10 +684,12 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final msg = switch (folder) {
-      'inbox'   => 'No new vacancies.\nThe RSS pipeline will add them automatically.',
-      'applied' => 'No applications sent yet.',
-      'archive' => 'Archive is empty.',
-      _         => 'No vacancies.',
+      'inbox'     => 'No new vacancies.\nThe RSS pipeline will add them automatically.',
+      'analyzed'  => 'No analyzed vacancies yet.',
+      'processed' => 'No CVs or covers generated yet.',
+      'applied'   => 'No applications sent yet.',
+      'archive'   => 'Archive is empty.',
+      _           => 'No vacancies.',
     };
     return Center(
       child: Text(

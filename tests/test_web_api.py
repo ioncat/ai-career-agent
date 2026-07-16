@@ -88,6 +88,31 @@ async def test_api_users_returns_list(client):
     assert names == {"Alice", "Bob"}
 
 
+# ── GET /api/vacancies — stage field ───────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_api_vacancies_includes_stage(client):
+    """GET /api/vacancies exposes the computed `stage` field for Flutter folder routing."""
+    uid = await database.insert_user(name="StageUser", telegram_chat_id=2100, skill_type="pm")
+    v_inbox = await database.insert_vacancy(url="https://djinni.co/jobs/st1/", user_id=uid)
+    v_analyzed = await database.insert_vacancy(url="https://djinni.co/jobs/st2/", user_id=uid)
+    await database.update_vacancy_status(v_analyzed, "analyzed")
+    v_processed = await database.insert_vacancy(url="https://djinni.co/jobs/st3/", user_id=uid)
+    await database.update_vacancy_status(v_processed, "cv_generated")
+    v_applied = await database.insert_vacancy(url="https://djinni.co/jobs/st4/", user_id=uid)
+    await database.update_vacancy_status(v_applied, "analyzed")
+    await database.set_vacancy_applied(v_applied, True)
+    v_archive = await database.insert_vacancy(url="https://djinni.co/jobs/st5/", user_id=uid)
+    await database.update_vacancy_status(v_archive, "declined")
+
+    data = {v["id"]: v["stage"] for v in client.get(f"/api/vacancies?user_id={uid}").json()}
+    assert data[v_inbox] == "inbox"
+    assert data[v_analyzed] == "analyzed"
+    assert data[v_processed] == "processed"
+    assert data[v_applied] == "applied"
+    assert data[v_archive] == "archive"
+
+
 # ── GET /api/vacancies?user_id=N ──────────────────────────────────────────────
 
 @pytest.mark.asyncio

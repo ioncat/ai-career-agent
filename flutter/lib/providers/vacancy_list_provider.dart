@@ -178,25 +178,8 @@ final folderVacanciesProvider =
   return state.vacancies.where((v) => _folderMatch(v, folder)).toList();
 });
 
-bool _folderMatch(VacancyListItem v, String folder) {
-  switch (folder) {
-    case 'inbox':
-      return !v.applied &&
-          (v.status == 'fetched' ||
-          v.status == 'analysis_queued' ||
-          v.status == 'analyzing' ||
-          v.status == 'analyzed' ||
-          v.status == 'analysis_failed' ||
-          v.status == 'cv_queued' ||
-          v.status == 'cv_generating' ||
-          v.status == 'cv_generated' ||
-          v.status == 'cover_generating' ||
-          v.status == 'cover_generated');
-    case 'applied':
-      return v.applied;
-    case 'archive':
-      return v.status == 'declined';
-    default:
-      return false;
-  }
-}
+// 5-stage taxonomy — mirrors core/vacancy_stage.py's stage() classification.
+// `stage` comes precomputed from the backend (single source of truth); this
+// is just a folder-name → stage-value lookup, not a reimplementation of the
+// classification logic.
+bool _folderMatch(VacancyListItem v, String folder) => v.stage == folder;

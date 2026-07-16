@@ -28,6 +28,7 @@ class VacancyListItem {
   final int? duplicateOf;
   final String? republishedAt;
   final String? folderPath;
+  final String stage;
 
   const VacancyListItem({
     required this.id,
@@ -52,6 +53,7 @@ class VacancyListItem {
     this.duplicateOf,
     this.republishedAt,
     this.folderPath,
+    this.stage = 'inbox',
   });
 
   factory VacancyListItem.fromJson(Map<String, dynamic> json) {
@@ -79,6 +81,7 @@ class VacancyListItem {
       duplicateOf: json['duplicate_of'] as int?,
       republishedAt: json['republished_at'] as String?,
       folderPath: json['folder_path'] as String?,
+      stage: json['stage'] as String? ?? 'inbox',
     );
   }
 
@@ -104,6 +107,7 @@ class VacancyListItem {
         'role_tags': roleTags,
         'duplicate_of': duplicateOf,
         'republished_at': republishedAt,
+        'stage': stage,
       };
 }
 
