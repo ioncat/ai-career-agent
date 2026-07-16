@@ -29,6 +29,22 @@
 
 ## 🟠 P1
 
+### Physical folder tree mirrors vacancy stage (added 2026-07-16)
+**Story:** As a user, I want the filesystem folder structure to match the visual 5-stage taxonomy — `vacancies/inbox/{user}/Analyzed/`, `.../Processed/`, `.../Applied/`, `.../Archive/` — not just the UI, so browsing on disk matches browsing in the app.
+**Context:** separate from (and much more expensive than) the computed `stage()` UI work shipped 2026-07-16 — that one is a read-only projection, this one physically moves vacancy folders on every stage transition. Estimated ~12–16h (2–2.5 days), medium-high risk — classic FS+DB consistency problem, not a UI task.
+**Risks (why this is its own ticket, not bundled):**
+- **Worker race**: CVWorker/CoverWorker write files into the vacancy folder mid-phase; a user-triggered move (e.g. marking Applied) while a phase is active would write into a path that no longer exists. Needs a guard — don't move while status is in the active set (`analyzing`/`cv_generating`/`cover_generating`).
+- **Atomicity**: filesystem move + DB `markdown_path` update are two separate operations, not a transaction. A crash between them desyncs DB and disk. Needs idempotent move (check "already at target" before moving) + a startup reconciliation pass.
+- **9+ call sites**: every `database.update_vacancy_status(...)` call (web/api.py ×5, analysis_worker, cv_worker, cover_worker, tools/cv_analyze.py, cv_generate.py, cv_cover.py, rss_watcher.py ×3) needs to also trigger the mover — centralize via a wrapper around `update_vacancy_status` rather than patching every site individually.
+- **Legacy statuses**: the 344 `fetching`/`queued`/`new`/`done` vacancies (see "DB data cleanup" bug ticket) need explicit stage classification too, or they fall through the new folder structure silently.
+**Scope:**
+- [ ] `core/vacancy_stage.py` — reuse the `stage()` classifier from the UI work (single source of truth for both Flutter routing and folder placement)
+- [ ] `move_vacancy_folder(vacancy_id)` — idempotent mover: compute target dir from stage, `shutil.move` if not already there, update `markdown_path` in same call
+- [ ] Guard: skip move while status is in the active set
+- [ ] Wrapper around `update_vacancy_status` (or explicit call after each transition) triggering the mover
+- [ ] Startup reconciliation: scan for DB/disk drift, fix or log
+- [ ] Tests: idempotent move, active-status guard, path update, at least one real transition end-to-end
+
 ### Settings: auto-refresh available models on provider switch (added 2026-07-14)
 **Story:** As a user, after switching provider I want the model list to reflect what's actually available right now — especially local Ollama, where I `pull`/`rm` models between runs and a stale list is useless.
 **Problem:** `_get_available_models` caches 24h for ALL providers (`web/api.py:341,375`). Ollama models change instantly but the cache hides new ones for a day; the localhost fetch is cheap (~5s) so caching it barely helps. On provider switch the PATCH returns the cached list, not a fresh fetch.
