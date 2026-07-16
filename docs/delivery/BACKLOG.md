@@ -29,6 +29,16 @@
 
 ## 🟠 P1
 
+### Pre-filter critical blockers before spending LLM tokens (added 2026-07-16)
+**Story:** As a user, I want obviously-disqualifying vacancies (hard blockers like "English C1 required", "must reside in EU", "mobile B2C experience required" when I have none) filtered out cheaply BEFORE Phase 1+2 runs, so tokens aren't spent analyzing a vacancy that was never viable.
+**Context:** born from the "Inbox Zero" philosophy discussion (2026-07-16) — a good inbox is a *processed* inbox; obvious non-starters shouldn't even reach the point of costing an LLM call, let alone sitting around for the user to manually skip later.
+**Design sketch (not decided, needs its own pass):**
+- New `## Critical Blockers` section in `PROFILE.md`, same pattern as the existing `## Vacancy Preferences` (domain_interests etc.) — user-editable list, e.g. `english: C1`, `location: EU-resident-required`, `domain: mobile B2C experience required`.
+- Cheap deterministic check (regex/keyword match against JD text) — NOT an LLM call — run right after JD fetch, before Phase 1+2. Inherently fuzzy (phrasing varies: "advanced English", "C1 level", "fluent English" all mean similar things) — expect false negatives, acceptable since it's a pre-filter not a decision-maker.
+- **Advisory only, never auto-skip**: surface a flag/badge in Flutter ("⚠️ Possible blocker: English C1 required") so the user makes the final skip call themselves — matches user's own words: "показывать пользователю, а он потом сам скипает." Auto-declining silently would risk false-negative-driven loss of real opportunities.
+- Complements (doesn't replace) Phase 2's LLM-driven Key Barriers — this is a cruder, free, earlier gate; Phase 2 remains the nuanced analysis for vacancies that pass the gate.
+**Not scoped/estimated yet** — needs its own design session before implementation.
+
 ### Physical folder tree mirrors vacancy stage (added 2026-07-16)
 **Story:** As a user, I want the filesystem folder structure to match the visual 5-stage taxonomy — `vacancies/inbox/{user}/Analyzed/`, `.../Processed/`, `.../Applied/`, `.../Archive/` — not just the UI, so browsing on disk matches browsing in the app.
 **Context:** separate from (and much more expensive than) the computed `stage()` UI work shipped 2026-07-16 — that one is a read-only projection, this one physically moves vacancy folders on every stage transition. Estimated ~12–16h (2–2.5 days), medium-high risk — classic FS+DB consistency problem, not a UI task.
