@@ -217,6 +217,14 @@
 
 ## 🐛 Bugs
 
+### ~~job-monitor: `--debug` silently marks vacancies as permanently delivered~~ — ✅ Fixed 2026-07-16
+**Found via:** user reported a live vacancy (`djinni.co/jobs/830286-ux-product-owner`) never reached the inbox despite matching the `Djinni | Product Manager / Owner` feed. Traced to `services/job-monitor/seen_jobs.json`: entry had `first_seen: 2026-06-15`, `status: "sent"`, **`attempts: 0`** — the tell that it was never actually POSTed to the webhook.
+**Root cause:** `check_feed()`'s `if debug:` branch (`services/job-monitor/monitor.py`) wrote `state[link] = _build_state_entry(..., silent=True)` for every "new" job while only logging — the docstring/CLI help implies `--debug` is read-only inspection, but it permanently mutated `seen_jobs.json`. Once written, `new_jobs = [j for j in jobs if j["link"] not in state]` excludes that link forever — the job is never delivered by a real (non-debug) run either.
+**Impact:** 186 of 722 entries in `seen_jobs.json` have this `sent`+`attempts:0` signature — silently lost, never delivered to career-agent, no error surfaced anywhere.
+**Fix:** `--debug` branch no longer writes to `state` at all — pure log-and-return. New/live jobs seen during `--debug` will be picked up normally on the next real (non-debug) poll cycle.
+**Scope decision (user, 2026-07-16):** fix the code only — do not bulk-recover the 186 pre-existing lost entries (most are month+ old, low value per "Inbox Zero"). Manually recovered the one reported case (`#830286` → inserted as vacancy `#705` via direct `POST /api/new-vacancy`).
+**Not done:** no test coverage added — `services/job-monitor/` has no test suite (standalone script, separate from the pytest-covered `career-agent` package).
+
 ### job-monitor: Djinni RSS feed returning empty/invalid XML intermittently (found 2026-07-16, watch-only)
 **Symptom:** `services/job-monitor/monitor.py`'s `check_feed()` fails with `xml.etree.ElementTree.ParseError: no element found: line 1, column 0` — all 4 Djinni feeds fail together in the same poll cycle, several times over ~20 min (18:30, 18:31, 18:36, 18:49). DOU feeds unaffected. 207 total "fetch failed" lines in `logs/monitor.log` history (broader pattern, includes an unrelated DNS blip on 07-14).
 **Likely cause:** today's heavy djinni.co traffic from the 264-row fetching cleanup (258 re-fetches + diagnostic requests, all from this machine) may have triggered a temporary rate-limit/bot-block on djinni's RSS endpoint specifically — individual job pages (via `services/parser`) fetched fine all day, only the RSS feed listing endpoint is affected.
@@ -261,6 +269,7 @@
 
 ## 🧊 Icebox (P3+)
 
+- **job-monitor: `seen_jobs.json` → own SQLite file** (idea, 2026-07-16) — dedup source of truth is already `vacancies.url` UNIQUE in career-agent's DB (`/api/new-vacancy` returns 409 on dup); `seen_jobs.json`'s real job is just avoiding redundant webhook POSTs + delivery-retry/backoff bookkeeping. Not urgent at current load (722 entries, 5-min poll) — the `--debug`-mutation bug found today was a logic bug, not a storage-format bug, and would've happened in SQLite too. If revisited: own SQLite file (NOT shared `agent.db` — job-monitor is deliberately decoupled from career-agent internals, no aiosqlite/sync-sqlite3 cross-process contention), gets atomic writes + queryability for free. Explicitly deferred — not a bug, just a "someday, if the JSON file starts actually hurting" cleanup.
 - **Docker deploy on VM** — compose ready (5 services); WeasyPrint needs GTK → Linux container only; plan: `git pull && docker compose up --build` on VM
 - **e2e full pipeline from URL** — fetch → analyze → generate → cover (`scripts/e2e_test.py`, costs tokens)
 - **health_check.py → Windows Task Scheduler** — recurring monitoring

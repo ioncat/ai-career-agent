@@ -561,12 +561,15 @@ async def check_feed(
     now_iso = now.isoformat(timespec="seconds")
 
     if debug:
+        # Inspection only — must NOT mutate state. Marking these "sent" here would
+        # permanently exclude them from real delivery once --debug is dropped
+        # (a job seen once during --debug never gets webhooked again). See
+        # BACKLOG "job-monitor: --debug silently marks vacancies as delivered".
         log.info("[%s] total: %d, new: %d, seen: %d",
                  feed["name"], len(jobs), len(new_jobs), len(jobs) - len(new_jobs))
         for j in new_jobs:
             log.info("  → %s | company=%s | salary=%s\n    %s",
                      j["title"], j["company"], j["salary"], j["link"])
-            state[j["link"]] = _build_state_entry(j, feed, now_iso, silent=True)
         return 0
 
     for j in new_jobs:
