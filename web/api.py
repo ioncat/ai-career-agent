@@ -33,6 +33,7 @@ except ImportError:
 
 from contracts.pipeline import AnalysisJson
 from core import config_store
+from core import vacancy_stage
 from db import database
 from web.reader import build_vacancy_view
 
@@ -295,6 +296,7 @@ async def api_vacancies(
         item = dict(row)
         item["applied"] = bool(item.get("applied"))
         item["starred"] = bool(item.get("starred"))
+        item["stage"] = vacancy_stage.stage(item.get("status") or "", item["applied"])
         db_company = item.get("company") or ""
         parsed = _parse_analysis_summary(item.pop("analysis_json", None))
         # Prefer analysis company (post-JD parse) over RSS company, but keep RSS as fallback

@@ -18,9 +18,12 @@ import '../widgets/status_line.dart';
 import 'vacancy_inbox_screen.dart';
 import 'settings_screen.dart';
 
-// Nav destinations
+// Nav destinations — 5-stage taxonomy (mirrors core/vacancy_stage.py) + Settings.
+// Order must match _AppShellState._folders below (index-aligned).
 const _kNavItems = [
   _NavItem(Icons.work,             Icons.work_outline,            'Inbox'),
+  _NavItem(Icons.fact_check,       Icons.fact_check_outlined,      'Analyzed'),
+  _NavItem(Icons.description,      Icons.description_outlined,     'Processed'),
   _NavItem(Icons.check_circle,     Icons.check_circle_outline,    'Applied'),
   _NavItem(Icons.archive,          Icons.archive_outlined,         'Archive'),
   _NavItem(Icons.settings,         Icons.settings_outlined,        'Settings'),
@@ -43,7 +46,7 @@ class AppShell extends ConsumerStatefulWidget {
 class _AppShellState extends ConsumerState<AppShell> {
   int _selectedIndex = 0;
 
-  static const _folders = ['inbox', 'applied', 'archive'];
+  static const _folders = ['inbox', 'analyzed', 'processed', 'applied', 'archive'];
 
   Future<void> _importJd() async {
     final result = await FilePicker.platform.pickFiles(
@@ -302,8 +305,8 @@ class _AppNavRail extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            // Main nav items: Inbox, Applied, Archive (indices 0–2)
-            ..._kNavItems.take(3).toList().asMap().entries.map((e) {
+            // Main nav items: Inbox, Analyzed, Processed, Applied, Archive (indices 0–4)
+            ..._kNavItems.take(5).toList().asMap().entries.map((e) {
               final i = e.key;
               return _NavRailItem(
                 item: e.value,
@@ -318,12 +321,12 @@ class _AppNavRail extends StatelessWidget {
               child: _AddVacancyButton(onTap: onAddVacancy),
             ),
             const Spacer(),
-            // Settings (index 3) — at the bottom, rarely used
+            // Settings (index 5) — at the bottom, rarely used
             _NavRailItem(
-              item: _kNavItems[3],
-              selected: selectedIndex == 3,
+              item: _kNavItems[5],
+              selected: selectedIndex == 5,
               badgeCount: unreadNotifCount,
-              onTap: () => onSelected(3),
+              onTap: () => onSelected(5),
             ),
             const SizedBox(height: 12),
           ],
