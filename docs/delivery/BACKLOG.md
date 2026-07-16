@@ -3,6 +3,12 @@
 > Last updated: 2026-07-16
 > Rules: [documentation-conventions.md](documentation-conventions.md) · History: [CHANGELOG.md](CHANGELOG.md) · Specs: [Epics/](Epics/)
 
+**Priority legend:**
+- 🔴 **P0** — блокеры / надо делать первым
+- 🟠 **P1** — высокая ценность, следующее в очереди
+- 🟡 **P2** — ценно, но не срочно
+- 🧊 **Icebox (P3+)** — когда-нибудь
+
 ---
 
 ## 📌 Now
