@@ -105,6 +105,40 @@ async def test_api_vacancies_filter_by_user_id(client):
     assert len(resp_all.json()) == 3
 
 
+# ── folder_path resolution (Open Folder button) ────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_folder_path_resolves_relative_markdown_path_to_absolute(client):
+    """folder_path must be absolute — a relative one makes explorer.exe silently
+    open the default Documents folder instead of the vacancy folder."""
+    import os as _os
+    from pathlib import Path as _Path
+
+    uid = await database.insert_user(name="FolderUser", telegram_chat_id=6001, skill_type="pm")
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/folder1/", user_id=uid)
+    relative = _os.path.join("vacancies", "inbox", str(uid), "test-folder", "JD.md")
+    await database.update_vacancy_fields(vid, markdown_path=relative)
+
+    resp = client.get(f"/api/vacancies?user_id={uid}")
+    assert resp.status_code == 200
+    item = next(v for v in resp.json() if v["id"] == vid)
+
+    assert item["folder_path"] is not None
+    assert _Path(item["folder_path"]).is_absolute()
+    assert item["folder_path"].endswith(_os.path.join("vacancies", "inbox", str(uid), "test-folder"))
+
+
+@pytest.mark.asyncio
+async def test_folder_path_none_when_no_markdown_path(client):
+    """No markdown_path yet (e.g. queued vacancy) → folder_path is null, not a bad path."""
+    uid = await database.insert_user(name="NoFolderUser", telegram_chat_id=6002, skill_type="pm")
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/folder2/", user_id=uid)
+
+    resp = client.get(f"/api/vacancies?user_id={uid}")
+    item = next(v for v in resp.json() if v["id"] == vid)
+    assert item["folder_path"] is None
+
+
 # ── GET /?user_id=N (tracker page) ────────────────────────────────────────────
 
 @pytest.mark.asyncio
