@@ -1,6 +1,6 @@
 # career-agent — Backlog
 
-> Last updated: 2026-07-16
+> Last updated: 2026-07-17
 > Rules: [documentation-conventions.md](documentation-conventions.md) · History: [CHANGELOG.md](CHANGELOG.md) · Specs: [Epics/](Epics/)
 
 **Priority legend:**
@@ -29,15 +29,15 @@
 
 ## 🟠 P1
 
-### Pre-filter critical blockers before spending LLM tokens (added 2026-07-16)
-**Story:** As a user, I want obviously-disqualifying vacancies (hard blockers like "English C1 required", "must reside in EU", "mobile B2C experience required" when I have none) filtered out cheaply BEFORE Phase 1+2 runs, so tokens aren't spent analyzing a vacancy that was never viable.
-**Context:** born from the "Inbox Zero" philosophy discussion (2026-07-16) — a good inbox is a *processed* inbox; obvious non-starters shouldn't even reach the point of costing an LLM call, let alone sitting around for the user to manually skip later.
-**Design sketch (not decided, needs its own pass):**
-- New `## Critical Blockers` section in `PROFILE.md`, same pattern as the existing `## Vacancy Preferences` (domain_interests etc.) — user-editable list, e.g. `english: C1`, `location: EU-resident-required`, `domain: mobile B2C experience required`.
-- Cheap deterministic check (regex/keyword match against JD text) — NOT an LLM call — run right after JD fetch, before Phase 1+2. Inherently fuzzy (phrasing varies: "advanced English", "C1 level", "fluent English" all mean similar things) — expect false negatives, acceptable since it's a pre-filter not a decision-maker.
-- **Advisory only, never auto-skip**: surface a flag/badge in Flutter ("⚠️ Possible blocker: English C1 required") so the user makes the final skip call themselves — matches user's own words: "показывать пользователю, а он потом сам скипает." Auto-declining silently would risk false-negative-driven loss of real opportunities.
-- Complements (doesn't replace) Phase 2's LLM-driven Key Barriers — this is a cruder, free, earlier gate; Phase 2 remains the nuanced analysis for vacancies that pass the gate.
-**Not scoped/estimated yet** — needs its own design session before implementation.
+### Wire Critical Blocker pre-filter into an automatic trigger (added 2026-07-17)
+**What:** `POST /api/vacancies/{id}/prefilter` + Flutter "Check blockers" button ship manual-trigger-only (EPIC-27, delivered 2026-07-17) — deliberate, so the prompt/`## Critical Blockers` format can be validated first. This ticket is the follow-up: decide and wire an actual automatic trigger point once that validation is done.
+**Why:** manual button proves the mechanism works; automatic triggering is what actually saves the user time day-to-day (the original point of the feature).
+**Scope:** needs to cover BOTH vacancy-creation paths — `RSSWatcher._process()` (RSS feed pickup) AND `POST /api/vacancies/import-jd` (manual JD paste, bypasses RSSWatcher entirely) — an RSS-only hook would silently miss imported vacancies. See [EPIC-27's Rollout section](Epics/EPIC-27-per-phase-llm-routing.md) for full context and the reverted auto-hook's exact prior location.
+**Design — ✅ resolved (user, 2026-07-17):** one Settings toggle, "Auto-analyze blockers: on/off", is a master switch for BOTH logic and UI — the two modes are mutually exclusive by design, never both active:
+- **ON** → pre-filter runs automatically on every vacancy, regardless of creation path (RSS or `import-jd`). The manual "Check blockers" button (vacancy detail screen) is **hidden** — showing it alongside automatic mode would be confusing (re-running raises "what does this even do now?" questions) and pointless (already covered).
+- **OFF** → no automatic run anywhere. The manual button is shown; the user decides per vacancy whether to check.
+No dual-availability state — the button's visibility is a direct, deterministic function of the toggle.
+**Not scoped/estimated yet.**
 
 ### Physical folder tree mirrors vacancy stage (added 2026-07-16)
 **Story:** As a user, I want the filesystem folder structure to match the visual 5-stage taxonomy — `vacancies/inbox/{user}/Analyzed/`, `.../Processed/`, `.../Applied/`, `.../Archive/` — not just the UI, so browsing on disk matches browsing in the app.
@@ -161,6 +161,12 @@
 
 ## 🟡 P2
 
+### Scrape Djinni's own structured job-criteria block for pre-filter (added 2026-07-17)
+**What:** Djinni job pages render a public, unauthenticated `<aside>` block with structured job-side criteria — min years experience, remote/hybrid/office format, countries considered, required language level, employment type, domain, company stage. Confirmed live (anonymous browser session, no login) on a real job page — these are the JOB's own stated thresholds, not a personalized comparison against a specific candidate account (that comparison IS login-gated and stays out of reach; not needed anyway since we already have the candidate's own attributes in PROFILE.md).
+**Why:** Djinni already curates "hardest, most explicit" criteria structurally — could feed the pre-filter directly (skip/cheapen LLM reasoning for categories Djinni already classifies) or serve as a second signal to cross-check LLM output. Ties directly into the reliability problem being investigated in [EPIC-27](Epics/EPIC-27-per-phase-llm-routing.md) / `docs/discovery/prefilter-local-model-selection.md` — local-model instability (see that doc's stability findings) is exactly the gap this structured data could shrink.
+**Scope (not started):** `services/parser/`'s Djinni site config needs a second selector for this `<aside>` block (separate from `.job-post__description`); `ParsedDocument` contract needs a field for structured criteria; decide how it feeds the pre-filter (hard pre-check before the LLM call, or extra context appended to the prompt).
+**Priority:** low — the local-model pre-filter work itself is currently exploratory/low-priority; this is an enhancement on an unstable foundation, not urgent.
+
 ### Re-analyze UX: vacancy visually "disappears" from Analyzed folder mid-run (found 2026-07-16, vacancy #665)
 **Repro:** vacancy #665 ("Senior Product Manager — MAKEUP", talentC) was `status='analyzed'`, sitting in the Analyzed folder. User triggered a re-analysis (Re-analyze button) without noting the ID first — while it ran, the vacancy was nowhere to be found: not in Analyzed, not in any other folder user checked. It reappeared once analysis completed.
 **Root cause (traced, not yet fixed):** re-analyze transitions status through `analysis_queued`/`analyzing` before landing back on `analyzed`. `core/vacancy_stage.py`'s `stage()` only maps `analyzed`/`analysis_failed` to the "Analyzed" folder — `analyzing`/`analysis_queued` fall through to "Inbox". So mid-re-analysis, the vacancy correctly (per current logic) moves to Inbox — but this is a new, more confusing behavior since the 5-stage taxonomy shipped (2026-07-16): previously Inbox absorbed the whole fetched→cover_generated range, so this transition was invisible (still "Inbox" before and during). Now that Analyzed/Processed are separate folders, a re-analyze is a visible, unexpected folder-jump — not tested when the taxonomy shipped.
@@ -269,6 +275,7 @@
 
 ## 🧊 Icebox (P3+)
 
+- **Research: does Ollama's `think`/`effort` parameter actually grade reasoning depth, and in which local models?** (idea, 2026-07-17, ties to [EPIC-27](Epics/EPIC-27-per-phase-llm-routing.md) / `docs/discovery/prefilter-local-model-selection.md`) — found while debugging the Critical Blocker pre-filter: a direct `think=low` vs `think=high` comparison on `gemma4:e2b` showed no measurable difference in reasoning length/depth (<1%), while `think=off` vs any `think=<level>` clearly does matter (on/off, not graduated). Working theory: Ollama's `think` API param is a generic slot — some architectures (gpt-oss, some Qwen3 variants) use the string value to modulate depth, but Gemma 4's `ollama show` capability listing is a plain boolean (`thinking`, no levels), so the level is likely ignored. Not confirmed against source, just one comparison + the model card. Two separate questions worth a real answer someday: (1) does the `think` level string do ANYTHING model-observable for architectures that don't advertise graduated support, or is it silently ignored; (2) which of our locally-available models (qwen3:8b, phi4:14b, etc.) genuinely support graduated effort vs boolean-only. Not blocking — current pre-filter work treats `effort=medium` as just "thinking on" and moves forward on that basis.
 - **job-monitor: `seen_jobs.json` → own SQLite file** (idea, 2026-07-16) — dedup source of truth is already `vacancies.url` UNIQUE in career-agent's DB (`/api/new-vacancy` returns 409 on dup); `seen_jobs.json`'s real job is just avoiding redundant webhook POSTs + delivery-retry/backoff bookkeeping. Not urgent at current load (722 entries, 5-min poll) — the `--debug`-mutation bug found today was a logic bug, not a storage-format bug, and would've happened in SQLite too. If revisited: own SQLite file (NOT shared `agent.db` — job-monitor is deliberately decoupled from career-agent internals, no aiosqlite/sync-sqlite3 cross-process contention), gets atomic writes + queryability for free. Explicitly deferred — not a bug, just a "someday, if the JSON file starts actually hurting" cleanup.
 - **Docker deploy on VM** — compose ready (5 services); WeasyPrint needs GTK → Linux container only; plan: `git pull && docker compose up --build` on VM
 - **e2e full pipeline from URL** — fetch → analyze → generate → cover (`scripts/e2e_test.py`, costs tokens)
@@ -278,7 +285,7 @@
 - **asyncio.Queue → Redis** — when concurrent users justify it
 - **MCP Server** — Career Agent as tool for personal AI agents → [../discovery/mcp-server.md](../discovery/mcp-server.md)
 - **Extensions** — `yt_transcribe.py`, `quote_store.py`, `email_draft.py`, job auto-submit (feasibility research first)
-- **Unit Economics Dashboard** — `GET /api/economics` + Chart.js (cost/vacancy, phase breakdown, cache efficiency, spend)
+- **Unit Economics Dashboard** — `GET /api/economics` + Chart.js (cost/vacancy, phase breakdown, cache efficiency, spend). ⚠️ Before aggregating `cost_usd`/`input_tokens`/`output_tokens`: `claude_cli` rows store these as literal `0` (not NULL, no real data — `core/llm_client.py:704-719`), indistinguishable from genuinely-free. Exclude/footnote `WHERE provider='claude_cli'` explicitly instead of summing — see [per-phase-llm-routing.md](../discovery/per-phase-llm-routing.md).
 - **Polish & docs** — README Mermaid diagrams, QUICKSTART.md, USER_GUIDE.md
 
 ---
@@ -300,5 +307,6 @@
 | [EPIC-24](Epics/EPIC-24-progressive-profile.md) | Progressive Profile | 🚧 T1–T6, T8 done; T7, T9 open |
 | [EPIC-25](Epics/EPIC-25-auth-billing.md) | Auth, User Management & Billing | 📋 Planned (design-first) |
 | [EPIC-26](Epics/EPIC-26-vacancy-dedup-republish.md) | Dedup & Re-publish Detection | ✅ Done 2026-07-09 |
+| [EPIC-27](Epics/EPIC-27-per-phase-llm-routing.md) | Per-Phase LLM Routing + Blocker Pre-filter | 🚧 Core done 2026-07-17; auto-trigger deferred |
 
 Pre-pivot EPIC 1–12: [epics-archive/EPIC-01-12-pre-pivot.md](epics-archive/EPIC-01-12-pre-pivot.md)
