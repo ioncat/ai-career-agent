@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/config_provider.dart';
 import '../providers/settings_provider.dart';
+import '../widgets/phase_llm_config_tile.dart';
 // RemoteConfig used by _ModelDropdown
 
 /// Runs a config_provider patch (model/effort) and surfaces the result.
@@ -152,6 +153,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               _SectionLabel('AI Provider'),
               const SizedBox(height: 12),
               const _AiProviderTile(),
+              const SizedBox(height: 16),
+              const PhaseRoutingSection(),
               const SizedBox(height: 32),
 
               // Save button

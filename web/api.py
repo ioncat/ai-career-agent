@@ -297,6 +297,21 @@ async def api_vacancies(
         item["applied"] = bool(item.get("applied"))
         item["starred"] = bool(item.get("starred"))
         item["stage"] = vacancy_stage.stage(item.get("status") or "", item["applied"])
+        # EPIC-27: pre-filter result — advisory badge, never affects stage/status.
+        # blocker_checked distinguishes "checked, came back clean" from "never
+        # checked" — both look identical via blocker_flag=false alone, which is
+        # exactly what made a clean result invisible in the UI (found 2026-07-17,
+        # vacancy #716: check finished, nothing appeared). blocker_raw_output
+        # itself is NOT sent here — full model output is heavy for a list
+        # response; fetched on demand via GET /api/vacancies/{id} instead.
+        item["blocker_flag"] = bool(item.get("blocker_flag"))
+        raw_output = item.pop("blocker_raw_output", None)
+        item["blocker_checked"] = bool(raw_output)
+        raw_reasons = item.pop("blocker_reasons", None)
+        try:
+            item["blocker_reasons"] = json.loads(raw_reasons) if raw_reasons else []
+        except (json.JSONDecodeError, TypeError):
+            item["blocker_reasons"] = []
         db_company = item.get("company") or ""
         parsed = _parse_analysis_summary(item.pop("analysis_json", None))
         # Prefer analysis company (post-JD parse) over RSS company, but keep RSS as fallback
@@ -347,10 +362,13 @@ async def api_user_progressive_profile(user_id: int):
         raise HTTPException(status_code=500, detail="Profile data corrupted")
 
 
-# Fallback list used when network fetch fails
+# Fallback list used when network fetch fails.
+# claude_cli: NOT the full Anthropic API catalog (verified 2026-07-17 — the CLI's own
+# --model flag accepts only current aliases, not every dated snapshot the API lists).
+# Keep this hardcoded and current; do not point it at _fetch_anthropic_models().
 _FALLBACK_MODELS: dict[str, list[str]] = {
-    "claude_api": ["claude-opus-4-5", "claude-sonnet-4-6", "claude-haiku-4-5"],
-    "claude_cli": ["claude-sonnet-4-6", "claude-opus-4-5", "claude-haiku-4-5"],
+    "claude_api": ["claude-opus-4-8", "claude-sonnet-5", "claude-haiku-4-5-20251001"],
+    "claude_cli": ["claude-sonnet-5", "claude-opus-4-8", "claude-haiku-4-5-20251001", "claude-fable-5"],
 }
 
 _MODELS_CACHE_TTL_HOURS = 24
@@ -505,6 +523,104 @@ async def patch_config(body: ConfigPatch):
         "analysis_mode": os.getenv("ANALYSIS_MODE", "inbox_first").lower(),
         "available_models": allowed,
         "valid_providers": sorted(config_store.VALID_PROVIDERS),
+    }
+
+
+@app.get("/api/config/phases")
+async def api_config_phases():
+    """Return every pipeline phase with its resolved config (EPIC-27).
+
+    Unpinned phases resolve to the same global default as GET /api/config.
+    is_override distinguishes "explicitly pinned" from "following default"
+    without a second round-trip.
+    """
+    resolved = await config_store.get_resolved_phase_configs()
+    phases = {}
+    for phase, cfg in resolved.items():
+        provider = cfg["provider"]
+        phases[phase] = {
+            "provider": provider,
+            "model": config_store.effective_model(provider, cfg["model"]),
+            "thinking_effort": cfg["thinking_effort"],
+            "is_override": cfg["is_override"],
+            "available_models": await _get_available_models(provider),
+        }
+    return {"phases": phases, "valid_providers": sorted(config_store.VALID_PROVIDERS)}
+
+
+class PhaseConfigPatch(BaseModel):
+    provider: str | None = None
+    model: str | None = None
+    thinking_effort: str | None = None
+    # Same drift-guard as PATCH /api/config, keyed to this one phase's resolved
+    # provider (which may come from an override row OR the global default).
+    expected_provider: str | None = None
+
+
+@app.patch("/api/config/phases/{phase}")
+async def patch_config_phase(phase: str, body: PhaseConfigPatch):
+    """Set/update an override for one phase. Unknown phase → 404.
+
+    Mirrors PATCH /api/config's validation + drift-guard exactly, keyed by phase
+    instead of global. See core/config_store.py:set_phase_config for the
+    provider-switch-resets-model semantics.
+    """
+    if phase not in config_store.VALID_PHASES:
+        raise HTTPException(status_code=404, detail=f"unknown phase {phase!r}")
+
+    current = await config_store.get_config(phase)
+
+    if body.expected_provider is not None and body.provider is None:
+        if body.expected_provider.lower() != current["provider"]:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Provider for phase {phase!r} changed on backend (now {current['provider']!r}) — refresh Settings",
+            )
+
+    target_provider = body.provider.lower() if body.provider is not None else current["provider"]
+    if body.provider is not None and target_provider not in config_store.VALID_PROVIDERS:
+        raise HTTPException(status_code=422, detail=f"provider must be one of {sorted(config_store.VALID_PROVIDERS)}")
+    if body.thinking_effort is not None and body.thinking_effort not in config_store.VALID_EFFORTS:
+        raise HTTPException(status_code=422, detail=f"thinking_effort must be one of {sorted(config_store.VALID_EFFORTS)}")
+
+    provider_switched = body.provider is not None and target_provider != current["provider"]
+    allowed = await _get_available_models(target_provider)
+    if not provider_switched and body.model and allowed and body.model not in allowed:
+        raise HTTPException(status_code=422, detail=f"model not valid for provider {target_provider!r}")
+
+    try:
+        cfg = await config_store.set_phase_config(
+            phase, provider=target_provider, model=body.model, thinking_effort=body.thinking_effort
+        )
+    except config_store.ConfigError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+    provider = cfg["provider"]
+    return {
+        "phase": phase,
+        "provider": provider,
+        "model": config_store.effective_model(provider, cfg["model"]),
+        "thinking_effort": cfg["thinking_effort"],
+        "is_override": True,
+        "available_models": allowed,
+    }
+
+
+@app.delete("/api/config/phases/{phase}")
+async def delete_config_phase(phase: str):
+    """Reset a phase to follow the global default — removes its override row."""
+    if phase not in config_store.VALID_PHASES:
+        raise HTTPException(status_code=404, detail=f"unknown phase {phase!r}")
+    await config_store.delete_phase_config(phase)
+    cfg = await config_store.get_config(phase)
+    provider = cfg["provider"]
+    return {
+        "phase": phase,
+        "provider": provider,
+        "model": config_store.effective_model(provider, cfg["model"]),
+        "thinking_effort": cfg["thinking_effort"],
+        "is_override": False,
+        "available_models": await _get_available_models(provider),
     }
 
 
@@ -1089,6 +1205,63 @@ async def api_vacancy_analyze(vacancy_id: int, request: Request):
     # Standalone fallback (no agent.py running)
     await database.update_vacancy_status(vacancy_id, "analysis_queued")
     return {"id": vacancy_id, "status": "analysis_queued"}
+
+
+@app.post("/api/vacancies/{vacancy_id}/prefilter", status_code=200)
+async def api_vacancy_prefilter(vacancy_id: int):
+    """Manually run the critical-blocker pre-filter on one vacancy (EPIC-27).
+
+    Synchronous — a single cheap LLM call, not a queued pipeline phase. NOT
+    wired into the automatic fetch flow (deliberate, 2026-07-17): lets the
+    user validate/tune prompts/[skill_type]/prefilter.md and PROFILE.md's
+    ## Critical Blockers against real vacancies first — this is the manual
+    "Check blockers" button in Flutter, not an auto-triggered phase.
+    """
+    row = await database.get_vacancy_by_id(vacancy_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Vacancy not found")
+    if not row["markdown_path"]:
+        raise HTTPException(status_code=422, detail="Vacancy has no JD.md yet")
+
+    from types import SimpleNamespace
+    from core.settings import ConfigError as SettingsConfigError, load_settings
+    from tools.cv_prefilter import cv_prefilter
+    try:
+        settings = load_settings()
+    except SettingsConfigError as exc:
+        raise HTTPException(status_code=503, detail=f"LLM settings unavailable: {exc}")
+
+    user_id = row["user_id"] if "user_id" in row.keys() and row["user_id"] else 1
+    user_row = await database.get_user_by_id(user_id)
+    skill_type = (user_row["skill_type"] if user_row and "skill_type" in user_row.keys() else None) or "pm"
+
+    async def _get_llm(phase: str):
+        return await config_store.build_llm_client(phase, settings)
+
+    ctx = SimpleNamespace(deps=SimpleNamespace(get_llm=_get_llm, skill_type=skill_type, user_id=user_id))
+
+    try:
+        result = await cv_prefilter(ctx, vacancy_id)  # type: ignore[arg-type]
+    except Exception as exc:
+        # cv_prefilter is already fail-open internally for LLM/parse errors —
+        # anything that still escapes here is a real bug, surface it (this IS
+        # the manual debugging button, hiding failures defeats its purpose).
+        raise HTTPException(status_code=500, detail=f"Pre-filter crashed: {exc}")
+
+    # "ok" distinguishes a real, correctly-parsed answer from any failure (LLM
+    # unreachable, model not found, output didn't match the expected format) —
+    # collapsing these into "no blockers" is exactly what went wrong on vacancy
+    # #716 (2026-07-17): a bad model pin 404'd three times, looked identical in
+    # the UI to "checked, all clear".
+    return {
+        "vacancy_id": vacancy_id,
+        "ok": result["ok"],
+        "blocked": result["blocked"],
+        "reasons": result["reasons"],
+        "raw_output": result["raw_output"],
+        "error": result["error"],
+        "provider_unavailable": result["provider_unavailable"],
+    }
 
 
 @app.post("/api/vacancies/{vacancy_id}/reset", status_code=200)

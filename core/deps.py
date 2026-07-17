@@ -13,6 +13,7 @@ Usage in a tool:
         ...
 """
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -28,7 +29,13 @@ class AgentDeps:
 
     Attributes:
         parser_adapter: Async HTTP client for jd-parser service (URL → Markdown).
-        llm:            LLM provider for completions — ClaudeProvider or OllamaProvider.
+        get_llm:        Phase-aware LLM client factory (EPIC-27) — call
+                        `await ctx.deps.get_llm("phase1")` to get a live provider
+                        instance for that specific phase (each phase may resolve to
+                        a different provider/model per core.config_store's
+                        phase_llm_config overrides). Bound to a worker's
+                        `_fresh_llm` method — never call the same phase name twice
+                        expecting a cached client back; it builds fresh each time.
         vacancies_path: Root directory for vacancy filesystem storage.
         candidate_name: Full name used in CV filenames (e.g. "Oleksii_Bondarenko").
         cv_adapter:     Subprocess wrapper for cv_to_pdf.py in callback-cv repo.
@@ -39,7 +46,7 @@ class AgentDeps:
                         None if PROFILE.md is absent (pipeline runs with degraded personalisation).
     """
     parser_adapter: ParserAdapter
-    llm: ClaudeProvider | OllamaProvider | ClaudeCodeProvider
+    get_llm: Callable[[str], Awaitable[ClaudeProvider | OllamaProvider | ClaudeCodeProvider]]
     vacancies_path: Path
     candidate_name: str
     cv_adapter: CVAdapter

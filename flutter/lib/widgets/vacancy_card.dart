@@ -101,6 +101,16 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
                       child: _RepublishedBadge(),
                     ),
                   ],
+                  if (v.blockerFlag) ...[
+                    const SizedBox(width: 6),
+                    Tooltip(
+                      message: v.blockerReasons.isEmpty
+                          ? 'Pre-filter flagged a possible hard blocker in this JD.'
+                          : 'Possible blocker(s):\n${v.blockerReasons.map((r) => '• $r').join('\n')}',
+                      preferBelow: false,
+                      child: const _BlockerBadge(),
+                    ),
+                  ],
                   if (v.duplicateOf != null) ...[
                     const SizedBox(width: 6),
                     Tooltip(
@@ -304,6 +314,42 @@ class _RepublishedBadge extends StatelessWidget {
               fontWeight: FontWeight.w700,
               fontSize: 10,
             ),
+      ),
+    );
+  }
+}
+
+// Pre-filter (EPIC-27) — advisory only, distinct from Phase 2's Key Barriers
+// (LLM-derived fit-gap analysis, shown lower in the card). This badge is the
+// cheap gate that runs before any real analysis — deliberately more prominent
+// (top row, always visible) since its whole point is "look twice before you
+// spend time reading this one".
+class _BlockerBadge extends StatelessWidget {
+  const _BlockerBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFEBEE),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFFE57373), width: 0.8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.block_rounded, size: 11, color: Color(0xFFC62828)),
+          const SizedBox(width: 3),
+          Text(
+            'Possible blocker',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: const Color(0xFFC62828),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 10,
+                ),
+          ),
+        ],
       ),
     );
   }

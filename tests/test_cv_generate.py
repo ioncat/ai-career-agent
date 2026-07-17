@@ -55,7 +55,7 @@ _PHASE3_DRAFT = "Oleksii Bondarenko\nProduct Manager\nemail@... \n\nSUMMARY\n\nD
 
 def _make_ctx(tmp_path: Path, llm=None, cv_adapter=None) -> MagicMock:
     ctx = MagicMock()
-    ctx.deps.llm = llm or _make_llm()
+    ctx.deps.get_llm = AsyncMock(return_value=llm or _make_llm())
     ctx.deps.cv_adapter = cv_adapter or _make_cv_adapter()
     ctx.deps.candidate_name = "Oleksii_Bondarenko"
     ctx.deps.vacancies_path = tmp_path / "vacancies"

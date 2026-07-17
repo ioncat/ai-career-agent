@@ -115,9 +115,10 @@ async def cv_cover(ctx: RunContext[AgentDeps], vacancy_id: int) -> str:
     try:
         log.info("cv_cover: Phase 4 start — vacancy_id=%d", vacancy_id)
         t0 = time.monotonic()
-        cover_text = await ctx.deps.llm.complete(phase4_user, system=phase4_prompt)
+        llm4 = await ctx.deps.get_llm("phase4")
+        cover_text = await llm4.complete(phase4_user, system=phase4_prompt)
         log.info("cv_cover: Phase 4 done — %d chars, elapsed=%.1fs", len(cover_text), time.monotonic() - t0)
-        if u := ctx.deps.llm.last_call_usage:
+        if u := llm4.last_call_usage:
             await database.insert_llm_usage(phase="phase4", vacancy_id=vacancy_id, user_id=ctx.deps.user_id, **u)
     except LLMError as exc:
         await database.update_pipeline_run(run_id, status="error", error_message=str(exc))

@@ -242,6 +242,11 @@ class RSSWatcher:
 
             await database.update_vacancy_status(vacancy_id, "fetched")
 
+            # Pre-filter (EPIC-27) is NOT auto-triggered here by design (2026-07-17):
+            # user wants to validate/tune the prefilter.md prompt and PROFILE.md
+            # Critical Blockers manually first — see POST /api/vacancies/{id}/prefilter
+            # (manual trigger button in Flutter) before this gets wired in automatically.
+
             # inbox_first mode: stop after fetch — user triggers analysis manually
             if self._settings is None or self._settings.analysis_mode != "full_auto":
                 log.info("RSSWatcher: mode=inbox_first — v#%d fetched, awaiting user", vacancy_id)

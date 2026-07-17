@@ -110,7 +110,7 @@ async def test_fresh_llm_ollama_uses_db_model():
         patch("core.analysis_worker.config_store.get_config", new_callable=AsyncMock, return_value=cfg),
         patch("core.llm_client.OllamaProvider") as MockOllama,
     ):
-        await worker._fresh_llm()
+        await worker._fresh_llm("phase1")
 
     # DB-selected model (via config_store) wins over the env default
     assert MockOllama.call_args.kwargs["model"] == "qwen3:8b"
@@ -131,7 +131,7 @@ async def test_fresh_llm_ollama_falls_back_to_env_model(monkeypatch):
         patch("core.analysis_worker.config_store.get_config", new_callable=AsyncMock, return_value=cfg),
         patch("core.llm_client.OllamaProvider") as MockOllama,
     ):
-        await worker._fresh_llm()
+        await worker._fresh_llm("phase1")
 
     assert MockOllama.call_args.kwargs["model"] == "qwen2.5:32b"
 

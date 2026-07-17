@@ -59,6 +59,11 @@ CREATE TABLE IF NOT EXISTS vacancies (
     fetch_attempts INTEGER NOT NULL DEFAULT 0,
                                           -- count of failed RSSWatcher fetch attempts; capped
                                           -- retry gives up after MAX_FETCH_ATTEMPTS (rss_watcher.py)
+    -- EPIC-27: critical blocker pre-filter (advisory only, never auto-skips)
+    blocker_flag    INTEGER NOT NULL DEFAULT 0,
+                                          -- 1 = pre-filter found a conflict with ## Critical Blockers
+    blocker_reasons TEXT,                 -- JSON array of strings, e.g. ["english: JD requires C1"]
+    blocker_raw_output TEXT,               -- full LLM response, for debugging parse failures
     created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
     updated_at    TEXT    NOT NULL DEFAULT (datetime('now'))
 );
@@ -175,5 +180,20 @@ CREATE TABLE IF NOT EXISTS user_settings (
     llm_provider    TEXT,                            -- NULL = use LLM_PROVIDER env default
     llm_model       TEXT,                            -- NULL = use LLM_MODEL env default
     thinking_effort TEXT    NOT NULL DEFAULT 'off',  -- 'off'|'low'|'medium'|'high'|'xhigh'|'max'
+    updated_at      TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
+-- ── phase_llm_config ──────────────────────────────────────────────────────────
+-- Per-phase LLM provider/model/effort overrides (EPIC-27). Additive — user_settings
+-- stays the global default, untouched. No row (or provider IS NULL) for a phase =
+-- fall through to the global default. Global today (no user_id) — mirrors
+-- user_settings' own single-user-today precedent; PK becomes (user_id, phase) if
+-- multi-tenant (EPIC-25) ever needs per-user pins.
+
+CREATE TABLE IF NOT EXISTS phase_llm_config (
+    phase           TEXT PRIMARY KEY,   -- 'prefilter'|'phase1'|'phase2'|'phase3'|'phase3_5'|'phase4'
+    provider        TEXT,               -- NULL = no override
+    model           TEXT,
+    thinking_effort TEXT,
     updated_at      TEXT    NOT NULL DEFAULT (datetime('now'))
 );

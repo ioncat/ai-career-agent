@@ -384,7 +384,27 @@ class OllamaProvider:
         model:      Model tag, e.g. "qwen2.5:32b" or "llama3.3:70b".
         profile_md: Full text content of PROFILE.md — prepended to every system prompt.
         max_tokens: Max tokens for completion (passed as num_predict to Ollama).
+        effort:     'off'|'low'|'medium'|'high'|'xhigh'|'max' — sent as Ollama's
+                    `think` param when not 'off'. Only reasoning-capable models
+                    (Qwen 3, GPT-OSS, DeepSeek R1/v3.1, etc — see
+                    docs.ollama.com/capabilities/thinking) act on it; behavior on
+                    unsupported models is undocumented upstream (untested here —
+                    see EPIC-27 design doc's open question).
+        num_ctx:    Explicit context window to request from Ollama. Left unset,
+                    Ollama loads the model's full declared context length (e.g.
+                    qwen3:8b defaults to 40960) and pre-allocates KV cache sized
+                    for it regardless of actual prompt length — on a 16GB GPU
+                    this can overflow VRAM and force partial CPU execution,
+                    turning a ~5s call into tens of minutes (found 2026-07-17:
+                    `ollama ps` showed qwen3:8b running 56% CPU/44% GPU at 30GB
+                    total memory for a 5.2GB-on-disk model). Callers that know
+                    their real token budget should pass a right-sized value.
     """
+
+    # Ollama's `think` param accepts low|medium|high|max (or bool, but GPT-OSS
+    # rejects bool per Ollama's docs — always send a level). Our VALID_EFFORTS has
+    # 'xhigh' too (Claude-specific); Ollama has no such level, map to its ceiling.
+    _EFFORT_TO_THINK = {"low": "low", "medium": "medium", "high": "high", "xhigh": "max", "max": "max"}
 
     def __init__(
         self,
@@ -393,17 +413,31 @@ class OllamaProvider:
         profile_md: str,
         max_tokens: int = 4096,
         timeout: int = 600,
+        effort: str = "off",
+        num_ctx: int | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._model = model
         self._profile_md = profile_md
         self._max_tokens = max_tokens
+        self._effort = effort
+        self._num_ctx = num_ctx
         read_timeout = None if timeout == 0 else float(timeout)
         self._timeout = httpx.Timeout(timeout=read_timeout, connect=10.0)
         self._last_call_usage: dict | None = None
+        self._last_thinking: str | None = None
         self._sess_calls = 0
         self._sess_input = 0
         self._sess_output = 0
+
+    @property
+    def last_thinking(self) -> str | None:
+        """Reasoning trace from the most recent complete() call, when effort != 'off'
+        and the model actually returned one — Ollama's /api/chat separates it from
+        `content` (`message.thinking`), and it was previously discarded entirely,
+        making it impossible to tell "model reasoned wrong" from "model reasoned
+        right but answered wrong anyway" (found debugging vacancy #716, 2026-07-17)."""
+        return self._last_thinking
 
     async def complete(self, user: str, *, system: str | None = None, **_kwargs) -> str:
         """Call Ollama /api/chat. system and user mirror ClaudeProvider.complete()."""
@@ -421,6 +455,10 @@ class OllamaProvider:
             "stream": False,
             "options": {"num_predict": self._max_tokens},
         }
+        if self._num_ctx is not None:
+            payload["options"]["num_ctx"] = self._num_ctx
+        if self._effort != "off":
+            payload["think"] = self._EFFORT_TO_THINK.get(self._effort, self._effort)
 
         t0 = time.monotonic()
         async with httpx.AsyncClient(timeout=self._timeout) as client:
@@ -450,7 +488,9 @@ class OllamaProvider:
             data = resp.json()
         except ValueError as exc:
             raise LLMError(f"Ollama returned invalid JSON: {resp.text[:100]}") from exc
-        text = (data.get("message") or {}).get("content") or ""
+        message = data.get("message") or {}
+        text = message.get("content") or ""
+        self._last_thinking = message.get("thinking") or None
         if not text:
             raise LLMError("Ollama returned empty response")
 

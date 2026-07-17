@@ -384,6 +384,30 @@ async def test_process_full_auto_runs_analysis():
     mock_db.update_vacancy_status.assert_awaited_with(1, "fetched")
 
 
+# ── Pre-filter (EPIC-27) — deliberately NOT auto-triggered ─────────────────
+
+@pytest.mark.asyncio
+async def test_process_does_not_auto_trigger_prefilter():
+    """Manual-only by design (2026-07-17) — user wants to validate/tune the
+    prefilter.md prompt via the Flutter button before this runs automatically.
+    See POST /api/vacancies/{id}/prefilter. Regression guard: if this starts
+    failing because something re-added the auto-call, that's a decision to
+    make consciously, not a side effect of an unrelated refactor."""
+    watcher, _ = _make_watcher()
+    watcher._settings.analysis_mode = "full_auto"  # even in full_auto — no exception
+    mock_prefilter = AsyncMock()
+    mock_db = _mock_db([])
+
+    with patch("core.rss_watcher.database", mock_db), \
+         patch("tools.cv_fetch_jd.fetch_jd", AsyncMock(return_value=1)), \
+         patch("tools.cv_analyze.cv_analyze", AsyncMock()), \
+         patch("tools.cv_prefilter.cv_prefilter", mock_prefilter), \
+         patch("core.rss_watcher.RSSWatcher._push_result", AsyncMock()):
+        await watcher._process("https://djinni.co/jobs/1/")
+
+    mock_prefilter.assert_not_awaited()
+
+
 # ── Semaphore ─────────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
