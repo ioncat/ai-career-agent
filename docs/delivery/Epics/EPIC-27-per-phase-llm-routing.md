@@ -91,6 +91,15 @@ The manual button works identically regardless of how the vacancy was created.
 - **Next step (not started):** once the prompt/format are validated manually,
   design the actual automatic trigger point (RSS fetch? Import-jd path too? Both?)
   as its own follow-up — not scoped further here.
+- **Manual validation, in progress (2026-07-17):** full investigation into which
+  local model/config is actually reliable enough to trust —
+  [docs/discovery/prefilter-local-model-selection.md](../../discovery/prefilter-local-model-selection.md)
+  (gitignored). Found and fixed two real bugs along the way (prefilter was
+  getting the full PROFILE.md instead of just `## Critical Blockers`; `OllamaProvider`
+  never capped `num_ctx`, overflowing this machine's GPU and making some models
+  look 50-100× slower than they actually are). Current leader: `gemma4:e4b`, not
+  yet fully validated — see that doc's "Plan for 2026-07-18". Session log:
+  [.claude/sessions/2026-07-17-prefilter-reliability-model-comparison.md](../../../.claude/sessions/2026-07-17-prefilter-reliability-model-comparison.md).
 
 ### Notes for Engineering
 
