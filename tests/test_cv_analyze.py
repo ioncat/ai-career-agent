@@ -84,9 +84,14 @@ def _make_llm(side_effect=None, return_value="LLM output") -> AsyncMock:
 
 
 def _make_ctx(tmp_path: Path, llm=None) -> MagicMock:
-    """Build mock RunContext[AgentDeps]."""
+    """Build mock RunContext[AgentDeps].
+
+    get_llm returns the SAME mock for every phase (matches EPIC-27's per-phase
+    resolution interface) — tests still sequence phase1/phase2 responses via
+    llm.complete's side_effect list, since both calls land on one mock.
+    """
     ctx = MagicMock()
-    ctx.deps.llm = llm or _make_llm()
+    ctx.deps.get_llm = AsyncMock(return_value=llm or _make_llm())
     ctx.deps.vacancies_path = tmp_path / "vacancies"
     ctx.deps.skill_type = "pm"
     ctx.deps.user_id = 1

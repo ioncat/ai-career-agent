@@ -4,7 +4,9 @@ agent.py — career-agent entry point.
 Startup sequence:
 1. Load Settings from env
 2. Configure + initialise SQLite DB
-3. Build LLM client (ClaudeCodeProvider / OllamaProvider / ClaudeProvider)
+3. Wire phase-aware LLM resolution (core.config_store.build_llm_client — each
+   pipeline phase builds its own client per call, provider/model may differ per
+   phase; see EPIC-27)
 4. Build AgentDeps + workers (AnalysisWorker, CVWorker, CoverWorker)
 5. Build TelegramBot (push notifications only — no incoming message routing)
 6. Start RSS Watcher + workers + FastAPI; block on stop_event
@@ -24,13 +26,13 @@ import uvicorn
 
 from adapters.cv_adapter import CVAdapter
 from adapters.parser_adapter import ParserAdapter
+from core import config_store
 from core.deps import AgentDeps
 from core.analysis_worker import AnalysisWorker
 from core.cv_worker import CVWorker
 from core.cover_worker import CoverWorker
 from core.rss_watcher import RSSWatcher
 from core.settings import ConfigError, load_settings
-from core.llm_client import ClaudeProvider, OllamaProvider, ClaudeCodeProvider
 from core.telegram import TelegramBot
 from db import database
 
@@ -120,33 +122,14 @@ async def main() -> None:
         profile_md = "# Candidate Profile\n\n_Profile not found._"
         profile = None
 
-    if settings.llm_provider == "claude_cli":
-        llm = ClaudeCodeProvider(
-            profile_md=profile_md,
-            model=settings.llm_model,
-            timeout=settings.claude_cli_timeout,
-        )
-        log.info("LLM provider: claude_cli — model=%s (subscription, $0 cost)", settings.llm_model)
-    elif settings.llm_provider == "ollama_api":
-        llm = OllamaProvider(
-            base_url=settings.ollama_base_url,
-            model=settings.ollama_model,
-            profile_md=profile_md,
-            max_tokens=settings.max_tokens,
-            timeout=settings.ollama_timeout,
-        )
-        log.info("LLM provider: ollama_api — model=%s base_url=%s", settings.ollama_model, settings.ollama_base_url)
-    else:  # claude_api (default)
-        llm = ClaudeProvider(
-            api_key=settings.anthropic_api_key,
-            model=settings.llm_model,
-            profile_md=profile_md,
-            max_tokens=settings.max_tokens,
-            testing_mode=(settings.agent_mode == "testing"),
-        )
-        if settings.agent_mode == "testing":
-            log.warning("AGENT_MODE=testing — Claude API calls require confirmation before each request")
-        log.info("LLM provider: Claude — model=%s", settings.llm_model)
+    # LLM client is now built fresh per phase call, not once at startup — see
+    # core.config_store.build_llm_client (EPIC-27). config_store, not raw env
+    # settings, is the source of truth for provider/model/effort (seeded from
+    # env once, then DB-authoritative — see config_store.py's module docstring).
+    async def _fresh_llm(phase: str) -> object:
+        return await config_store.build_llm_client(phase, settings)
+
+    log.info("LLM: phase-aware resolution via config_store (env-seeded provider=%s)", settings.llm_provider)
 
     # ── 4. Tools + deps ──────────────────────────────────────────────────────
     settings.vacancies_path.mkdir(parents=True, exist_ok=True)
@@ -155,7 +138,7 @@ async def main() -> None:
     cv_adapter = CVAdapter(pdf_service_url=settings.pdf_service_url)
     deps = AgentDeps(
         parser_adapter=parser_adapter,
-        llm=llm,
+        get_llm=_fresh_llm,
         vacancies_path=settings.vacancies_path,
         candidate_name=settings.candidate_name,
         cv_adapter=cv_adapter,
@@ -250,7 +233,8 @@ async def main() -> None:
         await cv_worker.stop()
         await analysis_worker.stop()
         await bot.stop()
-        llm.log_session_summary()
+        # No single shared LLM client left to summarize (EPIC-27 — each phase call
+        # builds its own client). Per-call cost/usage is tracked in llm_usage (DB).
         log.info("career-agent stopped")
 
 

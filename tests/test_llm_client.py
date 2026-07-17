@@ -199,6 +199,51 @@ async def test_ollama_complete_returns_text():
 
 
 @pytest.mark.asyncio
+async def test_ollama_num_ctx_omitted_when_not_set():
+    provider = _make_ollama()
+    fake_resp = MagicMock()
+    fake_resp.json.return_value = {"message": {"content": "ok"}}
+    fake_resp.raise_for_status = MagicMock()
+
+    with patch("httpx.AsyncClient") as mock_client_cls:
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.post = AsyncMock(return_value=fake_resp)
+        mock_client_cls.return_value = mock_client
+
+        await provider.complete("test")
+
+    payload = mock_client.post.call_args.kwargs["json"]
+    assert "num_ctx" not in payload["options"]
+
+
+@pytest.mark.asyncio
+async def test_ollama_num_ctx_sent_when_set():
+    """num_ctx caps Ollama's KV-cache allocation to our real token budget instead
+    of the model's full declared context (e.g. qwen3:8b defaults to 40960) —
+    left uncapped, a large default overflowed this project's 16GB GPU and forced
+    CPU offload, turning ~30s calls into 20-30+ minutes (found 2026-07-17
+    debugging the prefilter's speed on qwen3:8b/gemma4:e4b)."""
+    provider = _make_ollama(num_ctx=4096)
+    fake_resp = MagicMock()
+    fake_resp.json.return_value = {"message": {"content": "ok"}}
+    fake_resp.raise_for_status = MagicMock()
+
+    with patch("httpx.AsyncClient") as mock_client_cls:
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.post = AsyncMock(return_value=fake_resp)
+        mock_client_cls.return_value = mock_client
+
+        await provider.complete("test")
+
+    payload = mock_client.post.call_args.kwargs["json"]
+    assert payload["options"]["num_ctx"] == 4096
+
+
+@pytest.mark.asyncio
 async def test_ollama_connect_error_raises_unavailable():
     import httpx
     provider = _make_ollama()

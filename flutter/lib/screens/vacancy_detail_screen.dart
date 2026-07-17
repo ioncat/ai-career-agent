@@ -40,7 +40,12 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
   bool _loadingAnalyze = false;
   bool _loadingDecline = false;
   bool _loadingRestore = false;
+  bool _loadingPrefilter = false;
   bool _refreshing = false;
+  // Kept for the "View details" affordance on _PrefilterBanner — the modal
+  // is no longer shown automatically (found unreliable/easy-to-miss in
+  // practice, 2026-07-17) but raw_output/error are still worth a drill-down.
+  Map<String, dynamic>? _lastPrefilterResult;
 
   Future<void> _refresh() async {
     setState(() => _refreshing = true);
@@ -78,6 +83,183 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
     } finally {
       if (mounted) setState(() => _loadingAnalyze = false);
     }
+  }
+
+  Future<void> _checkBlockers() async {
+    setState(() => _loadingPrefilter = true);
+    try {
+      final result = await _repo.runPrefilter(widget.vacancyId);
+      if (mounted) {
+        setState(() => _lastPrefilterResult = result);
+        // Persistent result now lives in _PrefilterBanner (driven by the
+        // refreshed vacancy's blocker_flag/reasons) — the SnackBar here is
+        // just immediate feedback for THIS click, not the record of what
+        // happened. Record itself: banner (persisted) + Activity log (raw).
+        ref.read(vacancyListProvider.notifier).refresh();
+        final ok = result['ok'] as bool? ?? false;
+        final blocked = result['blocked'] as bool? ?? false;
+        // provider_unavailable is the SAME signal from every provider (Ollama
+        // not running, Claude API down/rate-limited, claude CLI missing) — show
+        // the actual reason immediately, not a generic "something failed"
+        // (gap found 2026-07-17: Ollama being down looked like any other error).
+        final providerUnavailable = result['provider_unavailable'] as bool? ?? false;
+        final String msg;
+        Color? bg;
+        if (providerUnavailable) {
+          msg = 'LLM provider unavailable: ${result['error']}';
+          bg = Colors.orange.shade800;
+        } else if (!ok) {
+          msg = 'Check failed — see details below';
+          bg = Colors.red;
+        } else {
+          msg = blocked ? 'Possible blocker found — see below' : 'Checked — no blockers found';
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            backgroundColor: bg,
+            duration: Duration(seconds: providerUnavailable ? 6 : 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loadingPrefilter = false);
+    }
+  }
+
+  /// "Details" affordance — uses the session-fresh result if this click's
+  /// _checkBlockers() already ran, otherwise fetches the persisted raw_output
+  /// from the server (works after app restart/navigation, when the session
+  /// state is gone but the vacancy's own record isn't).
+  Future<void> _showPrefilterDetails() async {
+    if (_lastPrefilterResult != null) {
+      await _showPrefilterResult(_lastPrefilterResult!);
+      return;
+    }
+    final rawOutput = await _repo.getVacancyBlockerRawOutput(widget.vacancyId);
+    if (!mounted) return;
+    await _showPrefilterResult({
+      'ok': true,
+      'blocked': widget.vacancy?.blockerFlag ?? false,
+      'reasons': widget.vacancy?.blockerReasons ?? const [],
+      'raw_output': rawOutput,
+      'error': null,
+      'provider_unavailable': false,
+    });
+  }
+
+  Future<void> _showPrefilterResult(Map<String, dynamic> result) {
+    // "ok" distinguishes a real, correctly-parsed answer from any failure (call
+    // unreachable/model missing/output didn't match format) — collapsing these
+    // into "no blockers" is exactly the bug found on vacancy #716 (2026-07-17).
+    final ok = result['ok'] as bool? ?? false;
+    final blocked = result['blocked'] as bool? ?? false;
+    final reasons = (result['reasons'] as List<dynamic>? ?? []).cast<String>();
+    final rawOutput = result['raw_output'] as String?;
+    final error = result['error'] as String?;
+    final providerUnavailable = result['provider_unavailable'] as bool? ?? false;
+
+    final title = providerUnavailable
+        ? '🔌 Provider unavailable'
+        : (!ok ? '❌ Check failed' : (blocked ? '⚠️ Possible blocker found' : '✅ No blockers'));
+
+    return showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: SizedBox(
+          width: 460,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (!ok) ...[
+                  Text(error ?? 'Unknown error', style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
+                  const SizedBox(height: 8),
+                  if (providerUnavailable)
+                    Text(
+                      "The LLM provider configured for this phase couldn't be reached "
+                      '(service not running, down, or rate-limited). Check it\'s running, '
+                      'or switch provider in Settings → Advanced: Per-Phase Routing.',
+                      style: Theme.of(ctx).textTheme.bodySmall,
+                    )
+                  else
+                    Text('Full record (model, tokens, timing, or lack thereof) is in the Activity tab.',
+                        style: Theme.of(ctx).textTheme.bodySmall),
+                ] else if (blocked)
+                  ...reasons.map((r) => Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Text('•  $r'),
+                      ))
+                else
+                  const Text('The pre-filter found no explicit conflict with your Critical Blockers.'),
+                if (rawOutput != null && rawOutput.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  ExpansionTile(
+                    tilePadding: EdgeInsets.zero,
+                    title: Text('Raw model output', style: Theme.of(ctx).textTheme.labelMedium),
+                    children: [
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Theme.of(ctx).colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: SelectableText(rawOutput, style: const TextStyle(fontSize: 11.5, fontFamily: 'monospace')),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Close')),
+        ],
+      ),
+    );
+  }
+
+  /// Same pipeline_runs + llm_usage data as the tabbed Activity view — but that
+  /// tab only exists once Phase 1+2 analysis exists (VacancyDetailScreen gates
+  /// the whole TabBar on `p2 != null`). Before analysis (e.g. only a pre-filter
+  /// check has run, like vacancy #716 — 2026-07-17), there was no way to see
+  /// this data in the UI at all despite it being recorded. _ActivityLogView is
+  /// self-contained (fetches its own data by vacancyId) — reused as-is here.
+  void _showActivityLog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        child: SizedBox(
+          width: 640,
+          height: 480,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 12, 0),
+                child: Row(
+                  children: [
+                    Text('Activity — Vacancy #${widget.vacancyId}', style: Theme.of(ctx).textTheme.titleMedium),
+                    const Spacer(),
+                    IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.of(ctx).pop()),
+                  ],
+                ),
+              ),
+              Expanded(child: _ActivityLogView(vacancyId: widget.vacancyId)),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _decline() async {
@@ -185,6 +367,15 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                   onPressed: _refreshing ? null : _refresh,
                 ),
               ),
+              Tooltip(
+                message: 'Activity log — pipeline runs + LLM calls (incl. pre-filter checks). '
+                    'Only reachable from this JD view before analysis — the tabbed Activity tab '
+                    'only appears once Phase 1+2 analysis exists.',
+                child: IconButton(
+                  icon: Icon(Icons.history_rounded, size: 18, color: cs.onSurfaceVariant),
+                  onPressed: () => _showActivityLog(context),
+                ),
+              ),
               if (widget.restoreMode) ...[
                 OutlinedButton.icon(
                   onPressed: _loadingRestore ? null : _restore,
@@ -210,6 +401,21 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                 ),
                 const SizedBox(width: 8),
                 Tooltip(
+                  message: 'Run the critical-blocker pre-filter manually (EPIC-27) — not auto-triggered yet',
+                  child: OutlinedButton.icon(
+                    onPressed: _loadingPrefilter ? null : _checkBlockers,
+                    icon: _loadingPrefilter
+                        ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.block_outlined, size: 16),
+                    label: const Text('Check blockers'),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: cs.outlineVariant),
+                      foregroundColor: cs.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Tooltip(
                   message: workerAvailable ? '' : 'Analysis worker unavailable — start agent.py',
                   child: FilledButton.icon(
                     onPressed: _loadingAnalyze || !workerAvailable ? null : _analyze,
@@ -222,6 +428,12 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
               ],
             ],
           ),
+        ),
+        _PrefilterBanner(
+          blocked: widget.vacancy?.blockerFlag ?? false,
+          checked: widget.vacancy?.blockerChecked ?? false,
+          reasons: widget.vacancy?.blockerReasons ?? const [],
+          onTapDetails: (widget.vacancy?.blockerChecked ?? false) ? _showPrefilterDetails : null,
         ),
         // JD content
         Expanded(
@@ -1751,7 +1963,104 @@ class _VacancyHero extends StatelessWidget {
             ],
           ],
         ),
+        // Pre-filter result — deprioritized here vs _JdModeView's prominent
+        // placement: Phase 2's full analysis (above) is now the primary
+        // signal, this is supplementary context, not the headline (2026-07-17).
+        _PrefilterBanner(
+          blocked: vacancy?.blockerFlag ?? false,
+          checked: vacancy?.blockerChecked ?? false,
+          reasons: vacancy?.blockerReasons ?? const [],
+          compact: true,
+        ),
       ],
+    );
+  }
+}
+
+/// Persistent pre-filter result — replaces the old "show a modal after
+/// clicking Check blockers" pattern (found unreliable/easy-to-miss in
+/// practice, 2026-07-17): the result is now driven by the vacancy's own
+/// blocker_flag/blocker_reasons (survives navigation/reload), shown inline
+/// wherever the vacancy is displayed. Renders nothing when not blocked —
+/// a clean pre-filter result isn't noteworthy enough to take up space.
+class _PrefilterBanner extends StatelessWidget {
+  final bool blocked;
+  final bool checked;
+  final List<String> reasons;
+  final bool compact;
+  final VoidCallback? onTapDetails;
+
+  const _PrefilterBanner({
+    required this.blocked,
+    required this.checked,
+    required this.reasons,
+    this.compact = false,
+    this.onTapDetails,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Three distinct states — collapsing "checked, clean" into "nothing to
+    // show" (the original design) is exactly the bug found on vacancy #716
+    // (2026-07-17): a finished, clean check produced zero visible feedback,
+    // indistinguishable from never having checked at all.
+    if (!checked) return const SizedBox.shrink();
+
+    final cs = Theme.of(context).colorScheme;
+    final bg = blocked ? const Color(0xFFFFEBEE) : const Color(0xFFE8F5E9);
+    final border = blocked ? const Color(0xFFE57373) : const Color(0xFF81C784);
+    final fg = blocked ? const Color(0xFFC62828) : const Color(0xFF2E7D32);
+    final icon = blocked ? Icons.block_rounded : Icons.check_circle_outline_rounded;
+    final label = blocked ? 'Possible blocker — pre-filter check' : 'Pre-filter checked — no blockers';
+
+    return Container(
+      width: double.infinity,
+      margin: EdgeInsets.only(
+        left: compact ? 0 : 16,
+        right: compact ? 0 : 16,
+        top: compact ? 16 : 12,
+        bottom: compact ? 0 : 8,
+      ),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 15, color: fg),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: fg,
+                  fontSize: compact ? 11.5 : 12.5,
+                ),
+              ),
+              if (onTapDetails != null) ...[
+                const Spacer(),
+                InkWell(
+                  onTap: onTapDetails,
+                  child: Text('Details',
+                      style: TextStyle(fontSize: 11, color: cs.primary, decoration: TextDecoration.underline)),
+                ),
+              ],
+            ],
+          ),
+          if (blocked) ...[
+            const SizedBox(height: 6),
+            ...reasons.map((r) => Padding(
+                  padding: const EdgeInsets.only(bottom: 3),
+                  child: Text('•  $r', style: TextStyle(fontSize: compact ? 11.5 : 12.5)),
+                )),
+          ],
+        ],
+      ),
     );
   }
 }

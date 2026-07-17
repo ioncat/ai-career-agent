@@ -29,6 +29,12 @@ class VacancyListItem {
   final String? republishedAt;
   final String? folderPath;
   final String stage;
+  final bool blockerFlag;
+  final List<String> blockerReasons;
+  // Distinguishes "checked, came back clean" from "never checked" — both look
+  // identical via blockerFlag=false alone (gap found 2026-07-17, vacancy #716:
+  // a finished, clean check produced zero visible UI change).
+  final bool blockerChecked;
 
   const VacancyListItem({
     required this.id,
@@ -54,6 +60,9 @@ class VacancyListItem {
     this.republishedAt,
     this.folderPath,
     this.stage = 'inbox',
+    this.blockerFlag = false,
+    this.blockerReasons = const [],
+    this.blockerChecked = false,
   });
 
   factory VacancyListItem.fromJson(Map<String, dynamic> json) {
@@ -82,6 +91,9 @@ class VacancyListItem {
       republishedAt: json['republished_at'] as String?,
       folderPath: json['folder_path'] as String?,
       stage: json['stage'] as String? ?? 'inbox',
+      blockerFlag: json['blocker_flag'] as bool? ?? false,
+      blockerReasons: _parseStringList(json['blocker_reasons']),
+      blockerChecked: json['blocker_checked'] as bool? ?? false,
     );
   }
 
@@ -108,6 +120,9 @@ class VacancyListItem {
         'duplicate_of': duplicateOf,
         'republished_at': republishedAt,
         'stage': stage,
+        'blocker_flag': blockerFlag,
+        'blocker_reasons': blockerReasons,
+        'blocker_checked': blockerChecked,
       };
 }
 

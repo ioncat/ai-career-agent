@@ -195,9 +195,15 @@ async def run_e2e(
     user_row = await database.get_user_by_id(user_id)
     skill_type = user_row["skill_type"] if user_row else settings.default_skill_type
 
+    # e2e_test builds one client from CLI args (--testing/--auto-confirm are
+    # dev-only concerns, not part of core.config_store's production path) —
+    # get_llm ignores the phase and always returns this same instance.
+    async def _fixed_llm(_phase: str) -> object:
+        return llm
+
     deps = AgentDeps(
         parser_adapter=parser,
-        llm=llm,
+        get_llm=_fixed_llm,
         vacancies_path=settings.vacancies_path,
         candidate_name=settings.candidate_name,
         cv_adapter=cv_adapter,

@@ -21,6 +21,7 @@ inside this module — callers (API routes, workers) never change.
 
 import logging
 import os
+import re
 
 from db import database
 
@@ -28,6 +29,10 @@ log = logging.getLogger(__name__)
 
 VALID_PROVIDERS = {"claude_api", "ollama_api", "claude_cli"}
 VALID_EFFORTS = {"off", "low", "medium", "high", "xhigh", "max"}
+
+# EPIC-27: independently-routable pipeline phases. Ordered (pipeline order), not a set —
+# iteration order matters for GET /api/config/phases responses.
+VALID_PHASES = ("prefilter", "phase1", "phase2", "phase3", "phase3_5", "phase4")
 
 _USER_ID = 1  # single-user today; becomes per-request once multi-user lands
 
@@ -76,9 +81,25 @@ def _env_model_for(provider: str) -> str:
     return os.getenv("LLM_MODEL", "claude-opus-4-5")
 
 
-async def get_config() -> dict:
-    """Return {provider, model, thinking_effort} — model is the raw DB value (may be None)."""
+async def get_config(phase: str | None = None) -> dict:
+    """Return {provider, model, thinking_effort} — model is the raw DB value (may be None).
+
+    phase=None (default): today's global behavior, unchanged.
+    phase="phase1" etc: if that phase has an override (phase_llm_config), return it;
+    otherwise fall through to the same global default. Unknown phase names are NOT
+    validated here (read-only resolution) — invalid phase names are rejected by
+    set_phase_config/delete_phase_config instead, where writing one would be a mistake
+    worth catching loudly.
+    """
     await _ensure_seeded()
+    if phase is not None:
+        override = await database.get_phase_llm_config(phase)
+        if override is not None:
+            return {
+                "provider": override["provider"],
+                "model": override["model"],
+                "thinking_effort": override["thinking_effort"] or "off",
+            }
     row = await database.get_user_settings(_USER_ID) or {}
     return {
         "provider": row.get("llm_provider") or "claude_api",
@@ -138,3 +159,157 @@ async def set_config(
     )
     log.info("config_store: set provider=%s model=%s effort=%s", new_provider, new_model, new_effort)
     return {"provider": new_provider, "model": new_model, "thinking_effort": new_effort}
+
+
+async def set_phase_config(
+    phase: str,
+    *,
+    provider: str | None = None,
+    model: str | None = None,
+    thinking_effort: str | None = None,
+) -> dict:
+    """Create/update an override for one phase. Same provider-switch-resets-model
+    semantics as set_config(). provider is required the first time an override is
+    created for a phase (there's no "current" provider to fall back to yet).
+    Raises ConfigError on an unknown phase or invalid provider/effort value.
+    """
+    if phase not in VALID_PHASES:
+        raise ConfigError(f"unknown phase {phase!r}, must be one of {list(VALID_PHASES)}")
+
+    current = await database.get_phase_llm_config(phase)
+
+    new_provider = current["provider"] if current else None
+    # provider_switched means "changing away from an already-pinned provider" —
+    # NOT "creating a pin for the first time". On first creation there's no old
+    # model to invalidate, so a caller setting provider+model together in one call
+    # (the common UI action: pin a previously-unpinned phase) must not have its
+    # model silently discarded.
+    provider_switched = False
+    if provider is not None:
+        new_provider = provider.lower()
+        if new_provider not in VALID_PROVIDERS:
+            raise ConfigError(f"llm_provider must be one of {sorted(VALID_PROVIDERS)}")
+        provider_switched = current is not None and new_provider != current["provider"]
+    if new_provider is None:
+        raise ConfigError(f"phase {phase!r} has no existing override — provider is required to create one")
+
+    new_effort = thinking_effort if thinking_effort is not None else (current["thinking_effort"] if current else "off")
+    if new_effort not in VALID_EFFORTS:
+        raise ConfigError(f"thinking_effort must be one of {sorted(VALID_EFFORTS)}")
+
+    if provider_switched:
+        new_model = None
+    elif model is not None:
+        new_model = model
+    else:
+        new_model = current["model"] if current else None
+
+    await database.set_phase_llm_config(phase, new_provider, new_model, new_effort)
+    log.info(
+        "config_store: set phase=%s provider=%s model=%s effort=%s",
+        phase, new_provider, new_model, new_effort,
+    )
+    return {"provider": new_provider, "model": new_model, "thinking_effort": new_effort}
+
+
+async def delete_phase_config(phase: str) -> None:
+    """Remove a phase's override — it falls back to the global default on the next read."""
+    if phase not in VALID_PHASES:
+        raise ConfigError(f"unknown phase {phase!r}, must be one of {list(VALID_PHASES)}")
+    await database.delete_phase_llm_config(phase)
+    log.info("config_store: cleared override for phase=%s", phase)
+
+
+async def get_resolved_phase_configs() -> dict[str, dict]:
+    """Return every known phase with its resolved config (override or global fallback),
+    plus is_override so callers can distinguish "explicitly pinned" from "following
+    default" without a second lookup. Used by GET /api/config/phases.
+    """
+    global_cfg = await get_config()
+    overrides = await database.list_phase_llm_configs()
+    result: dict[str, dict] = {}
+    for phase in VALID_PHASES:
+        if phase in overrides:
+            result[phase] = {**overrides[phase], "is_override": True}
+        else:
+            result[phase] = {**global_cfg, "is_override": False}
+    return result
+
+
+def _extract_critical_blockers(profile_md: str) -> str:
+    """Pull just the '## Critical Blockers' yaml block out of PROFILE.md.
+
+    The prefilter phase only ever needs this list — sending the full profile
+    (Evidence/Archetype/Honest Gaps, ~6K tokens) gave a small local model
+    unrelated facts to misapply as blockers (e.g. pulling an Honest Gaps line
+    instead of a real Critical Blockers one — found 2026-07-17 testing
+    gemma4:e2b). Keeps the '## Critical Blockers' heading itself so it matches
+    the literal text prefilter.md's prompt tells the model to look for.
+    """
+    m = re.search(r"## Critical Blockers.*?```yaml\s*\n(.*?)```", profile_md, re.DOTALL)
+    if not m:
+        return "## Critical Blockers\n\n(none)"
+    lines = [ln for ln in m.group(1).splitlines() if ln.strip() and not ln.strip().startswith("#")]
+    if not lines:
+        return "## Critical Blockers\n\n(none)"
+    return "## Critical Blockers\n\n" + "\n".join(lines) + "\n"
+
+
+async def build_llm_client(phase: str | None, settings) -> object:
+    """Build a live LLM provider instance for `phase` (or the global default when
+    phase=None), resolving through get_config(phase).
+
+    Centralizes what used to be duplicated identically in every worker's
+    _fresh_llm() (AnalysisWorker, CVWorker, CoverWorker) — those methods now just
+    delegate here with a phase name. `settings` is a core.settings.Settings
+    instance, passed explicitly rather than imported (avoids import-time coupling;
+    this module already owns config resolution, not settings loading).
+    """
+    from core.llm_client import ClaudeCodeProvider, ClaudeProvider, OllamaProvider
+
+    cfg = await get_config(phase)
+    provider_type = cfg["provider"]
+    model = effective_model(provider_type, cfg["model"])
+    effort = cfg["thinking_effort"]
+
+    profile_md = ""
+    if settings.profile_md_path.exists():
+        profile_md = settings.profile_md_path.read_text(encoding="utf-8")
+        if phase == "prefilter":
+            profile_md = _extract_critical_blockers(profile_md)
+
+    log.info(
+        "config_store: building LLM — phase=%s provider=%s model=%s effort=%s",
+        phase, provider_type, model, effort,
+    )
+
+    if provider_type == "claude_cli":
+        return ClaudeCodeProvider(
+            profile_md=profile_md,
+            model=model,
+            timeout=settings.claude_cli_timeout,
+            effort=effort,
+        )
+    if provider_type == "ollama_api":
+        # prefilter's real token budget is small (~280 system + JD + output) —
+        # cap num_ctx instead of letting Ollama load the model's full declared
+        # context (e.g. qwen3:8b defaults to 40960), which can overflow a 16GB
+        # GPU's VRAM and force CPU offload (found 2026-07-17: 33.5min instead
+        # of ~10-20s). Other phases keep Ollama's default (untested for this
+        # specific issue, out of scope here).
+        num_ctx = 4096 if phase == "prefilter" else None
+        return OllamaProvider(
+            base_url=settings.ollama_base_url,
+            model=model,
+            profile_md=profile_md,
+            max_tokens=settings.max_tokens,
+            timeout=settings.ollama_timeout,
+            effort=effort,
+            num_ctx=num_ctx,
+        )
+    return ClaudeProvider(
+        api_key=settings.anthropic_api_key,
+        model=model,
+        profile_md=profile_md,
+        max_tokens=settings.max_tokens,
+    )

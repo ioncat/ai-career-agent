@@ -165,6 +165,17 @@ class VacancyRepository {
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
+  /// Full pre-filter raw output, persisted server-side — used by the "Details"
+  /// drill-down when the app was restarted/navigated away since the check ran
+  /// (session-local result is gone, but the record on the vacancy isn't).
+  Future<String?> getVacancyBlockerRawOutput(int vacancyId) async {
+    final uri = Uri.parse('$baseUrl/api/vacancies/$vacancyId');
+    final response = await http.get(uri).timeout(const Duration(seconds: 5));
+    if (response.statusCode != 200) return null;
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return data['blocker_raw_output'] as String?;
+  }
+
   Future<({List<PipelineRun> runs, List<ActivityEntry> entries})> getActivity(int vacancyId) async {
     final uri = Uri.parse('$baseUrl/api/vacancies/$vacancyId/activity');
     final response = await http.get(uri).timeout(const Duration(seconds: 10));
@@ -249,6 +260,74 @@ class VacancyRepository {
     }
     if (response.statusCode != 200) {
       throw Exception('Config update failed: ${response.statusCode}');
+    }
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  /// Manually run the critical-blocker pre-filter on one vacancy (EPIC-27).
+  /// Not auto-triggered — this is the "Check blockers" button's call.
+  Future<Map<String, dynamic>> runPrefilter(int vacancyId) async {
+    final uri = Uri.parse('$baseUrl/api/vacancies/$vacancyId/prefilter');
+    // 30s was too short — local Ollama inference on a 7k+ token JD legitimately
+    // takes longer (measured 18.3s on a clean run, more under load/bigger model).
+    // Found the hard way (2026-07-17): client gave up while the GPU kept working
+    // server-side, showing a false "failed" error mid-generation. Backend's own
+    // patience is 600s (OLLAMA_TIMEOUT) — 180s here is a saner middle ground,
+    // not a guess at "the" right number.
+    final response = await http.post(uri).timeout(const Duration(seconds: 180));
+    if (response.statusCode != 200) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>?;
+      throw Exception(data?['detail'] as String? ?? 'Pre-filter failed: ${response.statusCode}');
+    }
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  // ── Per-phase LLM routing (EPIC-27) ─────────────────────────────────────────
+
+  Future<Map<String, dynamic>> getConfigPhases() async {
+    final uri = Uri.parse('$baseUrl/api/config/phases');
+    final response = await http.get(uri).timeout(const Duration(seconds: 5));
+    if (response.statusCode != 200) throw Exception('Phase config unavailable');
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> patchConfigPhase(
+    String phase, {
+    String? provider,
+    String? model,
+    String? thinkingEffort,
+    String? expectedProvider,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/config/phases/$phase');
+    final body = <String, dynamic>{};
+    if (provider != null) body['provider'] = provider;
+    if (model != null) body['model'] = model;
+    if (thinkingEffort != null) body['thinking_effort'] = thinkingEffort;
+    if (expectedProvider != null) body['expected_provider'] = expectedProvider;
+    final response = await http
+        .patch(uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(body))
+        .timeout(const Duration(seconds: 5));
+    if (response.statusCode == 409) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>?;
+      throw ConfigDriftException(
+          data?['detail'] as String? ?? 'Provider changed on backend — refresh Settings');
+    }
+    if (response.statusCode == 404) {
+      throw Exception('Unknown phase: $phase');
+    }
+    if (response.statusCode != 200) {
+      throw Exception('Phase config update failed: ${response.statusCode}');
+    }
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> deleteConfigPhase(String phase) async {
+    final uri = Uri.parse('$baseUrl/api/config/phases/$phase');
+    final response = await http.delete(uri).timeout(const Duration(seconds: 5));
+    if (response.statusCode != 200) {
+      throw Exception('Phase reset failed: ${response.statusCode}');
     }
     return jsonDecode(response.body) as Map<String, dynamic>;
   }

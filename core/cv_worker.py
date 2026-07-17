@@ -67,10 +67,9 @@ class CVWorker:
 
         async with self._llm_sem:
             try:
-                llm = await self._fresh_llm()
                 fresh_deps = AgentDeps(
                     parser_adapter=self._deps.parser_adapter,
-                    llm=llm,  # type: ignore[arg-type]
+                    get_llm=self._fresh_llm,  # type: ignore[arg-type]
                     vacancies_path=self._deps.vacancies_path,
                     candidate_name=self._deps.candidate_name,
                     cv_adapter=self._deps.cv_adapter,
@@ -86,42 +85,10 @@ class CVWorker:
                 log.error("CVWorker: failed v#%d: %s", vacancy_id, err_msg)
                 await database.update_vacancy_status(vacancy_id, "analyzed")
 
-    async def _fresh_llm(self) -> object:
-        """Build LLM provider from core.config_store (single source of truth) on every call."""
-        from core.llm_client import ClaudeCodeProvider, ClaudeProvider, OllamaProvider
+    async def _fresh_llm(self, phase: str) -> object:
+        """Build LLM provider for `phase` via core.config_store (single source of truth).
 
-        cfg = await config_store.get_config()
-        provider_type = cfg["provider"]
-        model = config_store.effective_model(provider_type, cfg["model"])
-        effort = cfg["thinking_effort"]
-
-        profile_md = ""
-        if self._settings.profile_md_path.exists():
-            profile_md = self._settings.profile_md_path.read_text(encoding="utf-8")
-
-        log.info(
-            "CVWorker: building LLM — provider=%s model=%s effort=%s source=config_store",
-            provider_type, model, effort,
-        )
-
-        if provider_type == "claude_cli":
-            return ClaudeCodeProvider(
-                profile_md=profile_md,
-                model=model,
-                timeout=self._settings.claude_cli_timeout,
-                effort=effort,
-            )
-        if provider_type == "ollama_api":
-            return OllamaProvider(
-                base_url=self._settings.ollama_base_url,
-                model=model,
-                profile_md=profile_md,
-                max_tokens=self._settings.max_tokens,
-                timeout=self._settings.ollama_timeout,
-            )
-        return ClaudeProvider(
-            api_key=self._settings.anthropic_api_key,
-            model=model,
-            profile_md=profile_md,
-            max_tokens=self._settings.max_tokens,
-        )
+        Bound to AgentDeps.get_llm — cv_generate() calls this once per sub-phase
+        (phase3, phase3_5), each independently resolvable (EPIC-27).
+        """
+        return await config_store.build_llm_client(phase, self._settings)

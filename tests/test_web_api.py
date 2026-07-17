@@ -113,6 +113,35 @@ async def test_api_vacancies_includes_stage(client):
     assert data[v_archive] == "archive"
 
 
+@pytest.mark.asyncio
+async def test_api_vacancies_blocker_checked_distinguishes_clean_from_unchecked(client):
+    """Regression guard for vacancy #716 (2026-07-17): a clean pre-filter result
+    (blocker_flag=false) looked identical to "never checked" in the UI, because
+    there was no signal to tell them apart. blocker_checked fixes that.
+    blocker_raw_output itself must NOT appear in the list response — it's heavy
+    and only needed for the single-vacancy detail fetch."""
+    uid = await database.insert_user(name="BlockerUser", telegram_chat_id=2200, skill_type="pm")
+    v_unchecked = await database.insert_vacancy(url="https://djinni.co/jobs/bc1/", user_id=uid)
+    v_clean = await database.insert_vacancy(url="https://djinni.co/jobs/bc2/", user_id=uid)
+    await database.set_vacancy_blocker(v_clean, False, [], raw_output="BLOCKED: no")
+    v_blocked = await database.insert_vacancy(url="https://djinni.co/jobs/bc3/", user_id=uid)
+    await database.set_vacancy_blocker(v_blocked, True, ["english: C1 required"], raw_output="BLOCKED: yes\n...")
+
+    data = {v["id"]: v for v in client.get(f"/api/vacancies?user_id={uid}").json()}
+
+    assert data[v_unchecked]["blocker_checked"] is False
+    assert data[v_unchecked]["blocker_flag"] is False
+
+    assert data[v_clean]["blocker_checked"] is True
+    assert data[v_clean]["blocker_flag"] is False
+
+    assert data[v_blocked]["blocker_checked"] is True
+    assert data[v_blocked]["blocker_flag"] is True
+
+    for v in data.values():
+        assert "blocker_raw_output" not in v
+
+
 # ── GET /api/vacancies?user_id=N ──────────────────────────────────────────────
 
 @pytest.mark.asyncio
@@ -493,6 +522,145 @@ async def test_analyze_already_analyzing_returns_409(client):
     assert resp.status_code == 409
 
 
+# ── POST /api/vacancies/{id}/prefilter (EPIC-27, manual trigger only) ────────
+
+def _set_llm_env(monkeypatch, tmp_path):
+    """load_settings() requires these — set them so the endpoint doesn't 503
+    on a dev machine's real .env leaking in via dotenv.load_dotenv()."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-dummy")
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "test-token")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "1")
+    monkeypatch.setenv("PROFILE_MD_PATH", str(tmp_path / "PROFILE.md"))
+    (tmp_path / "PROFILE.md").write_text("# Profile", encoding="utf-8")
+
+
+@pytest.mark.asyncio
+async def test_prefilter_not_found(client):
+    resp = client.post("/api/vacancies/9999/prefilter")
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_prefilter_no_jd_returns_422(client):
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/pf1/", status="queued")
+    resp = client.post(f"/api/vacancies/{vid}/prefilter")
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_prefilter_missing_settings_returns_503(client, tmp_path):
+    """core.settings does its own load_dotenv() on first import — patching
+    load_settings() directly (not monkeypatch.delenv) avoids depending on
+    whether some earlier test in the session already imported core.settings
+    (which would have already loaded the real .env, making delenv+reload race
+    against it — see EPIC-27 session notes)."""
+    from unittest.mock import patch
+    from core.settings import ConfigError as SettingsConfigError
+
+    jd_path = tmp_path / "JD.md"
+    jd_path.write_text("# JD", encoding="utf-8")
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/pf2/", status="fetched")
+    await database.update_vacancy_fields(vid, markdown_path=str(jd_path))
+
+    with patch("core.settings.load_settings", side_effect=SettingsConfigError("missing vars")):
+        resp = client.post(f"/api/vacancies/{vid}/prefilter")
+    assert resp.status_code == 503
+
+
+@pytest.mark.asyncio
+async def test_prefilter_happy_path_returns_result_and_persists(client, monkeypatch, tmp_path):
+    from unittest.mock import AsyncMock, patch
+
+    _set_llm_env(monkeypatch, tmp_path)
+    monkeypatch.setenv("LLM_PROVIDER", "ollama_api")
+    await database.insert_user(name="Pf", telegram_chat_id=8001, skill_type="pm")
+
+    jd_path = tmp_path / "JD.md"
+    jd_path.write_text("# JD\n\nRequires English C1.", encoding="utf-8")
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/pf3/", status="fetched", user_id=1)
+    await database.update_vacancy_fields(vid, markdown_path=str(jd_path))
+
+    with patch("core.llm_client.OllamaProvider") as MockOllama:
+        instance = MockOllama.return_value
+        instance.complete = AsyncMock(return_value="BLOCKED: yes\nREASONS:\n- english: requires C1")
+        instance.last_call_usage = None
+        resp = client.post(f"/api/vacancies/{vid}/prefilter")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data == {
+        "vacancy_id": vid, "ok": True, "blocked": True,
+        "reasons": ["english: requires C1"],
+        "raw_output": "BLOCKED: yes\nREASONS:\n- english: requires C1",
+        "error": None, "provider_unavailable": False,
+    }
+
+    row = await database.get_vacancy_by_id(vid)
+    assert row["blocker_flag"] == 1
+
+
+@pytest.mark.asyncio
+async def test_prefilter_format_mismatch_surfaces_as_not_ok(client, monkeypatch, tmp_path):
+    """Regression guard for the exact #716 bug: a call that succeeds but whose
+    output doesn't match the expected format must return ok=False, HTTP 200 —
+    never look identical to a real 'no blockers' answer."""
+    from unittest.mock import AsyncMock, patch
+
+    _set_llm_env(monkeypatch, tmp_path)
+    monkeypatch.setenv("LLM_PROVIDER", "ollama_api")
+    await database.insert_user(name="Pf2", telegram_chat_id=8002, skill_type="pm")
+
+    jd_path = tmp_path / "JD.md"
+    jd_path.write_text("# JD\n\nRequires English C1.", encoding="utf-8")
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/pf4/", status="fetched", user_id=1)
+    await database.update_vacancy_fields(vid, markdown_path=str(jd_path))
+
+    with patch("core.llm_client.OllamaProvider") as MockOllama:
+        instance = MockOllama.return_value
+        instance.complete = AsyncMock(return_value="I think there might be some issues with this one...")
+        instance.last_call_usage = None
+        resp = client.post(f"/api/vacancies/{vid}/prefilter")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ok"] is False
+    assert data["blocked"] is False
+    assert data["raw_output"] == "I think there might be some issues with this one..."
+    assert data["error"] is not None
+
+
+@pytest.mark.asyncio
+async def test_prefilter_ollama_down_flags_provider_unavailable(client, monkeypatch, tmp_path):
+    """Ollama not running (or Claude API down, or claude CLI missing — same
+    LLMUnavailableError for all three providers) must surface as
+    provider_unavailable=True, not an opaque generic error. Gap found
+    2026-07-17: this looked identical to any other failure before the fix."""
+    from unittest.mock import AsyncMock, patch
+    from core.llm_client import LLMUnavailableError
+
+    _set_llm_env(monkeypatch, tmp_path)
+    monkeypatch.setenv("LLM_PROVIDER", "ollama_api")
+    await database.insert_user(name="Pf3", telegram_chat_id=8003, skill_type="pm")
+
+    jd_path = tmp_path / "JD.md"
+    jd_path.write_text("# JD\n\nRequires English C1.", encoding="utf-8")
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/pf5/", status="fetched", user_id=1)
+    await database.update_vacancy_fields(vid, markdown_path=str(jd_path))
+
+    with patch("core.llm_client.OllamaProvider") as MockOllama:
+        instance = MockOllama.return_value
+        instance.complete = AsyncMock(
+            side_effect=LLMUnavailableError("Ollama unreachable at http://localhost:11434: connection refused")
+        )
+        resp = client.post(f"/api/vacancies/{vid}/prefilter")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ok"] is False
+    assert data["provider_unavailable"] is True
+    assert "unreachable" in data["error"].lower()
+
+
 # ── POST /api/vacancies/{id}/reset ───────────────────────────────────────────
 
 @pytest.mark.asyncio
@@ -786,6 +954,90 @@ async def test_patch_config_switching_provider_ignores_expected_provider(client,
     )
     assert resp.status_code == 200
     assert resp.json()["llm_provider"] == "claude_cli"
+
+
+# ── /api/config/phases (EPIC-27) ──────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_get_config_phases_lists_all_six_unpinned_by_default(client, monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "claude_api")
+    await database.insert_user(name="Phases1", telegram_chat_id=7200, skill_type="pm")
+
+    resp = client.get("/api/config/phases")
+    assert resp.status_code == 200
+    phases = resp.json()["phases"]
+    assert set(phases.keys()) == set(config_store.VALID_PHASES)
+    assert all(p["is_override"] is False for p in phases.values())
+    assert all(p["provider"] == "claude_api" for p in phases.values())
+
+
+@pytest.mark.asyncio
+async def test_patch_config_phase_pins_only_that_phase(client, monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "claude_api")
+    await database.insert_user(name="Phases2", telegram_chat_id=7201, skill_type="pm")
+
+    resp = client.patch("/api/config/phases/prefilter", json={"provider": "ollama_api", "model": "gemma3:2b"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["provider"] == "ollama_api"
+    assert body["model"] == "gemma3:2b"
+    assert body["is_override"] is True
+
+    phases = client.get("/api/config/phases").json()["phases"]
+    assert phases["prefilter"]["provider"] == "ollama_api"
+    assert phases["phase1"]["provider"] == "claude_api"  # unaffected
+
+
+@pytest.mark.asyncio
+async def test_patch_config_phase_unknown_phase_404(client, monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "claude_api")
+    await database.insert_user(name="Phases3", telegram_chat_id=7202, skill_type="pm")
+
+    resp = client.patch("/api/config/phases/not_a_phase", json={"provider": "ollama_api"})
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_patch_config_phase_bad_provider_422(client, monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "claude_api")
+    await database.insert_user(name="Phases4", telegram_chat_id=7203, skill_type="pm")
+
+    resp = client.patch("/api/config/phases/phase1", json={"provider": "gpt5"})
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_patch_config_phase_drift_guard_409(client, monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "claude_api")
+    await database.insert_user(name="Phases5", telegram_chat_id=7204, skill_type="pm")
+
+    client.patch("/api/config/phases/prefilter", json={"provider": "ollama_api", "model": "gemma3:2b"})
+    resp = client.patch(
+        "/api/config/phases/prefilter",
+        json={"model": "other-model", "expected_provider": "claude_api"},
+    )
+    assert resp.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_delete_config_phase_resets_to_default(client, monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "claude_api")
+    await database.insert_user(name="Phases6", telegram_chat_id=7205, skill_type="pm")
+
+    client.patch("/api/config/phases/prefilter", json={"provider": "ollama_api", "model": "gemma3:2b"})
+    resp = client.delete("/api/config/phases/prefilter")
+    assert resp.status_code == 200
+    assert resp.json()["is_override"] is False
+    assert resp.json()["provider"] == "claude_api"
+
+
+@pytest.mark.asyncio
+async def test_delete_config_phase_unknown_phase_404(client, monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "claude_api")
+    await database.insert_user(name="Phases7", telegram_chat_id=7206, skill_type="pm")
+
+    resp = client.delete("/api/config/phases/not_a_phase")
+    assert resp.status_code == 404
 
 
 # ── Seed-once behavior via the API surface ───────────────────────────────────

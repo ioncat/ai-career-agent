@@ -161,6 +161,21 @@ async def init_db() -> None:
                 created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
             )""",
             "CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications (user_id, created_at)",
+            # EPIC-27: per-phase LLM provider/model/effort overrides.
+            # Additive — user_settings stays the global default, untouched.
+            # No row (or provider IS NULL) for a phase = fall through to the global default.
+            """CREATE TABLE IF NOT EXISTS phase_llm_config (
+                phase           TEXT PRIMARY KEY,
+                provider        TEXT,
+                model           TEXT,
+                thinking_effort TEXT,
+                updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+            )""",
+            # EPIC-27: critical blocker pre-filter result (advisory only)
+            "ALTER TABLE vacancies ADD COLUMN blocker_flag INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE vacancies ADD COLUMN blocker_reasons TEXT",
+            # Raw LLM response — debug parse failures (found the hard way on #716, 2026-07-17)
+            "ALTER TABLE vacancies ADD COLUMN blocker_raw_output TEXT",
         ]:
             try:
                 await db.execute(migration)
@@ -507,6 +522,29 @@ async def set_analysis_error(vacancy_id: int, error: str | None) -> None:
         await db.execute(
             "UPDATE vacancies SET analysis_error = ?, status = 'analysis_failed', updated_at = datetime('now') WHERE id = ?",
             (error, vacancy_id),
+        )
+        await db.commit()
+
+
+async def set_vacancy_blocker(
+    vacancy_id: int, blocked: bool, reasons: list[str], raw_output: str | None = None
+) -> None:
+    """Store pre-filter result (EPIC-27). Advisory only — never changes status.
+
+    raw_output: the model's full response, always stored (even when it didn't
+    match the expected format) — without this, a parse failure is undebuggable
+    after the fact (found the hard way on vacancy #716, 2026-07-17).
+    """
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE vacancies SET blocker_flag = ?, blocker_reasons = ?, blocker_raw_output = ?, "
+            "updated_at = datetime('now') WHERE id = ?",
+            (
+                1 if blocked else 0,
+                json.dumps(reasons, ensure_ascii=False) if reasons else None,
+                raw_output,
+                vacancy_id,
+            ),
         )
         await db.commit()
 
@@ -1016,6 +1054,70 @@ async def set_user_settings(
             """,
             (user_id, llm_provider, llm_model, thinking_effort),
         )
+        await db.commit()
+
+
+async def get_phase_llm_config(phase: str) -> dict | None:
+    """Return override row for one phase, or None if unset (caller falls back to global default)."""
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT provider, model, thinking_effort FROM phase_llm_config WHERE phase = ?",
+            (phase,),
+        )
+        row = await cursor.fetchone()
+    if row is None or row["provider"] is None:
+        return None
+    return {
+        "provider": row["provider"],
+        "model": row["model"],
+        "thinking_effort": row["thinking_effort"],
+    }
+
+
+async def list_phase_llm_configs() -> dict[str, dict]:
+    """Return all override rows, keyed by phase. Phases with no override are absent."""
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT phase, provider, model, thinking_effort FROM phase_llm_config WHERE provider IS NOT NULL",
+        )
+        rows = await cursor.fetchall()
+    return {
+        row["phase"]: {
+            "provider": row["provider"],
+            "model": row["model"],
+            "thinking_effort": row["thinking_effort"],
+        }
+        for row in rows
+    }
+
+
+async def set_phase_llm_config(
+    phase: str,
+    provider: str,
+    model: str | None,
+    thinking_effort: str,
+) -> None:
+    """Upsert an override for one phase."""
+    async with get_db() as db:
+        await db.execute(
+            """
+            INSERT INTO phase_llm_config (phase, provider, model, thinking_effort, updated_at)
+            VALUES (?, ?, ?, ?, datetime('now'))
+            ON CONFLICT(phase) DO UPDATE SET
+                provider = excluded.provider,
+                model = excluded.model,
+                thinking_effort = excluded.thinking_effort,
+                updated_at = excluded.updated_at
+            """,
+            (phase, provider, model, thinking_effort),
+        )
+        await db.commit()
+
+
+async def delete_phase_llm_config(phase: str) -> None:
+    """Remove a phase's override — resets it to follow the global default."""
+    async with get_db() as db:
+        await db.execute("DELETE FROM phase_llm_config WHERE phase = ?", (phase,))
         await db.commit()
 
 
