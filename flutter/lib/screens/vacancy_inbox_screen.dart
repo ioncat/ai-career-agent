@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/vacancy.dart';
 import '../providers/read_vacancies_provider.dart';
+import '../providers/settings_provider.dart';
 import '../providers/vacancy_list_provider.dart';
+import '../repositories/vacancy_repository.dart';
 import '../widgets/processing_wrapper.dart';
 import '../widgets/vacancy_card.dart';
 import 'vacancy_detail_screen.dart';
@@ -23,6 +25,88 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
   bool _crossFolderNav = false;
   final _searchController = TextEditingController();
   String _searchQuery = '';
+
+  // ── Mass actions (BACKLOG "Batch Analysis Mode") ──────────────────────────
+  bool _multiSelectMode = false;
+  final Set<int> _selectedIds = {};
+  bool _batchRunning = false;
+  int _batchDone = 0;
+  int _batchTotal = 0;
+  String _batchLabel = '';
+
+  VacancyRepository get _repo {
+    final apiUrl = ref.read(settingsProvider).valueOrNull?.apiUrl ?? 'http://localhost:8080';
+    return VacancyRepository(baseUrl: apiUrl);
+  }
+
+  void _enterMultiSelect(int firstId) {
+    setState(() {
+      _multiSelectMode = true;
+      _selectedIds
+        ..clear()
+        ..add(firstId);
+    });
+  }
+
+  void _toggleCheck(int id) {
+    setState(() {
+      if (_selectedIds.contains(id)) {
+        _selectedIds.remove(id);
+      } else {
+        _selectedIds.add(id);
+      }
+    });
+  }
+
+  void _exitMultiSelect() {
+    setState(() {
+      _multiSelectMode = false;
+      _selectedIds.clear();
+    });
+  }
+
+  /// Runs one action per selected vacancy, strictly sequential — never
+  /// parallel. Local Ollama prefilter calls corrupt each other under
+  /// concurrent load (found 2026-07-17: 18-24 min stalls instead of ~15-30s),
+  /// and even for the cheap actions (analyze/decline) sequential keeps this
+  /// simple and gives honest per-item progress instead of a burst of
+  /// simultaneous requests.
+  Future<void> _runBatch(String label, Future<void> Function(int id) action) async {
+    final ids = _selectedIds.toList();
+    setState(() {
+      _batchRunning = true;
+      _batchDone = 0;
+      _batchTotal = ids.length;
+      _batchLabel = label;
+    });
+    var succeeded = 0;
+    var failed = 0;
+    for (final id in ids) {
+      try {
+        await action(id);
+        succeeded++;
+      } catch (_) {
+        failed++;
+      }
+      if (mounted) setState(() => _batchDone++);
+    }
+    if (!mounted) return;
+    setState(() => _batchRunning = false);
+    ref.read(vacancyListProvider.notifier).refresh();
+    _exitMultiSelect();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(failed == 0
+            ? '$label: $succeeded/${ids.length} done'
+            : '$label: $succeeded/${ids.length} done, $failed failed'),
+        backgroundColor: failed == 0 ? null : Colors.orange,
+      ),
+    );
+  }
+
+  Future<void> _batchAnalyze() => _runBatch('Analyze', (id) => _repo.analyze(id));
+  Future<void> _batchCheckBlockers() => _runBatch('Check blockers', (id) => _repo.runPrefilter(id));
+  Future<void> _batchSkip() => _runBatch('Skip', (id) => _repo.decline(id));
 
   void _onSkipped() {
     _crossFolderNav = false;
@@ -283,8 +367,24 @@ List<VacancyListItem> _filter(List<VacancyListItem> all) {
                             ref.read(readVacanciesProvider.notifier).markRead(v.id);
                           },
                           onTapRelated: _selectByIdAny,
+                          multiSelectMode: _multiSelectMode,
+                          checkedIds: _selectedIds,
+                          onCheckToggle: _toggleCheck,
+                          onLongPress: _enterMultiSelect,
                         ),
                 ),
+                if (_multiSelectMode)
+                  _BatchActionBar(
+                    count: _selectedIds.length,
+                    running: _batchRunning,
+                    runningLabel: _batchLabel,
+                    done: _batchDone,
+                    total: _batchTotal,
+                    onAnalyze: _selectedIds.isEmpty || _batchRunning ? null : _batchAnalyze,
+                    onCheckBlockers: _selectedIds.isEmpty || _batchRunning ? null : _batchCheckBlockers,
+                    onSkip: _selectedIds.isEmpty || _batchRunning ? null : _batchSkip,
+                    onCancel: _batchRunning ? null : _exitMultiSelect,
+                  ),
               ],
             ),
           ),
@@ -619,12 +719,20 @@ class _VacancyList extends StatelessWidget {
   final int? selectedId;
   final ValueChanged<VacancyListItem> onSelect;
   final void Function(int vacancyId)? onTapRelated;
+  final bool multiSelectMode;
+  final Set<int> checkedIds;
+  final void Function(int id)? onCheckToggle;
+  final void Function(int id)? onLongPress;
 
   const _VacancyList({
     required this.vacancies,
     required this.selectedId,
     required this.onSelect,
     this.onTapRelated,
+    this.multiSelectMode = false,
+    this.checkedIds = const {},
+    this.onCheckToggle,
+    this.onLongPress,
   });
 
   @override
@@ -644,10 +752,99 @@ class _VacancyList extends StatelessWidget {
               selected: v.id == selectedId,
               onTap: () => onSelect(v),
               onTapRelated: onTapRelated,
+              multiSelectMode: multiSelectMode,
+              checked: checkedIds.contains(v.id),
+              onCheckToggle: onCheckToggle == null ? null : () => onCheckToggle!(v.id),
+              onLongPress: onLongPress == null ? null : () => onLongPress!(v.id),
             ),
           ),
         );
       },
+    );
+  }
+}
+
+// ─── Batch action bar (mass actions: Analyze / Check blockers / Skip) ─────────
+
+class _BatchActionBar extends StatelessWidget {
+  final int count;
+  final bool running;
+  final String runningLabel;
+  final int done;
+  final int total;
+  final VoidCallback? onAnalyze;
+  final VoidCallback? onCheckBlockers;
+  final VoidCallback? onSkip;
+  final VoidCallback? onCancel;
+
+  const _BatchActionBar({
+    required this.count,
+    required this.running,
+    required this.runningLabel,
+    required this.done,
+    required this.total,
+    this.onAnalyze,
+    this.onCheckBlockers,
+    this.onSkip,
+    this.onCancel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHigh,
+        border: Border(top: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.4))),
+      ),
+      child: running
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('$runningLabel: $done/$total',
+                    style: Theme.of(context).textTheme.labelMedium),
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: total == 0 ? null : done / total,
+                    minHeight: 4,
+                  ),
+                ),
+              ],
+            )
+          : Row(
+              children: [
+                Text('$count selected',
+                    style: Theme.of(context).textTheme.labelMedium),
+                const Spacer(),
+                IconButton(
+                  tooltip: 'Cancel',
+                  icon: const Icon(Icons.close, size: 18),
+                  onPressed: onCancel,
+                  visualDensity: VisualDensity.compact,
+                ),
+                TextButton.icon(
+                  onPressed: onSkip,
+                  icon: Icon(Icons.block, size: 16, color: cs.error),
+                  label: Text('Skip', style: TextStyle(color: cs.error)),
+                ),
+                TextButton.icon(
+                  onPressed: onCheckBlockers,
+                  icon: const Icon(Icons.shield_outlined, size: 16),
+                  label: const Text('Check blockers'),
+                ),
+                FilledButton.icon(
+                  onPressed: onAnalyze,
+                  icon: const Icon(Icons.play_arrow, size: 16),
+                  label: const Text('Analyze'),
+                ),
+              ],
+            ),
     );
   }
 }

@@ -249,7 +249,14 @@ def _extract_critical_blockers(profile_md: str) -> str:
     m = re.search(r"## Critical Blockers.*?```yaml\s*\n(.*?)```", profile_md, re.DOTALL)
     if not m:
         return "## Critical Blockers\n\n(none)"
-    lines = [ln for ln in m.group(1).splitlines() if ln.strip() and not ln.strip().startswith("#")]
+    lines = [
+        ln for ln in m.group(1).splitlines()
+        if ln.strip() and not ln.strip().startswith("#")
+        # title is checked deterministically in tools/cv_prefilter.py before the
+        # LLM ever runs (2026-07-23) — never send it to the model, it has
+        # nothing left to judge there.
+        and not ln.strip().lower().startswith("title:")
+    ]
     if not lines:
         return "## Critical Blockers\n\n(none)"
     return "## Critical Blockers\n\n" + "\n".join(lines) + "\n"

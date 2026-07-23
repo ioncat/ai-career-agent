@@ -32,25 +32,131 @@ _PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
 _BLOCKED_RE = re.compile(r"(?im)^BLOCKED:\s*(yes|no)\s*$")
 _REASON_RE = re.compile(r"(?m)^-\s*(.+)$")
 
+# Mirrors the fit-list in PROFILE.md's `title:` Critical Blockers line. Kept
+# here (not read from PROFILE.md) because this is a deterministic code path,
+# not a prompt — see docs/discovery/prefilter-local-model-selection.md
+# (2026-07-23): letting an LLM judge a literal substring match against ~9
+# known terms produced errors an LLM should never make ("Product Owner Lead"
+# flagged despite containing "Product Owner") because the title verdict got
+# blended with unrelated JD-body signal (domain, seniority) in the same call.
+_TITLE_ALLOWLIST = [
+    "product manager",
+    "product owner",
+    "project manager",
+    "delivery manager",
+    "program manager",
+    "business analyst",
+    "operations manager",
+    "technical product manager",
+    "technical project manager",
+]
+
+# A word immediately BEFORE a matched allowlist term that changes the actual
+# function of the role, not just its domain/platform — "Growth Product
+# Manager" contains "Product Manager" as a literal substring but is a
+# distinct discipline (growth marketing), same reason the candidate flagged
+# it as its own denylist item before the allowlist rewrite. Found 2026-07-23
+# via a 50-vacancy audit (#779 "Growth Product Manager (iGaming)" — real
+# mismatch, wrongly passed by substring-only matching). A word AFTER the
+# term (iGaming, Mobile, Adtech, in parens or after a dash) is a domain
+# modifier, not a function modifier — #776 "Product Manager (iGaming)" is a
+# genuine fit, iGaming there says nothing about the role's function.
+_TITLE_PREFIX_DENYLIST = {
+    "growth", "crm", "retention", "marketing", "sales", "bizdev",
+    "risk", "compliance", "antifraud", "gamification", "community", "smm",
+    "vip", "payment", "payments", "ppc",
+}
+
+_WORD_RE = re.compile(r"[a-z]+")
+
+
+def _check_title_allowlist(title: str) -> str | None:
+    """Deterministic pre-check: does the vacancy title contain one of the
+    candidate's fit-list terms, without a function-changing prefix directly
+    in front of it? Returns None if it fits (proceed to the LLM content
+    check), or a reason string if it's a mismatch (short-circuit, never call
+    the LLM).
+    """
+    if not title:
+        return None
+    low = title.lower()
+    for term in _TITLE_ALLOWLIST:
+        idx = low.find(term)
+        if idx == -1:
+            continue
+        preceding_words = _WORD_RE.findall(low[:idx])
+        if preceding_words and preceding_words[-1] in _TITLE_PREFIX_DENYLIST:
+            continue  # substring matched, but a function-changing prefix sits right before it — keep scanning other terms
+        return None
+    return f'title: "{title.strip()}" does not contain a fitting role term (Product Manager/Owner, Project/Delivery/Program Manager, Business Analyst, Operations Manager, Technical Product/Project Manager)'
+
+
+# Fast-path for the `domain`/`igaming` Critical Blockers — NOT a new blocker
+# category, same verdict the LLM would reach reading the JD body, caught
+# earlier (and for free) on the ~common cases where the title names the
+# domain outright (usually a parenthetical suffix: "Product Manager
+# (iGaming)", "Product Manager (Mobile Apps)"). Kept deliberately small per
+# user's explicit call (2026-07-23) — not meant to replace the LLM's JD-body
+# read for domain signal, just skip the round-trip when the title already
+# gives it away. Unlike `title:`, `domain`/`igaming` stay in what the LLM
+# sees too (`_extract_critical_blockers` doesn't strip them) — a title
+# without the domain in it still needs the LLM to catch it from the body.
+_TITLE_DOMAIN_DENYLIST = {
+    "igaming": "igaming",
+    "gambling": "igaming",
+    "betting": "igaming",
+    "mobile": "domain",
+}
+
+
+def _check_title_domain_signals(title: str) -> str | None:
+    """Deterministic pre-check: does the title itself name a blocked domain
+    (iGaming, Mobile)? Returns None if clean (or ambiguous — let the LLM
+    decide from the JD body), or a reason string to short-circuit on.
+    """
+    if not title:
+        return None
+    low = title.lower()
+    for term, category in _TITLE_DOMAIN_DENYLIST.items():
+        if term in low:
+            return f'{category}: title "{title.strip()}" names the domain directly'
+    return None
+
 
 def _parse_prefilter_output(text: str) -> tuple[bool, list[str], bool]:
     """Parse the BLOCKED:/REASONS: format.
 
-    Returns (blocked, reasons, format_ok). format_ok=False means the model's
-    output didn't contain a recognizable "BLOCKED: yes|no" line at all — distinct
-    from format_ok=True + blocked=False, which means the model correctly followed
-    the format and explicitly said no blocker. Collapsing these two into one
-    "no blocker" result is exactly what hid the real bug on vacancy #716 (2026-07-17):
-    a small model rambled instead of following the format, and the caller had no
-    way to tell "checked, clean" from "couldn't parse what it said".
+    Returns (blocked, reasons, format_ok). format_ok=False means either the
+    model's output didn't contain a recognizable "BLOCKED: yes|no" line at all
+    — distinct from format_ok=True + blocked=False, which means the model
+    correctly followed the format and explicitly said no blocker. Collapsing
+    these two into one "no blocker" result is exactly what hid the real bug on
+    vacancy #716 (2026-07-17): a small model rambled instead of following the
+    format, and the caller had no way to tell "checked, clean" from "couldn't
+    parse what it said".
+
+    format_ok is ALSO False when MULTIPLE "BLOCKED:" lines appear — a sign the
+    model leaked self-correction into the final output instead of keeping it
+    to the hidden reasoning channel (found 2026-07-23, vacancy #725: model
+    wrote "BLOCKED: yes" ... "Wait — ... No title conflict" ... "BLOCKED: no").
+    The LAST match is used as the verdict (the self-corrected answer is more
+    likely the model's real final judgment), but the anomaly is still flagged
+    rather than silently treated as a clean run — same principle as the
+    single-match case above.
     """
-    m = _BLOCKED_RE.search(text)
-    if not m:
+    matches = list(_BLOCKED_RE.finditer(text))
+    if not matches:
         return False, [], False
-    if m.group(1).lower() != "yes":
-        return False, [], True
-    reasons = [r.strip() for r in _REASON_RE.findall(text)][:5]
-    return True, reasons, True
+    clean_format = len(matches) == 1
+    last = matches[-1]
+    if last.group(1).lower() != "yes":
+        return False, [], clean_format
+    reasons = [r.strip() for r in _REASON_RE.findall(text[last.end():])]
+    if not reasons:
+        # some models put REASONS before the final BLOCKED line — fall back
+        # to scanning the whole text rather than reporting an empty list.
+        reasons = [r.strip() for r in _REASON_RE.findall(text)]
+    return True, reasons[:5], clean_format
 
 
 async def cv_prefilter(ctx: RunContext[AgentDeps], vacancy_id: int) -> dict:
@@ -92,6 +198,24 @@ async def cv_prefilter(ctx: RunContext[AgentDeps], vacancy_id: int) -> dict:
         log.warning("cv_prefilter: JD.md not found at %s — skipping", jd_path)
         return _fail(f"JD.md not found at {jd_path}")
 
+    run_id = await database.insert_pipeline_run(vacancy_id, phase="prefilter")
+
+    title = vacancy["title"] or ""
+    deterministic_reason = _check_title_domain_signals(title) or _check_title_allowlist(title)
+    if deterministic_reason is not None:
+        log.info("cv_prefilter: v#%d deterministic match (no LLM call): %s", vacancy_id, deterministic_reason)
+        await database.set_vacancy_blocker(vacancy_id, True, [deterministic_reason], raw_output=f"BLOCKED: yes\n- {deterministic_reason}\n(deterministic title check — no LLM call)")
+        await database.update_pipeline_run(run_id, status="done")
+        return {
+            "ok": True,
+            "blocked": True,
+            "reasons": [deterministic_reason],
+            "raw_output": None,
+            "format_ok": True,
+            "error": None,
+            "provider_unavailable": False,
+        }
+
     jd_text = jd_path.read_text(encoding="utf-8")
     skill_dir = _PROMPTS_DIR / ctx.deps.skill_type
     prompt_path = skill_dir / "prefilter.md"
@@ -99,7 +223,6 @@ async def cv_prefilter(ctx: RunContext[AgentDeps], vacancy_id: int) -> dict:
         prompt_path = _PROMPTS_DIR / "generic" / "prefilter.md"
     prefilter_prompt = prompt_path.read_text(encoding="utf-8")
 
-    run_id = await database.insert_pipeline_run(vacancy_id, phase="prefilter")
     await database.update_pipeline_run(run_id, status="running")
 
     try:

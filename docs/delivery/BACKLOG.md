@@ -1,6 +1,6 @@
 # career-agent — Backlog
 
-> Last updated: 2026-07-23
+> Last updated: 2026-07-23 (session 2)
 > Rules: [documentation-conventions.md](documentation-conventions.md) · History: [CHANGELOG.md](CHANGELOG.md) · Specs: [Epics/](Epics/)
 
 **Priority legend:**
@@ -28,6 +28,17 @@
 ---
 
 ## 🟠 P1
+
+### Prompt review pass — `prompts/pm|generic/prefilter.md` (added 2026-07-23)
+**What:** the prefilter prompt has grown reactively all session (Requirements-vs-Responsibilities rule, quote-only-JD rule, output-format examples) — do a holistic pass to see what can be tightened, consolidated, or dropped, rather than just keep bolting on more rules as new failure modes surface.
+**Why:** user's own instinct after finding the self-correction-leak bug (#725) — fix the parser first (done, see CHANGELOG), but the prompt itself deserves a step-back review, not just incremental patches.
+**Scope:** re-read both prompt files fresh; check for redundancy between rules; check whether the growing rule count itself might be part of the instability (matches today's broader finding that `gemma4:e2b` real-world hit rate stayed flat regardless of prompt rewrites — worth checking if that pattern holds for the CURRENT prompt too). Re-test on the same batch (`batch_validate.py`-style, scratchpad) after any change.
+
+### Validate `gemma4:e4b` as the pre-filter model (unfinished from 2026-07-17)
+**What:** after fixing two real bugs (context bloat, `num_ctx`/VRAM overflow), `gemma4:e4b` hit 3/3 clean catches on vacancy #716 (~30s, 100% GPU) — the best result found that day. Investigation stopped there ("plan for tomorrow") and was never resumed — never validated on the broader real-vacancy set (#717/#718/#720/#722) or repeated beyond one vacancy.
+**Why:** blocks picking a reliable local pre-filter model, which in turn blocks the automatic-trigger ticket below. Also directly relevant to any other JD-analysis-shaped task considered for a local model (e.g. the archetype/frequency analysis idea discussed 2026-07-23) — reliability here isn't proven yet, don't assume it generalizes.
+**Scope:** `scripts/e2e_prefilter.py --model gemma4:e4b --effort medium` (with `num_ctx=4096`, already wired for `phase="prefilter"`), 60s cutoff / ~30s target, sequential only — run on #717/#718/#720/#722, 3× each. Also queued but untested: `phi4:14b`. Decide single-run vs OR-logic multi-run based on results.
+**Spec:** [docs/discovery/prefilter-local-model-selection.md](../discovery/prefilter-local-model-selection.md) "Plan for 2026-07-18" section (gitignored, full methodology + prior results).
 
 ### Wire Critical Blocker pre-filter into an automatic trigger (added 2026-07-17)
 **What:** `POST /api/vacancies/{id}/prefilter` + Flutter "Check blockers" button ship manual-trigger-only (EPIC-27, delivered 2026-07-17) — deliberate, so the prompt/`## Critical Blockers` format can be validated first. This ticket is the follow-up: decide and wire an actual automatic trigger point once that validation is done.

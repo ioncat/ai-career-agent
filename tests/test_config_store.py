@@ -283,6 +283,23 @@ english: C1 required (mine: B2)
     assert "english: C1 required" in result
 
 
+def test_extract_critical_blockers_strips_title_line():
+    """The title blocker is checked deterministically in tools/cv_prefilter.py
+    before the LLM ever runs (2026-07-23) — the LLM must never see it, so it's
+    never tempted to re-judge it and blend the verdict with unrelated JD-body
+    signal (the failure mode that motivated the split)."""
+    profile = """## Critical Blockers
+
+```yaml
+title: ALLOWLIST RULE based on the vacancy TITLE STRING ALONE — ...
+domain: B2C subscription hands-on experience required (none)
+```
+"""
+    result = config_store._extract_critical_blockers(profile)
+    assert "title:" not in result
+    assert "domain: B2C subscription" in result
+
+
 def test_extract_critical_blockers_missing_section_returns_none_marker():
     result = config_store._extract_critical_blockers("# Profile\n\nNo blockers section here.")
     assert result == "## Critical Blockers\n\n(none)"
