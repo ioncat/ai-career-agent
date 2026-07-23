@@ -25,6 +25,7 @@ class _JdModeView extends ConsumerStatefulWidget {
   final VoidCallback? onSkipped;
 
   const _JdModeView({
+    super.key,
     required this.vacancyId,
     required this.url,
     this.vacancy,
@@ -781,9 +782,9 @@ class _VacancyDetailScreenState extends ConsumerState<VacancyDetailScreen>
       error: (e, _) {
         // API error → fall back to JD view with context-appropriate buttons
         if (status == 'declined') {
-          return _JdModeView(vacancyId: widget.vacancyId, url: widget.url, vacancy: widget.vacancy, restoreMode: true);
+          return _JdModeView(key: ValueKey(widget.vacancyId), vacancyId: widget.vacancyId, url: widget.url, vacancy: widget.vacancy, restoreMode: true);
         }
-        return _JdModeView(vacancyId: widget.vacancyId, url: widget.url, vacancy: widget.vacancy, onSkipped: widget.onSkipped);
+        return _JdModeView(key: ValueKey(widget.vacancyId), vacancyId: widget.vacancyId, url: widget.url, vacancy: widget.vacancy, onSkipped: widget.onSkipped);
       },
       data: (analysis) {
         final p1 = analysis.p1;
@@ -792,9 +793,9 @@ class _VacancyDetailScreenState extends ConsumerState<VacancyDetailScreen>
         if (p2 == null) {
           // No analysis yet — show JD view with context-appropriate buttons
           if (status == 'declined') {
-            return _JdModeView(vacancyId: widget.vacancyId, url: widget.url, vacancy: widget.vacancy, restoreMode: true);
+            return _JdModeView(key: ValueKey(widget.vacancyId), vacancyId: widget.vacancyId, url: widget.url, vacancy: widget.vacancy, restoreMode: true);
           }
-          return _JdModeView(vacancyId: widget.vacancyId, url: widget.url, vacancy: widget.vacancy, onSkipped: widget.onSkipped);
+          return _JdModeView(key: ValueKey(widget.vacancyId), vacancyId: widget.vacancyId, url: widget.url, vacancy: widget.vacancy, onSkipped: widget.onSkipped);
         }
 
         final role = p1?.role.isNotEmpty == true
