@@ -14,6 +14,12 @@ class VacancyCard extends ConsumerStatefulWidget {
   final bool selected;
   final VoidCallback onTap;
   final void Function(int vacancyId)? onTapRelated;
+  /// Mass-action mode (BACKLOG "Batch Analysis Mode") — when true, the card
+  /// shows a checkbox instead of opening the detail screen on tap.
+  final bool multiSelectMode;
+  final bool checked;
+  final VoidCallback? onCheckToggle;
+  final VoidCallback? onLongPress;
 
   const VacancyCard({
     super.key,
@@ -21,6 +27,10 @@ class VacancyCard extends ConsumerStatefulWidget {
     required this.onTap,
     this.selected = false,
     this.onTapRelated,
+    this.multiSelectMode = false,
+    this.checked = false,
+    this.onCheckToggle,
+    this.onLongPress,
   });
 
   @override
@@ -37,7 +47,8 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
     final readIds = ref.watch(readVacanciesProvider).valueOrNull ?? {};
     final isUnread = v.status == 'fetched' && !readIds.contains(v.id);
 
-    final bgColor = widget.selected
+    final highlighted = widget.multiSelectMode ? widget.checked : widget.selected;
+    final bgColor = highlighted
         ? cs.surface
         : _hovered
             ? cs.surfaceContainerLow
@@ -50,19 +61,20 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       child: GestureDetector(
-        onTap: widget.onTap,
+        onTap: widget.multiSelectMode ? widget.onCheckToggle : widget.onTap,
+        onLongPress: widget.onLongPress,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
           margin: EdgeInsets.zero,
           decoration: BoxDecoration(
             color: bgColor,
             borderRadius: borderRadius,
-            border: widget.selected
+            border: highlighted
                 ? Border.all(color: cs.primary.withValues(alpha: 0.55), width: 1.5)
                 : Border.all(
                     color: cs.outlineVariant.withValues(alpha: 0.3),
                   ),
-            boxShadow: widget.selected
+            boxShadow: highlighted
                 ? [
                     BoxShadow(
                       color: cs.primary.withValues(alpha: 0.14),
@@ -84,10 +96,18 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Row 1: source badge + "New" badge + dedup/republish badges | date right-aligned
+              // Row 1: [checkbox in multi-select] source badge + "New" badge + dedup/republish badges | date right-aligned
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
+                  if (widget.multiSelectMode) ...[
+                    Icon(
+                      widget.checked ? Icons.check_box : Icons.check_box_outline_blank,
+                      size: 20,
+                      color: widget.checked ? cs.primary : cs.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 8),
+                  ],
                   if (v.site.isNotEmpty) SourceBadge(site: v.site),
                   if (isUnread) ...[
                     const SizedBox(width: 6),

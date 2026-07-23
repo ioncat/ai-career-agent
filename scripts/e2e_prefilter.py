@@ -204,7 +204,30 @@ async def run(
     print(f"  Raw model output:")
     print(f"{'─'*60}")
     print(result["raw_output"] or "(none)")
-    print(f"{'─'*60}\n")
+    print(f"{'─'*60}")
+
+    usage = getattr(_built_llm[-1], "last_call_usage", None) if _built_llm else None
+    if usage:
+        real_in = usage.get("input_tokens") or 0
+        real_out = usage.get("output_tokens") or 0
+        # claude_cli never returns real usage (claude -p text mode has none) — profile/
+        # prompt/user tokens are len//4 estimates already computed by the provider;
+        # output estimate computed here (script-only, never persisted to llm_usage —
+        # input_tokens=0/output_tokens=0 in the DB is a meaningful "no real data"
+        # signal elsewhere, e.g. Activity tab — not something to silently overwrite).
+        out_est = len(result["raw_output"] or "") // 4
+        print(f"  Token usage ({usage.get('provider', '?')}):")
+        if real_in or real_out:
+            print(f"    input (real)  : {real_in}")
+            print(f"    output (real) : {real_out}")
+        else:
+            profile_t = usage.get("profile_tokens", 0)
+            prompt_t = usage.get("prompt_tokens", 0)
+            user_t = usage.get("user_tokens", 0)
+            print(f"    input (est. len//4)  : profile={profile_t} + prompt={prompt_t} + user={user_t} = {profile_t + prompt_t + user_t}")
+            print(f"    output (est. len//4) : {out_est}")
+            print(f"    ⚠️  no real token count available from this provider — estimates only")
+    print()
 
     print("✅  e2e prefilter test complete")
 

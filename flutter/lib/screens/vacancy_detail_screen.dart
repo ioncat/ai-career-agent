@@ -14,6 +14,30 @@ import '../providers/vacancy_list_provider.dart';
 import '../repositories/vacancy_repository.dart';
 import '../providers/vacancy_cv_provider.dart';
 
+/// Renders a pre-filter reason string ("category: explanation" — as produced by
+/// prompts/pm|generic/prefilter.md) with the category bolded + capitalized,
+/// e.g. "title: Product Marketing Lead is a Marketing function" →
+/// "•  **Title:** Product Marketing Lead is a Marketing function".
+Widget _reasonLine(String reason, {TextStyle? style}) {
+  final colonIdx = reason.indexOf(':');
+  if (colonIdx == -1) {
+    return Text('•  $reason', style: style);
+  }
+  final category = reason.substring(0, colonIdx).trim();
+  final rest = reason.substring(colonIdx + 1).trim();
+  final capitalized = category.isEmpty ? category : category[0].toUpperCase() + category.substring(1);
+  return Text.rich(
+    TextSpan(
+      style: style,
+      children: [
+        const TextSpan(text: '•  '),
+        TextSpan(text: '$capitalized: ', style: const TextStyle(fontWeight: FontWeight.bold)),
+        TextSpan(text: rest),
+      ],
+    ),
+  );
+}
+
 // ── JD mode — shown for status='fetched' ──────────────────────────────────────
 
 class _JdModeView extends ConsumerStatefulWidget {
@@ -197,7 +221,7 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                 ] else if (blocked)
                   ...reasons.map((r) => Padding(
                         padding: const EdgeInsets.only(bottom: 6),
-                        child: Text('•  $r'),
+                        child: _reasonLine(r),
                       ))
                 else
                   const Text('The pre-filter found no explicit conflict with your Critical Blockers.'),
@@ -393,8 +417,8 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                 OutlinedButton(
                   onPressed: _loadingDecline ? null : _decline,
                   style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: cs.outlineVariant),
-                    foregroundColor: cs.onSurfaceVariant,
+                    side: BorderSide(color: cs.error),
+                    foregroundColor: cs.error,
                   ),
                   child: _loadingDecline
                       ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
@@ -2057,7 +2081,7 @@ class _PrefilterBanner extends StatelessWidget {
             const SizedBox(height: 6),
             ...reasons.map((r) => Padding(
                   padding: const EdgeInsets.only(bottom: 3),
-                  child: Text('•  $r', style: TextStyle(fontSize: compact ? 11.5 : 12.5)),
+                  child: _reasonLine(r, style: TextStyle(fontSize: compact ? 11.5 : 12.5)),
                 )),
           ],
         ],

@@ -10,7 +10,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from tools.cv_prefilter import _parse_prefilter_output, cv_prefilter
+from tools.cv_prefilter import (
+    _check_title_allowlist,
+    _check_title_domain_signals,
+    _parse_prefilter_output,
+    cv_prefilter,
+)
 
 
 # ── Parser ───────────────────────────────────────────────────────────────────
@@ -50,13 +55,156 @@ def test_parse_caps_reasons_at_five():
     text = "BLOCKED: yes\nREASONS:\n" + "\n".join(f"- reason {i}" for i in range(8))
     _, reasons, format_ok = _parse_prefilter_output(text)
     assert len(reasons) == 5
-    assert format_ok is True
+
+
+def test_parse_multiple_blocked_lines_uses_last_but_flags_format_not_ok():
+    """Found 2026-07-23, vacancy #725: model wrote 'BLOCKED: yes' with a title
+    reason, then self-corrected inline ('Wait — ... IS on allowlist. No title
+    conflict.') and ended with 'BLOCKED: no'. The self-corrected (last) answer
+    is used as the verdict, but format_ok=False so this leak is still visible
+    rather than silently treated as a clean 'no' — same principle as the
+    no-BLOCKED-line case above."""
+    text = (
+        "BLOCKED: yes\n"
+        "REASONS:\n"
+        "- title: \"Product Manager\"\n"
+        "\n"
+        "Wait — title check: \"Product Manager\" IS on allowlist. No title conflict.\n"
+        "\n"
+        "Recheck other blockers:\n"
+        "\n"
+        "BLOCKED: no\n"
+    )
+    blocked, reasons, format_ok = _parse_prefilter_output(text)
+    assert blocked is False
+    assert reasons == []
+    assert format_ok is False
+
+
+def test_parse_multiple_blocked_lines_final_yes_picks_up_its_own_reasons():
+    text = (
+        "BLOCKED: no\n"
+        "\n"
+        "Wait — actually there is a conflict.\n"
+        "\n"
+        "BLOCKED: yes\n"
+        "REASONS:\n"
+        "- english: \"C1 required\"\n"
+    )
+    blocked, reasons, format_ok = _parse_prefilter_output(text)
+    assert blocked is True
+    assert reasons == ['english: "C1 required"']
+    assert format_ok is False
+
+
+# ── Title allowlist (deterministic, 2026-07-23) ────────────────────────────────
+# Added after real-data testing showed an LLM asked to judge title as one of
+# 10 blocker categories in a single call made execution slips a pure string
+# match should never make ("Product Owner Lead" flagged despite containing
+# "Product Owner"; "Business Analyst / Project Manager" flagged despite
+# containing both terms) — see docs/discovery/prefilter-local-model-selection.md.
+
+def test_title_allowlist_fits_exact_term():
+    assert _check_title_allowlist("Product Manager") is None
+
+
+def test_title_allowlist_fits_with_seniority_prefix():
+    assert _check_title_allowlist("Senior Product Owner") is None
+
+
+def test_title_allowlist_fits_case_insensitive():
+    assert _check_title_allowlist("PRODUCT OWNER lead") is None
+
+
+def test_title_allowlist_regression_814_product_owner_lead():
+    """#814 (2026-07-23): LLM flagged this despite the literal term being
+    present — title contains "Product Owner", must fit deterministically."""
+    assert _check_title_allowlist("Product Owner Lead") is None
+
+
+def test_title_allowlist_regression_813_business_analyst_project_manager():
+    """#813 (2026-07-23): LLM flagged despite containing two allowlist terms."""
+    assert _check_title_allowlist("Business Analyst / Project Manager") is None
+
+
+def test_title_allowlist_flags_mismatch():
+    reason = _check_title_allowlist("Product Marketing Lead")
+    assert reason is not None
+    assert reason.startswith("title:")
+    assert "Product Marketing Lead" in reason
+
+
+def test_title_allowlist_flags_no_known_term():
+    """#814 fresh-batch counterpart: title with NO allowlist term must flag,
+    even if it superficially sounds product-adjacent."""
+    reason = _check_title_allowlist("Product Adoption Analytics Lead")
+    assert reason is not None
+
+
+def test_title_allowlist_empty_title_does_not_flag():
+    assert _check_title_allowlist("") is None
+    assert _check_title_allowlist(None) is None
+
+
+def test_title_allowlist_regression_779_growth_prefix_flags():
+    """#779 (2026-07-23 audit): "Growth Product Manager" literally contains
+    "Product Manager" but Growth is a function-changing prefix (a distinct
+    discipline, growth marketing) — must still flag despite the substring."""
+    reason = _check_title_allowlist("Growth Product Manager (iGaming)")
+    assert reason is not None
+
+
+def test_title_allowlist_regression_776_domain_suffix_fits():
+    """#776 counterpart: a word AFTER the term (domain/platform, in parens)
+    must NOT affect the verdict — iGaming here says nothing about function."""
+    assert _check_title_allowlist("Product Manager (iGaming)") is None
+
+
+def test_title_allowlist_prefix_denylist_case_insensitive():
+    assert _check_title_allowlist("GROWTH Product Manager") is not None
+
+
+def test_title_allowlist_prefix_denylist_falls_through_to_other_term():
+    """A bad prefix on one matched term doesn't poison the whole title if a
+    clean allowlist term also appears elsewhere."""
+    assert _check_title_allowlist("Growth Product Manager / Business Analyst") is None
+
+
+# ── Title domain-signal fast-path (2026-07-23) ─────────────────────────────────
+# NOT a new blocker category — same `domain`/`igaming` verdict the LLM would
+# reach reading the JD body, caught for free when the title names the domain
+# outright (most commonly a parenthetical suffix).
+
+def test_title_domain_signals_igaming_flags():
+    reason = _check_title_domain_signals("Product Manager (iGaming)")
+    assert reason is not None
+    assert reason.startswith("igaming:")
+
+
+def test_title_domain_signals_mobile_flags():
+    reason = _check_title_domain_signals("Product Manager (Mobile Apps)")
+    assert reason is not None
+    assert reason.startswith("domain:")
+
+
+def test_title_domain_signals_gambling_betting_flag_as_igaming():
+    assert _check_title_domain_signals("Product Manager, Gambling").startswith("igaming:")
+    assert _check_title_domain_signals("Product Manager (Betting)").startswith("igaming:")
+
+
+def test_title_domain_signals_clean_title_returns_none():
+    assert _check_title_domain_signals("Product Manager") is None
+
+
+def test_title_domain_signals_empty_title_does_not_flag():
+    assert _check_title_domain_signals("") is None
+    assert _check_title_domain_signals(None) is None
 
 
 # ── cv_prefilter ─────────────────────────────────────────────────────────────
 
-def _make_vacancy_row(jd_path: Path, vacancy_id: int = 1) -> MagicMock:
-    data = {"id": vacancy_id, "markdown_path": str(jd_path)}
+def _make_vacancy_row(jd_path: Path, vacancy_id: int = 1, title: str = "Product Manager") -> MagicMock:
+    data = {"id": vacancy_id, "markdown_path": str(jd_path), "title": title}
     row = MagicMock()
     row.__getitem__ = lambda self, key: data[key]
     return row
@@ -254,6 +402,63 @@ async def test_prefilter_jd_missing_on_disk_returns_early(tmp_path):
 
     mock_db.set_vacancy_blocker.assert_not_awaited()
     assert result["ok"] is False
+
+
+@pytest.mark.asyncio
+async def test_prefilter_title_mismatch_short_circuits_no_llm_call(tmp_path):
+    """Title check runs before the LLM — a mismatch must never reach get_llm()."""
+    jd_path = _write_jd(tmp_path)
+    vacancy_row = _make_vacancy_row(jd_path, title="Product Marketing Lead")
+    ctx = _make_ctx()
+    mock_db = _mock_db(vacancy_row)
+
+    with patch("tools.cv_prefilter.database", mock_db):
+        result = await cv_prefilter(ctx, 1)
+
+    ctx.deps.get_llm.assert_not_awaited()
+    assert result["ok"] is True
+    assert result["blocked"] is True
+    assert result["format_ok"] is True
+    assert len(result["reasons"]) == 1
+    assert result["reasons"][0].startswith("title:")
+    mock_db.set_vacancy_blocker.assert_awaited_once()
+    args, kwargs = mock_db.set_vacancy_blocker.call_args
+    assert args[0] == 1
+    assert args[1] is True
+    mock_db.update_pipeline_run.assert_any_call(1, status="done")
+
+
+@pytest.mark.asyncio
+async def test_prefilter_domain_signal_short_circuits_no_llm_call(tmp_path):
+    """A fitting title with a blocked domain suffix (iGaming) still short-
+    circuits — domain signal is checked before the allowlist fit check."""
+    jd_path = _write_jd(tmp_path)
+    vacancy_row = _make_vacancy_row(jd_path, title="Product Manager (iGaming)")
+    ctx = _make_ctx()
+    mock_db = _mock_db(vacancy_row)
+
+    with patch("tools.cv_prefilter.database", mock_db):
+        result = await cv_prefilter(ctx, 1)
+
+    ctx.deps.get_llm.assert_not_awaited()
+    assert result["blocked"] is True
+    assert result["reasons"][0].startswith("igaming:")
+
+
+@pytest.mark.asyncio
+async def test_prefilter_title_fit_proceeds_to_llm(tmp_path):
+    """Title on the allowlist must still go through the normal LLM content check."""
+    jd_path = _write_jd(tmp_path)
+    vacancy_row = _make_vacancy_row(jd_path, title="Product Owner Lead")
+    llm = _make_llm("BLOCKED: no")
+    ctx = _make_ctx(llm)
+    mock_db = _mock_db(vacancy_row)
+
+    with patch("tools.cv_prefilter.database", mock_db):
+        result = await cv_prefilter(ctx, 1)
+
+    ctx.deps.get_llm.assert_awaited_once()
+    assert result["blocked"] is False
 
 
 @pytest.mark.asyncio
