@@ -98,6 +98,13 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
             mainAxisSize: MainAxisSize.min,
             children: [
               // Row 1: [checkbox in multi-select] source badge + "New" badge + dedup/republish badges | date right-aligned
+              // Badge cluster is a Wrap, not a fixed-width Row segment — the badge
+              // count is unbounded (source/new/republished/blocker/duplicate can all
+              // be present at once), so a Row silently overflows on narrow cards
+              // instead of wrapping. Found 2026-07-24 (blocker badge pushed a card
+              // 5px past its bound, showing the debug "RIGHT OVERFLOWED" banner) —
+              // same fix pattern as the 2026-07-05 score-pill overflow, different
+              // widget (that one was the detail-screen hero, not this inbox card).
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -109,56 +116,53 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
                     ),
                     const SizedBox(width: 8),
                   ],
-                  if (v.site.isNotEmpty) SourceBadge(site: v.site),
-                  if (isUnread) ...[
-                    const SizedBox(width: 6),
-                    _NewBadge(),
-                  ],
-                  if (v.republishedAt != null) ...[
-                    const SizedBox(width: 6),
-                    Tooltip(
-                      message: 'Re-published by the employer after being declined.\nMoved back to inbox for review.',
-                      preferBelow: false,
-                      child: _RepublishedBadge(),
+                  Expanded(
+                    child: Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        if (v.site.isNotEmpty) SourceBadge(site: v.site),
+                        if (isUnread) _NewBadge(),
+                        if (v.republishedAt != null)
+                          Tooltip(
+                            message: 'Re-published by the employer after being declined.\nMoved back to inbox for review.',
+                            preferBelow: false,
+                            child: _RepublishedBadge(),
+                          ),
+                        // No hover tooltip here on purpose — the full reason list
+                        // dwarfed the card (found 2026-07-24). Tap the card to see
+                        // details instead.
+                        if (v.blockerFlag) const _BlockerBadge(),
+                        if (v.duplicateOf != null)
+                          Tooltip(
+                            message: 'Same job found on another source (duplicate of #${v.duplicateOf}).\nTap to view the original posting.',
+                            preferBelow: false,
+                            child: MouseRegion(
+                              cursor: widget.onTapRelated != null
+                                  ? SystemMouseCursors.click
+                                  : MouseCursor.defer,
+                              child: GestureDetector(
+                                onTap: widget.onTapRelated != null
+                                    ? () => widget.onTapRelated!(v.duplicateOf!)
+                                    : null,
+                                behavior: HitTestBehavior.opaque,
+                                child: _DuplicateBadge(originalId: v.duplicateOf!),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
-                  ],
-                  if (v.blockerFlag) ...[
+                  ),
+                  if (v.publishedAt != null) ...[
                     const SizedBox(width: 6),
-                    Tooltip(
-                      message: v.blockerReasons.isEmpty
-                          ? 'Pre-filter flagged a possible hard blocker in this JD.'
-                          : 'Possible blocker(s):\n${v.blockerReasons.map((r) => '• $r').join('\n')}',
-                      preferBelow: false,
-                      child: const _BlockerBadge(),
-                    ),
-                  ],
-                  if (v.duplicateOf != null) ...[
-                    const SizedBox(width: 6),
-                    Tooltip(
-                      message: 'Same job found on another source (duplicate of #${v.duplicateOf}).\nTap to view the original posting.',
-                      preferBelow: false,
-                      child: MouseRegion(
-                        cursor: widget.onTapRelated != null
-                            ? SystemMouseCursors.click
-                            : MouseCursor.defer,
-                        child: GestureDetector(
-                          onTap: widget.onTapRelated != null
-                              ? () => widget.onTapRelated!(v.duplicateOf!)
-                              : null,
-                          behavior: HitTestBehavior.opaque,
-                          child: _DuplicateBadge(originalId: v.duplicateOf!),
-                        ),
-                      ),
-                    ),
-                  ],
-                  const Spacer(),
-                  if (v.publishedAt != null)
                     Text(
                       _relativeTime(v.publishedAt!),
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
                             color: cs.secondary,
                           ),
                     ),
+                  ],
                   _StarButton(vacancyId: v.id, isStarred: v.starred),
                 ],
               ),
@@ -352,7 +356,13 @@ class _BlockerBadge extends StatelessWidget {
           const Icon(Icons.block_rounded, size: 11, color: Color(0xFFC62828)),
           const SizedBox(width: 3),
           Text(
-            'Possible blocker',
+            // "Possible blocker" measured ~168px wide (2026-07-24) — wider
+            // than the other badges combined, and the actual cause of the
+            // badge-row overflow, not the layout itself. "Blocker" carries
+            // the same meaning (red + block icon already signal "warning")
+            // at roughly a third of the width. Full detail is a tap away —
+            // see the removed hover tooltip note above.
+            'Blocker',
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   color: const Color(0xFFC62828),
                   fontWeight: FontWeight.w700,
