@@ -8,6 +8,7 @@ class RemoteConfig {
   final String model;
   final String thinkingEffort;
   final String analysisMode;
+  final bool autoCheckTitle;
   final List<String> availableModels;
   final List<String> validProviders;
 
@@ -16,6 +17,7 @@ class RemoteConfig {
     required this.model,
     required this.thinkingEffort,
     required this.analysisMode,
+    required this.autoCheckTitle,
     required this.availableModels,
     required this.validProviders,
   });
@@ -87,6 +89,7 @@ class RemoteConfigNotifier extends AsyncNotifier<RemoteConfig> {
       model: current.model,
       thinkingEffort: current.thinkingEffort,
       analysisMode: current.analysisMode,
+      autoCheckTitle: current.autoCheckTitle,
       availableModels: models,
       validProviders: current.validProviders,
     ));
@@ -98,6 +101,16 @@ class RemoteConfigNotifier extends AsyncNotifier<RemoteConfig> {
     await _patchAgainstCurrentProvider(
       (expected) => repo.patchConfig(thinkingEffort: effort, expectedProvider: expected),
     );
+  }
+
+  /// Stage 1 pre-filter (title/domain, deterministic — no LLM) auto-trigger
+  /// on/off. Independent of provider/model/effort — no drift-guard needed,
+  /// this flag never affects which provider is active.
+  Future<void> patchAutoCheckTitle(bool enabled) async {
+    final settings = await ref.read(settingsProvider.future);
+    final repo = VacancyRepository(baseUrl: settings.apiUrl);
+    final data = await repo.patchConfig(autoCheckTitle: enabled);
+    state = AsyncData(_fromMap(data));
   }
 
   static RemoteConfig _fromMap(Map<String, dynamic> data) {
@@ -114,6 +127,7 @@ class RemoteConfigNotifier extends AsyncNotifier<RemoteConfig> {
       model: data['model'] as String? ?? '',
       thinkingEffort: data['thinking_effort'] as String? ?? 'off',
       analysisMode: data['analysis_mode'] as String? ?? '',
+      autoCheckTitle: data['auto_check_title'] as bool? ?? true,
       availableModels: models,
       validProviders: providers,
     );

@@ -461,6 +461,7 @@ async def api_config():
         "analysis_mode": os.getenv("ANALYSIS_MODE", "inbox_first").lower(),
         "available_models": available_models,
         "valid_providers": sorted(config_store.VALID_PROVIDERS),
+        "auto_check_title": await database.get_auto_check_title(1),
     }
 
 
@@ -468,6 +469,7 @@ class ConfigPatch(BaseModel):
     llm_provider: str | None = None
     model: str | None = None
     thinking_effort: str | None = None
+    auto_check_title: bool | None = None
     # Drift guard: the provider the client believes is currently active. Only
     # checked when llm_provider is NOT being set (i.e. patching model/effort
     # against an assumed-active provider) — a mismatch means the provider
@@ -514,6 +516,9 @@ async def patch_config(body: ConfigPatch):
     except config_store.ConfigError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
+    if body.auto_check_title is not None:
+        await database.set_auto_check_title(1, body.auto_check_title)
+
     provider = cfg["provider"]
 
     return {
@@ -523,6 +528,7 @@ async def patch_config(body: ConfigPatch):
         "analysis_mode": os.getenv("ANALYSIS_MODE", "inbox_first").lower(),
         "available_models": allowed,
         "valid_providers": sorted(config_store.VALID_PROVIDERS),
+        "auto_check_title": await database.get_auto_check_title(1),
     }
 
 
@@ -832,6 +838,16 @@ async def api_import_jd(req: ImportJdRequest):
 
     await database.update_vacancy_fields(vacancy_id, markdown_path=str(jd_path))
     log.info("api/import-jd: vacancy_id=%d title=%r user=%d", vacancy_id, title, req.user_id)
+
+    # Stage 1 pre-filter (title/domain, deterministic — no LLM) — same
+    # auto-trigger as RSSWatcher._process(), see 2026-07-23 CHANGELOG entry.
+    try:
+        if await database.get_auto_check_title(req.user_id):
+            from tools.cv_prefilter import apply_title_stage
+            await apply_title_stage(vacancy_id, title)
+    except Exception as exc:
+        log.warning("import-jd: title stage failed v#%d (non-fatal): %s", vacancy_id, exc)
+
     return {"vacancy_id": vacancy_id, "title": title}
 
 

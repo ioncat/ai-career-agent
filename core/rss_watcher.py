@@ -176,6 +176,7 @@ class RSSWatcher:
         """
         from tools.cv_analyze import cv_analyze  # local import to avoid circular
         from tools.cv_fetch_jd import fetch_jd
+        from tools.cv_prefilter import apply_title_stage
 
         source = self._source_label(url)
         display = rss_title or url
@@ -242,10 +243,19 @@ class RSSWatcher:
 
             await database.update_vacancy_status(vacancy_id, "fetched")
 
-            # Pre-filter (EPIC-27) is NOT auto-triggered here by design (2026-07-17):
-            # user wants to validate/tune the prefilter.md prompt and PROFILE.md
-            # Critical Blockers manually first — see POST /api/vacancies/{id}/prefilter
-            # (manual trigger button in Flutter) before this gets wired in automatically.
+            # Stage 1 pre-filter (title/domain, deterministic — no LLM) auto-runs
+            # here when the user's "Auto-check title" setting is on (2026-07-23).
+            # Stage 2 (LLM content check) stays manual-trigger-only by design
+            # (2026-07-17, see POST /api/vacancies/{id}/prefilter) — that decision
+            # was about spending LLM calls automatically on every vacancy, which
+            # never applied to Stage 1 (zero tokens either way).
+            try:
+                if await database.get_auto_check_title(self._deps.user_id):
+                    v = await database.get_vacancy_by_id(vacancy_id)
+                    if v is not None:
+                        await apply_title_stage(vacancy_id, v["title"] or "")
+            except Exception as exc:
+                log.warning("RSSWatcher: title stage failed v#%d (non-fatal): %s", vacancy_id, exc)
 
             # inbox_first mode: stop after fetch — user triggers analysis manually
             if self._settings is None or self._settings.analysis_mode != "full_auto":

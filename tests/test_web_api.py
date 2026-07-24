@@ -796,6 +796,41 @@ async def test_api_config_provider_case_insensitive(client, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_api_config_auto_check_title_defaults_true(client):
+    """GET /api/config exposes auto_check_title, default True (schema default)."""
+    await database.insert_user(name="CfgAutoCheck", telegram_chat_id=7104, skill_type="pm")
+    resp = client.get("/api/config")
+    assert resp.status_code == 200
+    assert resp.json()["auto_check_title"] is True
+
+
+@pytest.mark.asyncio
+async def test_api_config_patch_auto_check_title(client):
+    await database.insert_user(name="CfgAutoCheckPatch", telegram_chat_id=7105, skill_type="pm")
+
+    resp = client.patch("/api/config", json={"auto_check_title": False})
+    assert resp.status_code == 200
+    assert resp.json()["auto_check_title"] is False
+
+    assert client.get("/api/config").json()["auto_check_title"] is False
+
+    resp2 = client.patch("/api/config", json={"auto_check_title": True})
+    assert resp2.json()["auto_check_title"] is True
+
+
+@pytest.mark.asyncio
+async def test_api_config_patch_auto_check_title_does_not_affect_llm_config(client, monkeypatch):
+    """Flipping the title-stage flag must not disturb the active provider/model
+    (same isolation guarantee as database.set_auto_check_title's own test)."""
+    monkeypatch.setenv("LLM_PROVIDER", "claude_cli")
+    await database.insert_user(name="CfgAutoCheckIso", telegram_chat_id=7106, skill_type="pm")
+    client.get("/api/config")  # trigger env seed
+
+    resp = client.patch("/api/config", json={"auto_check_title": False})
+    assert resp.json()["llm_provider"] == "claude_cli"
+
+
+@pytest.mark.asyncio
 async def test_api_config_analysis_mode_full_auto(client, monkeypatch):
     """GET /api/config reflects ANALYSIS_MODE=full_auto."""
     monkeypatch.setenv("ANALYSIS_MODE", "full_auto")
@@ -1121,6 +1156,44 @@ async def test_import_jd_happy_path(client, tmp_path):
     rows = await database.list_vacancies(status="fetched", user_id=uid)
     assert len(rows) == 1
     assert rows[0]["site"] == "manual"
+
+
+@pytest.mark.asyncio
+async def test_import_jd_auto_checks_title_by_default(client):
+    """Stage 1 (2026-07-23) — auto_check_title defaults True (schema default),
+    so a mismatching title gets blocker_flag set immediately, no LLM call."""
+    uid = await database.insert_user(name="Importer2", telegram_chat_id=9002, skill_type="pm")
+    content = "# Product Marketing Lead\n\nWe are looking for a marketing lead."
+
+    resp = client.post("/api/vacancies/import-jd", json={
+        "content": content,
+        "filename": "Product Marketing Lead — Acme.md",
+        "user_id": uid,
+    })
+    assert resp.status_code == 201
+    vacancy_id = resp.json()["vacancy_id"]
+
+    row = await database.get_vacancy_by_id(vacancy_id)
+    assert row["blocker_flag"] == 1
+    assert "title:" in row["blocker_reasons"]
+
+
+@pytest.mark.asyncio
+async def test_import_jd_skips_title_stage_when_setting_off(client):
+    uid = await database.insert_user(name="Importer3", telegram_chat_id=9003, skill_type="pm")
+    await database.set_auto_check_title(uid, False)
+    content = "# Product Marketing Lead\n\nWe are looking for a marketing lead."
+
+    resp = client.post("/api/vacancies/import-jd", json={
+        "content": content,
+        "filename": "Product Marketing Lead — Acme.md",
+        "user_id": uid,
+    })
+    assert resp.status_code == 201
+    vacancy_id = resp.json()["vacancy_id"]
+
+    row = await database.get_vacancy_by_id(vacancy_id)
+    assert row["blocker_flag"] == 0
 
 
 @pytest.mark.asyncio

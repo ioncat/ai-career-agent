@@ -176,6 +176,11 @@ async def init_db() -> None:
             "ALTER TABLE vacancies ADD COLUMN blocker_reasons TEXT",
             # Raw LLM response — debug parse failures (found the hard way on #716, 2026-07-17)
             "ALTER TABLE vacancies ADD COLUMN blocker_raw_output TEXT",
+            # Stage 1 pre-filter (title/domain, deterministic, no LLM) auto-runs on
+            # ingest when 1 — separate from Stage 2 (LLM content check), which stays
+            # manual-trigger-only. Default 1: free + already-validated, no reason to
+            # ship it off.
+            "ALTER TABLE user_settings ADD COLUMN auto_check_title INTEGER NOT NULL DEFAULT 1",
         ]:
             try:
                 await db.execute(migration)
@@ -1053,6 +1058,39 @@ async def set_user_settings(
                 updated_at = excluded.updated_at
             """,
             (user_id, llm_provider, llm_model, thinking_effort),
+        )
+        await db.commit()
+
+
+async def get_auto_check_title(user_id: int) -> bool:
+    """Whether Stage 1 (deterministic title/domain pre-filter) auto-runs on
+    ingest for this user. Missing row → default True (matches the column's
+    schema default) — a fresh user hasn't opted OUT yet."""
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT auto_check_title FROM user_settings WHERE user_id = ?",
+            (user_id,),
+        )
+        row = await cursor.fetchone()
+    if row is None:
+        return True
+    return bool(row["auto_check_title"])
+
+
+async def set_auto_check_title(user_id: int, enabled: bool) -> None:
+    """Upsert just the auto_check_title flag — deliberately narrow (not folded
+    into set_user_settings) so flipping it never touches llm_provider/model/
+    thinking_effort on an existing row."""
+    async with get_db() as db:
+        await db.execute(
+            """
+            INSERT INTO user_settings (user_id, auto_check_title, updated_at)
+            VALUES (?, ?, datetime('now'))
+            ON CONFLICT(user_id) DO UPDATE SET
+                auto_check_title = excluded.auto_check_title,
+                updated_at = excluded.updated_at
+            """,
+            (user_id, int(enabled)),
         )
         await db.commit()
 
