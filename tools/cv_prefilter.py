@@ -181,6 +181,7 @@ async def apply_title_stage(vacancy_id: int, title: str) -> bool:
     await database.set_vacancy_blocker(
         vacancy_id, True, [reason],
         raw_output=f"BLOCKED: yes\n- {reason}\n(deterministic title check — no LLM call)",
+        stage="title",
     )
     return True
 
@@ -230,7 +231,11 @@ async def cv_prefilter(ctx: RunContext[AgentDeps], vacancy_id: int) -> dict:
     deterministic_reason = _check_title_domain_signals(title) or _check_title_allowlist(title)
     if deterministic_reason is not None:
         log.info("cv_prefilter: v#%d deterministic match (no LLM call): %s", vacancy_id, deterministic_reason)
-        await database.set_vacancy_blocker(vacancy_id, True, [deterministic_reason], raw_output=f"BLOCKED: yes\n- {deterministic_reason}\n(deterministic title check — no LLM call)")
+        await database.set_vacancy_blocker(
+            vacancy_id, True, [deterministic_reason],
+            raw_output=f"BLOCKED: yes\n- {deterministic_reason}\n(deterministic title check — no LLM call)",
+            stage="title",
+        )
         await database.update_pipeline_run(run_id, status="done")
         return {
             "ok": True,
@@ -287,7 +292,7 @@ async def cv_prefilter(ctx: RunContext[AgentDeps], vacancy_id: int) -> dict:
         return _fail(err)
 
     blocked, reasons, format_ok = _parse_prefilter_output(output)
-    await database.set_vacancy_blocker(vacancy_id, blocked, reasons, raw_output=output)
+    await database.set_vacancy_blocker(vacancy_id, blocked, reasons, raw_output=output, stage="content")
     await database.update_pipeline_run(
         run_id,
         status="done" if format_ok else "error",

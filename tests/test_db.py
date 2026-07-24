@@ -530,3 +530,37 @@ async def test_get_provider_snapshot_malformed_json_falls_back_to_empty_dict():
 
     snapshot = await database.get_provider_snapshot("claude_api")
     assert snapshot["phase_configs"] == {}
+
+
+# ── blocker_stage (2026-07-24) — real field for which pre-filter phase blocked ─
+# Replaces string-matching blocker_reasons for a "title:" prefix, considered
+# and rejected as fragile — see db/schema.sql's blocker_stage comment.
+
+@pytest.mark.asyncio
+async def test_set_vacancy_blocker_stores_stage_when_blocked():
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/900/")
+    await database.set_vacancy_blocker(vid, True, ["title: mismatch"], stage="title")
+
+    row = await database.get_vacancy_by_id(vid)
+    assert row["blocker_stage"] == "title"
+
+
+@pytest.mark.asyncio
+async def test_set_vacancy_blocker_content_stage():
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/901/")
+    await database.set_vacancy_blocker(vid, True, ["english: C1 required"], stage="content")
+
+    row = await database.get_vacancy_by_id(vid)
+    assert row["blocker_stage"] == "content"
+
+
+@pytest.mark.asyncio
+async def test_set_vacancy_blocker_clean_result_clears_stage():
+    """A blocked=False write always clears blocker_stage to NULL — a clean
+    result was never staged by anything, regardless of what a caller passes."""
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/902/")
+    await database.set_vacancy_blocker(vid, True, ["title: mismatch"], stage="title")
+    await database.set_vacancy_blocker(vid, False, [])
+
+    row = await database.get_vacancy_by_id(vid)
+    assert row["blocker_stage"] is None

@@ -296,7 +296,8 @@ async def test_prefilter_flags_blocker(tmp_path):
         result = await cv_prefilter(ctx, 1)
 
     mock_db.set_vacancy_blocker.assert_awaited_once_with(
-        1, True, ["english: JD requires C1"], raw_output="BLOCKED: yes\nREASONS:\n- english: JD requires C1"
+        1, True, ["english: JD requires C1"], raw_output="BLOCKED: yes\nREASONS:\n- english: JD requires C1",
+        stage="content",
     )
     mock_db.update_pipeline_run.assert_any_call(1, status="done", error_message=None)
     assert result == {
@@ -316,7 +317,7 @@ async def test_prefilter_no_blocker(tmp_path):
     with patch("tools.cv_prefilter.database", mock_db):
         result = await cv_prefilter(ctx, 1)
 
-    mock_db.set_vacancy_blocker.assert_awaited_once_with(1, False, [], raw_output="BLOCKED: no")
+    mock_db.set_vacancy_blocker.assert_awaited_once_with(1, False, [], raw_output="BLOCKED: no", stage="content")
     assert result["ok"] is True
     assert result["blocked"] is False
 
@@ -339,7 +340,7 @@ async def test_prefilter_format_mismatch_reported_as_not_ok(tmp_path):
     assert result["blocked"] is False  # still fail-open for the decision itself
     assert result["raw_output"] == rambling
     assert "format" in result["error"].lower()
-    mock_db.set_vacancy_blocker.assert_awaited_once_with(1, False, [], raw_output=rambling)
+    mock_db.set_vacancy_blocker.assert_awaited_once_with(1, False, [], raw_output=rambling, stage="content")
     mock_db.update_pipeline_run.assert_any_call(
         1, status="error", error_message="Model output didn't match the expected BLOCKED: format"
     )

@@ -191,6 +191,11 @@ async def init_db() -> None:
                 phase_configs   TEXT,
                 updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
             )""",
+            # 2026-07-24: real field for which pre-filter stage set blocker_flag
+            # ('title' = Stage 1 deterministic, 'content' = Stage 2 LLM) —
+            # replaces string-matching blocker_reasons for a "title:" prefix,
+            # which was considered and rejected as fragile. See schema.sql.
+            "ALTER TABLE vacancies ADD COLUMN blocker_stage TEXT",
         ]:
             try:
                 await db.execute(migration)
@@ -542,22 +547,30 @@ async def set_analysis_error(vacancy_id: int, error: str | None) -> None:
 
 
 async def set_vacancy_blocker(
-    vacancy_id: int, blocked: bool, reasons: list[str], raw_output: str | None = None
+    vacancy_id: int, blocked: bool, reasons: list[str], raw_output: str | None = None,
+    stage: str | None = None,
 ) -> None:
     """Store pre-filter result (EPIC-27). Advisory only — never changes status.
 
     raw_output: the model's full response, always stored (even when it didn't
     match the expected format) — without this, a parse failure is undebuggable
     after the fact (found the hard way on vacancy #716, 2026-07-17).
+
+    stage: 'title' (Stage 1, deterministic) | 'content' (Stage 2, LLM) — which
+    pre-filter phase produced this verdict, a real field rather than string-
+    matching blocker_reasons (decided 2026-07-24). Callers passing
+    blocked=True must pass a stage; blocked=False always clears it to NULL —
+    a "no blocker" result was never staged by anything.
     """
     async with get_db() as db:
         await db.execute(
             "UPDATE vacancies SET blocker_flag = ?, blocker_reasons = ?, blocker_raw_output = ?, "
-            "updated_at = datetime('now') WHERE id = ?",
+            "blocker_stage = ?, updated_at = datetime('now') WHERE id = ?",
             (
                 1 if blocked else 0,
                 json.dumps(reasons, ensure_ascii=False) if reasons else None,
                 raw_output,
+                stage if blocked else None,
                 vacancy_id,
             ),
         )

@@ -35,6 +35,11 @@ class VacancyListItem {
   // identical via blockerFlag=false alone (gap found 2026-07-17, vacancy #716:
   // a finished, clean check produced zero visible UI change).
   final bool blockerChecked;
+  // Which pre-filter phase set blockerFlag: 'title' (Stage 1, deterministic —
+  // no LLM) | 'content' (Stage 2, LLM-judged) | null (not blocked / never
+  // checked). A real field, not string-matching blockerReasons for a
+  // "title:" prefix (considered and rejected as fragile, 2026-07-24).
+  final String? blockerStage;
 
   const VacancyListItem({
     required this.id,
@@ -63,6 +68,7 @@ class VacancyListItem {
     this.blockerFlag = false,
     this.blockerReasons = const [],
     this.blockerChecked = false,
+    this.blockerStage,
   });
 
   factory VacancyListItem.fromJson(Map<String, dynamic> json) {
@@ -94,6 +100,7 @@ class VacancyListItem {
       blockerFlag: json['blocker_flag'] as bool? ?? false,
       blockerReasons: _parseStringList(json['blocker_reasons']),
       blockerChecked: json['blocker_checked'] as bool? ?? false,
+      blockerStage: json['blocker_stage'] as String?,
     );
   }
 
@@ -123,6 +130,7 @@ class VacancyListItem {
         'blocker_flag': blockerFlag,
         'blocker_reasons': blockerReasons,
         'blocker_checked': blockerChecked,
+        'blocker_stage': blockerStage,
       };
 }
 

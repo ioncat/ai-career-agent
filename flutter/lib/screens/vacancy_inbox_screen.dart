@@ -115,9 +115,37 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
   /// Auto-selects everything currently visible with a pre-filter blocker
   /// flag and skips it. Reuses _runBatch's sequential-execution + progress
   /// UI/snackbar, just with an explicit id list instead of _selectedIds.
+  /// Confirms first (2026-07-24, explicit user ask) — a single accidental
+  /// click on this button archives every flagged vacancy at once, unlike
+  /// the manual multi-select actions where the selection itself is the
+  /// deliberate step.
   Future<void> _skipAllWithBlockers(List<VacancyListItem> visible) async {
     final ids = visible.where((v) => v.blockerFlag).map((v) => v.id).toList();
     if (ids.isEmpty) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Skip all with blockers?'),
+        content: Text(
+          'This will archive ${ids.length} vacancy${ids.length == 1 ? '' : 'ies'} '
+          'flagged by the pre-filter. This can\'t be undone in bulk.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
+            child: Text('Skip ${ids.length}'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
     await _runBatch('Skip', (id) => _repo.decline(id), ids: ids);
   }
 
@@ -152,6 +180,7 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
   bool _filterExpanded = false;
   Set<String> _statusFilter = {};
   bool _starredOnly = false;
+  bool _blockedOnly = false;
   DateTime? _dateFrom;
   DateTime? _dateTo;
 
@@ -167,6 +196,7 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
   int get _activeFilterCount =>
       _statusFilter.length +
       (_starredOnly ? 1 : 0) +
+      (_blockedOnly ? 1 : 0) +
       (_dateFrom != null || _dateTo != null ? 1 : 0);
 
   @override
@@ -190,6 +220,10 @@ List<VacancyListItem> _filter(List<VacancyListItem> all) {
         return false;
       }
       if (_starredOnly && !v.starred) return false;
+      // Stage 1 (title/domain, deterministic) only — not Stage 2 (LLM
+      // content check). blockerStage is a real field (2026-07-24), not
+      // string-matching blockerReasons for a "title:" prefix.
+      if (_blockedOnly && v.blockerStage != 'title') return false;
       if (_dateFrom != null || _dateTo != null) {
         final raw = v.publishedAt;
         if (raw == null) return false;
@@ -227,6 +261,7 @@ List<VacancyListItem> _filter(List<VacancyListItem> all) {
     setState(() {
       _statusFilter = {};
       _starredOnly = false;
+      _blockedOnly = false;
       _dateFrom = null;
       _dateTo = null;
       _searchController.clear();
@@ -336,7 +371,7 @@ List<VacancyListItem> _filter(List<VacancyListItem> all) {
                   ),
                 ),
                 if (_filterExpanded)
-                  _FilterPanel(
+                  InboxFilterPanel(
                     availableStatuses: availableStatuses,
                     selectedStatuses: _statusFilter,
                     onStatusToggle: (s) => setState(() {
@@ -349,6 +384,9 @@ List<VacancyListItem> _filter(List<VacancyListItem> all) {
                     starredOnly: _starredOnly,
                     onToggleStarred: () =>
                         setState(() => _starredOnly = !_starredOnly),
+                    blockedOnly: _blockedOnly,
+                    onToggleBlocked: () =>
+                        setState(() => _blockedOnly = !_blockedOnly),
                     dateFrom: _dateFrom,
                     dateTo: _dateTo,
                     onPickFrom: _pickDateFrom,
@@ -552,12 +590,14 @@ class InboxListHeader extends StatelessWidget {
 
 // ─── Filter panel ─────────────────────────────────────────────────────────────
 
-class _FilterPanel extends StatelessWidget {
+class InboxFilterPanel extends StatelessWidget {
   final Set<String> availableStatuses;
   final Set<String> selectedStatuses;
   final ValueChanged<String> onStatusToggle;
   final bool starredOnly;
   final VoidCallback onToggleStarred;
+  final bool blockedOnly;
+  final VoidCallback onToggleBlocked;
   final DateTime? dateFrom;
   final DateTime? dateTo;
   final VoidCallback onPickFrom;
@@ -566,12 +606,15 @@ class _FilterPanel extends StatelessWidget {
   final bool hasActiveFilters;
   final VoidCallback onClearAll;
 
-  const _FilterPanel({
+  const InboxFilterPanel({
+    super.key,
     required this.availableStatuses,
     required this.selectedStatuses,
     required this.onStatusToggle,
     required this.starredOnly,
     required this.onToggleStarred,
+    required this.blockedOnly,
+    required this.onToggleBlocked,
     this.dateFrom,
     this.dateTo,
     required this.onPickFrom,
@@ -643,19 +686,42 @@ class _FilterPanel extends StatelessWidget {
             ),
             const SizedBox(height: 10),
           ],
-          FilterChip(
-            avatar: Icon(
-              starredOnly ? Icons.star : Icons.star_border,
-              size: 14,
-              color: starredOnly ? cs.primary : cs.onSurfaceVariant,
-            ),
-            label: Text('Starred',
-                style: Theme.of(context).textTheme.labelSmall),
-            selected: starredOnly,
-            onSelected: (_) => onToggleStarred(),
-            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-            visualDensity: VisualDensity.compact,
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            children: [
+              FilterChip(
+                avatar: Icon(
+                  starredOnly ? Icons.star : Icons.star_border,
+                  size: 14,
+                  color: starredOnly ? cs.primary : cs.onSurfaceVariant,
+                ),
+                label: Text('Starred',
+                    style: Theme.of(context).textTheme.labelSmall),
+                selected: starredOnly,
+                onSelected: (_) => onToggleStarred(),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                visualDensity: VisualDensity.compact,
+              ),
+              // Stage 1 (title/domain, deterministic) only — not Stage 2
+              // (LLM content check). "Title blocked" names the specific
+              // check, not a generic "has any blocker" (2026-07-24).
+              FilterChip(
+                avatar: Icon(
+                  Icons.block,
+                  size: 14,
+                  color: blockedOnly ? cs.error : cs.onSurfaceVariant,
+                ),
+                label: Text('Title blocked',
+                    style: Theme.of(context).textTheme.labelSmall),
+                selected: blockedOnly,
+                onSelected: (_) => onToggleBlocked(),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                visualDensity: VisualDensity.compact,
+              ),
+            ],
           ),
           const SizedBox(height: 10),
           Text('Published',
