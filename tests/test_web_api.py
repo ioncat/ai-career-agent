@@ -7,6 +7,8 @@ Uses FastAPI TestClient + real temp DB (no mocks).
 Run: python -m pytest tests/test_web_api.py -v
 """
 
+import datetime
+
 import pytest
 import pytest_asyncio
 from fastapi.testclient import TestClient
@@ -256,6 +258,64 @@ async def test_new_vacancy_minimal_payload(client):
     """POST /api/new-vacancy with only url field (no title/feed_name/user_id) succeeds."""
     resp = client.post("/api/new-vacancy", json={"url": "https://djinni.co/jobs/300/"})
     assert resp.status_code == 201
+
+
+def test_sanitize_published_at_none_passthrough():
+    from web.api import _sanitize_published_at
+    assert _sanitize_published_at(None) is None
+
+
+def test_sanitize_published_at_unparseable_passthrough():
+    from web.api import _sanitize_published_at
+    assert _sanitize_published_at("not-a-date") == "not-a-date"
+
+
+def test_sanitize_published_at_future_replaced():
+    from web.api import _sanitize_published_at
+    future = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S")
+    result = _sanitize_published_at(future)
+    assert result != future
+
+
+@pytest.mark.asyncio
+async def test_new_vacancy_stale_published_at_replaced_with_fetch_time(client):
+    """A brand-new vacancy with an implausibly old feed pubDate (>24h stale —
+    Djinni re-crawl/feed-lag artifact, found 2026-07-24 vacancy #823) gets
+    published_at replaced with fetch time, not silently buried in a
+    date-sorted inbox."""
+    uid = await database.insert_user(name="StaleDate", telegram_chat_id=6001, skill_type="pm")
+    before = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=5)
+
+    resp = client.post("/api/new-vacancy", json={
+        "url": "https://djinni.co/jobs/500/",
+        "user_id": uid,
+        "published_at": "2026-06-01T10:00:00",  # weeks stale relative to "now"
+    })
+    assert resp.status_code == 201
+    vacancy_id = resp.json()["vacancy_id"]
+
+    row = await database.get_vacancy_by_id(vacancy_id)
+    stored = datetime.datetime.fromisoformat(row["published_at"]).replace(tzinfo=datetime.timezone.utc)
+    assert stored >= before
+
+
+@pytest.mark.asyncio
+async def test_new_vacancy_fresh_published_at_kept_as_is(client):
+    """A plausible, recent published_at is trusted verbatim — the guard only
+    kicks in on implausible values."""
+    uid = await database.insert_user(name="FreshDate", telegram_chat_id=6002, skill_type="pm")
+    fresh = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%S")
+
+    resp = client.post("/api/new-vacancy", json={
+        "url": "https://djinni.co/jobs/501/",
+        "user_id": uid,
+        "published_at": fresh,
+    })
+    assert resp.status_code == 201
+    vacancy_id = resp.json()["vacancy_id"]
+
+    row = await database.get_vacancy_by_id(vacancy_id)
+    assert row["published_at"] == fresh
 
 
 @pytest.mark.asyncio
