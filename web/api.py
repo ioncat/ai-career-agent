@@ -514,8 +514,9 @@ async def patch_config(body: ConfigPatch):
     Written through core/config_store — the single source of truth. Workers
     rebuild their LLM from the store before each task, so a change applies to
     the next queued vacancy without a backend restart. Switching provider
-    resets the model to the new provider's default (a model of one provider
-    is invalid for another).
+    loads that provider's last-SAVED snapshot (global model/effort + every
+    phase pin) via config_store.set_config() — see POST /api/config/save-
+    snapshot for how a snapshot gets written (2026-07-24 Settings redesign).
     """
     current = await config_store.get_config()
 
@@ -559,6 +560,19 @@ async def patch_config(body: ConfigPatch):
         "valid_providers": sorted(config_store.VALID_PROVIDERS),
         "auto_check_title": await database.get_auto_check_title(1),
     }
+
+
+@app.post("/api/config/save-snapshot")
+async def api_config_save_snapshot():
+    """Persist the CURRENT full state (global model/effort + every phase pin)
+    under the currently active provider's key (2026-07-24 Settings redesign).
+
+    This is the Settings "Save" button's real job for AI Provider state —
+    switching back to this provider later (PATCH /api/config with
+    llm_provider) restores exactly what was saved here.
+    """
+    result = await config_store.save_current_as_snapshot()
+    return result
 
 
 @app.get("/api/config/phases")

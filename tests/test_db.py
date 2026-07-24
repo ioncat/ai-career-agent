@@ -477,3 +477,56 @@ async def test_set_auto_check_title_does_not_touch_llm_settings():
     assert settings["llm_model"] == "gemma4:e4b"
     assert settings["thinking_effort"] == "high"
     assert await database.get_auto_check_title(1) is False
+
+
+# ── provider_config_snapshots (2026-07-24 Settings redesign) ───────────────────
+
+@pytest.mark.asyncio
+async def test_get_provider_snapshot_missing_returns_none():
+    assert await database.get_provider_snapshot("claude_api") is None
+
+
+@pytest.mark.asyncio
+async def test_set_and_get_provider_snapshot_roundtrip():
+    phase_configs = {"prefilter": {"provider": "claude_api", "model": "claude-haiku-4-5", "thinking_effort": "low"}}
+    await database.set_provider_snapshot("claude_api", "claude-opus-4-5", "high", phase_configs)
+
+    snapshot = await database.get_provider_snapshot("claude_api")
+    assert snapshot["model"] == "claude-opus-4-5"
+    assert snapshot["thinking_effort"] == "high"
+    assert snapshot["phase_configs"] == phase_configs
+
+
+@pytest.mark.asyncio
+async def test_set_provider_snapshot_upserts():
+    await database.set_provider_snapshot("ollama_api", "qwen2.5:32b", "off", {})
+    await database.set_provider_snapshot("ollama_api", "gemma4:e4b", "medium", {"phase1": {"provider": "ollama_api", "model": None, "thinking_effort": "off"}})
+
+    snapshot = await database.get_provider_snapshot("ollama_api")
+    assert snapshot["model"] == "gemma4:e4b"
+    assert snapshot["thinking_effort"] == "medium"
+    assert "phase1" in snapshot["phase_configs"]
+
+
+@pytest.mark.asyncio
+async def test_provider_snapshots_are_independent_per_provider():
+    await database.set_provider_snapshot("claude_api", "claude-opus-4-5", "high", {})
+    await database.set_provider_snapshot("ollama_api", "qwen2.5:32b", "off", {})
+
+    assert (await database.get_provider_snapshot("claude_api"))["model"] == "claude-opus-4-5"
+    assert (await database.get_provider_snapshot("ollama_api"))["model"] == "qwen2.5:32b"
+
+
+@pytest.mark.asyncio
+async def test_get_provider_snapshot_malformed_json_falls_back_to_empty_dict():
+    """Defensive: a hand-edited or corrupted phase_configs blob must not crash
+    the read path — same fail-open principle as blocker_reasons parsing."""
+    async with database.get_db() as db:
+        await db.execute(
+            "INSERT INTO provider_config_snapshots (provider, model, thinking_effort, phase_configs) VALUES (?, ?, ?, ?)",
+            ("claude_api", "claude-opus-4-5", "off", "not valid json"),
+        )
+        await db.commit()
+
+    snapshot = await database.get_provider_snapshot("claude_api")
+    assert snapshot["phase_configs"] == {}

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../repositories/vacancy_repository.dart';
 export '../repositories/vacancy_repository.dart' show ConfigDriftException;
+import 'phase_config_provider.dart';
 import 'settings_provider.dart';
 
 class RemoteConfig {
@@ -39,11 +40,25 @@ class RemoteConfigNotifier extends AsyncNotifier<RemoteConfig> {
     return _fromMap(data);
   }
 
+  /// Switching provider now also loads that provider's saved phase pins on
+  /// the backend (2026-07-24 redesign) — invalidate phaseConfigProvider so
+  /// the per-phase UI reflects them instead of showing stale data from
+  /// whichever provider was active a moment ago.
   Future<void> patchProvider(String provider) async {
     final settings = await ref.read(settingsProvider.future);
     final repo = VacancyRepository(baseUrl: settings.apiUrl);
     final data = await repo.patchConfig(llmProvider: provider);
     state = AsyncData(_fromMap(data));
+    ref.invalidate(phaseConfigProvider);
+  }
+
+  /// Persist the CURRENT full state (this provider's model/effort + every
+  /// phase pin) under the active provider's key — the Settings Save
+  /// button's real job for AI Provider state.
+  Future<void> saveSnapshot() async {
+    final settings = await ref.read(settingsProvider.future);
+    final repo = VacancyRepository(baseUrl: settings.apiUrl);
+    await repo.saveConfigSnapshot();
   }
 
   /// Patch model/effort against a provider the backend might have already

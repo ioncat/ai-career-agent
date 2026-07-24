@@ -124,12 +124,17 @@ async def set_config(
     model: str | None = None,
     thinking_effort: str | None = None,
 ) -> dict:
-    """Update config. Switching provider resets model to None (new provider's default).
+    """Update config. Switching provider loads that provider's last-SAVED
+    snapshot (model/effort + every phase pin), or defaults if never saved —
+    see save_current_as_snapshot(). This replaced the older "always reset to
+    None" behavior (2026-07-24): the old behavior left stale phase_llm_config
+    pins from whatever provider was active before, which read as a bug in the
+    UI (switch to claude_cli, prefilter silently stays pinned to ollama_api).
 
-    provider=None / thinking_effort=None means "leave unchanged". model=None
-    when NOT switching provider also means "leave unchanged" — pass an empty
-    string if you ever need to explicitly clear the model outside a switch
-    (not currently exposed).
+    provider=None / thinking_effort=None means "leave unchanged" (no switch).
+    model=None when NOT switching provider also means "leave unchanged" —
+    pass an empty string if you ever need to explicitly clear the model
+    outside a switch (not currently exposed).
     Raises ConfigError on an invalid provider/effort value.
     """
     await _ensure_seeded()
@@ -143,22 +148,65 @@ async def set_config(
             raise ConfigError(f"llm_provider must be one of {sorted(VALID_PROVIDERS)}")
         provider_switched = new_provider != current["provider"]
 
-    new_effort = thinking_effort if thinking_effort is not None else current["thinking_effort"]
+    snapshot = await database.get_provider_snapshot(new_provider) if provider_switched else None
+
+    if thinking_effort is not None:
+        new_effort = thinking_effort
+    elif provider_switched:
+        new_effort = snapshot["thinking_effort"] if snapshot else "off"
+    else:
+        new_effort = current["thinking_effort"]
     if new_effort not in VALID_EFFORTS:
         raise ConfigError(f"thinking_effort must be one of {sorted(VALID_EFFORTS)}")
 
-    if provider_switched:
-        new_model = None  # a model of the old provider is invalid for the new one
-    elif model is not None:
+    if model is not None:
         new_model = model
+    elif provider_switched:
+        new_model = snapshot["model"] if snapshot else None
     else:
         new_model = current["model"]
 
     await database.set_user_settings(
         _USER_ID, llm_provider=new_provider, llm_model=new_model, thinking_effort=new_effort
     )
+    if provider_switched:
+        # Full state swap, not just global model/effort — restore this
+        # provider's saved phase pins too (or clear all pins if it has never
+        # been saved), so nothing from the PREVIOUS provider's setup lingers.
+        await _apply_phase_snapshot(snapshot)
+
     log.info("config_store: set provider=%s model=%s effort=%s", new_provider, new_model, new_effort)
     return {"provider": new_provider, "model": new_model, "thinking_effort": new_effort}
+
+
+async def _apply_phase_snapshot(snapshot: dict | None) -> None:
+    """Restore every phase's pin from a provider snapshot's phase_configs, or
+    clear all pins if the provider has never been saved (snapshot is None) —
+    called on every provider switch, see set_config()."""
+    phase_configs = snapshot["phase_configs"] if snapshot else {}
+    for phase in VALID_PHASES:
+        pc = phase_configs.get(phase)
+        if pc:
+            await database.set_phase_llm_config(
+                phase, pc["provider"], pc.get("model"), pc.get("thinking_effort") or "off"
+            )
+        else:
+            await database.delete_phase_llm_config(phase)
+
+
+async def save_current_as_snapshot() -> dict:
+    """Persist the CURRENT full state (global model/effort + every phase pin)
+    under the currently active provider's key — the Settings Save button's
+    real job for AI Provider state (2026-07-24 redesign). Returns the saved
+    snapshot's provider + phase count for the caller to log/display.
+    """
+    await _ensure_seeded()
+    cfg = await get_config()
+    provider = cfg["provider"]
+    overrides = await database.list_phase_llm_configs()
+    await database.set_provider_snapshot(provider, cfg["model"], cfg["thinking_effort"], overrides)
+    log.info("config_store: saved snapshot for provider=%s (%d phase pins)", provider, len(overrides))
+    return {"provider": provider, "phase_pins": len(overrides)}
 
 
 async def set_phase_config(

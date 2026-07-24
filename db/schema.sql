@@ -198,3 +198,22 @@ CREATE TABLE IF NOT EXISTS phase_llm_config (
     thinking_effort TEXT,
     updated_at      TEXT    NOT NULL DEFAULT (datetime('now'))
 );
+
+-- ── provider_config_snapshots ────────────────────────────────────────────────
+-- Settings redesign (decided 2026-07-24): switching the global provider used
+-- to leave stale phase_llm_config pins from whatever provider was active
+-- before — e.g. pick claude_cli globally, prefilter silently stays pinned to
+-- ollama_api from an earlier test. One row per provider remembers that
+-- provider's last-saved FULL state (global model/effort + every phase pin,
+-- phase_configs as a JSON blob keyed by phase — small fixed set, doesn't
+-- earn a normalized table). Switching the provider dropdown loads its
+-- snapshot (or defaults if never saved); the Settings Save button writes the
+-- current full state under the active provider's key.
+
+CREATE TABLE IF NOT EXISTS provider_config_snapshots (
+    provider        TEXT PRIMARY KEY,   -- 'claude_api'|'ollama_api'|'claude_cli'
+    model           TEXT,
+    thinking_effort TEXT    NOT NULL DEFAULT 'off',
+    phase_configs   TEXT,               -- JSON: {phase: {provider, model, thinking_effort}}, absent phase = unpinned
+    updated_at      TEXT    NOT NULL DEFAULT (datetime('now'))
+);

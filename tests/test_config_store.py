@@ -126,6 +126,86 @@ async def test_set_config_provider_always_stored_explicitly():
     assert row["llm_provider"] == "claude_api"
 
 
+# ── Provider config snapshots (2026-07-24 Settings redesign) ──────────────────
+# Switching provider used to always reset model to None and leave stale
+# phase_llm_config pins from whatever provider was active before. Now it
+# loads that provider's last-saved snapshot (or defaults if never saved) —
+# both the global model/effort AND every phase pin move together.
+
+@pytest.mark.asyncio
+async def test_switch_to_never_saved_provider_clears_stale_phase_pins():
+    """The bug this redesign fixes: pin `prefilter` while on ollama_api, then
+    switch to claude_cli (never saved before) — the pin must NOT linger."""
+    await config_store.set_config(provider="ollama_api", model="qwen2.5:32b")
+    await config_store.set_phase_config("prefilter", provider="ollama_api", model="gemma4:e4b")
+
+    await config_store.set_config(provider="claude_cli")
+
+    resolved = await config_store.get_config("prefilter")
+    assert resolved["provider"] == "claude_cli"  # follows the new global, no ollama_api leftover
+
+
+@pytest.mark.asyncio
+async def test_save_then_switch_away_then_back_restores_full_state():
+    await config_store.set_config(provider="claude_api", model="claude-opus-4-5", thinking_effort="high")
+    await config_store.set_phase_config("prefilter", provider="claude_api", model="claude-haiku-4-5", thinking_effort="low")
+    await config_store.save_current_as_snapshot()
+
+    await config_store.set_config(provider="ollama_api", model="qwen2.5:32b")
+    assert (await config_store.get_config("prefilter"))["provider"] == "ollama_api"  # cleared
+
+    restored = await config_store.set_config(provider="claude_api")
+    assert restored["model"] == "claude-opus-4-5"
+    assert restored["thinking_effort"] == "high"
+    prefilter = await config_store.get_config("prefilter")
+    assert prefilter["provider"] == "claude_api"
+    assert prefilter["model"] == "claude-haiku-4-5"
+    assert prefilter["thinking_effort"] == "low"
+
+
+@pytest.mark.asyncio
+async def test_save_snapshot_with_no_phase_pins_saves_empty():
+    await config_store.set_config(provider="claude_api", model="claude-opus-4-5")
+    result = await config_store.save_current_as_snapshot()
+    assert result == {"provider": "claude_api", "phase_pins": 0}
+
+    snapshot = await database.get_provider_snapshot("claude_api")
+    assert snapshot["phase_configs"] == {}
+
+
+@pytest.mark.asyncio
+async def test_switch_provider_without_explicit_effort_uses_snapshots_effort():
+    await config_store.set_config(provider="claude_api", thinking_effort="xhigh")
+    await config_store.save_current_as_snapshot()
+    await config_store.set_config(provider="ollama_api", thinking_effort="off")
+
+    cfg = await config_store.set_config(provider="claude_api")  # no thinking_effort passed
+    assert cfg["thinking_effort"] == "xhigh"
+
+
+@pytest.mark.asyncio
+async def test_switch_provider_explicit_effort_overrides_snapshot():
+    """A caller-supplied thinking_effort in the same PATCH always wins over
+    whatever the target provider's snapshot says."""
+    await config_store.set_config(provider="claude_api", thinking_effort="xhigh")
+    await config_store.save_current_as_snapshot()
+    await config_store.set_config(provider="ollama_api")
+
+    cfg = await config_store.set_config(provider="claude_api", thinking_effort="low")
+    assert cfg["thinking_effort"] == "low"
+
+
+@pytest.mark.asyncio
+async def test_save_current_as_snapshot_captures_active_provider():
+    await config_store.set_config(provider="ollama_api", model="qwen2.5:32b", thinking_effort="medium")
+    result = await config_store.save_current_as_snapshot()
+    assert result["provider"] == "ollama_api"
+
+    snapshot = await database.get_provider_snapshot("ollama_api")
+    assert snapshot["model"] == "qwen2.5:32b"
+    assert snapshot["thinking_effort"] == "medium"
+
+
 # ── effective_model ──────────────────────────────────────────────────────────
 
 def test_effective_model_db_override_wins():

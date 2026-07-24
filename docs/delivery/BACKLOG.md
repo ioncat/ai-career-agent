@@ -29,17 +29,6 @@
 
 ## 🟠 P1
 
-### Settings redesign — per-provider config snapshots + AI Provider/Advanced merge (design decided 2026-07-24)
-**Problem found:** switching the global LLM provider does NOT touch existing per-phase overrides (`phase_llm_config` — Advanced: Per-Phase Routing). This is by design (EPIC-27: a phase pin is a deliberate "always use X regardless of global" choice) but reads as a bug in the UI — pick `claude_cli` globally, `prefilter` silently stays pinned to `ollama_api` from an earlier test, nothing in the screen explains why.
-**Decision (user, 2026-07-24) — supersedes the 3 options I proposed (cascade / visible-independent / warn-on-switch), none of which fit:** unify global provider + per-phase Advanced settings into ONE per-provider saved snapshot. Concretely:
-- A new table (or JSON blob) storing, per provider, its last-saved full config: global model + thinking_effort + every phase's provider/model/effort pin.
-- Switching the global provider dropdown loads that provider's last-saved snapshot (or sane defaults if never saved before) — model, effort, AND all phase pins update together, consistently, no stale cross-provider mix.
-- The Settings **Save** button (currently only persists apiUrl/pollInterval/notifications — see the existing "decide what Save does" ticket below) gets its real job here: persist the CURRENT full state (global + all phase pins) under the active provider's key.
-- Net effect: switch provider → tweak model/effort/phases → Save → that provider's config is now remembered. Switch to another provider → tweak → Save → both providers now have their own remembered setup. Switching back and forth restores each one's last state — no manual re-pinning every time, no stale mismatch.
-**UI grouping (decided same session):** merge "AI Provider" and "Advanced: Per-Phase Routing" into ONE section (per-phase routing becomes part of AI Provider, not a separate collapsible bolted on after it) — reflects that they're now one saved unit, not two independent controls. Top-level Settings groups: **General** (API URL, polling, notifications) + **AI Provider** (global + per-phase, unified). Pre-filter (`auto_check_title` toggle, shipped 2026-07-24) stays its own small section — unrelated to provider config.
-**Not scoped/estimated yet** — needs: schema design (per-provider snapshot storage), `config_store` changes (load-on-switch, save-under-key), Settings screen restructure (merge sections, wire Save to the new persist call), tests. Do NOT start without re-confirming scope — this is a decision record, not a plan.
-**Ties to:** [Settings: decide what the "Save" button does](#settings-decide-what-the-save-button-does-added-2026-07-14) below — same button, now has a real job for AI Provider state specifically (connection settings keep their own separate save semantics, unchanged).
-
 ### Prompt review pass — `prompts/pm|generic/prefilter.md` (added 2026-07-23)
 **What:** the prefilter prompt has grown reactively all session (Requirements-vs-Responsibilities rule, quote-only-JD rule, output-format examples) — do a holistic pass to see what can be tightened, consolidated, or dropped, rather than just keep bolting on more rules as new failure modes surface.
 **Why:** user's own instinct after finding the self-correction-leak bug (#725) — fix the parser first (done, see CHANGELOG), but the prompt itself deserves a step-back review, not just incremental patches.
@@ -161,15 +150,6 @@ No dual-availability state — the button's visibility is a direct, deterministi
 - [ ] Flutter `_PhaseStepper` widget at top of detail card; state machine done/current/failed/pending
 - [ ] Map status → active phase; red state on `*_failed`
 - [ ] Tooltips per chip (phase name + fit/score if available)
-
-### Settings: decide what the "Save" button does (added 2026-07-14)
-**Problem:** Settings has a mixed save model that misled the user into thinking model changes weren't applied. `_save()` persists ONLY apiUrl / pollInterval / notifications. Provider/model/effort save **instantly** via each control's `onChanged` (patchProvider/patchModel/patchEffort) — Save does not touch them. So "pick model → Save" felt like it saved the model; it didn't (see the model-selection bug fixed 2026-07-14).
-**Decision needed — pick one:**
-- **(a) Save saves everything** — collect provider/model/effort into `_save()`, remove instant-apply; single explicit commit. Most intuitive, matches user expectation.
-- **(b) No Save for LLM config** — drop the Save button's relevance to the AI Provider block (or move Save out); make it visually clear LLM settings apply instantly (e.g. inline "✓ applied" per control). Keep Save only for connection settings.
-- **(c) Split** — "Save" only for connection block; AI Provider block shows its own instant-apply affordance.
-**Recommendation:** (b) or (c) — instant-apply already works and is safer (no half-saved state); just remove the misleading Save coupling + add per-control applied feedback.
-**Scope:** decide → implement chosen option; `settings_screen.dart` `_save()` + AI Provider block affordance.
 
 ### Job Monitor — Error Alerting (added 2026-07-06)
 **What:** per-feed failure counter in `seen_jobs.json` → Telegram alert at 3 consecutive failures → recovery alert; `health_check.py --monitor` flag.
