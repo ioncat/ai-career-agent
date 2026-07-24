@@ -13,6 +13,7 @@ import '../providers/vacancy_detail_provider.dart';
 import '../providers/vacancy_list_provider.dart';
 import '../repositories/vacancy_repository.dart';
 import '../providers/vacancy_cv_provider.dart';
+import '../utils/backend_time.dart';
 
 /// Renders a pre-filter reason string ("category: explanation" — as produced by
 /// prompts/pm|generic/prefilter.md) with the category bolded + capitalized,
@@ -1139,11 +1140,7 @@ class _ActivityLogViewState extends ConsumerState<_ActivityLogView> {
     }
   }
 
-  // DB stores UTC as naive strings (no 'Z'). Force UTC so .toLocal() gives correct offset.
-  static DateTime _asUtc(String iso) {
-    final s = (iso.endsWith('Z') || iso.contains('+')) ? iso : '${iso}Z';
-    return DateTime.parse(s).toLocal();
-  }
+  static DateTime _asUtc(String iso) => parseBackendUtc(iso).toLocal();
 
   // Convert ISO UTC string → device local time, formatted DD.MM.YYYY HH:mm
   String _fmtTs(String? iso) {
@@ -2220,23 +2217,7 @@ class _PostedChip extends StatelessWidget {
 
   const _PostedChip({required this.publishedAt, required this.cs});
 
-  static DateTime _asUtc(String iso) {
-    final s = (iso.endsWith('Z') || iso.contains('+')) ? iso : '${iso}Z';
-    return DateTime.parse(s).toLocal();
-  }
-
-  String _relativeTime() {
-    try {
-      final dt = _asUtc(publishedAt);
-      final diff = DateTime.now().difference(dt);
-      if (diff.inDays > 0) return '${diff.inDays}d ago';
-      if (diff.inHours > 0) return '${diff.inHours}h ago';
-      if (diff.inMinutes > 0) return '${diff.inMinutes}m ago';
-      return 'just now';
-    } catch (_) {
-      return publishedAt;
-    }
-  }
+  String _relativeTime() => relativeTimeFromBackend(publishedAt);
 
   @override
   Widget build(BuildContext context) {
@@ -2271,10 +2252,7 @@ class _AnalyzedChip extends StatelessWidget {
 
   const _AnalyzedChip({required this.updatedAt, required this.cs});
 
-  static DateTime _asUtc(String iso) {
-    final s = (iso.endsWith('Z') || iso.contains('+')) ? iso : '${iso}Z';
-    return DateTime.parse(s).toLocal();
-  }
+  static DateTime _asUtc(String iso) => parseBackendUtc(iso).toLocal();
 
   String _fmtLocal() {
     try {
