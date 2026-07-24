@@ -52,6 +52,8 @@ services/job-monitor/monitor.lock
 *.db.backup*
 *.db-shm
 *.db-wal
+*.bak
+db/backups/
 
 # Internal dev guidelines and discovery docs (not for public repos)
 CLAUDE.md
