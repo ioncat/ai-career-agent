@@ -213,6 +213,25 @@ async def test_api_vacancies_blocker_checked_distinguishes_clean_from_unchecked(
     assert data[v_blocked]["blocker_checked"] is True
     assert data[v_blocked]["blocker_flag"] is True
 
+
+@pytest.mark.asyncio
+async def test_api_vacancies_exposes_blocker_stage(client):
+    """blocker_stage ('title' | 'content' | None) is a real field, not
+    string-matching blocker_reasons for a "title:" prefix — must reach the
+    API response, both list and detail (2026-07-24)."""
+    uid = await database.insert_user(name="BlockerStageUser", telegram_chat_id=2201, skill_type="pm")
+    v_title = await database.insert_vacancy(url="https://djinni.co/jobs/bs1/", user_id=uid)
+    await database.set_vacancy_blocker(v_title, True, ["title: mismatch"], stage="title")
+    v_content = await database.insert_vacancy(url="https://djinni.co/jobs/bs2/", user_id=uid)
+    await database.set_vacancy_blocker(v_content, True, ["english: C1 required"], stage="content")
+
+    data = {v["id"]: v for v in client.get(f"/api/vacancies?user_id={uid}").json()}
+    assert data[v_title]["blocker_stage"] == "title"
+    assert data[v_content]["blocker_stage"] == "content"
+
+    detail = client.get(f"/api/vacancies/{v_title}").json()
+    assert detail["blocker_stage"] == "title"
+
     for v in data.values():
         assert "blocker_raw_output" not in v
 

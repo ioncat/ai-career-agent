@@ -64,6 +64,13 @@ CREATE TABLE IF NOT EXISTS vacancies (
                                           -- 1 = pre-filter found a conflict with ## Critical Blockers
     blocker_reasons TEXT,                 -- JSON array of strings, e.g. ["english: JD requires C1"]
     blocker_raw_output TEXT,               -- full LLM response, for debugging parse failures
+    blocker_stage   TEXT,                 -- which pre-filter stage set the flag: 'title' (Stage 1,
+                                          -- deterministic — tools/cv_prefilter._check_title_allowlist/
+                                          -- _check_title_domain_signals, no LLM) | 'content' (Stage 2,
+                                          -- LLM-judged) | NULL (not blocked / never checked). A real
+                                          -- field, not string-matching blocker_reasons for "title:" —
+                                          -- decided 2026-07-24 after considering and rejecting the
+                                          -- string-match approach as fragile.
     created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
     updated_at    TEXT    NOT NULL DEFAULT (datetime('now'))
 );

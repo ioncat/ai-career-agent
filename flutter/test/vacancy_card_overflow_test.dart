@@ -5,6 +5,7 @@ import 'package:career_agent/models/vacancy.dart';
 import 'package:career_agent/providers/read_vacancies_provider.dart';
 import 'package:career_agent/providers/settings_provider.dart';
 import 'package:career_agent/widgets/vacancy_card.dart';
+import 'package:career_agent/widgets/source_badge.dart';
 
 // Found 2026-07-24: a vacancy with a "New" + "Possible blocker" badge
 // overflowed VacancyCard's badge Row on narrow inbox cards (real card width
@@ -86,5 +87,32 @@ void main() {
         .widgetList<Tooltip>(find.byType(Tooltip))
         .where((t) => (t.message ?? '').contains('Possible blocker'));
     expect(longMessageTooltips, isEmpty);
+  });
+
+  testWidgets('source badge stays a compact pill, not stretched to the card width', (tester) async {
+    // Regression guard, found 2026-07-24 right after the Wrap fix above:
+    // SourceBadge (Container with `alignment:` set, no explicit width) sat
+    // directly in a Row before that fix — Row gives non-flex children
+    // unbounded width, so it stayed shrink-wrapped by luck. Wrap gives its
+    // children loose-but-bounded constraints, which triggers Container's
+    // documented "alignment + bounded parent -> expand to fill" behavior —
+    // the badge silently stretched to the full card width. Fixed with
+    // IntrinsicWidth in source_badge.dart.
+    final vacancy = VacancyListItem(
+      id: 826,
+      role: 'Product manager',
+      company: 'A product company',
+      site: 'djinni',
+      url: 'https://example.com/826',
+      status: 'fetched',
+    );
+
+    await tester.pumpWidget(_harness(vacancy, width: 400));
+    await tester.pump();
+
+    final badgeSize = tester.getSize(find.byType(SourceBadge));
+    // "Djinni" pill is well under 100px wide — a stretched badge would
+    // report a width close to the card's own (minus padding, ~370px here).
+    expect(badgeSize.width, lessThan(100));
   });
 }
