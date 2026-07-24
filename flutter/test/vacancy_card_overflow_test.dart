@@ -115,4 +115,44 @@ void main() {
     // report a width close to the card's own (minus padding, ~370px here).
     expect(badgeSize.width, lessThan(100));
   });
+
+  testWidgets('source badge text stays on one line even when genuinely squeezed for space', (tester) async {
+    // Found live 2026-07-24, right after the IntrinsicWidth fix above:
+    // IntrinsicWidth asks for the pill's natural width, but still has to
+    // cooperate with whatever max width the parent Wrap actually has —
+    // on a narrow enough card, with the trailing time text + star button
+    // also competing for space, that can be less than "Djinni"'s natural
+    // width. Text wrapped to a second line by default, breaking the pill's
+    // fixed 24px height ("Djin" / "ni" stacked). Fixed with
+    // maxLines:1 + overflow:ellipsis in source_badge.dart.
+    final vacancy = VacancyListItem(
+      id: 826,
+      role: 'Product manager',
+      company: 'A product company',
+      site: 'djinni',
+      url: 'https://example.com/826',
+      status: 'fetched',
+      publishedAt: DateTime.now().toUtc().subtract(const Duration(hours: 2)).toIso8601String(),
+      starred: false,
+    );
+
+    // Narrow enough that the badge cluster's Expanded gets squeezed by the
+    // trailing time text + star button sharing the same Row.
+    await tester.pumpWidget(_harness(vacancy, width: 140));
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+
+    final texts = tester.widgetList<Text>(
+      find.descendant(of: find.byType(SourceBadge), matching: find.byType(Text)),
+    );
+    for (final t in texts) {
+      expect(t.maxLines, 1, reason: 'source badge text must never wrap to a second line');
+    }
+
+    // The pill's rendered height must stay at its fixed 24px, not grow to
+    // accommodate a wrapped second line.
+    final badgeSize = tester.getSize(find.byType(SourceBadge));
+    expect(badgeSize.height, 24);
+  });
 }

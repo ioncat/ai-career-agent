@@ -32,8 +32,19 @@ class SourceBadge extends StatelessWidget {
           borderRadius: BorderRadius.circular(999),
         ),
         alignment: Alignment.center,
+        // IntrinsicWidth (above) asks for this pill's natural width, but it
+        // still has to cooperate with whatever max width the parent Wrap
+        // actually has available — on a narrow card with the trailing time
+        // text + star button also competing for space, that can be less
+        // than "Djinni"'s natural width. Text wraps to a second line by
+        // default when squeezed, breaking the pill's fixed 24px height.
+        // maxLines/overflow make it ellipsize on one line instead — found
+        // live 2026-07-24, right after the IntrinsicWidth fix above.
         child: Text(
           label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          softWrap: false,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
                 color: Colors.white,
                 fontWeight: FontWeight.w500,
