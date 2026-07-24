@@ -112,24 +112,32 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
   Future<void> _batchSkip() => _runBatch('Skip', (id) => _repo.decline(id));
 
   /// Standalone action — never enters multi-select, no manual picking.
-  /// Auto-selects everything currently visible with a pre-filter blocker
-  /// flag and skips it. Reuses _runBatch's sequential-execution + progress
-  /// UI/snackbar, just with an explicit id list instead of _selectedIds.
-  /// Confirms first (2026-07-24, explicit user ask) — a single accidental
-  /// click on this button archives every flagged vacancy at once, unlike
-  /// the manual multi-select actions where the selection itself is the
-  /// deliberate step.
-  Future<void> _skipAllWithBlockers(List<VacancyListItem> visible) async {
-    final ids = visible.where((v) => v.blockerFlag).map((v) => v.id).toList();
+  /// Auto-selects everything currently visible flagged at the given
+  /// pre-filter stage and skips it. Reuses _runBatch's sequential-execution
+  /// + progress UI/snackbar, just with an explicit id list instead of
+  /// _selectedIds.
+  ///
+  /// Split into two separate stage-scoped actions (2026-07-24, explicit user
+  /// ask) rather than one "skip every blocker" button — Stage 1 (title,
+  /// deterministic) is 100% mechanical, safe to bulk-clear; Stage 2
+  /// (content, LLM-judged) is less certain and worth a human glance before
+  /// archiving, so it gets its own separate confirm rather than being
+  /// silently swept up by the same click.
+  ///
+  /// Confirms first regardless — a single accidental click archives every
+  /// matching vacancy at once, unlike the manual multi-select actions where
+  /// the selection itself is the deliberate step.
+  Future<void> _skipAllByStage(List<VacancyListItem> visible, String stage, String stageLabel) async {
+    final ids = visible.where((v) => v.blockerStage == stage).map((v) => v.id).toList();
     if (ids.isEmpty) return;
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Skip all with blockers?'),
+        title: Text('Skip all $stageLabel?'),
         content: Text(
           'This will archive ${ids.length} vacancy${ids.length == 1 ? '' : 'ies'} '
-          'flagged by the pre-filter. This can\'t be undone in bulk.',
+          'flagged by the $stageLabel pre-filter check. This can\'t be undone in bulk.',
         ),
         actions: [
           TextButton(
@@ -322,8 +330,14 @@ List<VacancyListItem> _filter(List<VacancyListItem> all) {
                   filterExpanded: _filterExpanded,
                   onToggleFilter: () =>
                       setState(() => _filterExpanded = !_filterExpanded),
-                  blockedCount: filtered.where((v) => v.blockerFlag).length,
-                  onSkipAllBlocked: _batchRunning ? null : () => _skipAllWithBlockers(filtered),
+                  titleBlockedCount: filtered.where((v) => v.blockerStage == 'title').length,
+                  onSkipAllTitleBlocked: _batchRunning
+                      ? null
+                      : () => _skipAllByStage(filtered, 'title', 'title-blocked'),
+                  contentBlockedCount: filtered.where((v) => v.blockerStage == 'content').length,
+                  onSkipAllContentBlocked: _batchRunning
+                      ? null
+                      : () => _skipAllByStage(filtered, 'content', 'content-blocked'),
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
@@ -482,8 +496,14 @@ class InboxListHeader extends StatelessWidget {
   final int filterCount;
   final bool filterExpanded;
   final VoidCallback onToggleFilter;
-  final int blockedCount;
-  final VoidCallback? onSkipAllBlocked;
+  // Split into two stage-scoped actions (2026-07-24) rather than one "skip
+  // every blocker" button — Stage 1 (title, deterministic) is safe to
+  // bulk-clear; Stage 2 (content, LLM-judged) is less certain and gets its
+  // own separate action so it's never silently swept up by the same click.
+  final int titleBlockedCount;
+  final VoidCallback? onSkipAllTitleBlocked;
+  final int contentBlockedCount;
+  final VoidCallback? onSkipAllContentBlocked;
 
   const InboxListHeader({
     super.key,
@@ -495,8 +515,10 @@ class InboxListHeader extends StatelessWidget {
     required this.filterCount,
     required this.filterExpanded,
     required this.onToggleFilter,
-    this.blockedCount = 0,
-    this.onSkipAllBlocked,
+    this.titleBlockedCount = 0,
+    this.onSkipAllTitleBlocked,
+    this.contentBlockedCount = 0,
+    this.onSkipAllContentBlocked,
   });
 
   @override
@@ -517,19 +539,32 @@ class InboxListHeader extends StatelessWidget {
                   style: Theme.of(context).textTheme.headlineMedium,
                 ),
               ),
-              // Standalone bulk action — not part of manual multi-select
-              // (2026-07-24 design call): auto-selects every visible
-              // pre-filter-flagged vacancy and skips it in one click, no
-              // long-press/checkbox picking needed.
-              if (blockedCount > 0)
+              // Standalone bulk actions — not part of manual multi-select
+              // (2026-07-24 design call): auto-select every visible
+              // vacancy at the given pre-filter stage and skip it in one
+              // click, no long-press/checkbox picking. Two separate icons —
+              // title (deterministic, safe to bulk-clear) and content
+              // (LLM-judged, its own confirm) — not one "skip everything".
+              if (titleBlockedCount > 0)
                 IconButton(
                   icon: Badge(
-                    label: Text('$blockedCount'),
+                    label: Text('$titleBlockedCount'),
                     backgroundColor: cs.error,
-                    child: Icon(Icons.playlist_remove, size: 20, color: cs.error),
+                    child: Icon(Icons.title, size: 20, color: cs.error),
                   ),
-                  onPressed: onSkipAllBlocked,
-                  tooltip: 'Skip all $blockedCount with blockers',
+                  onPressed: onSkipAllTitleBlocked,
+                  tooltip: 'Skip all $titleBlockedCount title-blocked',
+                  splashRadius: 18,
+                ),
+              if (contentBlockedCount > 0)
+                IconButton(
+                  icon: Badge(
+                    label: Text('$contentBlockedCount'),
+                    backgroundColor: cs.error,
+                    child: Icon(Icons.psychology_outlined, size: 20, color: cs.error),
+                  ),
+                  onPressed: onSkipAllContentBlocked,
+                  tooltip: 'Skip all $contentBlockedCount content-blocked',
                   splashRadius: 18,
                 ),
               IconButton(
