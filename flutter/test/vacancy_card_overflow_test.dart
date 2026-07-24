@@ -116,15 +116,19 @@ void main() {
     expect(badgeSize.width, lessThan(100));
   });
 
-  testWidgets('source badge text stays on one line even when genuinely squeezed for space', (tester) async {
-    // Found live 2026-07-24, right after the IntrinsicWidth fix above:
-    // IntrinsicWidth asks for the pill's natural width, but still has to
-    // cooperate with whatever max width the parent Wrap actually has —
-    // on a narrow enough card, with the trailing time text + star button
-    // also competing for space, that can be less than "Djinni"'s natural
-    // width. Text wrapped to a second line by default, breaking the pill's
-    // fixed 24px height ("Djin" / "ni" stacked). Fixed with
-    // maxLines:1 + overflow:ellipsis in source_badge.dart.
+  testWidgets('source badge shows full text on its own row even on a very narrow card', (tester) async {
+    // Found live 2026-07-24, right after the IntrinsicWidth stretch-fix:
+    // badges shared one Row with the trailing time text + star button, both
+    // competing for the same width budget — Row measures non-flex siblings
+    // (time, star) before the flex one (badges' Expanded), so on a narrow
+    // card the badges lost the fight and got squeezed below "Djinni"'s
+    // natural width, wrapping to a second line ("Djin" / "ni"). Root-cause
+    // fixed by giving badges their OWN row, separate from time+star (same
+    // priority principle as the 2026-07-05 detail-screen fix — the
+    // must-stay-readable text chip must never be the side that's forced to
+    // shrink). maxLines:1+ellipsis on SourceBadge itself stays as a
+    // defense-in-depth belt-and-suspenders for genuinely extreme widths,
+    // but real card widths should now show the full label, not a clip.
     final vacancy = VacancyListItem(
       id: 826,
       role: 'Product manager',
@@ -136,19 +140,18 @@ void main() {
       starred: false,
     );
 
-    // Narrow enough that the badge cluster's Expanded gets squeezed by the
-    // trailing time text + star button sharing the same Row.
+    // Narrow enough that the OLD shared-row layout squeezed the badge; the
+    // separate-row layout must render it at full natural width regardless.
     await tester.pumpWidget(_harness(vacancy, width: 140));
     await tester.pump();
 
     expect(tester.takeException(), isNull);
 
-    final texts = tester.widgetList<Text>(
+    final text = tester.widget<Text>(
       find.descendant(of: find.byType(SourceBadge), matching: find.byType(Text)),
     );
-    for (final t in texts) {
-      expect(t.maxLines, 1, reason: 'source badge text must never wrap to a second line');
-    }
+    expect(text.data, 'Djinni', reason: 'label must render in full, not ellipsized, on a real card width');
+    expect(text.maxLines, 1, reason: 'source badge text must never wrap to a second line');
 
     // The pill's rendered height must stay at its fixed 24px, not grow to
     // accommodate a wrapped second line.
