@@ -97,14 +97,30 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Row 1: [checkbox in multi-select] source badge + "New" badge + dedup/republish badges | date right-aligned
-              // Badge cluster is a Wrap, not a fixed-width Row segment — the badge
-              // count is unbounded (source/new/republished/blocker/duplicate can all
-              // be present at once), so a Row silently overflows on narrow cards
-              // instead of wrapping. Found 2026-07-24 (blocker badge pushed a card
-              // 5px past its bound, showing the debug "RIGHT OVERFLOWED" banner) —
-              // same fix pattern as the 2026-07-05 score-pill overflow, different
-              // widget (that one was the detail-screen hero, not this inbox card).
+              // Row 1: [checkbox in multi-select] source badge + "New" badge + dedup/republish badges
+              // Row 1b: date + star, right-aligned, its OWN row.
+              //
+              // These two used to share one Row, with the badge Wrap inside
+              // Expanded competing for width against the time text + star
+              // button. That inverted the working pattern from the
+              // 2026-07-05 detail-screen fix ("Wrap + PostedChip
+              // right-pinned"): there, the flexible/sacrificial side
+              // (score dots — a custom-painted graphic that degrades
+              // silently) got Expanded, while the must-stay-readable text
+              // chip (PostedChip) stayed a plain, unconstrained sibling.
+              // Putting SourceBadge — the must-stay-readable element here —
+              // inside Expanded meant it could be squeezed below its own
+              // natural width by time+star claiming their share first
+              // (Row measures non-flex siblings before flex ones,
+              // regardless of source order), which is exactly what
+              // happened: "Djinni" first stretched to fill the row
+              // (Container+alignment quirk, fixed with IntrinsicWidth),
+              // then wrapped to two lines under genuine space pressure
+              // (fixed with maxLines — a narrower patch than this one).
+              // Separating the rows removes the contention outright: badges
+              // get the FULL card width to themselves, time+star get theirs
+              // — nothing has to share a shrinking budget with anything
+              // it's actually not okay to shrink.
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -154,14 +170,21 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
                       ],
                     ),
                   ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
                   if (v.publishedAt != null) ...[
-                    const SizedBox(width: 6),
                     Text(
                       _relativeTime(v.publishedAt!),
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
                             color: cs.secondary,
                           ),
                     ),
+                    const SizedBox(width: 6),
                   ],
                   _StarButton(vacancyId: v.id, isStarred: v.starred),
                 ],
