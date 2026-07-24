@@ -542,30 +542,87 @@ class InboxListHeader extends StatelessWidget {
               // Standalone bulk actions — not part of manual multi-select
               // (2026-07-24 design call): auto-select every visible
               // vacancy at the given pre-filter stage and skip it in one
-              // click, no long-press/checkbox picking. Two separate icons —
-              // title (deterministic, safe to bulk-clear) and content
-              // (LLM-judged, its own confirm) — not one "skip everything".
-              if (titleBlockedCount > 0)
-                IconButton(
-                  icon: Badge(
-                    label: Text('$titleBlockedCount'),
-                    backgroundColor: cs.error,
-                    child: Icon(Icons.title, size: 20, color: cs.error),
+              // click, no long-press/checkbox picking. Title (deterministic,
+              // safe to bulk-clear) and content (LLM-judged, its own
+              // confirm) stay separate actions — just consolidated into one
+              // overflow menu instead of two more standalone icons.
+              //
+              // Found live 2026-07-24: this row already had filter+refresh
+              // icons plus an Expanded title — adding two more unconditional
+              // IconButtons pushed the total past what a narrow detail-pane
+              // width leaves for the header, overflowing it. Same root
+              // mistake as the badge-cluster bug earlier the same day
+              // (an unbounded-growing icon/badge count sharing a plain Row
+              // with no wrap/overflow protection) — just a different Row,
+              // caught later because the debug overflow banner rendered
+              // off in the empty detail pane, easy to miss at a glance.
+              if (titleBlockedCount > 0 || contentBlockedCount > 0)
+                PopupMenuButton<VoidCallback?>(
+                  tooltip: 'Skip all flagged',
+                  // Compact tap target — 3 icon-ish controls (this menu,
+                  // filter, refresh) share this row with the title; at
+                  // Material's default 48px-minimum touch target each,
+                  // three of them alone (144px) can exceed a narrow
+                  // detail-pane's available width before the title even
+                  // gets a look-in. Found via this fix's own regression
+                  // test, reproducing the real 160px-wide overflow.
+                  padding: EdgeInsets.zero,
+                  // `child:` instead of `icon:` — PopupMenuButton's `icon`
+                  // shorthand wraps content in its own IconButton, which
+                  // keeps Material 3's 48px minimum regardless of
+                  // `padding:` (same gotcha as the plain IconButtons below,
+                  // confirmed by measuring). `child:` skips that wrapper
+                  // entirely, sizing to content.
+                  child: Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: Badge(
+                      label: Text('${titleBlockedCount + contentBlockedCount}'),
+                      backgroundColor: cs.error,
+                      child: Icon(Icons.playlist_remove, size: 20, color: cs.error),
+                    ),
                   ),
-                  onPressed: onSkipAllTitleBlocked,
-                  tooltip: 'Skip all $titleBlockedCount title-blocked',
-                  splashRadius: 18,
-                ),
-              if (contentBlockedCount > 0)
-                IconButton(
-                  icon: Badge(
-                    label: Text('$contentBlockedCount'),
-                    backgroundColor: cs.error,
-                    child: Icon(Icons.psychology_outlined, size: 20, color: cs.error),
-                  ),
-                  onPressed: onSkipAllContentBlocked,
-                  tooltip: 'Skip all $contentBlockedCount content-blocked',
-                  splashRadius: 18,
+                  onSelected: (action) => action?.call(),
+                  itemBuilder: (context) => [
+                    // Text wrapped in Expanded+ellipsis on purpose — a plain
+                    // Text sibling in a Row overflows PopupMenuItem's own
+                    // constrained width on a narrow window (found writing
+                    // this fix's own test). Same lesson as the badge-cluster
+                    // and header-icon overflows above: text sharing a Row
+                    // with anything else needs explicit overflow handling,
+                    // never assume it'll just fit.
+                    if (titleBlockedCount > 0)
+                      PopupMenuItem<VoidCallback?>(
+                        value: onSkipAllTitleBlocked,
+                        child: Row(
+                          children: [
+                            const Icon(Icons.title, size: 16),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Skip $titleBlockedCount title-blocked',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    if (contentBlockedCount > 0)
+                      PopupMenuItem<VoidCallback?>(
+                        value: onSkipAllContentBlocked,
+                        child: Row(
+                          children: [
+                            const Icon(Icons.psychology_outlined, size: 16),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Skip $contentBlockedCount content-blocked',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
                 ),
               IconButton(
                 icon: Badge(
@@ -581,7 +638,15 @@ class InboxListHeader extends StatelessWidget {
                 ),
                 onPressed: onToggleFilter,
                 tooltip: 'Filters',
-                splashRadius: 18,
+                // `constraints:` alone doesn't shrink Material 3's IconButton
+                // below its 48x48 default (found measuring this fix's own
+                // test) — the theme's minimum tap target still wins unless
+                // tapTargetSize is explicitly shrinkWrap via style.
+                style: IconButton.styleFrom(
+                  minimumSize: const Size(32, 32),
+                  padding: EdgeInsets.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
               ),
               IconButton(
                 icon: Icon(
@@ -591,7 +656,11 @@ class InboxListHeader extends StatelessWidget {
                 ),
                 onPressed: polling ? null : onRefresh,
                 tooltip: 'Refresh',
-                splashRadius: 18,
+                style: IconButton.styleFrom(
+                  minimumSize: const Size(32, 32),
+                  padding: EdgeInsets.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
               ),
             ],
           ),
@@ -607,13 +676,20 @@ class InboxListHeader extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 6),
-              Text(
-                visibleCount == totalCount
-                    ? '$totalCount ${totalCount == 1 ? 'vacancy' : 'vacancies'}'
-                    : '$visibleCount / $totalCount vacancies',
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: cs.secondary,
-                    ),
+              // Expanded+ellipsis — same lesson as everywhere else in this
+              // header today: a plain Text sharing a Row with anything else
+              // needs explicit overflow handling, found via this fix's own
+              // regression test rather than assumed safe.
+              Expanded(
+                child: Text(
+                  visibleCount == totalCount
+                      ? '$totalCount ${totalCount == 1 ? 'vacancy' : 'vacancies'}'
+                      : '$visibleCount / $totalCount vacancies',
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: cs.secondary,
+                      ),
+                ),
               ),
             ],
           ),
