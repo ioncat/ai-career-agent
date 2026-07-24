@@ -14,6 +14,7 @@ from tools.cv_prefilter import (
     _check_title_allowlist,
     _check_title_domain_signals,
     _parse_prefilter_output,
+    apply_title_stage,
     cv_prefilter,
 )
 
@@ -199,6 +200,43 @@ def test_title_domain_signals_clean_title_returns_none():
 def test_title_domain_signals_empty_title_does_not_flag():
     assert _check_title_domain_signals("") is None
     assert _check_title_domain_signals(None) is None
+
+
+# ── apply_title_stage (auto-trigger helper, 2026-07-23) ────────────────────────
+
+@pytest.mark.asyncio
+async def test_apply_title_stage_writes_blocker_on_mismatch():
+    mock_db = _mock_db()
+    with patch("tools.cv_prefilter.database", mock_db):
+        result = await apply_title_stage(1, "Product Marketing Lead")
+
+    assert result is True
+    mock_db.set_vacancy_blocker.assert_awaited_once()
+    args, kwargs = mock_db.set_vacancy_blocker.call_args
+    assert args[0] == 1
+    assert args[1] is True
+    assert args[2][0].startswith("title:")
+
+
+@pytest.mark.asyncio
+async def test_apply_title_stage_no_write_on_fit():
+    mock_db = _mock_db()
+    with patch("tools.cv_prefilter.database", mock_db):
+        result = await apply_title_stage(1, "Product Manager")
+
+    assert result is False
+    mock_db.set_vacancy_blocker.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_apply_title_stage_domain_signal_also_writes():
+    mock_db = _mock_db()
+    with patch("tools.cv_prefilter.database", mock_db):
+        result = await apply_title_stage(1, "Product Manager (iGaming)")
+
+    assert result is True
+    args, kwargs = mock_db.set_vacancy_blocker.call_args
+    assert args[2][0].startswith("igaming:")
 
 
 # ── cv_prefilter ─────────────────────────────────────────────────────────────

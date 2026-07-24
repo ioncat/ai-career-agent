@@ -54,6 +54,12 @@ def _mock_db(queued_rows: list) -> MagicMock:
     # "still retrying" path unless a test overrides it to exercise give-up.
     db.increment_fetch_attempts = AsyncMock(return_value=1)
     db.give_up_fetch = AsyncMock()
+    # Stage 1 auto-trigger (2026-07-23) — default OFF so existing tests don't
+    # need to also patch tools.cv_prefilter's own `database` reference (a
+    # separate import, not touched by patching core.rss_watcher.database).
+    # Tests exercising the wiring flip this to True explicitly.
+    db.get_auto_check_title = AsyncMock(return_value=False)
+    db.get_vacancy_by_id = AsyncMock(return_value=None)
     return db
 
 
@@ -121,6 +127,61 @@ async def test_poll_once_triggers_fetch_for_queued_vacancy():
     msg = bot.send_message.call_args[0][0]
     assert "Новая вакансия" in msg
     assert "djinni.co" in msg.lower()
+
+
+@pytest.mark.asyncio
+async def test_poll_once_runs_title_stage_when_auto_check_enabled():
+    """Stage 1 (2026-07-23) — when the setting is on, the title/domain check
+    runs automatically right after fetch, before analysis."""
+    watcher, _ = _make_watcher()
+    row = _make_row(42, "https://djinni.co/jobs/42/", title="Product Marketing Lead")
+    mock_db = _mock_db([row])
+    mock_db.get_auto_check_title = AsyncMock(return_value=True)
+    mock_db.get_vacancy_by_id = AsyncMock(return_value=_make_row(42, "https://djinni.co/jobs/42/", title="Product Marketing Lead"))
+    mock_apply = AsyncMock(return_value=True)
+
+    with patch("core.rss_watcher.database", mock_db), \
+         patch("tools.cv_fetch_jd.fetch_jd", AsyncMock(return_value=42)), \
+         patch("tools.cv_prefilter.apply_title_stage", mock_apply), \
+         patch("core.rss_watcher.RSSWatcher._push_result", AsyncMock()):
+        await watcher._poll_once()
+
+    mock_apply.assert_awaited_once_with(42, "Product Marketing Lead")
+
+
+@pytest.mark.asyncio
+async def test_poll_once_skips_title_stage_when_auto_check_disabled():
+    watcher, _ = _make_watcher()
+    row = _make_row(42, "https://djinni.co/jobs/42/", title="Product Marketing Lead")
+    mock_db = _mock_db([row])  # get_auto_check_title defaults False
+    mock_apply = AsyncMock(return_value=True)
+
+    with patch("core.rss_watcher.database", mock_db), \
+         patch("tools.cv_fetch_jd.fetch_jd", AsyncMock(return_value=42)), \
+         patch("tools.cv_prefilter.apply_title_stage", mock_apply), \
+         patch("core.rss_watcher.RSSWatcher._push_result", AsyncMock()):
+        await watcher._poll_once()
+
+    mock_apply.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_poll_once_title_stage_failure_is_non_fatal():
+    """A crash in the title stage must not break fetch/analysis — fail-open,
+    same principle as the rest of the pre-filter."""
+    watcher, bot = _make_watcher()
+    row = _make_row(42, "https://djinni.co/jobs/42/", title="Product Manager")
+    mock_db = _mock_db([row])
+    mock_db.get_auto_check_title = AsyncMock(return_value=True)
+    mock_db.get_vacancy_by_id = AsyncMock(side_effect=RuntimeError("db exploded"))
+
+    with patch("core.rss_watcher.database", mock_db), \
+         patch("tools.cv_fetch_jd.fetch_jd", AsyncMock(return_value=42)), \
+         patch("tools.cv_analyze.cv_analyze", AsyncMock()), \
+         patch("core.rss_watcher.RSSWatcher._push_result", AsyncMock()):
+        await watcher._poll_once()  # must not raise
+
+    mock_db.update_vacancy_status.assert_any_await(42, "fetched")
 
 
 @pytest.mark.asyncio

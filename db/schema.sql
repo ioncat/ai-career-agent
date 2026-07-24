@@ -180,6 +180,7 @@ CREATE TABLE IF NOT EXISTS user_settings (
     llm_provider    TEXT,                            -- NULL = use LLM_PROVIDER env default
     llm_model       TEXT,                            -- NULL = use LLM_MODEL env default
     thinking_effort TEXT    NOT NULL DEFAULT 'off',  -- 'off'|'low'|'medium'|'high'|'xhigh'|'max'
+    auto_check_title INTEGER NOT NULL DEFAULT 1,     -- Stage 1 pre-filter (deterministic, no LLM) runs on ingest when 1
     updated_at      TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 

@@ -159,6 +159,32 @@ def _parse_prefilter_output(text: str) -> tuple[bool, list[str], bool]:
     return True, reasons[:5], clean_format
 
 
+async def apply_title_stage(vacancy_id: int, title: str) -> bool:
+    """Run the deterministic title/domain check (Stage 1 — no LLM) and write
+    a blocker immediately if it fails. Returns True if a blocker was set.
+
+    Called automatically on vacancy ingestion (RSSWatcher, import-jd) when
+    the "Auto-check title" setting is on — see db.database.get_auto_check_title().
+    Free and instant, so unlike Stage 2 (the LLM content check, still manual-
+    trigger-only) there's no cost/reliability reason to gate it behind a
+    per-vacancy button; the setting exists only so the user can turn the
+    write off entirely, not to control cost.
+
+    Safe to call again later — `cv_prefilter()` re-runs the same check first
+    and short-circuits identically, so there's no risk of a mismatched verdict
+    between the automatic write and a later manual "Check blockers" run.
+    """
+    reason = _check_title_domain_signals(title) or _check_title_allowlist(title)
+    if reason is None:
+        return False
+    log.info("apply_title_stage: v#%d flagged at ingestion (no LLM call): %s", vacancy_id, reason)
+    await database.set_vacancy_blocker(
+        vacancy_id, True, [reason],
+        raw_output=f"BLOCKED: yes\n- {reason}\n(deterministic title check — no LLM call)",
+    )
+    return True
+
+
 async def cv_prefilter(ctx: RunContext[AgentDeps], vacancy_id: int) -> dict:
     """Run the critical blocker pre-filter on a freshly-fetched vacancy.
 

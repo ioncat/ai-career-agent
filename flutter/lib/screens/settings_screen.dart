@@ -157,6 +157,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               const PhaseRoutingSection(),
               const SizedBox(height: 32),
 
+              // Pre-filter — Stage 1 (title/domain) auto-trigger toggle
+              _SectionLabel('Pre-filter'),
+              const SizedBox(height: 12),
+              const _AutoCheckTitleTile(),
+              const SizedBox(height: 32),
+
               // Save button
               Row(
                 children: [
@@ -277,6 +283,49 @@ class _AiProviderTile extends ConsumerWidget {
               _EffortControl(current: config.thinkingEffort),
             ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AutoCheckTitleTile extends ConsumerWidget {
+  const _AutoCheckTitleTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cs = Theme.of(context).colorScheme;
+    final configAsync = ref.watch(remoteConfigProvider);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainer,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
+      ),
+      child: configAsync.when(
+        loading: () => const SizedBox(
+            height: 56, child: Center(child: CircularProgressIndicator())),
+        error: (e, _) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Text(
+            'Unavailable — check backend: $e',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.error),
+          ),
+        ),
+        data: (config) => SwitchListTile(
+          title: const Text('Auto-check title on ingest'),
+          subtitle: const Text(
+            'Free, instant, no LLM — flags a role/domain mismatch (title or '
+            'iGaming/Mobile) the moment a vacancy arrives. Content-based '
+            'checks (skills, other requirements) still need the manual '
+            '"Check blockers" button.',
+          ),
+          value: config.autoCheckTitle,
+          onChanged: (v) =>
+              ref.read(remoteConfigProvider.notifier).patchAutoCheckTitle(v),
+          contentPadding: EdgeInsets.zero,
         ),
       ),
     );

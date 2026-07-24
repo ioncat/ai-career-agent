@@ -241,6 +241,7 @@ class VacancyRepository {
     String? model,
     String? thinkingEffort,
     String? expectedProvider,
+    bool? autoCheckTitle,
   }) async {
     final uri = Uri.parse('$baseUrl/api/config');
     final body = <String, dynamic>{};
@@ -248,6 +249,7 @@ class VacancyRepository {
     if (model != null) body['model'] = model;
     if (thinkingEffort != null) body['thinking_effort'] = thinkingEffort;
     if (expectedProvider != null) body['expected_provider'] = expectedProvider;
+    if (autoCheckTitle != null) body['auto_check_title'] = autoCheckTitle;
     final response = await http
         .patch(uri,
             headers: {'Content-Type': 'application/json'},

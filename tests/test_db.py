@@ -441,3 +441,39 @@ async def test_insert_explicit_site_overrides_inferred():
     )
     row = await database.get_vacancy_by_id(vid)
     assert row["site"] == "other"
+
+
+# ── auto_check_title (Stage 1 pre-filter auto-trigger setting, 2026-07-23) ─────
+
+@pytest.mark.asyncio
+async def test_auto_check_title_defaults_true_with_no_row():
+    """No user_settings row at all → default True (schema default, matches
+    'free and already-validated, no reason to ship it off')."""
+    assert await database.get_auto_check_title(1) is True
+
+
+@pytest.mark.asyncio
+async def test_auto_check_title_set_and_get_roundtrip():
+    await database.upsert_user(1, "Test User")
+    await database.set_auto_check_title(1, False)
+    assert await database.get_auto_check_title(1) is False
+
+    await database.set_auto_check_title(1, True)
+    assert await database.get_auto_check_title(1) is True
+
+
+@pytest.mark.asyncio
+async def test_set_auto_check_title_does_not_touch_llm_settings():
+    """Narrow upsert — flipping the flag must not clobber llm_provider/model/
+    thinking_effort on an existing row (the reason it's a separate function
+    from set_user_settings, not folded into it)."""
+    await database.upsert_user(1, "Test User")
+    await database.set_user_settings(1, llm_provider="ollama_api", llm_model="gemma4:e4b", thinking_effort="high")
+
+    await database.set_auto_check_title(1, False)
+
+    settings = await database.get_user_settings(1)
+    assert settings["llm_provider"] == "ollama_api"
+    assert settings["llm_model"] == "gemma4:e4b"
+    assert settings["thinking_effort"] == "high"
+    assert await database.get_auto_check_title(1) is False
