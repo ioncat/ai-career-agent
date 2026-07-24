@@ -669,6 +669,40 @@ class NewVacancyRequest(BaseModel):
     salary: str | None = None
 
 
+# RSS pubDate is trusted verbatim from the feed (job-monitor's _parse_pub_date)
+# — normally fine, but a feed can serve a stale pubDate for a listing we're
+# only NOW seeing for the first time (re-crawl, feed lag, backfill). Found
+# 2026-07-24: Djinni served pubDate=2026-07-21 for a vacancy first fetched by
+# our poller on 2026-07-24 — it silently sorted 3 days down the date-sorted
+# inbox, looking to the user like it never arrived at all, when it had. 24h
+# is generous relative to the poll cadence (seconds-to-minutes) — a genuinely
+# fresh listing should never be older than that when we first see it.
+_PUBLISHED_AT_MAX_AGE = datetime.timedelta(hours=24)
+
+
+def _sanitize_published_at(raw: str | None) -> str | None:
+    """Fall back to "now" (the moment we actually discovered it) when the
+    feed's claimed published_at is implausibly old or in the future, instead
+    of trusting it outright and silently distorting inbox freshness sort.
+    """
+    if not raw:
+        return raw
+    try:
+        parsed = datetime.datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=datetime.timezone.utc)
+    except ValueError:
+        return raw  # unparseable — leave as-is, not this guard's job to fix
+    now = datetime.datetime.now(datetime.timezone.utc)
+    if parsed < now - _PUBLISHED_AT_MAX_AGE or parsed > now + datetime.timedelta(minutes=5):
+        log.warning(
+            "published_at sanity check failed (feed said %s, now=%s) — using fetch time instead",
+            raw, now.isoformat(),
+        )
+        return now.strftime("%Y-%m-%dT%H:%M:%S")
+    return raw
+
+
 @app.post("/api/new-vacancy", status_code=201)
 async def api_new_vacancy(req: NewVacancyRequest):
     """Webhook endpoint for job-monitor: queue a new vacancy for fetching.
@@ -702,7 +736,10 @@ async def api_new_vacancy(req: NewVacancyRequest):
             site=_site_from_url(req.url),
             user_id=req.user_id,
             status="queued",
-            published_at=req.published_at,
+            # Sanitized only here (brand-new vacancy) — the republish/bump
+            # comparisons above intentionally compare the feed's raw claimed
+            # date against the stored one, unaffected by this guard.
+            published_at=_sanitize_published_at(req.published_at),
             company=req.company,
         )
         if req.salary:
