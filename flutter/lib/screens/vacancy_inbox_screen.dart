@@ -71,17 +71,20 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
   /// and even for the cheap actions (analyze/decline) sequential keeps this
   /// simple and gives honest per-item progress instead of a burst of
   /// simultaneous requests.
-  Future<void> _runBatch(String label, Future<void> Function(int id) action) async {
-    final ids = _selectedIds.toList();
+  /// `ids` defaults to the manual multi-select set; pass an explicit list to
+  /// drive a batch without ever entering multi-select mode (e.g. "Skip all
+  /// with blockers" — auto-selects everything flagged, no manual picking).
+  Future<void> _runBatch(String label, Future<void> Function(int id) action, {List<int>? ids}) async {
+    final targetIds = ids ?? _selectedIds.toList();
     setState(() {
       _batchRunning = true;
       _batchDone = 0;
-      _batchTotal = ids.length;
+      _batchTotal = targetIds.length;
       _batchLabel = label;
     });
     var succeeded = 0;
     var failed = 0;
-    for (final id in ids) {
+    for (final id in targetIds) {
       try {
         await action(id);
         succeeded++;
@@ -97,8 +100,8 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(failed == 0
-            ? '$label: $succeeded/${ids.length} done'
-            : '$label: $succeeded/${ids.length} done, $failed failed'),
+            ? '$label: $succeeded/${targetIds.length} done'
+            : '$label: $succeeded/${targetIds.length} done, $failed failed'),
         backgroundColor: failed == 0 ? null : Colors.orange,
       ),
     );
@@ -107,6 +110,16 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
   Future<void> _batchAnalyze() => _runBatch('Analyze', (id) => _repo.analyze(id));
   Future<void> _batchCheckBlockers() => _runBatch('Check blockers', (id) => _repo.runPrefilter(id));
   Future<void> _batchSkip() => _runBatch('Skip', (id) => _repo.decline(id));
+
+  /// Standalone action — never enters multi-select, no manual picking.
+  /// Auto-selects everything currently visible with a pre-filter blocker
+  /// flag and skips it. Reuses _runBatch's sequential-execution + progress
+  /// UI/snackbar, just with an explicit id list instead of _selectedIds.
+  Future<void> _skipAllWithBlockers(List<VacancyListItem> visible) async {
+    final ids = visible.where((v) => v.blockerFlag).map((v) => v.id).toList();
+    if (ids.isEmpty) return;
+    await _runBatch('Skip', (id) => _repo.decline(id), ids: ids);
+  }
 
   void _onSkipped() {
     _crossFolderNav = false;
@@ -263,7 +276,7 @@ List<VacancyListItem> _filter(List<VacancyListItem> all) {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _ListHeader(
+                InboxListHeader(
                   title: _title,
                   visibleCount: filtered.length,
                   totalCount: vacancies.length,
@@ -274,6 +287,8 @@ List<VacancyListItem> _filter(List<VacancyListItem> all) {
                   filterExpanded: _filterExpanded,
                   onToggleFilter: () =>
                       setState(() => _filterExpanded = !_filterExpanded),
+                  blockedCount: filtered.where((v) => v.blockerFlag).length,
+                  onSkipAllBlocked: _batchRunning ? null : () => _skipAllWithBlockers(filtered),
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
@@ -373,8 +388,11 @@ List<VacancyListItem> _filter(List<VacancyListItem> all) {
                           onLongPress: _enterMultiSelect,
                         ),
                 ),
-                if (_multiSelectMode)
-                  _BatchActionBar(
+                // _batchRunning alone (no multi-select) covers standalone
+                // batches like "Skip all with blockers" — same progress UI,
+                // no manual selection involved.
+                if (_multiSelectMode || _batchRunning)
+                  InboxBatchActionBar(
                     count: _selectedIds.length,
                     running: _batchRunning,
                     runningLabel: _batchLabel,
@@ -417,7 +435,7 @@ List<VacancyListItem> _filter(List<VacancyListItem> all) {
 
 // ─── Header ──────────────────────────────────────────────────────────────────
 
-class _ListHeader extends StatelessWidget {
+class InboxListHeader extends StatelessWidget {
   final String title;
   final int visibleCount;
   final int totalCount;
@@ -426,8 +444,11 @@ class _ListHeader extends StatelessWidget {
   final int filterCount;
   final bool filterExpanded;
   final VoidCallback onToggleFilter;
+  final int blockedCount;
+  final VoidCallback? onSkipAllBlocked;
 
-  const _ListHeader({
+  const InboxListHeader({
+    super.key,
     required this.title,
     required this.visibleCount,
     required this.totalCount,
@@ -436,6 +457,8 @@ class _ListHeader extends StatelessWidget {
     required this.filterCount,
     required this.filterExpanded,
     required this.onToggleFilter,
+    this.blockedCount = 0,
+    this.onSkipAllBlocked,
   });
 
   @override
@@ -456,6 +479,21 @@ class _ListHeader extends StatelessWidget {
                   style: Theme.of(context).textTheme.headlineMedium,
                 ),
               ),
+              // Standalone bulk action — not part of manual multi-select
+              // (2026-07-24 design call): auto-selects every visible
+              // pre-filter-flagged vacancy and skips it in one click, no
+              // long-press/checkbox picking needed.
+              if (blockedCount > 0)
+                IconButton(
+                  icon: Badge(
+                    label: Text('$blockedCount'),
+                    backgroundColor: cs.error,
+                    child: Icon(Icons.playlist_remove, size: 20, color: cs.error),
+                  ),
+                  onPressed: onSkipAllBlocked,
+                  tooltip: 'Skip all $blockedCount with blockers',
+                  splashRadius: 18,
+                ),
               IconButton(
                 icon: Badge(
                   isLabelVisible: filterCount > 0,
@@ -766,7 +804,7 @@ class _VacancyList extends StatelessWidget {
 
 // ─── Batch action bar (mass actions: Analyze / Check blockers / Skip) ─────────
 
-class _BatchActionBar extends StatelessWidget {
+class InboxBatchActionBar extends StatelessWidget {
   final int count;
   final bool running;
   final String runningLabel;
@@ -777,7 +815,8 @@ class _BatchActionBar extends StatelessWidget {
   final VoidCallback? onSkip;
   final VoidCallback? onCancel;
 
-  const _BatchActionBar({
+  const InboxBatchActionBar({
+    super.key,
     required this.count,
     required this.running,
     required this.runningLabel,
@@ -817,6 +856,11 @@ class _BatchActionBar extends StatelessWidget {
                 ),
               ],
             )
+          // 2 primary actions (Skip/Analyze — the daily-driver pair) + an
+          // overflow menu for less-frequent ones (Check blockers, and room
+          // for future additions) — a flat button-per-action row doesn't
+          // scale on a 360px inbox panel (design call, 2026-07-24: same
+          // narrow-panel constraint that caused the badge-row overflow bug).
           : Row(
               children: [
                 Text('$count selected',
@@ -828,15 +872,26 @@ class _BatchActionBar extends StatelessWidget {
                   onPressed: onCancel,
                   visualDensity: VisualDensity.compact,
                 ),
+                PopupMenuButton<void>(
+                  tooltip: 'More actions',
+                  icon: const Icon(Icons.more_horiz, size: 18),
+                  itemBuilder: (context) => [
+                    PopupMenuItem<void>(
+                      onTap: onCheckBlockers,
+                      child: const Row(
+                        children: [
+                          Icon(Icons.shield_outlined, size: 16),
+                          SizedBox(width: 8),
+                          Text('Check blockers'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
                 TextButton.icon(
                   onPressed: onSkip,
                   icon: Icon(Icons.block, size: 16, color: cs.error),
                   label: Text('Skip', style: TextStyle(color: cs.error)),
-                ),
-                TextButton.icon(
-                  onPressed: onCheckBlockers,
-                  icon: const Icon(Icons.shield_outlined, size: 16),
-                  label: const Text('Check blockers'),
                 ),
                 FilledButton.icon(
                   onPressed: onAnalyze,
