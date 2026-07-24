@@ -5,6 +5,7 @@ import '../providers/read_vacancies_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/vacancy_list_provider.dart';
 import '../repositories/vacancy_repository.dart';
+import '../utils/backend_time.dart';
 import 'fit_score_chip.dart';
 import 'vac_score_badge.dart';
 import 'source_badge.dart';
@@ -260,18 +261,7 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
     );
   }
 
-  String _relativeTime(String iso) {
-    try {
-      final dt = DateTime.parse(iso);
-      final diff = DateTime.now().difference(dt);
-      if (diff.inDays > 0) return '${diff.inDays}d ago';
-      if (diff.inHours > 0) return '${diff.inHours}h ago';
-      if (diff.inMinutes > 0) return '${diff.inMinutes}m ago';
-      return 'just now';
-    } catch (_) {
-      return iso;
-    }
-  }
+  String _relativeTime(String iso) => relativeTimeFromBackend(iso);
 }
 
 class _NewBadge extends StatelessWidget {

@@ -40,6 +40,35 @@ from web.reader import build_vacancy_view
 log = logging.getLogger(__name__)
 
 _CANDIDATE_NAME = os.getenv("CANDIDATE_NAME", "Candidate")
+
+# All DB timestamps are stored as naive UTC strings (SQLite `datetime('now')`
+# → "YYYY-MM-DD HH:MM:SS"; job-monitor/RSSWatcher write "YYYY-MM-DDTHH:MM:SS"
+# — neither carries a timezone marker). Every JSON consumer of these fields
+# (Flutter's DateTime.parse, browser JS Date) treats an unmarked ISO-ish
+# string as LOCAL time, not UTC — silently shifting every "posted Xh ago" /
+# "analyzed at HH:mm" display by the device's UTC offset. Found 2026-07-24:
+# vacancy #824, fetched ~15 minutes earlier, showed "3h ago" in Kyiv summer
+# time (UTC+3) — the offset matched exactly. Normalize every known date
+# field to carry an explicit 'Z' at the API response boundary (DB storage
+# stays naive/unchanged) so no consumer has to guess again.
+_DATE_FIELDS = {"published_at", "created_at", "updated_at", "republished_at", "started_at", "finished_at"}
+
+
+def _utc_z(value):
+    """Append an explicit UTC marker to a naive timestamp string, if missing."""
+    if not value or not isinstance(value, str):
+        return value
+    if value.endswith("Z") or re.search(r"[+-]\d\d:\d\d$", value):
+        return value
+    return value.replace(" ", "T", 1) + "Z"
+
+
+def _normalize_dates(item: dict) -> dict:
+    """Mutate + return item — appends 'Z' to every known date field present."""
+    for key in _DATE_FIELDS:
+        if key in item:
+            item[key] = _utc_z(item[key])
+    return item
 _PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 
 
@@ -293,7 +322,7 @@ async def api_vacancies(
     rows = await database.list_vacancies(status=status, user_id=user_id, since=since, limit=limit)
     result = []
     for row in rows:
-        item = dict(row)
+        item = _normalize_dates(dict(row))
         item["applied"] = bool(item.get("applied"))
         item["starred"] = bool(item.get("starred"))
         item["stage"] = vacancy_stage.stage(item.get("status") or "", item["applied"])
@@ -1365,7 +1394,7 @@ async def api_vacancy(vacancy_id: int):
     row = await database.get_vacancy_by_id(vacancy_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Vacancy not found")
-    return dict(row)
+    return _normalize_dates(dict(row))
 
 
 @app.get("/api/vacancies/{vacancy_id}/activity")
@@ -1382,7 +1411,11 @@ async def api_vacancy_activity(vacancy_id: int):
         database.get_vacancy_pipeline_runs(vacancy_id),
         database.get_vacancy_activity(vacancy_id),
     )
-    return {"vacancy_id": vacancy_id, "pipeline_runs": runs, "entries": entries}
+    return {
+        "vacancy_id": vacancy_id,
+        "pipeline_runs": [_normalize_dates(r) for r in runs],
+        "entries": [_normalize_dates(e) for e in entries],
+    }
 
 
 class AppliedUpdate(BaseModel):

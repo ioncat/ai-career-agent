@@ -90,6 +90,79 @@ async def test_api_users_returns_list(client):
     assert names == {"Alice", "Bob"}
 
 
+# ── Date normalization — naive DB timestamps → explicit UTC (2026-07-24) ───────
+# Found live: vacancy #824 (fetched ~15 min earlier) showed "3h ago" in
+# Flutter — DB stores naive UTC strings (no 'Z'), and DateTime.parse() on an
+# unmarked string is interpreted as LOCAL time by Dart. Every date field
+# returned by the API must carry an explicit 'Z' so no consumer has to guess.
+
+def test_utc_z_appends_marker_to_t_separated_naive_string():
+    from web.api import _utc_z
+    assert _utc_z("2026-07-24T12:53:34") == "2026-07-24T12:53:34Z"
+
+
+def test_utc_z_converts_space_separated_sqlite_format():
+    """SQLite's datetime('now') default produces a space, not 'T'."""
+    from web.api import _utc_z
+    assert _utc_z("2026-07-24 12:53:34") == "2026-07-24T12:53:34Z"
+
+
+def test_utc_z_leaves_already_marked_strings_untouched():
+    from web.api import _utc_z
+    assert _utc_z("2026-07-24T12:53:34Z") == "2026-07-24T12:53:34Z"
+    assert _utc_z("2026-07-24T12:53:34+03:00") == "2026-07-24T12:53:34+03:00"
+
+
+def test_utc_z_passes_through_none_and_empty():
+    from web.api import _utc_z
+    assert _utc_z(None) is None
+    assert _utc_z("") == ""
+
+
+def test_normalize_dates_only_touches_known_date_fields():
+    from web.api import _normalize_dates
+    item = {
+        "id": 1,
+        "title": "Product Manager",
+        "published_at": "2026-07-24T12:53:34",
+        "created_at": "2026-07-24 12:37:56",
+        "updated_at": None,
+        "content_hash": "abc123",  # not a date field — must be left alone
+    }
+    result = _normalize_dates(item)
+    assert result["published_at"] == "2026-07-24T12:53:34Z"
+    assert result["created_at"] == "2026-07-24T12:37:56Z"
+    assert result["updated_at"] is None
+    assert result["content_hash"] == "abc123"
+
+
+@pytest.mark.asyncio
+async def test_api_vacancies_dates_carry_utc_marker(client):
+    """Contract test: GET /api/vacancies must never return a naive date string
+    for a known date field — this is the regression guard for the #824 bug."""
+    uid = await database.insert_user(name="DateContractUser", telegram_chat_id=2050, skill_type="pm")
+    await database.insert_vacancy(url="https://djinni.co/jobs/dc1/", user_id=uid, published_at="2026-07-24T12:53:34")
+
+    data = client.get(f"/api/vacancies?user_id={uid}").json()
+    assert len(data) == 1
+    for field in ("published_at", "created_at", "updated_at"):
+        value = data[0].get(field)
+        if value:
+            assert value.endswith("Z") or "+" in value, f"{field}={value!r} has no timezone marker"
+
+
+@pytest.mark.asyncio
+async def test_api_vacancy_detail_dates_carry_utc_marker(client):
+    uid = await database.insert_user(name="DateContractDetail", telegram_chat_id=2051, skill_type="pm")
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/dc2/", user_id=uid, published_at="2026-07-24T12:53:34")
+
+    data = client.get(f"/api/vacancies/{vid}").json()
+    for field in ("published_at", "created_at", "updated_at"):
+        value = data.get(field)
+        if value:
+            assert value.endswith("Z") or "+" in value, f"{field}={value!r} has no timezone marker"
+
+
 # ── GET /api/vacancies — stage field ───────────────────────────────────────────
 
 @pytest.mark.asyncio
