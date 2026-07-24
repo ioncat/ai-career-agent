@@ -266,6 +266,17 @@ class VacancyRepository {
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
+  /// Persist the current full AI Provider state (global model/effort + every
+  /// phase pin) under the active provider's key (2026-07-24 redesign).
+  Future<Map<String, dynamic>> saveConfigSnapshot() async {
+    final uri = Uri.parse('$baseUrl/api/config/save-snapshot');
+    final response = await http.post(uri).timeout(const Duration(seconds: 5));
+    if (response.statusCode != 200) {
+      throw Exception('Failed to save AI Provider snapshot: ${response.statusCode}');
+    }
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
   /// Manually run the critical-blocker pre-filter on one vacancy (EPIC-27).
   /// Not auto-triggered — this is the "Check blockers" button's call.
   Future<Map<String, dynamic>> runPrefilter(int vacancyId) async {

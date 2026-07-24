@@ -963,6 +963,46 @@ async def test_api_config_patch_auto_check_title_does_not_affect_llm_config(clie
     assert resp.json()["llm_provider"] == "claude_cli"
 
 
+# ── POST /api/config/save-snapshot — per-provider config (2026-07-24) ──────────
+
+@pytest.mark.asyncio
+async def test_save_snapshot_then_switch_and_back_restores_model_and_phase_pin(client):
+    await database.insert_user(name="SnapUser", telegram_chat_id=8001, skill_type="pm")
+    client.patch("/api/config", json={"llm_provider": "claude_api"})
+    client.patch("/api/config", json={"model": "claude-opus-4-8", "thinking_effort": "high", "expected_provider": "claude_api"})
+    client.patch("/api/config/phases/prefilter", json={"provider": "claude_api", "model": "claude-haiku-4-5-20251001"})
+
+    save_resp = client.post("/api/config/save-snapshot")
+    assert save_resp.status_code == 200
+    assert save_resp.json() == {"provider": "claude_api", "phase_pins": 1}
+
+    client.patch("/api/config", json={"llm_provider": "ollama_api"})
+    assert client.get("/api/config/phases").json()["phases"]["prefilter"]["is_override"] is False
+
+    back = client.patch("/api/config", json={"llm_provider": "claude_api"})
+    assert back.json()["model"] == "claude-opus-4-8"
+    assert back.json()["thinking_effort"] == "high"
+
+    phases = client.get("/api/config/phases").json()["phases"]
+    assert phases["prefilter"]["is_override"] is True
+    assert phases["prefilter"]["model"] == "claude-haiku-4-5-20251001"
+
+
+@pytest.mark.asyncio
+async def test_switch_to_provider_with_no_snapshot_has_no_stale_phase_pins(client):
+    """The exact bug this redesign fixes: pin a phase under provider A,
+    switch to a never-saved provider B — the pin must not leak into B."""
+    await database.insert_user(name="StaleSnapUser", telegram_chat_id=8002, skill_type="pm")
+    client.patch("/api/config", json={"llm_provider": "ollama_api"})
+    client.patch("/api/config/phases/prefilter", json={"provider": "ollama_api", "model": "gemma4:e4b"})
+
+    client.patch("/api/config", json={"llm_provider": "claude_cli"})
+
+    phases = client.get("/api/config/phases").json()["phases"]
+    assert phases["prefilter"]["is_override"] is False
+    assert phases["prefilter"]["provider"] == "claude_cli"
+
+
 @pytest.mark.asyncio
 async def test_api_config_analysis_mode_full_auto(client, monkeypatch):
     """GET /api/config reflects ANALYSIS_MODE=full_auto."""

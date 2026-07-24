@@ -70,6 +70,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await notifier.updateApiUrl(_urlController.text.trim());
     await notifier.updatePollInterval(_pollInterval);
     await notifier.updateNotifications(_notifications);
+    // AI Provider's real job for Save (2026-07-24 redesign) — persists
+    // current model/effort/phase-pins under the active provider's key.
+    // Best-effort: connection settings above already saved regardless.
+    try {
+      await ref.read(remoteConfigProvider.notifier).saveSnapshot();
+    } catch (_) {
+      // Non-fatal — connection settings still saved; AI Provider state
+      // just wasn't (e.g. backend unreachable). No separate error surfaced
+      // here to keep the single "Saved" affordance simple.
+    }
     if (mounted) {
       setState(() => _saved = true);
       Future.delayed(const Duration(seconds: 2), () {
@@ -149,12 +159,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               const SizedBox(height: 32),
 
-              // AI Provider — model + effort (admin panel, read from /api/config)
+              // AI Provider — model + effort + per-phase routing, one saved
+              // unit (admin panel, read from /api/config[/phases])
               _SectionLabel('AI Provider'),
               const SizedBox(height: 12),
               const _AiProviderTile(),
-              const SizedBox(height: 16),
-              const PhaseRoutingSection(),
               const SizedBox(height: 32),
 
               // Pre-filter — Stage 1 (title/domain) auto-trigger toggle
@@ -282,6 +291,13 @@ class _AiProviderTile extends ConsumerWidget {
               const SizedBox(height: 10),
               _EffortControl(current: config.thinkingEffort),
             ],
+
+            // Per-phase routing — part of AI Provider (2026-07-24 redesign),
+            // not a separate top-level section: provider switch + phase pins
+            // are now one saved unit (see save-snapshot below), so they live
+            // in the same card.
+            const Divider(height: 28),
+            const PhaseRoutingSection(),
           ],
         ),
       ),

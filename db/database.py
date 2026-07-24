@@ -181,6 +181,16 @@ async def init_db() -> None:
             # manual-trigger-only. Default 1: free + already-validated, no reason to
             # ship it off.
             "ALTER TABLE user_settings ADD COLUMN auto_check_title INTEGER NOT NULL DEFAULT 1",
+            # Settings redesign (2026-07-24): per-provider saved config snapshot
+            # (global model/effort + all phase_llm_config pins as JSON) — see
+            # provider_config_snapshots comment in schema.sql for the full design.
+            """CREATE TABLE IF NOT EXISTS provider_config_snapshots (
+                provider        TEXT PRIMARY KEY,
+                model           TEXT,
+                thinking_effort TEXT NOT NULL DEFAULT 'off',
+                phase_configs   TEXT,
+                updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+            )""",
         ]:
             try:
                 await db.execute(migration)
@@ -1156,6 +1166,51 @@ async def delete_phase_llm_config(phase: str) -> None:
     """Remove a phase's override — resets it to follow the global default."""
     async with get_db() as db:
         await db.execute("DELETE FROM phase_llm_config WHERE phase = ?", (phase,))
+        await db.commit()
+
+
+async def get_provider_snapshot(provider: str) -> dict | None:
+    """Return the last-saved full config for one provider (global model/effort
+    + all phase pins), or None if never saved."""
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT model, thinking_effort, phase_configs FROM provider_config_snapshots WHERE provider = ?",
+            (provider,),
+        )
+        row = await cursor.fetchone()
+    if row is None:
+        return None
+    try:
+        phase_configs = json.loads(row["phase_configs"]) if row["phase_configs"] else {}
+    except (json.JSONDecodeError, TypeError):
+        phase_configs = {}
+    return {
+        "model": row["model"],
+        "thinking_effort": row["thinking_effort"],
+        "phase_configs": phase_configs,
+    }
+
+
+async def set_provider_snapshot(
+    provider: str,
+    model: str | None,
+    thinking_effort: str,
+    phase_configs: dict,
+) -> None:
+    """Upsert the full saved state for one provider."""
+    async with get_db() as db:
+        await db.execute(
+            """
+            INSERT INTO provider_config_snapshots (provider, model, thinking_effort, phase_configs, updated_at)
+            VALUES (?, ?, ?, ?, datetime('now'))
+            ON CONFLICT(provider) DO UPDATE SET
+                model = excluded.model,
+                thinking_effort = excluded.thinking_effort,
+                phase_configs = excluded.phase_configs,
+                updated_at = excluded.updated_at
+            """,
+            (provider, model, thinking_effort, json.dumps(phase_configs)),
+        )
         await db.commit()
 
 
