@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/health.dart';
 import '../providers/health_provider.dart';
+import '../providers/list_panel_provider.dart';
 import '../providers/notification_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/vacancy_list_provider.dart';
@@ -146,6 +147,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     final inboxCount = ref.watch(folderVacanciesProvider('inbox')).length;
     final notifState = ref.watch(notificationProvider).valueOrNull;
     final unreadNotifCount = notifState?.unreadCount ?? 0;
+    final listPanelCollapsed = ref.watch(listPanelProvider).valueOrNull?.collapsed ?? false;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -178,6 +180,9 @@ class _AppShellState extends ConsumerState<AppShell> {
                             unreadNotifCount: unreadNotifCount,
                             onSelected: (i) => setState(() => _selectedIndex = i),
                             onAddVacancy: _importJd,
+                            listPanelCollapsed: listPanelCollapsed,
+                            onToggleListPanel: () =>
+                                ref.read(listPanelProvider.notifier).toggleCollapsed(),
                           ),
                           // Thin divider
                           VerticalDivider(
@@ -266,6 +271,8 @@ class _AppNavRail extends StatelessWidget {
   final int unreadNotifCount;
   final ValueChanged<int> onSelected;
   final VoidCallback onAddVacancy;
+  final bool listPanelCollapsed;
+  final VoidCallback onToggleListPanel;
 
   const _AppNavRail({
     required this.selectedIndex,
@@ -273,6 +280,8 @@ class _AppNavRail extends StatelessWidget {
     required this.unreadNotifCount,
     required this.onSelected,
     required this.onAddVacancy,
+    required this.listPanelCollapsed,
+    required this.onToggleListPanel,
   });
 
   @override
@@ -305,22 +314,42 @@ class _AppNavRail extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            // Main nav items: Inbox, Analyzed, Processed, Applied, Archive (indices 0–4)
-            ..._kNavItems.take(5).toList().asMap().entries.map((e) {
-              final i = e.key;
-              return _NavRailItem(
-                item: e.value,
-                selected: selectedIndex == i,
-                badgeCount: i == 0 ? inboxCount : 0,
-                onTap: () => onSelected(i),
-              );
-            }),
-            // Add vacancy button — in the same group as nav items
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-              child: _AddVacancyButton(onTap: onAddVacancy),
+            // Scrollable rather than a fixed Column + Spacer — the toggle
+            // button added below (2026-07-25) left zero vertical slack on
+            // short windows (found via the widget-test's fixed 800x600
+            // surface: hard RenderFlex overflow, not just visually tight).
+            // Scrolling degrades gracefully instead of clipping content.
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    // Main nav items: Inbox, Analyzed, Processed, Applied, Archive (indices 0–4)
+                    ..._kNavItems.take(5).toList().asMap().entries.map((e) {
+                      final i = e.key;
+                      return _NavRailItem(
+                        item: e.value,
+                        selected: selectedIndex == i,
+                        badgeCount: i == 0 ? inboxCount : 0,
+                        onTap: () => onSelected(i),
+                      );
+                    }),
+                    // Add vacancy button — in the same group as nav items
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      child: _AddVacancyButton(onTap: onAddVacancy),
+                    ),
+                    // List-panel collapse/expand toggle — the only way to
+                    // bring the panel back once collapsed, so it lives here
+                    // rather than inside the panel itself (hidden when
+                    // collapsed — no in-panel affordance would be reachable).
+                    ListPanelToggleButton(
+                      collapsed: listPanelCollapsed,
+                      onTap: onToggleListPanel,
+                    ),
+                  ],
+                ),
+              ),
             ),
-            const Spacer(),
             // Settings (index 5) — at the bottom, rarely used
             _NavRailItem(
               item: _kNavItems[5],
@@ -511,6 +540,37 @@ class _NavRailItem extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── List-panel collapse/expand toggle ──────────────────────────────────────────
+
+class ListPanelToggleButton extends StatelessWidget {
+  final bool collapsed;
+  final VoidCallback onTap;
+
+  const ListPanelToggleButton({super.key, required this.collapsed, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Tooltip(
+      message: collapsed ? 'Show vacancy list' : 'Hide vacancy list',
+      child: InkWell(
+        onTap: onTap,
+        mouseCursor: SystemMouseCursors.click,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.all(6),
+          child: Icon(
+            collapsed ? Icons.view_sidebar_outlined : Icons.view_sidebar,
+            color: cs.onSurfaceVariant,
+            size: 18,
           ),
         ),
       ),
