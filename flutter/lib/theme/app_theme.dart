@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 // ── Brand colors (from DESIGN.md / Fluid Desktop Workspace) ──────────────────
 
@@ -55,25 +54,22 @@ const _colorScheme = ColorScheme(
   surfaceTint: Color(0xFF6750A4),
 );
 
-// ── TextTheme (Hanken Grotesk / Inter / JetBrains Mono) ──────────────────────
+// ── TextTheme (Hanken Grotesk / Inter / JetBrains Mono — bundled locally,
+// see pubspec.yaml — synchronous load, no google_fonts runtime fetch) ───────
 
 TextTheme _buildTextTheme() {
-  final hg = GoogleFonts.hankenGroteskTextTheme();
-  final inter = GoogleFonts.interTextTheme();
-  final jbm = GoogleFonts.jetBrainsMonoTextTheme();
-
-  return TextTheme(
+  return const TextTheme(
     // Headings — Hanken Grotesk
-    displaySmall:   hg.displaySmall?.copyWith(fontSize: 24, fontWeight: FontWeight.w700, height: 32/24),
-    headlineMedium: hg.headlineMedium?.copyWith(fontSize: 20, fontWeight: FontWeight.w600, height: 28/20),
-    titleMedium:    hg.titleMedium?.copyWith(fontSize: 16, fontWeight: FontWeight.w700, height: 24/16),
-    titleSmall:     hg.titleSmall?.copyWith(fontSize: 14, fontWeight: FontWeight.w600, height: 20/14),
+    displaySmall:   TextStyle(fontFamily: 'Hanken Grotesk', fontSize: 24, fontWeight: FontWeight.w700, height: 32/24),
+    headlineMedium: TextStyle(fontFamily: 'Hanken Grotesk', fontSize: 20, fontWeight: FontWeight.w600, height: 28/20),
+    titleMedium:    TextStyle(fontFamily: 'Hanken Grotesk', fontSize: 16, fontWeight: FontWeight.w700, height: 24/16),
+    titleSmall:     TextStyle(fontFamily: 'Hanken Grotesk', fontSize: 14, fontWeight: FontWeight.w600, height: 20/14),
     // Body — Inter
-    bodyMedium: inter.bodyMedium?.copyWith(fontSize: 14, fontWeight: FontWeight.w400, height: 20/14),
-    bodySmall:  inter.bodySmall?.copyWith(fontSize: 12, fontWeight: FontWeight.w400, height: 16/12),
+    bodyMedium: TextStyle(fontFamily: 'Inter', fontSize: 14, fontWeight: FontWeight.w400, height: 20/14),
+    bodySmall:  TextStyle(fontFamily: 'Inter', fontSize: 12, fontWeight: FontWeight.w400, height: 16/12),
     // Labels — JetBrains Mono
-    labelMedium: jbm.labelMedium?.copyWith(fontSize: 12, fontWeight: FontWeight.w500, height: 16/12),
-    labelSmall:  jbm.labelSmall?.copyWith(fontSize: 11, fontWeight: FontWeight.w500, height: 16/11, letterSpacing: 0.5),
+    labelMedium: TextStyle(fontFamily: 'JetBrains Mono', fontSize: 12, fontWeight: FontWeight.w500, height: 16/12),
+    labelSmall:  TextStyle(fontFamily: 'JetBrains Mono', fontSize: 11, fontWeight: FontWeight.w500, height: 16/11, letterSpacing: 0.5),
   );
 }
 

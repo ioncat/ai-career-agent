@@ -65,7 +65,9 @@ skill/users/
 skill/active_user
 
 # Fonts — licensed, not for public repo (copy from C:/Windows/Fonts/ or callback-cv/fonts/)
-fonts/
+# Anchored to repo root — flutter/assets/fonts/ is OFL-licensed (Google
+# Fonts), explicitly free to redistribute, and must stay tracked.
+/fonts/
 
 # Windows OS junk
 *.lnk
