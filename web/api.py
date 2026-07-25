@@ -295,6 +295,8 @@ def _parse_analysis_summary(analysis_json_str: str | None) -> dict:
         if p1:
             out["vacancy_score"] = p1.get("vacancy_score")
             out["primary_archetype"] = p1.get("role_archetype", "")
+            out["role"] = p1.get("role", "")
+            out["company"] = p1.get("company", "")
             out["role_tags"] = _role_tags(p1.get("role_balance", {}))
         return out
     except Exception:

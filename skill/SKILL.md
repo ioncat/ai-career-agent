@@ -367,13 +367,12 @@ Option "Оба" → two CVs + two covers generated sequentially.
 python scripts/vacancy_track.py update-json --id $VACANCY_ID --phase p1 --data '{
   "role": "[exact role title from JD]",
   "company": "[company name — clean, not a JD text snippet]",
-  "company_type": "startup|scaleup|enterprise|founder-led",
-  "role_archetype": "[Primary archetype label from 1.4]",
+  "north_star": "[one-line North Star from 1.0.5]",
+  "primary_archetype": "[Primary archetype label from 1.3]",
+  "company_type": "product|hybrid|outsourcing",
   "role_balance": {"strategy": N, "discovery": N, "execution": N, "coordination": N, "ops": N},
-  "autonomy": "high|medium|low",
   "dominant_culture": "ownership|speed|alignment|process|innovation|predictability",
-  "vacancy_score": N.N,
-  "vacancy_dims": {
+  "vacscore_dims": {
     "company_tier": N,
     "seniority": N,
     "market_scope": N,
@@ -382,27 +381,53 @@ python scripts/vacancy_track.py update-json --id $VACANCY_ID --phase p1 --data '
     "domain_score": N,
     "remote_policy": N,
     "compensation": N
-  }
+  },
+  "vacancy_score": N.N
 }'
 ```
 
+> **Every field above is REQUIRED — this must validate against `contracts/pipeline.py:Phase1Data`.**
+> `role`/`company` are the most consequential (see below), but any missing field
+> (`north_star`, `primary_archetype`, `vacscore_dims`, ...) or a `company_type`
+> value outside `product|hybrid|outsourcing` makes the whole `analysis_json`
+> fail strict validation — the API then falls back to a legacy parser that
+> only reads `role`/`company` (fixed 2026-07-25, previously dropped them too).
+> Found live 2026-07-25 on vacancies #828/#832 — this exact template was
+> stale relative to the schema (missing fields, wrong `company_type` enum,
+> old `vacancy_dims` name), producing invalid JSON for every locally-run
+> vacancy until caught. If unsure the current template still matches the
+> schema, check `contracts/pipeline.py:Phase1Data`/`Phase2Data` directly —
+> don't trust this doc blindly.
+>
 > **`role` and `company` are MANDATORY, not optional.** The web tracker list view reads `analysis_json.p1.role` and `.company` (`_parse_analysis_summary` in `web/api.py`). If omitted, the UI silently falls back to the raw DB `company`/`title` columns — which for RSS/scraped vacancies can be a garbage JD-text snippet instead of the actual company name (found on vacancy #690, 2026-07-16: DB company was a scraped mission-statement fragment, not "Solidgate", because `update-json --phase p1` omitted `role`/`company`).
 
 python scripts/vacancy_track.py update-json --id $VACANCY_ID --phase p2 --data '{
   "fit_score": N,
-  "recommendation": "apply|take a chance|decline",
+  "recommendation": "apply|take_a_chance|decline",
+  "recommendation_label": "[must start with the recommendation text above, e.g. \"Apply — strong match\" or \"Take a chance — ...\"]",
   "category": "[category string from Quick Scan]",
+  "who_they_want": "[one-line ideal-candidate summary]",
   "key_barriers": ["short label 1", "short label 2"],
   "hidden_risks": ["risk 1", "risk 2"],
   "warnings": ["warning 1", "warning 2"],
-  "salary": "$X–Y or empty string",
-  "fit_dimensions": {"domain": N, "execution": N, "strategy": N, "systems": N, "stakeholder": N}
+  "why_apply": ["reason 1", "reason 2"],
+  "why_not_apply": ["reason 1", "reason 2"],
+  "fit_dimensions": {
+    "domain_fit": N.N,
+    "execution_fit": N.N,
+    "strategy_fit": N.N,
+    "systems_fit": N.N,
+    "stakeholder_fit": N.N,
+    "overall_fit": N.N
+  }
 }'
 ```
 
 **key_barriers format:** short labels only, max 5 words each — e.g. `["A/B testing", "consumer product", "PSP/POS integrations"]`. These appear as chips in the tracker.
 **fit_score:** integer (7, not "7/10").
 **warnings/hidden_risks:** array of short strings, or empty array `[]` if none.
+**recommendation:** `take_a_chance` uses an underscore, not a space — `recommendation_label` validates that it starts with the recommendation text (spaces, case-insensitive), so `"take_a_chance"` → label must start with `"take a chance"` (e.g. `"Take a chance — ..."`).
+**salary** is a separate DB column, not a `p2` field — set it via `vacancy_track.py update --id $VACANCY_ID --salary "..."` if needed, don't add it to this JSON.
 
 **After p1+p2 saved — update status (MANDATORY):**
 
@@ -416,7 +441,7 @@ python scripts/vacancy_track.py update --id $VACANCY_ID --status analyzed
 > Этот шаг ранее существовал только в секции URL-flow (ниже), но отсутствовал здесь,
 > и Claude Desktop его пропускал. Исправлено 2026-07-02.
 
-**After Phase 3.5 approval — save p3:**
+**After Phase 3.5 approval — save p3, then update status (MANDATORY):**
 
 ```bash
 python scripts/vacancy_track.py update-json --id $VACANCY_ID --phase p3 --data '{
@@ -424,15 +449,26 @@ python scripts/vacancy_track.py update-json --id $VACANCY_ID --phase p3 --data '
   "cv_language": "en|uk|ru",
   "changes_count": N
 }'
+python scripts/vacancy_track.py update --id $VACANCY_ID --status cv_generated
 ```
 
-**After Phase 4 approval — save p4:**
+**After Phase 4 approval — save p4, then update status (MANDATORY):**
 
 ```bash
 python scripts/vacancy_track.py update-json --id $VACANCY_ID --phase p4 --data '{
   "cover_language": "en|uk|ru"
 }'
+python scripts/vacancy_track.py update --id $VACANCY_ID --status cover_generated
 ```
+
+> **Same MANDATORY reasoning as the p1+p2 status step above** — `stage()`
+> (`core/vacancy_stage.py`) maps `cv_generated`/`cover_generated` → "Processed"
+> folder; without this step the vacancy stays in "Analyzed" forever even
+> after a CV/cover was actually written, because `analysis_json.p3`/`.p4`
+> existing is invisible to the stage classifier — only `status` drives it.
+> Found live 2026-07-25 on vacancy #828: CV was generated and approved, but
+> `status` was never advanced past `analyzed`, so it looked "stuck"/missing
+> from the folder the user expected it in.
 
 ---
 
