@@ -953,11 +953,16 @@ class InboxVacancyList extends StatelessWidget {
   });
 
   /// Index of the first vacancy published before the start of today (local
-  /// time) — the list is already sorted newest-first, so this is where a
-  /// "today / earlier" divider belongs. Returns null when there's nothing
-  /// to separate (every dated vacancy is from today, or none are dated).
-  /// Purely visual (2026-07-24, explicit user ask) — doesn't change order,
-  /// filtering, or grouping, just marks where "today" ends in the list.
+  /// time) — the list is already sorted newest-first, so this is where the
+  /// "Today" section ends and "Earlier" begins. Returns null when there's
+  /// nothing to separate (every dated vacancy is from today, or none are
+  /// dated) — in that case no section headers are shown at all. Returns 0
+  /// when NOTHING is from today (every vacancy is earlier) — the caller
+  /// shows an explicit "Nothing for today" note instead of just starting
+  /// the list with a bare "Earlier" header, which read as unexplained
+  /// (2026-07-25, explicit user ask — the original bare-"Earlier" version
+  /// looked "visually strange" with no "Today" to contrast against).
+  /// Purely visual — doesn't change order, filtering, or grouping.
   int? _todayDividerIndex() {
     final now = DateTime.now();
     final startOfToday = DateTime(now.year, now.month, now.day);
@@ -970,43 +975,57 @@ class InboxVacancyList extends StatelessWidget {
     return null;
   }
 
+  Widget _buildCard(VacancyListItem v) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: ProcessingWrapper(
+        key: ValueKey('pw_${v.id}'),
+        status: v.status,
+        child: VacancyCard(
+          vacancy: v,
+          selected: v.id == selectedId,
+          onTap: () => onSelect(v),
+          onTapRelated: onTapRelated,
+          multiSelectMode: multiSelectMode,
+          checked: checkedIds.contains(v.id),
+          onCheckToggle: onCheckToggle == null ? null : () => onCheckToggle!(v.id),
+          onLongPress: onLongPress == null ? null : () => onLongPress!(v.id),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final dividerIndex = _todayDividerIndex();
 
+    final items = <Widget>[];
+    if (dividerIndex == 0) {
+      items.add(const _SectionHeader(label: 'Today'));
+      items.add(const _NothingForTodayNote());
+      items.add(const _SectionHeader(label: 'Earlier'));
+    } else if (dividerIndex != null) {
+      items.add(const _SectionHeader(label: 'Today'));
+    }
+    for (var i = 0; i < vacancies.length; i++) {
+      if (dividerIndex != null && dividerIndex > 0 && i == dividerIndex) {
+        items.add(const _SectionHeader(label: 'Earlier'));
+      }
+      items.add(_buildCard(vacancies[i]));
+    }
+
     return ListView.builder(
       padding: const EdgeInsets.all(8),
-      itemCount: vacancies.length + (dividerIndex != null ? 1 : 0),
-      itemBuilder: (ctx, i) {
-        if (dividerIndex != null && i == dividerIndex) {
-          return const _TodayDivider();
-        }
-        final vIndex = (dividerIndex != null && i > dividerIndex) ? i - 1 : i;
-        final v = vacancies[vIndex];
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: ProcessingWrapper(
-            key: ValueKey('pw_${v.id}'),
-            status: v.status,
-            child: VacancyCard(
-              vacancy: v,
-              selected: v.id == selectedId,
-              onTap: () => onSelect(v),
-              onTapRelated: onTapRelated,
-              multiSelectMode: multiSelectMode,
-              checked: checkedIds.contains(v.id),
-              onCheckToggle: onCheckToggle == null ? null : () => onCheckToggle!(v.id),
-              onLongPress: onLongPress == null ? null : () => onLongPress!(v.id),
-            ),
-          ),
-        );
-      },
+      itemCount: items.length,
+      itemBuilder: (ctx, i) => items[i],
     );
   }
 }
 
-class _TodayDivider extends StatelessWidget {
-  const _TodayDivider();
+class _SectionHeader extends StatelessWidget {
+  final String label;
+
+  const _SectionHeader({required this.label});
 
   @override
   Widget build(BuildContext context) {
@@ -1019,7 +1038,7 @@ class _TodayDivider extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Text(
-              'Earlier',
+              label,
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                     color: cs.onSurfaceVariant,
                     letterSpacing: 0.5,
@@ -1028,6 +1047,27 @@ class _TodayDivider extends StatelessWidget {
           ),
           Expanded(child: Divider(color: cs.outlineVariant, thickness: 1)),
         ],
+      ),
+    );
+  }
+}
+
+class _NothingForTodayNote extends StatelessWidget {
+  const _NothingForTodayNote();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+      child: Center(
+        child: Text(
+          'Nothing for today',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: cs.onSurfaceVariant,
+                fontStyle: FontStyle.italic,
+              ),
+        ),
       ),
     );
   }
