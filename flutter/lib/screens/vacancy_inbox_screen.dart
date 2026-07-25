@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/vacancy.dart';
+import '../providers/list_panel_provider.dart';
 import '../providers/read_vacancies_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/vacancy_list_provider.dart';
@@ -34,6 +35,11 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
   int _batchDone = 0;
   int _batchTotal = 0;
   String _batchLabel = '';
+
+  // Live width while the divider is being dragged — kept as local State so
+  // resize is smooth (no SharedPreferences write per drag frame); only
+  // committed to listPanelProvider (persisted) on drag end.
+  double? _dragWidth;
 
   VacancyRepository get _repo {
     final apiUrl = ref.read(settingsProvider).valueOrNull?.apiUrl ?? 'http://localhost:8080';
@@ -310,11 +316,18 @@ List<VacancyListItem> _filter(List<VacancyListItem> all) {
     final cs = Theme.of(context).colorScheme;
     final hasFilters = _searchQuery.isNotEmpty || _activeFilterCount > 0;
 
+    final panelState = ref.watch(listPanelProvider).valueOrNull ?? const ListPanelState();
+    final panelCollapsed = panelState.collapsed;
+    final panelWidth = _dragWidth ?? panelState.width;
+
     return Row(
       children: [
-        // Master: vacancy list (360px, bg-surface)
+        // Master: vacancy list — resizable + collapsible (2026-07-25).
+        // Collapsed entirely (not just width:0) when hidden — reopened via
+        // the nav rail toggle (app_shell.dart), not from inside this panel.
+        if (!panelCollapsed) ...[
         SizedBox(
-          width: 360,
+          width: panelWidth,
           child: Container(
             color: cs.surface,
             child: Column(
@@ -460,11 +473,40 @@ List<VacancyListItem> _filter(List<VacancyListItem> all) {
             ),
           ),
         ),
-        // Vertical divider
-        VerticalDivider(
-          width: 1,
-          thickness: 1,
-          color: cs.outlineVariant.withValues(alpha: 0.2),
+        ],
+        // Vertical divider — draggable to resize the panel above. Hit area
+        // is wider (8px) than the visual line (1px) — a 1px drag target is
+        // unhittable with a mouse.
+        MouseRegion(
+          cursor: panelCollapsed ? MouseCursor.defer : SystemMouseCursors.resizeColumn,
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onHorizontalDragUpdate: panelCollapsed
+                ? null
+                : (details) => setState(() {
+                      _dragWidth = (panelWidth + details.delta.dx)
+                          .clamp(kListPanelMinWidth, kListPanelMaxWidth);
+                    }),
+            onHorizontalDragEnd: panelCollapsed
+                ? null
+                : (_) {
+                    final committed = _dragWidth;
+                    if (committed != null) {
+                      ref.read(listPanelProvider.notifier).setWidth(committed);
+                    }
+                    setState(() => _dragWidth = null);
+                  },
+            child: SizedBox(
+              width: 8,
+              child: Center(
+                child: VerticalDivider(
+                  width: 1,
+                  thickness: 1,
+                  color: cs.outlineVariant.withValues(alpha: 0.2),
+                ),
+              ),
+            ),
+          ),
         ),
         // Detail panel (bg-surface-container-lowest)
         Expanded(
