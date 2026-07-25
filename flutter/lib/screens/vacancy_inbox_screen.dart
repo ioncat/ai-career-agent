@@ -5,6 +5,7 @@ import '../providers/read_vacancies_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/vacancy_list_provider.dart';
 import '../repositories/vacancy_repository.dart';
+import '../utils/backend_time.dart';
 import '../widgets/processing_wrapper.dart';
 import '../widgets/vacancy_card.dart';
 import 'vacancy_detail_screen.dart';
@@ -423,7 +424,7 @@ List<VacancyListItem> _filter(List<VacancyListItem> all) {
                                   ? null
                                   : _searchController.text)
                           : _EmptyState(folder: widget.folder))
-                      : _VacancyList(
+                      : InboxVacancyList(
                           vacancies: filtered,
                           selectedId: _selected?.id,
                           onSelect: (v) {
@@ -929,7 +930,7 @@ class _DateButton extends StatelessWidget {
 
 // ─── List ────────────────────────────────────────────────────────────────────
 
-class _VacancyList extends StatelessWidget {
+class InboxVacancyList extends StatelessWidget {
   final List<VacancyListItem> vacancies;
   final int? selectedId;
   final ValueChanged<VacancyListItem> onSelect;
@@ -939,7 +940,8 @@ class _VacancyList extends StatelessWidget {
   final void Function(int id)? onCheckToggle;
   final void Function(int id)? onLongPress;
 
-  const _VacancyList({
+  const InboxVacancyList({
+    super.key,
     required this.vacancies,
     required this.selectedId,
     required this.onSelect,
@@ -950,13 +952,37 @@ class _VacancyList extends StatelessWidget {
     this.onLongPress,
   });
 
+  /// Index of the first vacancy published before the start of today (local
+  /// time) — the list is already sorted newest-first, so this is where a
+  /// "today / earlier" divider belongs. Returns null when there's nothing
+  /// to separate (every dated vacancy is from today, or none are dated).
+  /// Purely visual (2026-07-24, explicit user ask) — doesn't change order,
+  /// filtering, or grouping, just marks where "today" ends in the list.
+  int? _todayDividerIndex() {
+    final now = DateTime.now();
+    final startOfToday = DateTime(now.year, now.month, now.day);
+    for (var i = 0; i < vacancies.length; i++) {
+      final raw = vacancies[i].publishedAt;
+      if (raw == null) continue;
+      final local = parseBackendUtc(raw).toLocal();
+      if (local.isBefore(startOfToday)) return i;
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final dividerIndex = _todayDividerIndex();
+
     return ListView.builder(
       padding: const EdgeInsets.all(8),
-      itemCount: vacancies.length,
+      itemCount: vacancies.length + (dividerIndex != null ? 1 : 0),
       itemBuilder: (ctx, i) {
-        final v = vacancies[i];
+        if (dividerIndex != null && i == dividerIndex) {
+          return const _TodayDivider();
+        }
+        final vIndex = (dividerIndex != null && i > dividerIndex) ? i - 1 : i;
+        final v = vacancies[vIndex];
         return Padding(
           padding: const EdgeInsets.only(bottom: 8),
           child: ProcessingWrapper(
@@ -975,6 +1001,34 @@ class _VacancyList extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _TodayDivider extends StatelessWidget {
+  const _TodayDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Expanded(child: Divider(color: cs.outlineVariant, thickness: 1)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Text(
+              'Earlier',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                    letterSpacing: 0.5,
+                  ),
+            ),
+          ),
+          Expanded(child: Divider(color: cs.outlineVariant, thickness: 1)),
+        ],
+      ),
     );
   }
 }
