@@ -55,6 +55,19 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
     });
   }
 
+  /// Header button entry point (2026-07-25) — long-press-to-enter was found
+  /// unintuitive on desktop ("без прочтения документации никогда не
+  /// додумаешься"). Kept long-press too (good pattern for the mobile port,
+  /// EPIC-28) rather than removing it — this is just a second, discoverable
+  /// way in. Unlike long-press, nothing is pre-selected; unlike exiting,
+  /// toggling off clears any in-progress selection.
+  void _toggleMultiSelectMode() {
+    setState(() {
+      _multiSelectMode = !_multiSelectMode;
+      if (!_multiSelectMode) _selectedIds.clear();
+    });
+  }
+
   void _toggleCheck(int id) {
     setState(() {
       if (_selectedIds.contains(id)) {
@@ -352,6 +365,8 @@ List<VacancyListItem> _filter(List<VacancyListItem> all) {
                   onSkipAllContentBlocked: _batchRunning
                       ? null
                       : () => _skipAllByStage(filtered, 'content', 'content-blocked'),
+                  multiSelectActive: _multiSelectMode,
+                  onToggleMultiSelect: _batchRunning ? null : _toggleMultiSelectMode,
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
@@ -398,7 +413,7 @@ List<VacancyListItem> _filter(List<VacancyListItem> all) {
                     ),
                   ),
                 ),
-                if (_filterExpanded)
+                if (_filterExpanded && !_multiSelectMode)
                   InboxFilterPanel(
                     availableStatuses: availableStatuses,
                     selectedStatuses: _statusFilter,
@@ -547,6 +562,10 @@ class InboxListHeader extends StatelessWidget {
   final VoidCallback? onSkipAllTitleBlocked;
   final int contentBlockedCount;
   final VoidCallback? onSkipAllContentBlocked;
+  // Explicit header entry point for multi-select (2026-07-25) — alongside
+  // long-press, not replacing it (see _toggleMultiSelectMode's doc comment).
+  final bool multiSelectActive;
+  final VoidCallback? onToggleMultiSelect;
 
   const InboxListHeader({
     super.key,
@@ -562,6 +581,8 @@ class InboxListHeader extends StatelessWidget {
     this.onSkipAllTitleBlocked,
     this.contentBlockedCount = 0,
     this.onSkipAllContentBlocked,
+    this.multiSelectActive = false,
+    this.onToggleMultiSelect,
   });
 
   @override
@@ -667,6 +688,20 @@ class InboxListHeader extends StatelessWidget {
                       ),
                   ],
                 ),
+              IconButton(
+                icon: Icon(
+                  multiSelectActive ? Icons.checklist_rtl : Icons.checklist,
+                  size: 20,
+                  color: multiSelectActive ? cs.primary : cs.onSurfaceVariant,
+                ),
+                onPressed: onToggleMultiSelect,
+                tooltip: multiSelectActive ? 'Exit selection' : 'Select multiple',
+                style: IconButton.styleFrom(
+                  minimumSize: const Size(32, 32),
+                  padding: EdgeInsets.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
               IconButton(
                 icon: Badge(
                   isLabelVisible: filterCount > 0,

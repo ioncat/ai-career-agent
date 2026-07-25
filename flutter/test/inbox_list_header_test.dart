@@ -25,6 +25,8 @@ InboxListHeader _header({
   VoidCallback? onSkipAllTitleBlocked,
   int contentBlockedCount = 0,
   VoidCallback? onSkipAllContentBlocked,
+  bool multiSelectActive = false,
+  VoidCallback? onToggleMultiSelect,
 }) {
   return InboxListHeader(
     title: 'Inbox',
@@ -38,6 +40,8 @@ InboxListHeader _header({
     onSkipAllTitleBlocked: onSkipAllTitleBlocked,
     contentBlockedCount: contentBlockedCount,
     onSkipAllContentBlocked: onSkipAllContentBlocked,
+    multiSelectActive: multiSelectActive,
+    onToggleMultiSelect: onToggleMultiSelect,
   );
 }
 
@@ -113,6 +117,50 @@ void main() {
     // for a squeezed detail pane.
     await tester.pumpWidget(_narrowHarness(
       _header(titleBlockedCount: 4, contentBlockedCount: 9),
+      160,
+    ));
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+  });
+
+  // ── Multi-select header toggle (2026-07-25) ─────────────────────────────
+
+  testWidgets('shows the "off" icon and tooltip when not in multi-select', (tester) async {
+    await tester.pumpWidget(_harness(_header(multiSelectActive: false)));
+
+    expect(find.byIcon(Icons.checklist), findsOneWidget);
+    expect(find.byIcon(Icons.checklist_rtl), findsNothing);
+    expect(find.byTooltip('Select multiple'), findsOneWidget);
+  });
+
+  testWidgets('shows the "on" icon and tooltip when in multi-select', (tester) async {
+    await tester.pumpWidget(_harness(_header(multiSelectActive: true)));
+
+    expect(find.byIcon(Icons.checklist_rtl), findsOneWidget);
+    expect(find.byIcon(Icons.checklist), findsNothing);
+    expect(find.byTooltip('Exit selection'), findsOneWidget);
+  });
+
+  testWidgets('tapping the toggle calls onToggleMultiSelect', (tester) async {
+    var toggled = false;
+    await tester.pumpWidget(_harness(_header(onToggleMultiSelect: () => toggled = true)));
+
+    await tester.tap(find.byIcon(Icons.checklist));
+    expect(toggled, isTrue);
+  });
+
+  testWidgets('narrow-width overflow guard still holds with the multi-select toggle present', (tester) async {
+    // Same regression shape as the skip-all-menu guard above, re-run with
+    // the new icon this header gained today — one more unconditional
+    // control sharing the same crowded Row.
+    await tester.pumpWidget(_narrowHarness(
+      _header(
+        titleBlockedCount: 4,
+        contentBlockedCount: 9,
+        multiSelectActive: true,
+        onToggleMultiSelect: () {},
+      ),
       160,
     ));
     await tester.pump();
