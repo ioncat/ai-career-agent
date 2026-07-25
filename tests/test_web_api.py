@@ -1327,6 +1327,55 @@ async def test_api_vacancies_key_barriers_string_coerced_to_list(client):
     assert isinstance(target.get("warnings", []), list)
 
 
+@pytest.mark.asyncio
+async def test_api_vacancies_legacy_json_still_carries_role_and_company(client):
+    """GET /api/vacancies pulls role/company from legacy-schema analysis_json.
+
+    _parse_analysis_summary()'s legacy-fallback branch (pre-B1 analysis_json
+    that fails strict AnalysisJson validation) used to only extract p2 fields
+    (fit_score/recommendation/...) and vacancy_score/primary_archetype from
+    p1 — never role/company. Found live on vacancy #828 (2026-07-25): the DB
+    company column was also empty (manually-imported vacancy, no RSS company
+    field to fall back to), so the card rendered with a blank company. Fixed
+    by mirroring the strict-validation branch's role/company extraction in
+    the legacy branch too.
+    """
+    import json as _json
+    uid = await database.insert_user(name="Bob", telegram_chat_id=9902, skill_type="pm")
+    vid = await database.insert_vacancy(url="manual:legacy-role-company", user_id=uid)
+
+    legacy_json = _json.dumps({
+        "p1": {
+            "role": "Product Manager",
+            "company": "Go Offer",
+            "company_type": "founder-led",  # not in current schema's enum
+            "role_archetype": "Execution-heavy Platform/Systems PM",
+            "role_balance": {},
+            "vacancy_score": 7.0,
+        },
+        "p2": {
+            "fit_score": 7,
+            "recommendation": "apply",
+            "category": "PM",
+            "key_barriers": [],
+        },
+    })
+    import aiosqlite
+    async with aiosqlite.connect(database._db_path) as db:
+        await db.execute(
+            "UPDATE vacancies SET analysis_json=?, status='analyzed', company=NULL WHERE id=?",
+            (legacy_json, vid),
+        )
+        await db.commit()
+
+    resp = client.get("/api/vacancies")
+    assert resp.status_code == 200
+    target = next((v for v in resp.json() if v["id"] == vid), None)
+    assert target is not None
+    assert target["role"] == "Product Manager"
+    assert target["company"] == "Go Offer"
+
+
 # ── POST /api/vacancies/import-jd ─────────────────────────────────────────────
 
 @pytest.mark.asyncio
