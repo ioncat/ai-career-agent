@@ -35,9 +35,6 @@ dependencies:
   # File save dialog (PDF download)
   file_picker: ^8.1.7
 
-  # Typography: Hanken Grotesk + Inter + JetBrains Mono
-  google_fonts: ^6.2.1
-
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -49,3 +46,42 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  # Bundled locally (2026-07-25) — google_fonts' runtime fetch/cache-read is
+  # async, racing first-frame layout of IntrinsicWidth-sized widgets (found
+  # live: SourceBadge pills truncated — "Dji…" — for up to ~a minute after
+  # app start, self-correcting once the font swapped in with no relayout).
+  # Bundled assets load synchronously before first frame — no race, period.
+  # Variable fonts ([wght] axis) — one file per family covers every weight
+  # used in app_theme.dart's TextTheme.
+  fonts:
+    - family: Hanken Grotesk
+      fonts:
+        - asset: assets/fonts/HankenGrotesk-Variable.ttf
+          weight: 400
+        - asset: assets/fonts/HankenGrotesk-Variable.ttf
+          weight: 500
+        - asset: assets/fonts/HankenGrotesk-Variable.ttf
+          weight: 600
+        - asset: assets/fonts/HankenGrotesk-Variable.ttf
+          weight: 700
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Variable.ttf
+          weight: 400
+        - asset: assets/fonts/Inter-Variable.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-Variable.ttf
+          weight: 600
+        - asset: assets/fonts/Inter-Variable.ttf
+          weight: 700
+    - family: JetBrains Mono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono-Variable.ttf
+          weight: 400
+        - asset: assets/fonts/JetBrainsMono-Variable.ttf
+          weight: 500
+        - asset: assets/fonts/JetBrainsMono-Variable.ttf
+          weight: 600
+        - asset: assets/fonts/JetBrainsMono-Variable.ttf
+          weight: 700
