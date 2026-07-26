@@ -179,14 +179,14 @@ final vacancyListProvider =
 // user decision, 2026-07-26): Inbox is about JD freshness on the market,
 // Applied/Archive are terminal states where "when we acted on it" is less
 // useful than "which JD is newest" for browsing.
-const _kUpdatedAtSortedFolders = {'analyzed', 'processed'};
+const kUpdatedAtSortedFolders = {'analyzed', 'processed'};
 
 final folderVacanciesProvider =
     Provider.family<List<VacancyListItem>, String>((ref, folder) {
   final state = ref.watch(vacancyListProvider).valueOrNull;
   if (state == null) return [];
   final filtered = state.vacancies.where((v) => _folderMatch(v, folder)).toList();
-  if (_kUpdatedAtSortedFolders.contains(folder)) {
+  if (kUpdatedAtSortedFolders.contains(folder)) {
     filtered.sort((a, b) {
       final aTime = a.updatedAt != null ? parseBackendUtc(a.updatedAt!) : null;
       final bTime = b.updatedAt != null ? parseBackendUtc(b.updatedAt!) : null;

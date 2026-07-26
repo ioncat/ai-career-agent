@@ -17,7 +17,7 @@ Widget _harness(Widget child) => ProviderScope(
 
 String _utc(DateTime local) => local.toUtc().toIso8601String();
 
-VacancyListItem _item(int id, {String? publishedAt}) => VacancyListItem(
+VacancyListItem _item(int id, {String? publishedAt, String? updatedAt}) => VacancyListItem(
       id: id,
       role: 'Role $id',
       company: 'Company $id',
@@ -25,6 +25,7 @@ VacancyListItem _item(int id, {String? publishedAt}) => VacancyListItem(
       url: 'https://example.com/$id',
       status: 'inbox',
       publishedAt: publishedAt,
+      updatedAt: updatedAt,
     );
 
 void main() {
@@ -132,12 +133,11 @@ void main() {
     expect(find.text('Nothing for today'), findsNothing);
   });
 
-  testWidgets('showTodayDivider:false suppresses headers even with a clear today/earlier mix',
+  testWidgets('todayDividerBasis:null suppresses headers even with a clear today/earlier mix',
       (tester) async {
-    // Analyzed/Processed folders sort by updated_at (2026-07-26), so a
-    // publishedAt-based boundary would land in the wrong place — callers on
-    // those folders pass showTodayDivider:false. Verifies the flag actually
-    // wins even when the data would otherwise trigger a divider.
+    // A folder with no divider concept (e.g. Applied/Archive) passes null —
+    // verifies that wins even when publishedAt data would otherwise trigger
+    // a divider under the default basis.
     final now = DateTime.now();
     final vacancies = [
       _item(1, publishedAt: _utc(now)),
@@ -148,7 +148,7 @@ void main() {
       vacancies: vacancies,
       selectedId: null,
       onSelect: (_) {},
-      showTodayDivider: false,
+      todayDividerBasis: null,
     )));
 
     expect(find.text('Today'), findsNothing);
@@ -156,5 +156,38 @@ void main() {
     expect(find.text('Nothing for today'), findsNothing);
     expect(find.text('Role 1'), findsOneWidget);
     expect(find.text('Role 2'), findsOneWidget);
+  });
+
+  testWidgets('todayDividerBasis:updatedAt checks updatedAt instead of publishedAt',
+      (tester) async {
+    // Analyzed/Processed sort by updated_at (2026-07-26) — the divider must
+    // scan that same field, not publishedAt, or the boundary lands wrong.
+    final now = DateTime.now();
+    final startOfToday = DateTime(now.year, now.month, now.day);
+    final yesterday = startOfToday.subtract(const Duration(hours: 2));
+
+    final vacancies = [
+      // publishedAt says "old", but updatedAt (analyzed) says "today".
+      _item(1, publishedAt: _utc(yesterday), updatedAt: _utc(now)),
+      // publishedAt says "today", but updatedAt (analyzed) says "earlier".
+      _item(2, publishedAt: _utc(now), updatedAt: _utc(yesterday)),
+    ];
+
+    await tester.pumpWidget(_harness(InboxVacancyList(
+      vacancies: vacancies,
+      selectedId: null,
+      onSelect: (_) {},
+      todayDividerBasis: TodayDividerBasis.updatedAt,
+    )));
+
+    expect(find.text('Today'), findsOneWidget);
+    expect(find.text('Earlier'), findsOneWidget);
+    final todayTop = tester.getTopLeft(find.text('Today')).dy;
+    final item1Top = tester.getTopLeft(find.text('Role 1')).dy;
+    final earlierTop = tester.getTopLeft(find.text('Earlier')).dy;
+    final item2Top = tester.getTopLeft(find.text('Role 2')).dy;
+    expect(todayTop, lessThan(item1Top));
+    expect(item1Top, lessThan(earlierTop));
+    expect(earlierTop, lessThan(item2Top));
   });
 }

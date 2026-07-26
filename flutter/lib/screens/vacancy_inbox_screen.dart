@@ -473,7 +473,11 @@ List<VacancyListItem> _filter(List<VacancyListItem> all) {
                           : _EmptyState(folder: widget.folder))
                       : InboxVacancyList(
                           vacancies: filtered,
-                          showTodayDivider: widget.folder == 'inbox',
+                          todayDividerBasis: widget.folder == 'inbox'
+                              ? TodayDividerBasis.publishedAt
+                              : kUpdatedAtSortedFolders.contains(widget.folder)
+                                  ? TodayDividerBasis.updatedAt
+                                  : null,
                           selectedId: _selected?.id,
                           onSelect: (v) {
                             setState(() {
@@ -1012,6 +1016,10 @@ class _DateButton extends StatelessWidget {
 
 // ─── List ────────────────────────────────────────────────────────────────────
 
+/// Which date field the Today/Earlier divider (below) checks — must match
+/// whatever field the caller's list is actually sorted by.
+enum TodayDividerBasis { publishedAt, updatedAt }
+
 class InboxVacancyList extends StatelessWidget {
   final List<VacancyListItem> vacancies;
   final int? selectedId;
@@ -1021,12 +1029,12 @@ class InboxVacancyList extends StatelessWidget {
   final Set<int> checkedIds;
   final void Function(int id)? onCheckToggle;
   final void Function(int id)? onLongPress;
-  // Today/Earlier headers assume the list is published_at-sorted (see
-  // _todayDividerIndex doc below) — folders sorted by updated_at instead
-  // (Analyzed/Processed, 2026-07-26) would show a boundary at the wrong,
-  // misleading position, since publishedAt order no longer matches list
-  // order. Callers on an updated_at-sorted folder must pass false.
-  final bool showTodayDivider;
+  // The Today/Earlier boundary must be scanned against whichever field the
+  // list is actually sorted by, or it lands in the wrong place (2026-07-26
+  // — Analyzed/Processed sort by updated_at, not published_at). `null`
+  // disables the divider entirely (folders with no "today" concept worth
+  // showing, e.g. Applied/Archive keep the plain unsorted-by-date list).
+  final TodayDividerBasis? todayDividerBasis;
 
   const InboxVacancyList({
     super.key,
@@ -1038,26 +1046,30 @@ class InboxVacancyList extends StatelessWidget {
     this.checkedIds = const {},
     this.onCheckToggle,
     this.onLongPress,
-    this.showTodayDivider = true,
+    this.todayDividerBasis = TodayDividerBasis.publishedAt,
   });
 
-  /// Index of the first vacancy published before the start of today (local
-  /// time) — the list is already sorted newest-first, so this is where the
-  /// "Today" section ends and "Earlier" begins. Returns null when there's
-  /// nothing to separate (every dated vacancy is from today, or none are
-  /// dated) — in that case no section headers are shown at all. Returns 0
-  /// when NOTHING is from today (every vacancy is earlier) — the caller
-  /// shows an explicit "Nothing for today" note instead of just starting
-  /// the list with a bare "Earlier" header, which read as unexplained
-  /// (2026-07-25, explicit user ask — the original bare-"Earlier" version
-  /// looked "visually strange" with no "Today" to contrast against).
+  /// Index of the first vacancy whose divider-basis date falls before the
+  /// start of today (local time) — the list must already be sorted
+  /// newest-first BY THAT SAME FIELD, so this is where the "Today" section
+  /// ends and "Earlier" begins. Returns null when there's nothing to
+  /// separate (every dated vacancy is from today, or none are dated) — in
+  /// that case no section headers are shown at all. Returns 0 when NOTHING
+  /// is from today (every vacancy is earlier) — the caller shows an
+  /// explicit "Nothing for today" note instead of just starting the list
+  /// with a bare "Earlier" header, which read as unexplained (2026-07-25,
+  /// explicit user ask — the original bare-"Earlier" version looked
+  /// "visually strange" with no "Today" to contrast against).
   /// Purely visual — doesn't change order, filtering, or grouping.
   int? _todayDividerIndex() {
-    if (!showTodayDivider) return null;
+    final basis = todayDividerBasis;
+    if (basis == null) return null;
     final now = DateTime.now();
     final startOfToday = DateTime(now.year, now.month, now.day);
     for (var i = 0; i < vacancies.length; i++) {
-      final raw = vacancies[i].publishedAt;
+      final raw = basis == TodayDividerBasis.updatedAt
+          ? vacancies[i].updatedAt
+          : vacancies[i].publishedAt;
       if (raw == null) continue;
       final local = parseBackendUtc(raw).toLocal();
       if (local.isBefore(startOfToday)) return i;
