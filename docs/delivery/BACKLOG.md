@@ -13,7 +13,11 @@
 
 ## 📌 Now
 
-*(empty — pick from P0/P1)*
+### End-to-end CLI acceptance test — full pipeline on real vacancies (added 2026-07-26)
+**What:** run the complete pipeline via CLI/API (`LLM_PROVIDER=claude_api`, not `claude_cli` — need real token/cost numbers, see `docs/discovery/editorial-audit-experiment/README.md`) end-to-end on real vacancies: fetch → Phase 1+2 → Phase 3+3.5 → 3.6 → 4 → **Phase 3.7 auto-trigger** (the new addition this session, `core/pipeline_runner.py` → `tools/cv_editorial_audit.py`).
+**Why:** everything shipped today (Phase 3.7 wiring) is verified only by mocked unit tests (883 green) — never actually run against a live vacancy outside this chat session. This is the real acceptance gate before trusting the automated FSM path.
+**Scope:** pick 2-3 real vacancies (mix of qualifying `apply, fit>=7` and non-qualifying, to confirm the gate skips correctly for free on the latter); confirm CV/Cover files land correctly, `JD_analysis.md` gets the right `## Phase 3.7: Editorial Audit (CV)`/`(Cover)` sections, `analysis_json.p3_7_cv`/`p3_7_cover` populate, notifications fire (`EDITORIAL_AUDIT_DONE`).
+**Priority:** top of Now — do first when tokens allow.
 
 ---
 
