@@ -2,7 +2,7 @@
 
 **AI job search counselor for PdM · PO**
 
-> **Status: active development** — Flutter MVP complete, pipeline live, new features added regularly.
+> Personal tool, actively evolving as I use it in my own job search.
 
 Reads vacancies deeply, scores honest fit, and generates targeted CVs — so candidates apply to the right roles and win them.
 
