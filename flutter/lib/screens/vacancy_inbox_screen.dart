@@ -473,6 +473,7 @@ List<VacancyListItem> _filter(List<VacancyListItem> all) {
                           : _EmptyState(folder: widget.folder))
                       : InboxVacancyList(
                           vacancies: filtered,
+                          showTodayDivider: widget.folder == 'inbox',
                           selectedId: _selected?.id,
                           onSelect: (v) {
                             setState(() {
@@ -1020,6 +1021,12 @@ class InboxVacancyList extends StatelessWidget {
   final Set<int> checkedIds;
   final void Function(int id)? onCheckToggle;
   final void Function(int id)? onLongPress;
+  // Today/Earlier headers assume the list is published_at-sorted (see
+  // _todayDividerIndex doc below) — folders sorted by updated_at instead
+  // (Analyzed/Processed, 2026-07-26) would show a boundary at the wrong,
+  // misleading position, since publishedAt order no longer matches list
+  // order. Callers on an updated_at-sorted folder must pass false.
+  final bool showTodayDivider;
 
   const InboxVacancyList({
     super.key,
@@ -1031,6 +1038,7 @@ class InboxVacancyList extends StatelessWidget {
     this.checkedIds = const {},
     this.onCheckToggle,
     this.onLongPress,
+    this.showTodayDivider = true,
   });
 
   /// Index of the first vacancy published before the start of today (local
@@ -1045,6 +1053,7 @@ class InboxVacancyList extends StatelessWidget {
   /// looked "visually strange" with no "Today" to contrast against).
   /// Purely visual — doesn't change order, filtering, or grouping.
   int? _todayDividerIndex() {
+    if (!showTodayDivider) return null;
     final now = DateTime.now();
     final startOfToday = DateTime(now.year, now.month, now.day);
     for (var i = 0; i < vacancies.length; i++) {
