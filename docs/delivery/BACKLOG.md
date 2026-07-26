@@ -19,6 +19,14 @@
 
 ## 🔴 P0
 
+### Phase 3.6 Signal Audit operates at sentence granularity, not clause granularity — noise rides along on valid clauses (found 2026-07-25)
+**What:** `prompts/pm|generic/phase3_6_signal_audit.md` maps whole sentences to JD signals. A compound sentence with one signal-mapping clause and one noise clause gets marked ✅ entirely — the noise clause is never independently flagged. Found on vacancy #828 (Go Offer): "Managed enterprise customer relationships end-to-end — pre-sales, pilot negotiation, onboarding, and ongoing account management — translating direct client feedback into product priorities" — only the tail clause maps to a Go Offer signal (client feedback → priorities); the middle (pre-sales/pilot negotiation/account management) is pure enterprise-sales vocabulary with zero JD signal, and risks reading as a sales/CS background for a role that wants roadmap/engineering ownership. Same pattern on a second sentence, where a strong factual clause carried an unrelated meta-commentary tail past the audit unflagged.
+**Why:** this is systemic, not a one-off — likely affects every CV generated so far where a PROFILE.md sentence mixes a relevant clause with an irrelevant one (common, since PROFILE.md prose is written once and reused verbatim across very different vacancies without independent per-vacancy scrutiny).
+**Fix direction:** audit algorithm needs to decompose compound sentences (split on em-dash/comma-separated clauses, not just whole sentences) before mapping each clause independently to the Signal Coverage Table — a sentence should only be counted "clean" if ALL its clauses carry signal, not just one.
+**Found via:** user's own re-read of the saved HostiServer paragraph in #828, after the pipeline had already marked it ✅ in the original Phase 3.6 pass — see `vacancies/inbox/1/828 — Product Manager — Go Offer/JD_analysis.md`.
+
+---
+
 ### Competitive landscape analysis (requested 2026-05-31 — overdue)
 **What:** research similar services (AI-assisted job search, CV tailoring, fit analysis — PM-focused).
 **Why:** understand the market before building further; critique our positioning with real data.
@@ -159,6 +167,11 @@ No dual-availability state — the button's visibility is a direct, deterministi
 
 ## 🟡 P2
 
+### Backfill garbled `company` on 188 pre-existing Djinni vacancies (added 2026-07-25)
+**What:** 188 Djinni-sourced vacancies have a `company` value that's actually a truncated RSS-description sentence fragment (e.g. `"Headway Inc is a global tech company, revolutionizing..."` instead of `"Headway Inc"`) — root cause fixed same day (the correctly-parsed company from `services/parser`'s `<title>`-tag extraction now gets persisted, see CHANGELOG), but these 188 rows predate the fix and are stuck with the bad value.
+**Why:** low urgency — display-only cosmetic issue on old rows, doesn't block anything (dedup/analysis still work off other fields).
+**Scope (not started):** the clean source (`<title>` tag) isn't stored anywhere — `JD.md` only has the parsed markdown body — so backfill needs a live re-fetch of each of the 188 URLs, not a pure DB migration. Real cost/rate-limit tradeoff against 188 external requests; batch with a delay, or skip and let it self-correct on next re-publish/re-fetch.
+
 ### Scrape Djinni's own structured job-criteria block for pre-filter (added 2026-07-17)
 **What:** Djinni job pages render a public, unauthenticated `<aside>` block with structured job-side criteria — min years experience, remote/hybrid/office format, countries considered, required language level, employment type, domain, company stage. Confirmed live (anonymous browser session, no login) on a real job page — these are the JOB's own stated thresholds, not a personalized comparison against a specific candidate account (that comparison IS login-gated and stays out of reach; not needed anyway since we already have the candidate's own attributes in PROFILE.md).
 **Why:** Djinni already curates "hardest, most explicit" criteria structurally — could feed the pre-filter directly (skip/cheapen LLM reasoning for categories Djinni already classifies) or serve as a second signal to cross-check LLM output. Ties directly into the reliability problem being investigated in [EPIC-27](Epics/EPIC-27-per-phase-llm-routing.md) / `docs/discovery/prefilter-local-model-selection.md` — local-model instability (see that doc's stability findings) is exactly the gap this structured data could shrink.
@@ -239,6 +252,12 @@ No dual-availability state — the button's visibility is a direct, deterministi
 **Impact:** `RSSWatcher` retries forever on the exact same doomed write (fetch "succeeds" at the parser level, only the file-write step fails) — looks identical to a dead-URL retry loop from the logs, easy to misdiagnose (did, initially, during 2026-07-16's cleanup — turned out 2 of 264 stuck rows were this, not the html2text parser bug that explained the rest).
 **Fix:** folder-name construction (`tools/cv_fetch_jd.py` and/or `services/parser`) needs to strip trailing separator characters when company is empty/malformed, or fall back to a placeholder (e.g. `"— Unknown Company"`) instead of leaving a dangling `"— "`.
 **Found via:** 2 real vacancies during the 264-row fetching cleanup (`#252`, `#593`) — deleted as a workaround, root cause not fixed.
+
+### PDF bullet-list text extraction — marker separated from item text (found 2026-07-25)
+**Symptom:** `pdfminer.six` extraction of generated CV/Cover PDFs (`services/pdf/render.py`, WeasyPrint) puts the `•` bullet marker on its own line, then a blank line, then the list-item text — e.g. `Key results:\n\n•  \n\nShipped a functional MVP...` instead of `• Shipped a functional MVP...` on one line.
+**Not a bug (ruled out):** initially misdiagnosed as a Unicode/ToUnicode CMap encoding bug (em-dash/middle-dot/bullet all rendering as `�`) — checked actual codepoints via `ord()` directly (not terminal display) and confirmed extraction is 100% correct (`U+2014`, `U+00B7`, `U+2022` all present and correct). The `�` was the Windows bash console failing to *display* those glyphs, not a PDF/extraction problem. Reproduced independent of custom fonts (plain `sans-serif`, no `@font-face`) and across WeasyPrint 68.1 and 69.0 — same list-layout quirk both versions, so not a version regression either.
+**Impact:** cosmetic in raw-text extraction only — all text/keywords are present and correctly encoded, just reordered around list markers. Low priority; check whether a naive line-based ATS parser could mis-split on this before deciding if it's worth a template fix (`services/pdf/templates/cv.html` list-item HTML/CSS).
+**Found via:** manual ATS-parseability check for vacancy #828 (Go Offer), `vacancies/inbox/1/828 — Product Manager — Go Offer/Alex Bondarenko_CV.pdf`.
 
 ---
 

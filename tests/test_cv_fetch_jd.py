@@ -35,11 +35,12 @@ def _make_ctx(tmp_path: Path, parser_adapter=None, user_id: int = 1) -> MagicMoc
     return ctx
 
 
-def _make_doc(title="Backend Dev", markdown="## Job\nGreat role.") -> ParsedDocument:
+def _make_doc(title="Backend Dev", markdown="## Job\nGreat role.", company=None) -> ParsedDocument:
     return ParsedDocument(
         title=title,
         markdown=markdown,
         source_url="https://djinni.co/jobs/123-backend/",
+        company=company,
     )
 
 
@@ -419,7 +420,7 @@ async def test_cv_fetch_jd_passes_user_id_to_db(tmp_path):
 
 @pytest.mark.asyncio
 async def test_cv_fetch_jd_queued_vacancy_updates_not_inserts(tmp_path):
-    doc = _make_doc(title="Queued PM Role")
+    doc = _make_doc(title="Queued PM Role", company="Real Company Name")
     parser = AsyncMock()
     parser.fetch_markdown = AsyncMock(return_value=doc)
     ctx = _make_ctx(tmp_path, parser, user_id=1)
@@ -441,6 +442,11 @@ async def test_cv_fetch_jd_queued_vacancy_updates_not_inserts(tmp_path):
     call_args = mock_db.update_vacancy_fields.call_args
     assert call_args is not None
     assert call_args.args[0] == 55
+    # The correctly-parsed company (from ParsedDocument, not the RSS-ingest
+    # guess) must be persisted — found live 2026-07-25 that it was computed
+    # and used for folder naming / dedup but never written back to the DB,
+    # leaving the original bad RSS-heuristic company value stuck forever.
+    assert call_args.kwargs["company"] == "Real Company Name"
     assert "✅" in result
 
 
@@ -480,6 +486,42 @@ async def test_fetch_jd_sets_content_hash(tmp_path):
     assert call_args.args[0] == 10
     assert isinstance(call_args.args[1], str)
     assert len(call_args.args[1]) == 64  # sha256 hex digest length
+
+
+@pytest.mark.asyncio
+async def test_fetch_jd_normalizes_title_with_company_before_dedup_lookup(tmp_path):
+    """find_duplicate() must receive a company-suffix-stripped title.
+
+    Found live 2026-07-25: the same real job posted on DOU (title gets a
+    " — Company" suffix appended by the RSS parser) and Djinni (bare title,
+    no suffix) never deduped, even when company data was correct, because
+    the raw title strings differed. _normalize_title() strips a trailing
+    "<dash> {company}" suffix — this asserts fetch_jd actually passes
+    doc.company through to it, not just the bare title.
+    """
+    from db import database as real_database
+
+    doc = _make_doc(
+        title="Product Manager (Globalization) — Headway Inc",
+        company="Headway Inc",
+    )
+    parser = AsyncMock()
+    parser.fetch_markdown = AsyncMock(return_value=doc)
+    deps = _make_deps(tmp_path, parser)
+
+    with patch("tools.cv_fetch_jd.database") as mock_db:
+        mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
+        mock_db.insert_vacancy = AsyncMock(return_value=11)
+        mock_db.update_vacancy_fields = AsyncMock()
+        mock_db._normalize_title = real_database._normalize_title
+        _mock_dedup(mock_db)
+
+        await fetch_jd(deps, "https://djinni.co/jobs/123/")
+
+    mock_db.find_duplicate.assert_awaited_once()
+    call_args = mock_db.find_duplicate.call_args
+    normalized_title = call_args.args[2]
+    assert normalized_title == "product manager (globalization)"
 
 
 @pytest.mark.asyncio
