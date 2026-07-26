@@ -131,4 +131,30 @@ void main() {
     expect(find.text('Earlier'), findsNothing);
     expect(find.text('Nothing for today'), findsNothing);
   });
+
+  testWidgets('showTodayDivider:false suppresses headers even with a clear today/earlier mix',
+      (tester) async {
+    // Analyzed/Processed folders sort by updated_at (2026-07-26), so a
+    // publishedAt-based boundary would land in the wrong place — callers on
+    // those folders pass showTodayDivider:false. Verifies the flag actually
+    // wins even when the data would otherwise trigger a divider.
+    final now = DateTime.now();
+    final vacancies = [
+      _item(1, publishedAt: _utc(now)),
+      _item(2, publishedAt: _utc(now.subtract(const Duration(days: 2)))),
+    ];
+
+    await tester.pumpWidget(_harness(InboxVacancyList(
+      vacancies: vacancies,
+      selectedId: null,
+      onSelect: (_) {},
+      showTodayDivider: false,
+    )));
+
+    expect(find.text('Today'), findsNothing);
+    expect(find.text('Earlier'), findsNothing);
+    expect(find.text('Nothing for today'), findsNothing);
+    expect(find.text('Role 1'), findsOneWidget);
+    expect(find.text('Role 2'), findsOneWidget);
+  });
 }

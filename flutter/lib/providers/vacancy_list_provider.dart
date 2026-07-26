@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/vacancy.dart';
 import '../repositories/vacancy_repository.dart';
+import '../utils/backend_time.dart';
 import 'settings_provider.dart';
 
 enum PollingStatus { idle, polling, found, empty, error }
@@ -171,11 +172,31 @@ final vacancyListProvider =
     AsyncNotifierProvider<VacancyListNotifier, PollingState>(
         VacancyListNotifier.new);
 
+// Folders where "freshest" means our own last action on the vacancy
+// (analysis finished / CV+cover generated), not how recently the JD itself
+// was posted — sorted by updated_at instead of the backend's default
+// published_at order. Inbox/Applied/Archive keep published_at (explicit
+// user decision, 2026-07-26): Inbox is about JD freshness on the market,
+// Applied/Archive are terminal states where "when we acted on it" is less
+// useful than "which JD is newest" for browsing.
+const _kUpdatedAtSortedFolders = {'analyzed', 'processed'};
+
 final folderVacanciesProvider =
     Provider.family<List<VacancyListItem>, String>((ref, folder) {
   final state = ref.watch(vacancyListProvider).valueOrNull;
   if (state == null) return [];
-  return state.vacancies.where((v) => _folderMatch(v, folder)).toList();
+  final filtered = state.vacancies.where((v) => _folderMatch(v, folder)).toList();
+  if (_kUpdatedAtSortedFolders.contains(folder)) {
+    filtered.sort((a, b) {
+      final aTime = a.updatedAt != null ? parseBackendUtc(a.updatedAt!) : null;
+      final bTime = b.updatedAt != null ? parseBackendUtc(b.updatedAt!) : null;
+      if (aTime == null && bTime == null) return 0;
+      if (aTime == null) return 1;
+      if (bTime == null) return -1;
+      return bTime.compareTo(aTime); // descending — most recently updated first
+    });
+  }
+  return filtered;
 });
 
 // 5-stage taxonomy — mirrors core/vacancy_stage.py's stage() classification.
