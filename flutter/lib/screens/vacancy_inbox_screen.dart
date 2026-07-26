@@ -368,6 +368,25 @@ List<VacancyListItem> _filter(List<VacancyListItem> all) {
                   multiSelectActive: _multiSelectMode,
                   onToggleMultiSelect: _batchRunning ? null : _toggleMultiSelectMode,
                 ),
+                // Lives right below the header (same row as the toggle that
+                // turns it on) — not at the bottom of the list — so entering
+                // Mass Action shows its controls where the mode was switched
+                // on, above search/filter (2026-07-26, explicit user ask).
+                // _batchRunning alone (no multi-select) covers standalone
+                // batches like "Skip all with blockers" — same progress UI,
+                // no manual selection involved.
+                if (_multiSelectMode || _batchRunning)
+                  InboxBatchActionBar(
+                    count: _selectedIds.length,
+                    running: _batchRunning,
+                    runningLabel: _batchLabel,
+                    done: _batchDone,
+                    total: _batchTotal,
+                    onAnalyze: _selectedIds.isEmpty || _batchRunning ? null : _batchAnalyze,
+                    onCheckBlockers: _selectedIds.isEmpty || _batchRunning ? null : _batchCheckBlockers,
+                    onSkip: _selectedIds.isEmpty || _batchRunning ? null : _batchSkip,
+                    onCancel: _batchRunning ? null : _exitMultiSelect,
+                  ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
                   child: TextField(
@@ -469,21 +488,6 @@ List<VacancyListItem> _filter(List<VacancyListItem> all) {
                           onLongPress: _enterMultiSelect,
                         ),
                 ),
-                // _batchRunning alone (no multi-select) covers standalone
-                // batches like "Skip all with blockers" — same progress UI,
-                // no manual selection involved.
-                if (_multiSelectMode || _batchRunning)
-                  InboxBatchActionBar(
-                    count: _selectedIds.length,
-                    running: _batchRunning,
-                    runningLabel: _batchLabel,
-                    done: _batchDone,
-                    total: _batchTotal,
-                    onAnalyze: _selectedIds.isEmpty || _batchRunning ? null : _batchAnalyze,
-                    onCheckBlockers: _selectedIds.isEmpty || _batchRunning ? null : _batchCheckBlockers,
-                    onSkip: _selectedIds.isEmpty || _batchRunning ? null : _batchSkip,
-                    onCancel: _batchRunning ? null : _exitMultiSelect,
-                  ),
               ],
             ),
           ),
