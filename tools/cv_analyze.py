@@ -137,15 +137,11 @@ async def cv_analyze(ctx: RunContext[AgentDeps], vacancy_id: int) -> str:
     quick_scan = _extract_quick_scan(phase2_output)
 
     # ── Write JD_analysis.md ──────────────────────────────────────────────────
-    # Re-analysis: if file already exists, save to Claude Desktop/ subfolder to
-    # preserve the original without overwriting.
-    normal_path = jd_path.parent / "JD_analysis.md"
-    if normal_path.exists():
-        reanalysis_dir = jd_path.parent / "Claude Desktop"
-        reanalysis_dir.mkdir(exist_ok=True)
-        analysis_path = reanalysis_dir / "JD_analysis.md"
-    else:
-        analysis_path = normal_path
+    # Always overwrite — this is the automated pipeline (CLI/API provider).
+    # The "never overwrite, save to Claude Desktop/ subfolder" rule is specific
+    # to the manual interactive /analyze skill session (see skill/SKILL.md),
+    # not this automated path.
+    analysis_path = jd_path.parent / "JD_analysis.md"
     analysis_content = _build_analysis_file(
         title=title,
         url=vacancy["url"],

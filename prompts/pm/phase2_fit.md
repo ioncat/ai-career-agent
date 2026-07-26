@@ -75,11 +75,16 @@ Output this block exactly as shown, filling in the placeholders.
 - -1.0 for archetype mismatch (JD wants Founder Proxy, candidate CV frames as Executor, or reverse)
 - Cap at 9.5 — no perfect scores
 
+**Multi-track JDs** — if Phase 1 section 1.0.6 lists `Candidate Profile Tracks` (not "none"):
+1. Pick the ONE track the candidate matches best, before building anything below.
+2. Score and list Key Barriers/Blockers against that track's requirements + the Shared bucket only.
+3. A requirement unique to a track the candidate is NOT pursuing is NOT a gap — never list it as a Key Barrier, never let it drive a decline. The JD explicitly said that requirement is optional (the other track covers it instead).
+
 **Key Barriers** — candidate-side hard gaps (be specific, name the evidence):
 - Missing commercial experience where JD explicitly requires it (pet-projects don't qualify)
 - Archetype mismatch: JD requires Founder Proxy, candidate currently framed as Executor (or reverse)
 - Below minimum experience threshold by a significant margin
-- Missing core domain where JD states it as mandatory
+- Missing core domain where JD states it as mandatory (single-track JDs only — see Multi-track rule above)
 
 **Archetype mismatch** is both a Key Barrier AND an Adaptation Plan signal:
 - Barrier: flags the risk clearly ("JD targets a Founder Proxy, candidate's CV currently frames them as an Executor")
