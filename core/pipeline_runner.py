@@ -123,6 +123,11 @@ async def run_generate_cv(
         )
         raise
 
+    # ── Phase 3.7: Editorial Audit (opt-in, best-effort, never blocks CV status) ──
+    # Gate (apply + fit>=7) lives inside cv_editorial_audit itself — most vacancies
+    # skip here for free (one DB read, no LLM call). Never raises past this point.
+    await _run_editorial_audit_best_effort(deps, vacancy_id, target="cv")
+
 
 async def run_generate_cover(deps: AgentDeps, vacancy_id: int) -> None:
     """Run Phase 4 cover letter generation for vacancy_id.
@@ -157,3 +162,65 @@ async def run_generate_cover(deps: AgentDeps, vacancy_id: int) -> None:
             body=err,
         )
         raise
+
+    # ── Phase 3.7: Editorial Audit (opt-in, best-effort, never blocks cover status) ──
+    await _run_editorial_audit_best_effort(deps, vacancy_id, target="cover")
+
+
+async def _run_editorial_audit_best_effort(
+    deps: AgentDeps, vacancy_id: int, target: str
+) -> None:
+    """Run Phase 3.7 editorial audit as a supplementary, non-blocking step.
+
+    Called automatically after CV/Cover generation succeeds — this is what makes
+    Phase 3.7 "opt-in" without needing a human to trigger it: the gate inside
+    cv_editorial_audit (Phase 2 recommendation=apply, fit_score>=7) decides
+    per-vacancy whether it actually runs. Most vacancies skip for free (a DB
+    read, no LLM call) — only genuinely strong matches pay the extra cost.
+
+    Deliberately does not affect vacancy status and never re-raises: a failure
+    or a real LLM error here must not roll back or fail CV/Cover generation,
+    which already succeeded and is independently usable.
+    """
+    try:
+        from tools.cv_editorial_audit import _parse_analysis_json, cv_editorial_audit
+
+        ctx = _Ctx(deps=deps)
+        result = await cv_editorial_audit(ctx, vacancy_id, target=target)  # type: ignore[arg-type]
+
+        if result.startswith("⚠️"):
+            # Gate not met, or document not found yet — expected for most vacancies.
+            log.info(
+                "pipeline_runner: editorial audit (%s) skipped v#%d: %s",
+                target, vacancy_id, result,
+            )
+            return
+
+        label = await _vacancy_title(vacancy_id)
+        vacancy = await database.get_vacancy_by_id(vacancy_id)
+        scores = {}
+        if vacancy:
+            scores = _parse_analysis_json(vacancy).get(f"p3_7_{target}", {})
+        body = ", ".join(f"{k}={v}/10" for k, v in scores.items()) if scores else ""
+
+        await notify(
+            deps.user_id,
+            PipelineEvent.EDITORIAL_AUDIT_DONE,
+            vacancy_id,
+            title=f"Editorial audit ({target}) — {label}",
+            body=body,
+        )
+        log.info("pipeline_runner: editorial audit (%s) done v#%d", target, vacancy_id)
+    except Exception as exc:
+        err = str(exc)[:500]
+        log.warning(
+            "pipeline_runner: editorial audit (%s) failed v#%d: %s",
+            target, vacancy_id, err,
+        )
+        await notify(
+            deps.user_id,
+            PipelineEvent.EDITORIAL_AUDIT_FAILED,
+            vacancy_id,
+            title=f"Editorial audit ({target}) failed — #{vacancy_id}",
+            body=err,
+        )
