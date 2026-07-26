@@ -41,6 +41,13 @@ def _patch_title(title="Acme — PM"):
     return patch("core.pipeline_runner._vacancy_title", new_callable=AsyncMock, return_value=title)
 
 
+def _patch_editorial_audit(result="⚠️ vacancy not found"):
+    """Default: simulate the gate skipping (most vacancies don't qualify) —
+    keeps existing happy-path tests' `notify` call-count assertions valid."""
+    return patch("tools.cv_editorial_audit.cv_editorial_audit",
+                 new_callable=AsyncMock, return_value=result)
+
+
 # ── run_analyze — happy path ──────────────────────────────────────────────────
 
 @pytest.mark.asyncio
@@ -123,7 +130,8 @@ async def test_run_generate_cv_happy_path():
     deps = _make_deps()
     mock_gen = AsyncMock()
 
-    with _patch_fsm() as mock_fsm, _patch_notify() as mock_notify, _patch_title("Stripe — PM"):
+    with _patch_fsm() as mock_fsm, _patch_notify() as mock_notify, _patch_title("Stripe — PM"), \
+         _patch_editorial_audit():
         with patch("tools.cv_generate.cv_generate", mock_gen):
             await run_generate_cv(deps, 7, language="en")
 
@@ -162,7 +170,8 @@ async def test_run_generate_cover_happy_path():
     deps = _make_deps()
     mock_cover = AsyncMock()
 
-    with _patch_fsm() as mock_fsm, _patch_notify() as mock_notify, _patch_title("Acme — PM"):
+    with _patch_fsm() as mock_fsm, _patch_notify() as mock_notify, _patch_title("Acme — PM"), \
+         _patch_editorial_audit():
         with patch("tools.cv_cover.cv_cover", mock_cover):
             await run_generate_cover(deps, 15)
 
@@ -206,3 +215,105 @@ async def test_run_analyze_notify_receives_correct_user_and_vacancy():
     args = mock_notify.call_args[0]
     assert args[0] == 3     # user_id
     assert args[2] == 77    # vacancy_id
+
+
+# ── Phase 3.7 Editorial Audit — auto-triggered after CV/Cover, opt-in via gate ──
+
+@pytest.mark.asyncio
+async def test_run_generate_cv_triggers_editorial_audit_with_cv_target():
+    """The whole point of Phase 3.7 being 'opt-in' is the gate INSIDE
+    cv_editorial_audit — not a human deciding whether to call it. run_generate_cv
+    must call it automatically, every time, for every vacancy."""
+    from core.pipeline_runner import run_generate_cv
+
+    deps = _make_deps()
+
+    with _patch_fsm(), _patch_notify(), _patch_title():
+        with patch("tools.cv_generate.cv_generate", AsyncMock()):
+            with _patch_editorial_audit() as mock_audit:
+                await run_generate_cv(deps, 7)
+
+    mock_audit.assert_awaited_once()
+    call_args = mock_audit.call_args
+    assert call_args.kwargs.get("target") == "cv" or "cv" in call_args.args
+
+
+@pytest.mark.asyncio
+async def test_run_generate_cover_triggers_editorial_audit_with_cover_target():
+    from core.pipeline_runner import run_generate_cover
+
+    deps = _make_deps()
+
+    with _patch_fsm(), _patch_notify(), _patch_title():
+        with patch("tools.cv_cover.cv_cover", AsyncMock()):
+            with _patch_editorial_audit() as mock_audit:
+                await run_generate_cover(deps, 15)
+
+    mock_audit.assert_awaited_once()
+    call_args = mock_audit.call_args
+    assert call_args.kwargs.get("target") == "cover" or "cover" in call_args.args
+
+
+@pytest.mark.asyncio
+async def test_editorial_audit_gate_skip_does_not_send_extra_notification():
+    """Most vacancies don't qualify (gate fails inside cv_editorial_audit) —
+    that must stay silent, not spam a notification for every vacancy."""
+    from core.pipeline_runner import run_generate_cv
+
+    deps = _make_deps()
+
+    with _patch_fsm(), _patch_notify() as mock_notify, _patch_title():
+        with patch("tools.cv_generate.cv_generate", AsyncMock()):
+            with _patch_editorial_audit(result="⚠️ вакансия не найдена"):
+                await run_generate_cv(deps, 7)
+
+    # Only CV_DONE — no EDITORIAL_AUDIT_DONE/FAILED for a skipped audit.
+    mock_notify.assert_awaited_once()
+    assert mock_notify.call_args[0][1] == PipelineEvent.CV_DONE
+
+
+@pytest.mark.asyncio
+async def test_editorial_audit_ran_sends_done_notification():
+    """When the gate passes and a real report comes back, a separate
+    EDITORIAL_AUDIT_DONE notification fires — the CV_DONE notify already fired
+    with its own title, this is additive, not a replacement."""
+    from core.pipeline_runner import run_generate_cv
+
+    deps = _make_deps()
+    fake_vacancy = MagicMock()
+    fake_vacancy.__getitem__ = lambda self, k: '{"p3_7_cv": {"naturalness": 7}}' if k == "analysis_json" else None
+    fake_vacancy.keys = lambda: ["analysis_json"]
+
+    with _patch_fsm(), _patch_notify() as mock_notify, _patch_title():
+        with patch("tools.cv_generate.cv_generate", AsyncMock()):
+            with _patch_editorial_audit(result="# Executive Summary\n\nNaturalness: 7/10"):
+                with patch("core.pipeline_runner.database.get_vacancy_by_id",
+                           new_callable=AsyncMock, return_value=fake_vacancy):
+                    await run_generate_cv(deps, 7)
+
+    assert mock_notify.await_count == 2
+    events = [c[0][1] for c in mock_notify.call_args_list]
+    assert PipelineEvent.CV_DONE in events
+    assert PipelineEvent.EDITORIAL_AUDIT_DONE in events
+
+
+@pytest.mark.asyncio
+async def test_editorial_audit_failure_does_not_fail_cv_generation():
+    """A real error inside the audit (LLM error, etc.) must not roll back or
+    fail the CV generation that already succeeded — it's supplementary."""
+    from core.pipeline_runner import run_generate_cv
+
+    deps = _make_deps()
+
+    with _patch_fsm(), _patch_notify() as mock_notify, _patch_title(), \
+         _patch_db_status() as mock_status:
+        with patch("tools.cv_generate.cv_generate", AsyncMock()):
+            with patch("tools.cv_editorial_audit.cv_editorial_audit",
+                       new_callable=AsyncMock, side_effect=RuntimeError("LLM down")):
+                await run_generate_cv(deps, 7)  # must NOT raise
+
+    # CV status was never rolled back — only the (non-existent) audit failed.
+    mock_status.assert_not_called()
+    events = [c[0][1] for c in mock_notify.call_args_list]
+    assert PipelineEvent.CV_DONE in events
+    assert PipelineEvent.EDITORIAL_AUDIT_FAILED in events

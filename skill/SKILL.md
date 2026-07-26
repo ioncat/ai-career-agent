@@ -88,6 +88,10 @@ Phase 3.6: Signal Audit    [runs after save, shown to user]
   → Display full CV text
   → Ask: "Переходим к cover?"
 
+  ↓ [OPT-IN, only if recommendation = apply AND fit_score ≥ 7, or user asks explicitly]
+
+Phase 3.7: Editorial Audit  [opt-in final polish — see below]
+
   ↓ [user explicitly requests cover]
 
 Phase 4: Cover Message
@@ -129,6 +133,13 @@ Resolved: N/N · Genuine gaps: [list]
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ✅ Phase 3.6 — Signal Audit
 Clean / N sentences removed · CV.md + CV.pdf updated
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Phase 3.7 — Editorial Audit
+N findings · N JD-echo · N applied · CV.md + CV.pdf updated
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
@@ -187,6 +198,44 @@ Cognitive + interactive (dialogue + judgment) → stays LLM. The barrier-list sc
 
 ---
 
+## Phase 3.7 — Editorial Audit (opt-in final polish)
+
+**Runs after Phase 3.6, only for vacancies that reached a strong outcome — NOT a default step.**
+Purpose: catch writing-craft issues (naturalness, credibility, JD-echo risk) that Phase 3.6 doesn't check — 3.6 audits JD-signal coverage per sentence, 3.7 audits prose quality and whether the document accidentally mirrors the JD's own wording.
+
+**Covers CV and Cover both — run separately, one report each.** Both are external-facing documents with the same em-dash/claim-stacking/JD-echo risk; auditing only the CV and shipping an unaudited cover misses half the point. The cover is short (a few sentences) so even one instance of a pattern can matter proportionally more — see `phase3_7_editorial_audit.md` → "Cover Message Variant" for the two dimensions that don't apply to a cover (Show-vs-Tell / metric-credibility, since the cover is deliberately evidence-free by design, per `phase4_cover.md`).
+
+### Trigger
+
+Run only when Phase 2 `recommendation = apply` AND `fit_score ≥ 7`, or when the user explicitly asks for it. **Never run by default on every vacancy** — this is a multi-pass, higher-cost audit; most vacancies (decline / take-a-chance / weak apply) never reach this bar and shouldn't pay for it. Cost discipline over blanket rigor.
+
+### Why isolated context matters here (Claude Code mode specifically)
+
+Self-audit bias is real and measurable — verified 2026-07-25 on vacancy #828: the same auditor (mid-conversation, same context as the document's author) scored their own writing higher on 3 of 6 dimensions than a zero-context pass did on the identical text. **Run this via an isolated subagent** (`Agent` tool, `isolation: "worktree"`), never inline in the same conversation that drafted the document.
+
+**Note (worktree write persistence):** subagent worktree file writes have been observed to not reliably persist after the agent finishes. Always instruct the subagent to return the FULL audit text verbatim in its final response (not a summary) as the primary deliverable — treat any file it writes as best-effort secondary, and save the returned text yourself.
+
+Give the subagent exactly three inputs, nothing else:
+1. The saved document — CV file (post 3.5/3.6) OR Cover file (post Phase 4 approval), one per run
+2. The vacancy's `JD.md` (for the JD-Echo Risk check — this is why it's a separate input, not folded into a "context" blurb)
+3. A one-two sentence audience/archetype blurb (from Phase 1 `## Quick Scan` → Category, Who they want) — not the full `JD_analysis.md`
+
+Prompt file: `prompts/[skill_type]/phase3_7_editorial_audit.md` (full methodology — 5-step workflow, JD-echo check, output format — lives there, not duplicated here).
+
+**Python/API pipeline (`tools/cv_generate.py`) note:** the self-audit bias above is specific to Claude-Code-style long conversations. Each Python pipeline phase is already a stateless, isolated LLM call — no subagent indirection needed there, just call the LLM with the phase3_7 prompt directly.
+
+### After the audit
+
+- **Quick Win findings** (includes JD-Echo Risk by default) → present to user → confirm → apply → re-save CV.md + PDF.
+- **Medium Investment / Major Rewrite** → present, let the user decide — do not auto-apply.
+- Append the full audit output to `JD_analysis.md` under `## Phase 3.7: Editorial Audit`.
+
+### Nature (per EPIC-21)
+
+Cognitive + evaluative → stays LLM, not deterministic. Prompt: `prompts/[skill_type]/phase3_7_editorial_audit.md`.
+
+---
+
 ## Company Type Detection → Lexicon Adaptation (Phase 3 Pre-flight)
 
 Before generating the CV draft (Phase 3), identify the target company type from the JD:
@@ -229,6 +278,7 @@ ALL phases are skill_type-specific. No universal phase files remain in prompts/ 
 | Phase 3 | `prompts/[skill_type]/phase3_cv_draft.md` | JD text + JD_analysis.md + language + name + **resolved objections** |
 | Phase 3.5 | `prompts/[skill_type]/phase3_5_review.md` | CV draft + JD_analysis.md |
 | Phase 3.6 | `prompts/[skill_type]/phase3_6_signal_audit.md` | Saved CV (EXPERIENCE) + Signal Coverage Table from JD_analysis.md |
+| Phase 3.7 (opt-in) | `prompts/[skill_type]/phase3_7_editorial_audit.md` | Saved CV + JD.md + audience/archetype blurb from Phase 1 Quick Scan |
 | Phase 4 | `prompts/[skill_type]/phase4_cover.md` | JD text + approved CV + JD_analysis.md |
 
 ---

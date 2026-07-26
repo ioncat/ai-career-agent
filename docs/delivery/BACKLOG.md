@@ -27,6 +27,14 @@
 
 ---
 
+### Phase 3 CV draft: cross-role lexical bleed — phrasing from one role leaks into another role's bullet within the same generation (found 2026-07-25, recurring across many past CVs per user)
+**What:** vacancy #828's Marketplace-role Key Result contained "no significant post-release issues" — a generic, unverifiable negative-proof claim (flagged separately by editorial audit, see `docs/discovery/editorial-audit-experiment/`). PROFILE.md's Marketplace entry does **not** contain this phrase at all. The actual source: "post-release issues" is real profile text, but from a **different, unrelated role** — HostiServer PM 2015–2017's canonical/protected Key Result ("Reduced rework and post-release issues by ~15%..."). Phase 3 pulled vocabulary from that nearby-in-context role into the Marketplace bullet it was writing.
+**Why it matters (user's framing):** this is not the documented "CV contamination between vacancies" bug ([[feedback_cv_no_contamination]] — cross-vacancy) — it's a narrower, previously-uncaught class: cross-role bleed **within a single CV generation**, sourced from the same PROFILE.md but the wrong section. User reports this specific failure mode ("something generic and unverifiable creeping into a bullet") recurring across many past CV generations, repeatedly asked to be removed, and reappearing — likely this same root cause each time (free-form prose generation over the full profile context, no hard boundary between roles' source material).
+**Proposed structural fix:** see P1 ticket "Per-archetype skeletal building-block constructs in PROFILE.md" below — this bug is the concrete evidence motivating that ticket.
+**Found via:** user noticed the recurring phrase during CV review for #828; traced to HostiServer PM's canonical text via `grep -i "post-release" skill/users/1/PROFILE.md`.
+
+---
+
 ### Competitive landscape analysis (requested 2026-05-31 — overdue)
 **What:** research similar services (AI-assisted job search, CV tailoring, fit analysis — PM-focused).
 **Why:** understand the market before building further; critique our positioning with real data.
@@ -36,6 +44,14 @@
 ---
 
 ## 🟠 P1
+
+### Per-archetype skeletal building-block constructs in PROFILE.md, instead of free-form Phase 3 generation (added 2026-07-25)
+**What:** Phase 3 currently writes each role's CV prose freely from the full PROFILE.md context every time. Instead, define fixed, pre-approved "skeletal" phrasing blocks per role/experience, tagged by archetype (delivery, discovery, execution, etc.) — reusable building blocks that Phase 3 selects and lightly adapts per vacancy, rather than generating prose from scratch out of the whole ambient profile.
+**Why:** free generation across the full profile context is the root mechanism behind at least one recurring, user-reported bug (see 🐛 Bugs — "Phase 3 CV draft: cross-role lexical bleed") — vocabulary from one role's canonical text (e.g. HostiServer PM's "post-release issues") leaking into an unrelated role's bullet (Marketplace) within the same generation. A fixed-block architecture removes the mechanism entirely rather than patching each leak as it's found. User has hit generic/unverifiable phrases creeping into CVs "many times" before this one was traced.
+**Scope (undecided, needs design pass):** how many blocks per role, how they're tagged/selected by archetype match to a given vacancy, how much free adaptation Phase 3 is still allowed to do per-vacancy (pure template insertion would lose tailoring quality — needs a balance), relation to EPIC-24 Evidence Bank (`EPIC-24-progressive-profile.md`) — adjacent (both touch how PROFILE.md content is structured) but distinct in purpose: Evidence Bank is about *collecting* evidence; this is about *fixed, non-generative phrasing templates* to prevent generation-time bleed. Should not be silently folded into Evidence Bank without its own design doc (per `core-differentiators.md` house rule: no stub → production without a written design).
+**Found via:** vacancy #828 (Go Offer), during editorial-audit experiment — see `docs/discovery/editorial-audit-experiment/`.
+
+---
 
 ### Prompt review pass — `prompts/pm|generic/prefilter.md` (added 2026-07-23)
 **What:** the prefilter prompt has grown reactively all session (Requirements-vs-Responsibilities rule, quote-only-JD rule, output-format examples) — do a holistic pass to see what can be tightened, consolidated, or dropped, rather than just keep bolting on more rules as new failure modes surface.

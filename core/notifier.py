@@ -32,6 +32,8 @@ class PipelineEvent(StrEnum):
     CV_FAILED       = "cv_failed"
     COVER_DONE      = "cover_done"
     COVER_FAILED    = "cover_failed"
+    EDITORIAL_AUDIT_DONE   = "editorial_audit_done"
+    EDITORIAL_AUDIT_FAILED = "editorial_audit_failed"
     NEW_VACANCY     = "new_vacancy"   # informational; rss_watcher is the sender
 
 
@@ -43,6 +45,7 @@ _WEB_PUSH_EVENTS: frozenset[PipelineEvent] = frozenset({
     PipelineEvent.CV_FAILED,
     PipelineEvent.COVER_DONE,
     PipelineEvent.COVER_FAILED,
+    PipelineEvent.EDITORIAL_AUDIT_DONE,
 })
 
 
