@@ -564,3 +564,37 @@ async def test_set_vacancy_blocker_clean_result_clears_stage():
 
     row = await database.get_vacancy_by_id(vid)
     assert row["blocker_stage"] is None
+
+
+# ── _normalize_title company-suffix stripping (2026-07-25) ────────────────────
+# DOU-sourced titles get " — Company" appended by the RSS parser; Djinni titles
+# don't. Without stripping, the same real job posted on both sites never
+# matches on title+company dedup even when company itself is correct.
+
+
+def test_normalize_title_no_company_just_lowercases_and_collapses_whitespace():
+    assert database._normalize_title("  Product   Manager  ") == "product manager"
+
+
+def test_normalize_title_strips_matching_company_suffix_em_dash():
+    result = database._normalize_title(
+        "Product Manager (Globalization) — Headway Inc", "Headway Inc"
+    )
+    assert result == "product manager (globalization)"
+
+
+def test_normalize_title_strips_matching_company_suffix_hyphen_case_insensitive():
+    result = database._normalize_title("Product Manager - headway inc", "Headway Inc")
+    assert result == "product manager"
+
+
+def test_normalize_title_without_matching_suffix_is_untouched():
+    # Djinni-style title never had the suffix to begin with.
+    result = database._normalize_title("Product Manager (Globalization)", "Headway Inc")
+    assert result == "product manager (globalization)"
+
+
+def test_normalize_title_unrelated_dash_not_stripped():
+    # Dash present, but what follows isn't the company being compared against.
+    result = database._normalize_title("Product Manager - B2B SaaS", "Headway Inc")
+    assert result == "product manager - b2b saas"

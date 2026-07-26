@@ -429,6 +429,7 @@ async def update_vacancy_fields(
     site: str | None = None,
     markdown_path: str | None = None,
     salary: str | None = None,
+    company: str | None = None,
 ) -> None:
     """Update mutable fields of an existing vacancy (e.g. after fetching a queued record).
 
@@ -448,6 +449,9 @@ async def update_vacancy_fields(
     if salary is not None:
         sets.append("salary = ?")
         params.append(salary)
+    if company is not None:
+        sets.append("company = ?")
+        params.append(company)
     if not sets:
         return
     params.append(vacancy_id)
@@ -618,9 +622,26 @@ async def clear_analysis_error(vacancy_id: int) -> None:
 
 # ── EPIC-26: Deduplication + Re-publish helpers ───────────────────────────────
 
-def _normalize_title(title: str) -> str:
-    """Lowercase + collapse whitespace. Used for title-based duplicate detection."""
+def _normalize_title(title: str, company: str | None = None) -> str:
+    """Lowercase + collapse whitespace. Used for title-based duplicate detection.
+
+    When `company` is given and the title ends with a dash + that exact company
+    (e.g. DOU-style "Role — Company", vs Djinni's bare "Role"), the suffix is
+    stripped first — otherwise the same real job posted on both sites never
+    matches on title+company even when company itself is correct (found live,
+    2026-07-25: "Product Manager (Globalization)" [Djinni] vs "Product Manager
+    (Globalization) — Headway Inc" [DOU] never deduped). Only strips a suffix
+    matching the specific company being compared — a title with an unrelated
+    dash (e.g. "Product Manager - B2B SaaS") is left alone.
+    """
     import re as _re
+    if company:
+        title = _re.sub(
+            rf"\s*[-–—]\s*{_re.escape(company.strip())}\s*$",
+            "",
+            title,
+            flags=_re.IGNORECASE,
+        )
     return _re.sub(r"\s+", " ", title.lower().strip())
 
 

@@ -124,7 +124,7 @@ async def fetch_jd(deps: AgentDeps, url: str) -> int:
     original_id = await database.find_duplicate(
         deps.user_id,
         content_hash,
-        database._normalize_title(doc.title or ""),
+        database._normalize_title(doc.title or "", doc.company),
         doc.company or "",
         exclude_id=vacancy_id,
     )
@@ -138,6 +138,7 @@ async def fetch_jd(deps: AgentDeps, url: str) -> int:
     if existing and existing["status"] in ("queued", "fetching"):
         await database.update_vacancy_fields(
             vacancy_id, title=doc.title, site=site, markdown_path=markdown_path,
+            company=doc.company,
         )
     else:
         await database.update_vacancy_fields(vacancy_id, markdown_path=markdown_path)
