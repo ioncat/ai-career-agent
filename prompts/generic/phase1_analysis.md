@@ -79,6 +79,24 @@ This North Star drives everything downstream:
 
 ---
 
+### 1.0.6 Candidate Profile Tracks (if JD offers alternatives)
+
+Some JDs explicitly offer OR logic — "we're open to two kinds of backgrounds", "either X or Y", "you might be A or you might be B". This is NOT a combined requirement — a candidate matching ONE track fully satisfies that part of the JD, regardless of the other track's requirements.
+
+If the JD does this, output:
+```
+**Candidate Profile Tracks:**
+├── Track A: [label] — [requirements specific to this track]
+├── Track B: [label] — [requirements specific to this track]
+└── Shared (all tracks): [requirements common to every track]
+```
+
+If the JD does NOT offer alternative tracks, output: `**Candidate Profile Tracks:** none — single profile`.
+
+**Why this matters downstream:** Phase 2 assesses fit against the single best-matching track + the Shared bucket — never against the union of all tracks. A requirement unique to a track the candidate is NOT pursuing is not a gap and must not appear as a Key Barrier or knockout.
+
+---
+
 ### 1.1 Company Pain Points
 
 Reconstruct what is actually broken, overloaded, or missing:

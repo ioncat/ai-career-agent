@@ -1,6 +1,6 @@
 # career-agent — Backlog
 
-> Last updated: 2026-07-23 (session 2)
+> Last updated: 2026-07-26
 > Rules: [documentation-conventions.md](documentation-conventions.md) · History: [CHANGELOG.md](CHANGELOG.md) · Specs: [Epics/](Epics/)
 
 **Priority legend:**
@@ -272,6 +272,16 @@ No dual-availability state — the button's visibility is a direct, deterministi
 **Impact:** `RSSWatcher` retries forever on the exact same doomed write (fetch "succeeds" at the parser level, only the file-write step fails) — looks identical to a dead-URL retry loop from the logs, easy to misdiagnose (did, initially, during 2026-07-16's cleanup — turned out 2 of 264 stuck rows were this, not the html2text parser bug that explained the rest).
 **Fix:** folder-name construction (`tools/cv_fetch_jd.py` and/or `services/parser`) needs to strip trailing separator characters when company is empty/malformed, or fall back to a placeholder (e.g. `"— Unknown Company"`) instead of leaving a dangling `"— "`.
 **Found via:** 2 real vacancies during the 264-row fetching cleanup (`#252`, `#593`) — deleted as a workaround, root cause not fixed.
+
+### Dedup misses same vacancy republished across different source sites (found 2026-07-26)
+**Symptom:** vacancy #778 (Djinni) and #758 (DOU.ua) are the same real-world job (Headway Inc, "Globalization Product Manager", published within 5 min of each other) but exist as two separate, un-deduplicated DB rows — each got its own independent Phase 1+2 analysis with different verdicts (fit 4/decline vs fit 6/take a chance) on essentially the same JD text.
+**Root cause:** `content_hash` (EPIC-26) hashes the exact scraped JD text. Djinni and DOU markdown differ in formatting only (smart quotes, markdown-link syntax vs plain bold) — substantively identical content, different hash, so exact-match dedup never fires across sources.
+**Fix sketch:** normalize text before hashing (strip markdown link syntax, normalize quotes/whitespace) and/or add a fuzzy secondary match (company + title + published_at proximity) to catch cross-source republishing that exact-hash dedup can't.
+**Found via:** user confusion investigating vacancy #778's re-analysis (see also the Phase 1/2 prompt fix for dual-track JD handling, same investigation).
+
+### Re-analysis doesn't auto-refresh the Analyzed screen (found 2026-07-26)
+**Symptom:** triggering re-analysis moves a vacancy Analyzed → Inbox (analyzing) → back to Analyzed once done, but the Flutter Analyzed list/card doesn't auto-refresh to reflect the new result — user has to manually hit refresh to see it land back, and even then it's unclear the fetch is against fresh data.
+**Fix sketch:** trigger a list refetch (or push a targeted update) when a vacancy transitions back to `analyzed` status after being queued for re-analysis, same mechanism as the existing push-on-complete in `core/analysis_worker.py::_push_result`.
 
 ### PDF bullet-list text extraction — marker separated from item text (found 2026-07-25)
 **Symptom:** `pdfminer.six` extraction of generated CV/Cover PDFs (`services/pdf/render.py`, WeasyPrint) puts the `•` bullet marker on its own line, then a blank line, then the list-item text — e.g. `Key results:\n\n•  \n\nShipped a functional MVP...` instead of `• Shipped a functional MVP...` on one line.
