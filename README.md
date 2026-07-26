@@ -25,7 +25,7 @@ Core focus is PdM / PO: fit analysis understands product archetypes (Delivery vs
 
 An active search means evaluating 30–100 vacancies. Most candidates decide emotionally — real barriers get missed, wrong roles get pursued. Then 30–90 minutes per CV, often wasted.
 
-Real example: self-assessed at 10/10 fit → agent returned 4/10. Delta = 6 points, one hidden requirement.
+Real example: self-assessed at 10/10 fit → system returned 4/10. Delta = 6 points, one hidden requirement.
 
 ---
 
@@ -81,13 +81,13 @@ When fit is real: a targeted CV from actual experience, cross-checked against th
 
 | Decision | Alternative | Reason |
 |----------|-------------|--------|
-| **PdM / PO as primary target user** (PM, BA also supported) | Serve all roles equally | PdM / PO job search has role-specific archetypes (Founder Proxy vs Executor, discovery vs delivery bias), domain signals, and lexicon that generic tools miss. Vertical depth beats horizontal breadth. PM and BA supported via generic skill_type — not the core optimization target. |
+| **PdM / PO as primary target user** (PM, BA also supported) | Serve all roles equally | PdM / PO job search has role-specific archetypes (a ten-label taxonomy — Founder Proxy, Executor, Discovery-heavy, Platform/Systems PM, Growth PM, and others, combinable in pairs), domain signals, and lexicon that generic tools often miss. Vertical depth beats horizontal breadth. PM and BA supported via generic skill_type — not the core optimization target. |
 | **Decision-first pipeline** — analyze fit before generating anything | Generate CV for every vacancy | Effort should follow a go/no-go recommendation, not precede it. Don't optimize a document the user shouldn't send. |
-| **RSS-first workflow** — jobs are pushed to the user | Manual vacancy search | Users should *evaluate* opportunities, not spend time *finding* them. |
+| **RSS-first workflow** — jobs are pushed to the user | Manual vacancy search | Users should *evaluate* opportunities, not spend time *finding* them. RSS integration is deliberately scoped to a couple of popular job boards, not broad coverage — anything else goes in via manual paste, since wider integration isn't the current focus. |
 | **Flutter Desktop as primary UI** | Telegram bot / web app | Local desktop app: zero hosting, zero HTTPS, no external dependency. Same Flutter codebase compiles to Web and Mobile later — no rewrite. RSS → auto-analysis → system tray notification → user opens app and decides. |
 | **Telegram → push-only, then removed** | Telegram as permanent UI | Telegram stays for push notifications during Flutter MVP phase. Removed in Phase D — the interaction model moves to Flutter entirely. |
 | **Monorepo — all services inside** | Permanent external dependencies | All user-built services live inside `services/`. Audit before migrating — cut dead code, keep only what the pipeline needs. |
-| **Human-in-the-loop on irreversible steps** | Full auto-apply | The user owns the apply/skip and CV-approval calls. Automation removes toil, not judgment. |
+| **Human-in-the-loop on irreversible steps** | Full auto-apply | The user owns the apply/skip and CV-approval calls. Automation removes toil, not judgment — and unattended, uncontrolled API calls are a real cost risk this design deliberately avoids. |
 
 ---
 
