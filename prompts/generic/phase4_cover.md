@@ -45,6 +45,7 @@ Most applicants are generic candidates. The HM's first screening question is: **
 - **Short bullets** — one clear fact per bullet, max 2 sentences. No nested clauses.
 - **No narrative** — not "I find this role interesting because..." — show, don't explain interest
 - **Closing line gender:** adapt to candidate (рада/радий — read from PROFILE.md context)
+- **NEVER use em-dashes (—).** Use a period, comma, or "and"/"because" instead. A chained em-dash pair inside one sentence is a strong, well-known AI-writing tell — this is a personal message, it should read like one.
 
 ---
 

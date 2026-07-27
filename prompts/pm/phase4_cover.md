@@ -86,6 +86,7 @@ The CV already contains all evidence. The cover must NOT repeat or reference spe
 - **Short bullets** — one clear fact per bullet, max 2 sentences. No nested clauses.
 - **No narrative** — not "I find this role interesting because..." — show, don't explain interest
 - **Closing must show genuine business interest** — never end with a generic "happy to connect" or "looking forward to hearing from you". One sentence on what makes this domain, product, or problem space genuinely interesting. Then an invitation that shows you want to understand their context specifically — not just get a callback. Model closing: "Would love to understand the software component: what it does today, what's breaking, and where the first sprint of real product ownership would make the most difference."
+- **NEVER use em-dashes (—).** Use a period, comma, or "and"/"because" instead. A chained em-dash pair inside one sentence is a strong, well-known AI-writing tell — this is a personal message, it should read like one.
 
 ---
 
