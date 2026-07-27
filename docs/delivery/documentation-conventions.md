@@ -91,7 +91,7 @@ One bullet per feature/fix:
 ```
 
 - Features: **mandatory**, same session as delivery (Global Rule 7).
-- Bug fixes: optional but recommended; prefix `**Bug fix — ...**` and include root cause.
+- Bug fixes: **mandatory**, same session as delivery; prefix `**Bug fix — ...**` and include root cause.
 - Epic completion: one bullet `**EPIC-NN complete/closed**` + link to the epic file.
 
 ### When to write
