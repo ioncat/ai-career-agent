@@ -332,6 +332,7 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
     final jdAsync = ref.watch(vacancyJdProvider(widget.vacancyId));
     final role = widget.vacancy?.role ?? '';
     final company = widget.vacancy?.company ?? '';
+    final salary = widget.vacancy?.salary ?? '';
     final health = ref.watch(healthProvider).valueOrNull ?? HealthStatus.checking;
     final workerAvailable = health == HealthStatus.online;
 
@@ -358,8 +359,9 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                           style: Theme.of(context).textTheme.titleSmall,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis),
-                      if (company.isNotEmpty)
-                        Text(company,
+                      if (company.isNotEmpty || salary.isNotEmpty)
+                        Text(
+                            [company, salary].where((s) => s.isNotEmpty).join('  ·  '),
                             style: Theme.of(context)
                                 .textTheme
                                 .bodySmall
