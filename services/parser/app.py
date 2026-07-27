@@ -66,17 +66,20 @@ def _extract_company(url: str, soup: BeautifulSoup, site_key: str | None, title:
         if m:
             return m.group(1).replace("-", " ").title()
 
-    # Djinni: page <title> is typically "Job Title — Company | Джинні"
+    # Djinni: page <title> is either "Job Title — Company | Джинні"
+    # or (Ukrainian locale) "Job Title в Company – Djinni"
     if site_key == "djinni.co":
         title_tag = soup.find("title")
         if title_tag:
             page_title = title_tag.get_text(strip=True)
-            # Strip "| Джинні" / "| Djinni" suffix
-            page_title = re.sub(r"\s*\|\s*(Джинні|Djinni)\s*$", "", page_title, flags=re.IGNORECASE).strip()
+            # Strip trailing "| Djinni" / "— Djinni" / "– Djinni" (with or without pipe/dash)
+            page_title = re.sub(r"\s*[|\-–—]?\s*(Джинні|Djinni)\s*$", "", page_title, flags=re.IGNORECASE).strip()
             # If page title starts with job title, the remainder is the company
             if title and page_title.lower().startswith(title.lower()):
                 rest = page_title[len(title):].strip()
                 rest = re.sub(r"^[\s\-—|]+", "", rest).strip()
+                # Ukrainian/Russian preposition "в"/"у" ("at <company>")
+                rest = re.sub(r"^(?:в|у)\s+", "", rest, flags=re.IGNORECASE).strip()
                 if rest:
                     return rest
 
