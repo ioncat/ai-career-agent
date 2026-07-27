@@ -1,6 +1,6 @@
 # career-agent — Backlog
 
-> Last updated: 2026-07-26
+> Last updated: 2026-07-27
 > Rules: [documentation-conventions.md](documentation-conventions.md) · History: [CHANGELOG.md](CHANGELOG.md) · Specs: [Epics/](Epics/)
 
 **Priority legend:**
@@ -185,6 +185,13 @@ No dual-availability state — the button's visibility is a direct, deterministi
 
 ---
 
+## 🟠 P1
+
+### Surface JD Analysis document in Flutter UI (added 2026-07-27)
+**What:** give the user direct access to the full `JD_analysis.md` (Phase 1+2 output) from within the vacancy detail screen — not just the Quick Scan summary already shown on the card.
+**Why:** secondary product goal — helping the candidate position themselves in interviews depends on them actually reading the full analysis (role archetype, company pain points, hidden pressure points, likely recruiter objections), not just the fit score. Right now that document only exists as a file on disk; the user has to leave the app to read it.
+**Scope:** Flutter detail screen — new section/tab rendering the stored `analysis_json` (or raw markdown) content; decide whether to show structured (parsed p1/p2 fields) or raw markdown.
+
 ## 🟡 P2
 
 ### Backfill garbled `company` on 188 pre-existing Djinni vacancies (added 2026-07-25)
@@ -253,6 +260,10 @@ No dual-availability state — the button's visibility is a direct, deterministi
 ---
 
 ## 🐛 Bugs
+
+### Check other past CVs for "SaaS platform" mischaracterization of HostiServer (found 2026-07-27)
+**Context:** vacancy #828's CV said "SaaS platform" for HostiServer, but the platform (billing, CRM, ticketing, DMCA compliance) was internal tooling for HostiServer's own hosting operations — never sold externally as SaaS. PROFILE.md's own text already said "ERP-like platform for operational process automation"; CV generation had drifted from it. Fixed for #828 (`internal operational platform`); other past vacancy CVs referencing HostiServer likely carry the same inaccurate framing and weren't audited.
+**Action:** low priority — only matters for vacancies still pending application. Spot-check a few recent HostiServer-mentioning CVs if time allows; not worth a bulk regen.
 
 ### job-monitor: Djinni RSS feed returning empty/invalid XML intermittently (found 2026-07-16, watch-only)
 **Symptom:** `services/job-monitor/monitor.py`'s `check_feed()` fails with `xml.etree.ElementTree.ParseError: no element found: line 1, column 0` — all 4 Djinni feeds fail together in the same poll cycle, several times over ~20 min (18:30, 18:31, 18:36, 18:49). DOU feeds unaffected. 207 total "fetch failed" lines in `logs/monitor.log` history (broader pattern, includes an unrelated DNS blip on 07-14).
