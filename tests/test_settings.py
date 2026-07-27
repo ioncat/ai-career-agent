@@ -46,6 +46,34 @@ def test_settings_default_skill_type_override(monkeypatch):
     assert s.default_skill_type == "generic"
 
 
+# ── settings: CANDIDATE_NAME / CANDIDATE_NAME_UK (2026-07-27) ─────────────────
+# Language-aware candidate name — previously a single static CANDIDATE_NAME was
+# used unconditionally regardless of CV language (found live, vacancy #844).
+
+def test_settings_candidate_name_defaults(monkeypatch):
+    monkeypatch.delenv("CANDIDATE_NAME", raising=False)
+    monkeypatch.delenv("CANDIDATE_NAME_UK", raising=False)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "test-token")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "123456")
+
+    from core.settings import load_settings
+    s = load_settings()
+    assert s.candidate_name == "Alex Bondarenko"
+    assert s.candidate_name_uk == "Олексій Бондаренко"
+
+
+def test_settings_candidate_name_uk_override(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "test-token")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "123456")
+    monkeypatch.setenv("CANDIDATE_NAME_UK", "Тест Тестенко")
+
+    from core.settings import load_settings
+    s = load_settings()
+    assert s.candidate_name_uk == "Тест Тестенко"
+
+
 # ── default user seeding (get_or_create_default_user) ─────────────────────────
 
 @pytest.mark.asyncio

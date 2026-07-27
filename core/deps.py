@@ -37,7 +37,12 @@ class AgentDeps:
                         `_fresh_llm` method — never call the same phase name twice
                         expecting a cached client back; it builds fresh each time.
         vacancies_path: Root directory for vacancy filesystem storage.
-        candidate_name: Full name used in CV filenames (e.g. "Oleksii_Bondarenko").
+        candidate_name: Full name used for English CVs — prompt injection + filename
+                        (e.g. "Alex Bondarenko").
+        candidate_name_uk: Same, for Ukrainian CVs (e.g. "Олексій Бондаренко") —
+                        defaulted so existing AgentDeps(...) call sites that don't
+                        touch CV generation (e.g. analysis_worker's Phase-1/2-only
+                        reconstruction) don't need to pass it.
         cv_adapter:     Subprocess wrapper for cv_to_pdf.py in callback-cv repo.
         user_id:        DB user ID for multi-user scoping. Default=1 (single-user mode).
         skill_type:     Routes ALL pipeline phases to prompts/[skill_type]/ (e.g. 'pm', 'generic').
@@ -51,5 +56,6 @@ class AgentDeps:
     candidate_name: str
     cv_adapter: CVAdapter
     user_id: int = 1
+    candidate_name_uk: str = "Олексій Бондаренко"
     skill_type: str = "pm"
     profile: CandidateProfile | None = None

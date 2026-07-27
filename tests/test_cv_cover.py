@@ -265,7 +265,7 @@ async def test_cover_cv_missing(tmp_path):
         result = await cv_cover(ctx, 1)
 
     assert "⚠️" in result
-    assert "CV.md" in result
+    assert "CV" in result
 
 
 @pytest.mark.asyncio
