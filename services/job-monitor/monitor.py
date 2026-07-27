@@ -322,14 +322,19 @@ def _build_state_entry(j: dict, feed: dict, now_iso: str, silent: bool) -> dict:
 def _is_republished(j: dict, entry: dict) -> bool:
     """True if this job's feed pubDate is newer than the baseline we recorded.
 
-    Entries with no stored baseline (pre-existing state predating this check,
-    or a feed item with no parseable pubDate) return False — they get their
-    baseline backfilled instead, so a genuinely bumped listing is only
-    flagged the *next* time it reappears with a newer date, never on the
-    first poll after this field starts being recorded.
+    Baseline is `pub_date` if already stored, else `first_seen` (present on
+    every entry, old or new — first_seen is when our own poller first fetched
+    the link, a decent proxy for "last known pubDate" before this field
+    existed). This lets a republish be caught on the very first poll after
+    this check ships, not just from the second bump onward.
+
+    first_seen is naive local time, pub_date is UTC-normalized — string
+    comparison across the two can be off by the machine's UTC offset (a few
+    hours). Immaterial here: a real republish gap is days to months, not
+    hours, so this doesn't cause false negatives/positives in practice.
     """
-    old_iso = _parse_pub_date(entry.get("pub_date", ""))
-    if old_iso is None:
+    old_iso = _parse_pub_date(entry.get("pub_date", "")) or entry.get("first_seen")
+    if not old_iso:
         return False
     new_iso = _parse_pub_date(j.get("pubDate", ""))
     return bool(new_iso and new_iso > old_iso)
