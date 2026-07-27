@@ -58,6 +58,7 @@ def _make_ctx(tmp_path: Path, llm=None, cv_adapter=None) -> MagicMock:
     ctx.deps.get_llm = AsyncMock(return_value=llm or _make_llm())
     ctx.deps.cv_adapter = cv_adapter or _make_cv_adapter()
     ctx.deps.candidate_name = "Oleksii_Bondarenko"
+    ctx.deps.candidate_name_uk = "Олексій_Бондаренко"
     ctx.deps.vacancies_path = tmp_path / "vacancies"
     ctx.deps.skill_type = "pm"
     ctx.deps.user_id = 1
@@ -163,6 +164,36 @@ def test_split_explicit_separator():
     assert cv.startswith("# Oleksii Bondarenko")
 
 
+def test_split_h1_review_headings_do_not_break_strategy4():
+    """Regression for vacancy #844 (2026-07-27): review sections used literal
+    H1 headings ("# Top-15 Word Frequency", "# Tools & Technologies") instead
+    of the code-fenced format other fixtures use. Taking the FIRST H1 match
+    landed on the review heading (position 0), tripped the old m.start()>0
+    guard, and fell through to "use everything, unsplit" — leaking the whole
+    review block into the saved CV. The CV's own name header is reliably the
+    LAST H1 in the output; strategy 4 must find that one, not the first.
+    """
+    text = (
+        "# Top-15 Word Frequency\n\n"
+        "```\nJD top-15   CV top-15\n13 macpaw   16 product\n```\n\n"
+        "# 🛠️ Tools & Technologies\n\n"
+        "```\nMake   —   missing\n```\n\n"
+        "# CV SELF-REVIEW\n\n"
+        "❌ Remove: none.\n\n"
+        "# Alex Bondarenko\n"
+        "Product Owner / Product Manager\n\n"
+        "## SUMMARY\n\nStrong product leader.\n\n## EXPERIENCE\n\nSenior PM at Co.\n"
+    )
+    review, cv = _split_review_and_cv(text)
+    assert cv.startswith("# Alex Bondarenko")
+    assert "Top-15 Word Frequency" not in cv
+    assert "Tools & Technologies" not in cv
+    assert "CV SELF-REVIEW" not in cv
+    assert "macpaw" not in cv
+    assert "Top-15 Word Frequency" in review
+    assert "CV SELF-REVIEW" in review
+
+
 def test_split_cyrillic_h1_strategy4():
     """Strategy 4 must work for Ukrainian/Russian names (Cyrillic H1)."""
     text = (
@@ -239,6 +270,71 @@ async def test_generate_saves_cv_md(tmp_path):
     content = cv_path.read_text()
     assert "SUMMARY" in content
     assert "Oleksii Bondarenko" in content
+
+
+# ── Language-aware candidate name (2026-07-27) ─────────────────────────────────
+# Found live on vacancy #844: candidate_name was a single static config value
+# fed unconditionally into the Phase 3 prompt, regardless of the CV's language
+# (English JD, Ukrainian formal name used). cv_generate() already auto-detects
+# language — these assert it's actually wired to name selection now.
+
+@pytest.mark.asyncio
+async def test_generate_english_uses_candidate_name(tmp_path):
+    jd_path, _ = _write_vacancy_files(tmp_path)
+    vacancy_row = _make_vacancy_row(jd_path)
+    llm = _make_llm(side_effect=[_PHASE3_DRAFT, _PHASE35_SAMPLE])
+    ctx = _make_ctx(tmp_path, llm)
+    ctx.deps.candidate_name = "Alex Bondarenko"
+    ctx.deps.candidate_name_uk = "Олексій Бондаренко"
+    mock_db = _mock_db(vacancy_row=vacancy_row)
+
+    with patch("tools.cv_generate.database", mock_db):
+        await cv_generate(ctx, 1, language="English")
+
+    phase3_prompt_sent = llm.complete.await_args_list[0].args[0]
+    assert "Candidate name: Alex Bondarenko" in phase3_prompt_sent
+    assert (jd_path.parent / "Alex_Bondarenko_CV.md").exists()
+
+
+@pytest.mark.asyncio
+async def test_generate_ukrainian_uses_candidate_name_uk(tmp_path):
+    jd_path, _ = _write_vacancy_files(tmp_path)
+    vacancy_row = _make_vacancy_row(jd_path)
+    llm = _make_llm(side_effect=[_PHASE3_DRAFT, _PHASE35_SAMPLE])
+    ctx = _make_ctx(tmp_path, llm)
+    ctx.deps.candidate_name = "Alex Bondarenko"
+    ctx.deps.candidate_name_uk = "Олексій Бондаренко"
+    mock_db = _mock_db(vacancy_row=vacancy_row)
+
+    with patch("tools.cv_generate.database", mock_db):
+        await cv_generate(ctx, 1, language="Ukrainian")
+
+    phase3_prompt_sent = llm.complete.await_args_list[0].args[0]
+    assert "Candidate name: Олексій Бондаренко" in phase3_prompt_sent
+    assert (jd_path.parent / "Oleksii_Bondarenko_CV.md").exists()
+
+
+@pytest.mark.asyncio
+async def test_generate_auto_detected_ukrainian_uses_candidate_name_uk(tmp_path):
+    """language='auto' + Cyrillic JD must also route to the Ukrainian name,
+    not just an explicit language='Ukrainian' call."""
+    jd_dir = tmp_path / "vacancies" / "dou" / "2026-05" / "999"
+    jd_dir.mkdir(parents=True)
+    jd_path = jd_dir / "JD.md"
+    jd_path.write_text("# Продакт менеджер\n\nОпис вакансії українською.", encoding="utf-8")
+    (jd_dir / "JD_analysis.md").write_text("## Quick Scan\n\n**Fit score:** 7/10", encoding="utf-8")
+    vacancy_row = _make_vacancy_row(jd_path)
+    llm = _make_llm(side_effect=[_PHASE3_DRAFT, _PHASE35_SAMPLE])
+    ctx = _make_ctx(tmp_path, llm)
+    ctx.deps.candidate_name = "Alex Bondarenko"
+    ctx.deps.candidate_name_uk = "Олексій Бондаренко"
+    mock_db = _mock_db(vacancy_row=vacancy_row)
+
+    with patch("tools.cv_generate.database", mock_db):
+        await cv_generate(ctx, 1, language="auto")
+
+    phase3_prompt_sent = llm.complete.await_args_list[0].args[0]
+    assert "Candidate name: Олексій Бондаренко" in phase3_prompt_sent
 
 
 # ── _next_version_path ────────────────────────────────────────────────────────

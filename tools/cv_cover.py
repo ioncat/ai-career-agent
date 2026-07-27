@@ -17,6 +17,7 @@ Receives shared dependencies via RunContext[AgentDeps].
 """
 
 import logging
+import re
 import time
 from pathlib import Path
 
@@ -24,7 +25,6 @@ from pydantic_ai import RunContext
 
 from core.deps import AgentDeps
 from core.llm_client import LLMError
-from core.translit import safe_filename_stem
 from db import database
 
 log = logging.getLogger(__name__)
@@ -83,15 +83,21 @@ async def cv_cover(ctx: RunContext[AgentDeps], vacancy_id: int) -> str:
             f"Сначала запусти анализ для вакансии #{vacancy_id}."
         )
 
-    # Latin ASCII stem — same rule as cv_generate so the CV glob matches.
-    safe_name = safe_filename_stem(ctx.deps.candidate_name)
-    cv_candidates = sorted(jd_path.parent.glob(f"{safe_name}_CV*.md"))
+    # Match any candidate-name variant (English/Ukrainian) — cv_generate now
+    # picks the name based on CV language (2026-07-27), so this can no longer
+    # assume ctx.deps.candidate_name specifically without re-detecting the
+    # vacancy's language here too. The vacancy folder is already scoped to
+    # one vacancy, so an unqualified "*_CV*.md" glob is unambiguous.
+    cv_candidates = sorted(jd_path.parent.glob("*_CV*.md"))
     if not cv_candidates:
         return (
-            f"⚠️ {safe_name}_CV.md не найден. "
+            f"⚠️ CV не найден в папке вакансии. "
             f"Сначала сгенерируй CV для вакансии #{vacancy_id}."
         )
     cv_path = cv_candidates[-1]
+    # Derive the name stem from the CV file actually found, so Cover.md is
+    # saved under the same name variant the CV used — instead of guessing.
+    safe_name = re.sub(r"_CV(?:_v\d+)?$", "", cv_path.stem)
 
     jd_text = jd_path.read_text(encoding="utf-8")
     analysis_text = analysis_path.read_text(encoding="utf-8")

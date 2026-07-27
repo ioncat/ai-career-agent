@@ -101,6 +101,17 @@ async def cv_generate(
         language = "Ukrainian" if any('Ѐ' <= c <= 'ӿ' for c in jd_text) else "English"
         log.info("cv_generate: auto-detected language=%s for vacancy_id=%d", language, vacancy_id)
 
+    # Candidate name follows CV language — PROFILE.md's own rule (English →
+    # informal default, no asking; Ukrainian → Ukrainian-spelling variant).
+    # Previously a single static candidate_name was used unconditionally
+    # regardless of language, injected straight into the Phase 3 prompt as a
+    # hard instruction — the LLM never got a chance to apply the profile's
+    # own default-name rule. Found live 2026-07-27 (vacancy #844, English JD,
+    # wrong formal-variant name used).
+    candidate_display_name = (
+        ctx.deps.candidate_name_uk if language == "Ukrainian" else ctx.deps.candidate_name
+    )
+
     # ── Load progressive_profile evidence (EPIC-24 T6) ───────────────────────
     _pp_evidence: str | None = None
     user_row = await database.get_user_by_id(ctx.deps.user_id)
@@ -131,7 +142,7 @@ async def cv_generate(
         f"JD Analysis:\n\n{analysis_text}\n\n"
         f"---\n\n"
         f"Target language: {language}\n"
-        f"Candidate name: {ctx.deps.candidate_name}"
+        f"Candidate name: {candidate_display_name}"
     )
     if _pp_evidence:
         phase3_user += f"\n\n---\n\n## Candidate Evidence (DB Profile)\n\nUse the structured evidence below to enrich the CV with specific, accurate detail. This is the authoritative source for narratives, key results, and framing. Prefer this over the summary in PROFILE.md when both are present.\n\n{_pp_evidence}"
@@ -209,7 +220,7 @@ async def cv_generate(
     # ── Save [Name]_CV.md (versioned if already exists) ──────────────────────
     # Filename is always Latin ASCII, even for Ukrainian/Russian CVs (Cyrillic
     # filenames break filesystems/sync/email); document content stays original.
-    safe_name = safe_filename_stem(ctx.deps.candidate_name)
+    safe_name = safe_filename_stem(candidate_display_name)
     cv_md_path = _next_version_path(jd_path.parent / f"{safe_name}_CV.md")
     cv_md_path.write_text(final_cv, encoding="utf-8")
     log.info("cv_generate: saved CV.md → %s", cv_md_path)
@@ -355,10 +366,20 @@ def _split_review_and_cv(phase35_output: str) -> tuple[str, str]:
         return review, cv.strip()
 
     # ── Strategy 4: H1 heading — CV always starts with "# FirstName LastName" ─
-    # Review sections use ## / ### or plain text; H1 only appears as CV header.
-    # Unicode range Ѐ-ӿ covers Cyrillic uppercase (Ukrainian/Russian names).
-    m = re.search(r"(?m)^# [A-ZЀ-ӿ]", phase35_output)
-    if m and m.start() > 0:
+    # Review sections are supposed to use ## / ### or plain text, but the LLM
+    # doesn't always comply — found live 2026-07-27 (vacancy #844): review
+    # sections used their own literal H1s ("# Top-15 Word Frequency",
+    # "# 🛠️ Tools & Technologies"). Taking the FIRST H1 match landed on that
+    # review heading instead of the CV's name header, tripped the old
+    # `m.start() > 0` guard, and fell through to "use everything, unsplit".
+    # The CV body itself never uses H1 after its own name header (SUMMARY/
+    # EXPERIENCE/CERTIFICATIONS are always ##/###) — so the name header is
+    # reliably the LAST H1 in the whole output, regardless of how many H1s
+    # the review preamble uses. Unicode range Ѐ-ӿ covers Cyrillic uppercase
+    # (Ukrainian/Russian names).
+    matches = list(re.finditer(r"(?m)^# [A-ZЀ-ӿ]", phase35_output))
+    if matches:
+        m = matches[-1]
         review = phase35_output[: m.start()].strip()
         cv = phase35_output[m.start():].strip()
         return review, cv

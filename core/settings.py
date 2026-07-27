@@ -3,7 +3,7 @@ core/settings.py — application config loaded from env vars.
 
 Required vars: ANTHROPIC_API_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 Optional vars (have defaults): LLM_MODEL, DB_PATH, PARSER_URL,
-                               CANDIDATE_NAME, PDF_SERVICE_URL, MULTI_USER_ENABLED
+                               CANDIDATE_NAME, CANDIDATE_NAME_UK, PDF_SERVICE_URL, MULTI_USER_ENABLED
 Deprecated (still functional as fallback): PROFILE_MD_PATH
   — EPIC-17: profile now loaded from DB (users.profile_json).
     PROFILE_MD_PATH is used only when DB profile is empty (new install / not yet onboarded).
@@ -43,7 +43,8 @@ class Settings:
     pdf_service_url: str = "http://localhost:8002"
     vacancies_path: Path = field(default_factory=lambda: Path("vacancies"))
     max_tokens: int = 4096
-    candidate_name: str = "Candidate"
+    candidate_name: str = "Alex Bondarenko"  # English CVs — PROFILE.md default variant
+    candidate_name_uk: str = "Олексій Бондаренко"  # CANDIDATE_NAME_UK — Ukrainian CVs
     seen_jobs_path: Path = field(default_factory=lambda: Path("seen_jobs.json"))
     rss_poll_interval: int = 60  # seconds between seen_jobs.json polls
     agent_mode: str = "production"  # "testing" → confirm before each LLM API call
@@ -120,7 +121,8 @@ def load_settings() -> Settings:
         pdf_service_url=_optional("PDF_SERVICE_URL", "http://localhost:8002"),
         vacancies_path=Path(_optional("VACANCIES_PATH", "vacancies")),
         max_tokens=int(_optional("MAX_TOKENS", "4096")),
-        candidate_name=_optional("CANDIDATE_NAME", "Candidate"),
+        candidate_name=_optional("CANDIDATE_NAME", "Alex Bondarenko"),
+        candidate_name_uk=_optional("CANDIDATE_NAME_UK", "Олексій Бондаренко"),
         seen_jobs_path=Path(_optional("SEEN_JOBS_PATH", "seen_jobs.json")),
         rss_poll_interval=int(_optional("RSS_POLL_INTERVAL", "60")),
         agent_mode=_optional("AGENT_MODE", "production"),

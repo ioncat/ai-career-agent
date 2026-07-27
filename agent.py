@@ -141,6 +141,7 @@ async def main() -> None:
         get_llm=_fresh_llm,
         vacancies_path=settings.vacancies_path,
         candidate_name=settings.candidate_name,
+        candidate_name_uk=settings.candidate_name_uk,
         cv_adapter=cv_adapter,
         user_id=default_user_id,
         skill_type=default_skill_type,
