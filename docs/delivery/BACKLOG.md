@@ -290,10 +290,6 @@ No dual-availability state — the button's visibility is a direct, deterministi
 **Fix sketch:** normalize text before hashing (strip markdown link syntax, normalize quotes/whitespace) and/or add a fuzzy secondary match (company + title + published_at proximity) to catch cross-source republishing that exact-hash dedup can't.
 **Found via:** user confusion investigating vacancy #778's re-analysis (see also the Phase 1/2 prompt fix for dual-track JD handling, same investigation).
 
-### Re-analysis doesn't auto-refresh the Analyzed screen (found 2026-07-26)
-**Symptom:** triggering re-analysis moves a vacancy Analyzed → Inbox (analyzing) → back to Analyzed once done, but the Flutter Analyzed list/card doesn't auto-refresh to reflect the new result — user has to manually hit refresh to see it land back, and even then it's unclear the fetch is against fresh data.
-**Fix sketch:** trigger a list refetch (or push a targeted update) when a vacancy transitions back to `analyzed` status after being queued for re-analysis, same mechanism as the existing push-on-complete in `core/analysis_worker.py::_push_result`.
-
 ### PDF bullet-list text extraction — marker separated from item text (found 2026-07-25)
 **Symptom:** `pdfminer.six` extraction of generated CV/Cover PDFs (`services/pdf/render.py`, WeasyPrint) puts the `•` bullet marker on its own line, then a blank line, then the list-item text — e.g. `Key results:\n\n•  \n\nShipped a functional MVP...` instead of `• Shipped a functional MVP...` on one line.
 **Not a bug (ruled out):** initially misdiagnosed as a Unicode/ToUnicode CMap encoding bug (em-dash/middle-dot/bullet all rendering as `�`) — checked actual codepoints via `ord()` directly (not terminal display) and confirmed extraction is 100% correct (`U+2014`, `U+00B7`, `U+2022` all present and correct). The `�` was the Windows bash console failing to *display* those glyphs, not a PDF/extraction problem. Reproduced independent of custom fonts (plain `sans-serif`, no `@font-face`) and across WeasyPrint 68.1 and 69.0 — same list-layout quirk both versions, so not a version regression either.

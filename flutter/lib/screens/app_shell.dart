@@ -117,6 +117,17 @@ class _AppShellState extends ConsumerState<AppShell> {
         (prev, next) {
       final state = next.valueOrNull;
       if (state == null || state.fresh.isEmpty) return;
+
+      // notificationProvider and vacancyListProvider poll on independent
+      // timers (same interval, not synchronized) — a fresh pipeline event
+      // (e.g. re-analysis done) previously only updated the toast/notif
+      // list, leaving the vacancy list/card waiting on its own timer to
+      // eventually catch up, which looked like "doesn't refresh, needs a
+      // manual refresh" (found live 2026-07-26). A fresh event already
+      // means "something changed" — force an immediate refetch instead of
+      // waiting on a second, unrelated timer.
+      ref.read(vacancyListProvider.notifier).refresh();
+
       if (!(settings?.notificationsEnabled ?? true)) return;
 
       for (final n in state.fresh) {
