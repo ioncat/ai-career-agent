@@ -314,8 +314,25 @@ def _build_state_entry(j: dict, feed: dict, now_iso: str, silent: bool) -> dict:
         "title": j["title"],
         "feed": feed["name"],
         "first_seen": now_iso,
+        "pub_date": j.get("pubDate", ""),
         "delivery": {str(uid): dict(initial) for uid in feed["user_ids"]},
     }
+
+
+def _is_republished(j: dict, entry: dict) -> bool:
+    """True if this job's feed pubDate is newer than the baseline we recorded.
+
+    Entries with no stored baseline (pre-existing state predating this check,
+    or a feed item with no parseable pubDate) return False — they get their
+    baseline backfilled instead, so a genuinely bumped listing is only
+    flagged the *next* time it reappears with a newer date, never on the
+    first poll after this field starts being recorded.
+    """
+    old_iso = _parse_pub_date(entry.get("pub_date", ""))
+    if old_iso is None:
+        return False
+    new_iso = _parse_pub_date(j.get("pubDate", ""))
+    return bool(new_iso and new_iso > old_iso)
 
 
 def migrate_state(state: dict, feeds: list[dict]) -> int:
@@ -557,6 +574,10 @@ async def check_feed(
         j["salary"] = SALARY_RE.search(j["title"]).group() if SALARY_RE.search(j["title"]) else ""
 
     new_jobs = [j for j in jobs if j["link"] not in state]
+    republished_jobs = [
+        j for j in jobs
+        if j["link"] in state and _is_republished(j, state[j["link"]])
+    ]
     now = datetime.now()
     now_iso = now.isoformat(timespec="seconds")
 
@@ -565,21 +586,39 @@ async def check_feed(
         # permanently exclude them from real delivery once --debug is dropped
         # (a job seen once during --debug never gets webhooked again). See
         # BACKLOG "job-monitor: --debug silently marks vacancies as delivered".
-        log.info("[%s] total: %d, new: %d, seen: %d",
-                 feed["name"], len(jobs), len(new_jobs), len(jobs) - len(new_jobs))
+        log.info("[%s] total: %d, new: %d, republished: %d, seen: %d",
+                 feed["name"], len(jobs), len(new_jobs), len(republished_jobs),
+                 len(jobs) - len(new_jobs) - len(republished_jobs))
         for j in new_jobs:
             log.info("  → %s | company=%s | salary=%s\n    %s",
                      j["title"], j["company"], j["salary"], j["link"])
+        for j in republished_jobs:
+            log.info("  ↻ republished: %s\n    %s", j["title"], j["link"])
         return 0
 
     for j in new_jobs:
         state[j["link"]] = _build_state_entry(j, feed, now_iso, silent=silent)
 
+    # Backfill missing pub_date baseline on already-seen links (state predates
+    # this field, or the feed omitted pubDate) — silent, not a republish signal.
+    for j in jobs:
+        entry = state.get(j["link"])
+        if entry is not None and not entry.get("pub_date"):
+            entry["pub_date"] = j.get("pubDate", "")
+
+    for j in republished_jobs:
+        entry = state[j["link"]]
+        entry["pub_date"] = j.get("pubDate", "")
+        for delivery in entry["delivery"].values():
+            delivery["status"] = "sent" if silent else "pending"
+            delivery["attempts"] = 0
+            delivery["last_error"] = None
+
     if silent:
         return 0
 
     notified = 0
-    for j in new_jobs:
+    for j in new_jobs + republished_jobs:
         results = await asyncio.gather(
             *[deliver_one(session, j["link"], j, feed["name"], uid, career_agent_url, state, now)
               for uid in feed["user_ids"]],
@@ -587,7 +626,8 @@ async def check_feed(
         )
         sent = [feed["user_ids"][i] for i, r in enumerate(results) if r is True]
         status = f"-> {sent} OK" if sent else "-> FAIL"
-        log.info("[%s] NEW: %s | %s | %s", feed["name"], j["title"], j["link"], status)
+        tag = "NEW" if j in new_jobs else "REPUBLISHED"
+        log.info("[%s] %s: %s | %s | %s", feed["name"], tag, j["title"], j["link"], status)
         if sent:
             notified += 1
     return notified
