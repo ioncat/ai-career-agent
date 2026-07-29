@@ -27,22 +27,22 @@ User will provide:
 6. **Do not self-apply "Senior"** unless officially held
 7. **Avoid AI clichés** — "AI-Native", "AI-Driven mindset" etc.
 8. **Avoid first-person pronouns** — standard CV convention
-9. **"Built" implies coding** — use "Led design and delivery", "Owned", "Coordinated" for PM work
-10. **Metrics belong in Key Results only** — do not duplicate in prose
-11. **NO Skills section**
-12. **NO Education section**
-13. **NO Location**
-14. **GitHub link — never include in contacts.** Portfolio site (from PROFILE.md contacts) already covers it. GitHub URL is redundant and creates noise.
-15. **Summary section header — language rule:** English CV → use `SUMMARY` header. Ukrainian CV → NO header, summary text flows directly after headline/contacts. "РЕЗЮМЕ" as a section label is redundant inside a CV.
-16. **Domain context (e.g. iGaming, fintech, e-commerce) — include only if JD is from that domain.** Never volunteer domain in a generic or unrelated vacancy.
-17. **Add `---` separator between each job entry** for visual spacing in PDF output.
-18. **NEVER use plural forms for things built or owned: no "systems", "portals", "platforms".** Name individual items specifically (singular each), or use "product" / "product suite" as a collective. Exception: "products" is allowed only when referring to multiple distinct products in context.
-19. **NEVER use third-person verbs anywhere in the CV** — no "Understands", "Knows", "Applies", "Works", "Brings", "Has". CV language = headline-style (no subject) or past-tense action verbs. Applies to Summary, bullets, and all prose.
+9. **NEVER use third-person verbs anywhere in the CV** — no "Understands", "Knows", "Applies", "Works", "Brings", "Has", "Reads", "Holds", "Designs" (present-tense, implied-subject form). CV language = headline-style (no subject) or past-tense action verbs. Applies to Summary, bullets, and all prose. Companion rule to #8 — both are voice rules, check them together on every pass, especially the Summary section where they're most often missed.
+10. **"Built" implies coding** — use "Led design and delivery", "Owned", "Coordinated" for PM work
+11. **Metrics belong in Key Results only** — do not duplicate in prose
+12. **NO Skills section**
+13. **NO Education section**
+14. **NO Location**
+15. **GitHub link — never include in contacts.** Portfolio site (from PROFILE.md contacts) already covers it. GitHub URL is redundant and creates noise.
+16. **Summary section header — language rule:** English CV → use `SUMMARY` header. Ukrainian CV → NO header, summary text flows directly after headline/contacts. "РЕЗЮМЕ" as a section label is redundant inside a CV.
+17. **Domain context (e.g. iGaming, fintech, e-commerce) — include only if JD is from that domain.** Never volunteer domain in a generic or unrelated vacancy.
+18. **Add `---` separator between each job entry** for visual spacing in PDF output.
+19. **NEVER use plural forms for things built or owned: no "systems", "portals", "platforms".** Name individual items specifically (singular each), or use "product" / "product suite" as a collective. Exception: "products" is allowed only when referring to multiple distinct products in context.
 20. **CERTIFICATIONS: include only "Certified AI-Empowered SAFe® Product Owner/Product Manager" by default.** Add others only when directly relevant to the specific vacancy.
 21. **NPS/CSAT — context-dependent.**
-24. **Every sentence must earn its place.** After drafting each role paragraph, check every sentence against the Signal Coverage Table. Ask: does this deliver value in the context of this JD's requirements, or lead the recruiter in the wrong direction? If a sentence maps to no JD signal (high/medium/low) — cut it. Factual ≠ relevant. (Phase 3.6 will audit the saved CV — but the draft should already pass this check.) For technical/platform/AI roles: NPS and CSAT are CX/support metrics — deprioritize or remove; use error reduction %, automation %, delivery velocity instead. Keep for: CX-focused PM, growth PM, customer-success-adjacent roles.
-22. **CV describes practice, NOT cases.** Role descriptions state what the candidate did as a pattern (approach, method, ongoing responsibility). Specific examples, named projects, and case-study evidence belong in the interview, not the CV. Wrong: "identified an off-hours revenue gap and built an automated flow". Right: "applied gap analysis to identify process discrepancies and defined requirements to close them." The CV proves breadth of practice; the interview proves depth with specifics.
-23. **Years of experience — count ONLY "Product Owner"-titled roles.** Default summary = "Product Owner with 6+ years…". PO-titled roles as of 2026-07: Independent/Project-based PO (Aug 2025–Present, ~11m) + InsulaLabs (5m) + Marketplace PO (14m) + HostiServer PO (46m) = ~76m ≈ 6+ years. Project Manager title ≠ product years — never fold it in. Recompute only if a new PO-titled role is added.
+22. **Every sentence must earn its place.** After drafting each role paragraph, check every sentence against the Signal Coverage Table. Ask: does this deliver value in the context of this JD's requirements, or lead the recruiter in the wrong direction? If a sentence maps to no JD signal (high/medium/low) — cut it. Factual ≠ relevant. (Phase 3.6 will audit the saved CV — but the draft should already pass this check.) For technical/platform/AI roles: NPS and CSAT are CX/support metrics — deprioritize or remove; use error reduction %, automation %, delivery velocity instead. Keep for: CX-focused PM, growth PM, customer-success-adjacent roles.
+23. **CV describes practice, NOT cases.** Role descriptions state what the candidate did as a pattern (approach, method, ongoing responsibility). Specific examples, named projects, and case-study evidence belong in the interview, not the CV. Wrong: "identified an off-hours revenue gap and built an automated flow". Right: "applied gap analysis to identify process discrepancies and defined requirements to close them." The CV proves breadth of practice; the interview proves depth with specifics.
+24. **Years of experience — count ONLY "Product Owner"-titled roles.** Default summary = "Product Owner with 6+ years…". PO-titled roles as of 2026-07: Independent/Project-based PO (Aug 2025–Present, ~11m) + InsulaLabs (5m) + Marketplace PO (14m) + HostiServer PO (46m) = ~76m ≈ 6+ years. Project Manager title ≠ product years — never fold it in. Recompute only if a new PO-titled role is added.
 25. **NEVER use em-dashes (—).** Use a period, comma, colon, or parentheses instead. A chained em-dash pair inside one sentence (a mid-sentence parenthetical insert) is a strong, well-known AI-writing tell — rewrite as two sentences or a parenthetical instead of reaching for a dash.
 
 ---

@@ -85,6 +85,17 @@ Also check visually for structural patterns not captured by frequency count:
 
 ---
 
+## Voice Check — rules #8/#9 (internal only — do NOT output label, but MANDATORY)
+
+Run this as an explicit, separate pass over the CV draft — not a general impression. Read every sentence in SUMMARY and EXPERIENCE (excluding Key results bullets, which are noun/past-tense by convention) and check two things:
+
+1. **First-person pronouns** (rule #8): "I", "my", "me" anywhere → violation.
+2. **Third-person present-tense verbs with implied subject** (rule #9): any sentence where the (omitted) subject is the candidate and the verb carries a present-tense third-person "-s" form — "Reads", "Holds", "Designs", "Owns", "Understands", "Knows", "Applies", "Works", "Brings", "Has", "Drives", "Runs", "Supports", etc. This includes verbs buried mid-sentence after "and"/comma (e.g. "Read and designs..." — the second verb is the common miss), not just sentence-opening verbs.
+
+**If either is found: add to ❌ (not ⚠️/🔧 — this is a NON-NEGOTIABLE rule violation, not a style preference) and rewrite to past tense or headline-style before output.** This check exists because the two rules were repeatedly missed on prior CVs when relying on general judgment alone (found on vacancy #844, 2026-07-27) — treat it as a hard gate, not a scan-and-hope pass.
+
+---
+
 ## Company Tone & Positioning Check (internal only — do NOT output label)
 
 1. **Detect company type** from JD: `enterprise | scaleup | startup | founder-led`
