@@ -2,7 +2,7 @@
 
 **AI job search counselor for PdM · PO**
 
-> Personal tool, actively evolving as I use it in my own job search.
+> 🚧 **Active development.** Personal tool, actively evolving as I use it in my own job search — features and behavior may change between sessions.
 
 Reads vacancies deeply, scores honest fit, and generates targeted CVs — so candidates apply to the right roles and win them.
 
