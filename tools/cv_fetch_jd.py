@@ -216,8 +216,9 @@ def _safe_folder_name(title: str) -> str:
     Falls back to 'vacancy' if result is empty.
     """
     safe = re.sub(r'[<>:"/\\|?*]', "", title)
+    safe = safe.strip(". ").strip()[:80]
     safe = safe.strip(". ").strip()
-    return (safe or "vacancy")[:80]
+    return safe or "vacancy"
 
 
 def _url_slug(url: str) -> str:

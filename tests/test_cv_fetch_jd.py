@@ -12,7 +12,14 @@ import pytest
 
 from adapters.parser_adapter import ParserError
 from contracts.parsed_document import ParsedDocument
-from tools.cv_fetch_jd import FetchError, _detect_site, _url_slug, cv_fetch_jd, fetch_jd
+from tools.cv_fetch_jd import (
+    FetchError,
+    _detect_site,
+    _safe_folder_name,
+    _url_slug,
+    cv_fetch_jd,
+    fetch_jd,
+)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -114,6 +121,31 @@ def test_url_slug_max_length():
 def test_url_slug_empty_path():
     slug = _url_slug("https://example.com")
     assert slug == "vacancy"
+
+
+# ── _safe_folder_name ─────────────────────────────────────────────────────────
+
+def test_safe_folder_name_removes_forbidden_chars():
+    assert _safe_folder_name('Role: "Lead" <PM>') == "Role Lead PM"
+
+
+def test_safe_folder_name_strips_trailing_dot_space():
+    assert _safe_folder_name("Company Inc. ") == "Company Inc"
+
+
+def test_safe_folder_name_empty_falls_back():
+    assert _safe_folder_name('""') == "vacancy"
+
+
+def test_safe_folder_name_truncation_does_not_leave_trailing_space():
+    # Regression: vacancy #889 — a title >80 chars whose 80th char landed on a
+    # space produced a folder name ending in " ", which Windows silently trims
+    # on mkdir but Path.write_text() does not — "No such file or directory".
+    title = "889 — Product Owner (сервіси обліку та інтеграції, партнерські сервіси клієнтам, discovery)"
+    result = _safe_folder_name(title)
+    assert not result.endswith(" ")
+    assert not result.endswith(".")
+    assert len(result) <= 80
 
 
 # ── fetch_jd — direct call (auto-pipeline path) ───────────────────────────────
