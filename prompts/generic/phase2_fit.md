@@ -149,7 +149,9 @@ Skip boilerplate requirements (teamwork, communication, responsibility). Focus o
 List 2–3 structural reasons why this vacancy is not worth the time investment.
 Focus on gaps that cannot be bridged with reframing alone.
 
-**If Recommendation is "apply" or "take a chance":**
+This is advisory only — it informs the "Генерируем CV?" decision, it does not block Phase 3. If the user chooses to generate anyway, ALSO provide the reframing actions below so Phase 3 has real instructions to work from instead of refusing.
+
+**Always (regardless of recommendation), provide reframing actions:**
 
 Provide 3–5 concrete reframing actions. Each action = specific and actionable.
 

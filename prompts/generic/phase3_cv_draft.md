@@ -22,7 +22,8 @@ User will provide:
 1. **NEVER copy-paste JD phrases verbatim** — absorb meaning, rewrite in natural language
 2. **NEVER change actual job titles** — dishonest and verifiable
 3. **NEVER fabricate experience** — if it doesn't exist, don't claim it
-4. **NEVER remove a work experience entry** — every job in PROFILE.md stays in CV
+4. **NEVER remove a work experience entry** — every job in PROFILE.md stays in CV. This includes the current/most recent role — never drop it even if it looks less relevant to the JD than an older role.
+4b. **EXPERIENCE order is ALWAYS strict reverse-chronological — most recent role first.** Never reorder by relevance or "lead with the strongest match." If the Adaptation Plan says "lead with X," that means strengthen X's framing/word choice within its own chronological slot, not move it to the top of the list.
 5. **CV language = input language** — English JD → English CV; Ukrainian JD → Ukrainian CV
 6. **Avoid AI clichés** — "AI-Native", "AI-Driven mindset" etc.
 7. **Avoid first-person pronouns** — standard CV convention

@@ -1,6 +1,6 @@
 # career-agent — Backlog
 
-> Last updated: 2026-07-29
+> Last updated: 2026-07-30
 > Rules: [documentation-conventions.md](documentation-conventions.md) · History: [CHANGELOG.md](CHANGELOG.md) · Specs: [Epics/](Epics/)
 
 **Priority legend:**
@@ -12,6 +12,18 @@
 ---
 
 ## 📌 Now
+
+### ★ Systemic: CV self-review/audit phases optimize for JD-surface-matching, not ground truth — 4 known failure classes, none structurally fixed (added 2026-07-30) — HIGH PRIORITY
+**Orienting note, not a new ticket** — every existing "check" step (Phase 3.5 self-review, Phase 3.6 Signal Audit) is built to optimize keyword/tone match against the JD, not to verify the draft against ground truth or its own house rules. That's the one root mechanism behind four separate, currently-open failure classes — which is why manual per-vacancy polish keeps costing real time every session despite all the automated analysis passes that already exist.
+1. **Fact fabrication via JD-vocabulary bleed** — self-review has no PROFILE.md grounding check. See "Phase 3 CV draft fabricates experience..." ticket directly below (MAX PRIORITY, #844). Fresh evidence 2026-07-30: vacancy #934's HostiServer paragraph gained "Facilitated stakeholder workshops" — literally lifted from the JD's own responsibilities line, zero backing anywhere in PROFILE.md — caught only by the user's manual re-read, not by any pipeline step.
+2. **Sentence-granularity signal audit lets noise ride along on valid clauses** — see "Phase 3.6 Signal Audit operates at sentence granularity" ticket below (P0, #828). Fresh evidence 2026-07-30: the same "pre-sales, pilot negotiation... account management" enterprise-sales-jargon pattern first found on #828 reappeared in spirit on #934's HostiServer paragraph.
+3. **Cross-role lexical bleed within one generation** — see "Phase 3 CV draft: cross-role lexical bleed" ticket below (P0, #828).
+4. **NEW — mechanical NON-NEGOTIABLE rules (em-dash ban, banned-phrase list) are never re-verified downstream.** Not previously tracked — see new P0 ticket "Mechanical NON-NEGOTIABLE rule violations are never re-verified downstream" below.
+**Structural fix (covers 1 & 3):** "Per-archetype skeletal building-block constructs in PROFILE.md" (P1, below) — fixed, vetted phrasing blocks instead of free generation removes the fabrication/bleed *mechanism*, not just patches each individual leak as it's found.
+**Cheap fix (covers most of 4, and a slice of 1 & 2):** a deterministic, non-LLM lint pass right after Phase 3.5 saves the draft — regex-scan for em-dash characters and a maintained banned-phrase list — before the draft is ever shown to the user. Near-zero implementation cost, would have auto-caught a real chunk of today's manual fixes.
+**When to pick this up:** start with the cheap lint pass whenever there's a free slot — immediate ROI, no design work needed. The skeletal-blocks rewrite (1 & 3) is the bigger investment, save for later.
+
+---
 
 ### Phase 3 CV draft fabricates experience by mirroring JD vocabulary as if it were candidate history — Phase 3.5 review reinforces it instead of catching it (found 2026-07-27, vacancy #844) — MAX PRIORITY
 **What:** vacancy #844 (MacPaw/Setapp, Platform PM — JD centers on "vendor ecosystem", "external developers/software creators", "vendor onboarding", "asset distribution", "build verification flows") — Phase 3 wrote these exact JD concepts into the candidate's actual work history: HostiServer's real B2C/B2B hosting customers became "external software creators and enterprise customers"; the Marketplace Startup role gained an invented "Defined vendor onboarding workflows enabling external software creators to list and manage product distribution" — neither claim exists anywhere in `PROFILE.md` (Marketplace section explicitly caveats "not full-ownership 0→1 discovery"; HostiServer section explicitly says "B2C and B2B... legal entities and individual clients"). CI/CD phrasing was also over-specified ("deployment gates and dependency management") beyond PROFILE.md's honest "conceptual fluency, NOT commercial hands-on" framing.
@@ -60,11 +72,33 @@
 
 ---
 
+### Mechanical NON-NEGOTIABLE rule violations (em-dash, banned phrases) are never re-verified downstream (added 2026-07-30)
+**What:** `prompts/pm|generic/phase3_cv_draft.md` rule 25 ("NEVER use em-dashes — a chained em-dash pair is a well-known AI-writing tell") and house-rule banned phrases (e.g. "gap analysis" — [[feedback_no_gap_analysis]]) are stated once in the generation prompt and never mechanically re-checked afterward. Recurred repeatedly in a single session, 2026-07-30: em-dash found in vacancy #915 (a chained pair in the HostiServer paragraph — the exact AI-tell pattern the rule exists to stop), #922 (3 separate instances), #934 (2 instances); "gap analysis" recurred independently on #932 and #934, despite both rules already being explicit and dated (em-dash rule added 2026-07-27 per CHANGELOG).
+**Why:** the LLM doesn't reliably self-enforce every listed NON-NEGOTIABLE rule on every generation, and nothing downstream re-checks mechanically — Phase 3.5's self-review checklist (word-frequency, tools table, tone) doesn't include a literal scan for either.
+**Fix direction:** deterministic, non-LLM post-generation lint step, run right after Phase 3.5 saves the CV and before it's shown to the user — regex for em-dash characters plus a maintained banned-phrase list. Flag matches for a one-click fix rather than hard-blocking. Cheap, high-value, no prompt-design risk — good first pick when picking up the broader "self-review checks the wrong things" problem (see orienting note at top of this section).
+**Found via:** repeated manual catches across vacancies #915/#922/#932/#934 in a single session, 2026-07-30 — see session transcript / `CHANGELOG.md` 2026-07-30 entries.
+
+---
+
 ### Competitive landscape analysis (requested 2026-05-31 — overdue)
 **What:** research similar services (AI-assisted job search, CV tailoring, fit analysis — PM-focused).
 **Why:** understand the market before building further; critique our positioning with real data.
 **How:** research prompt from `docs/discovery/product-thesis.md` + `docs/discovery/ideas.md` + README → web search.
 **Output:** `docs/discovery/competitive-analysis.md` with verdict: is the gap real, what to adjust.
+
+---
+
+### Phase 1 "Company" extraction ignores the already-known job-board company, invents a placeholder when the JD body anonymizes the end-client — corrupts DB `title` and hides the real company in Flutter (found 2026-07-30, vacancy #934, N-iX)
+**What:** `prompts/pm|generic/phase1_analysis.md:42` — `**Company:** [company name as written in JD]` — extracts strictly from JD body text. Common for staffing/BPO/recruiting-agency postings (Djinni especially) to anonymize the end-client in the body ("Our Client provides...") while the actual hiring company is known and already correct in `vacancies.company` (fetched from the job-board page itself, not the body). On #934 this produced `analysis_json.p1.company = "[undisclosed — insurance claims/services BPO, client-facing role via staffing partner]"` even though `vacancies.company = "N-iX"` was sitting right there, correct, the whole time.
+**Two downstream breakages from the one bad value:**
+1. `web/api.py:349` (`api_vacancies`) explicitly prefers `analysis_json.p1.company` over the correct `vacancies.company` for the Flutter-facing `company` field ("prefer analysis company... over RSS company") — no guard against the analysis value being a placeholder/prose-descriptor rather than an actual name, so the correct "N-iX" gets hidden behind the useless placeholder in the UI (this is the exact card the user screenshotted).
+2. Something in the pipeline (likely a `role — company` title composition using Phase 1's own `company` field) also corrupted `vacancies.title` to `"Senior Product Owner — [undisclosed — insurance claims/services BPO, client-facing role via staffing partner]"` — the raw placeholder leaking into a DB column that should just hold the clean role title. Needs tracing (not yet found which write path does this — worth checking `scripts/vacancy_track.py update --title` call sites in the pipeline).
+**Fix direction:**
+- `phase1_analysis.md`: when the JD body doesn't name the hiring company (anonymized/agency posting), fall back to the company name already known from the fetch (pass it into the Phase 1 prompt context) instead of inventing a placeholder; if there's a genuinely separate undisclosed end-client worth noting, keep that as a short parenthetical, not the whole Company value (pattern used in the manual fix: `"N-iX (end client undisclosed: insurance claims/services BPO)"`).
+- `web/api.py:349`: don't blindly prefer `analysis_json` company over `db.company` — at minimum, don't override with a value that looks like a bracketed placeholder/prose sentence rather than a name.
+- Trace and fix whatever write path let the placeholder leak into `vacancies.title`.
+**Manually fixed for #934 this session:** `vacancies.title` → `"Senior Product Owner"`, `analysis_json.p1.company` and `JD_analysis.md`'s two `Company:`/header lines → `"N-iX (end client undisclosed: insurance claims/services BPO)"`. `vacancies.company` was never wrong, untouched.
+**Found via:** user noticed the placeholder rendering in the Flutter Analysis tab where the company name should be (screenshot), despite the folder already being correctly named `934 — Senior Product Owner — N-iX` from the correct `vacancies.company` value.
 
 ---
 
@@ -78,6 +112,14 @@
 - For manual adds where the URL's site isn't recognized (or there's no URL at all — pasted-text drop), let the user set `site` explicitly at add time rather than defaulting silently.
 - **New UX:** "Add vacancy" button opens a modal with two paths — (a) paste a URL → existing parser-extraction flow, unchanged; (b) upload a file (`.md`/`.txt`) + manually type the source name → goes through the `inbox_manual` flow but writes `site` from user input instead of leaving it blank.
 **Scope:** Flutter modal (new widget, replaces whatever currently triggers manual add — check `flutter/lib/screens/` for the current inbox "add" entry point); `scripts/vacancy_track.py upsert` needs a `--site` arg wired to `database.insert_vacancy`; extend `_detect_site()` known-sites list; extend `SourceColors.forSite/label`.
+
+---
+
+### Auto-detect and repair `markdown_path` desync when a vacancy folder is renamed by hand (added 2026-07-30, found via vacancies #904/#905/#870)
+**What:** user manually renames an inbox folder after fetch (typically to append the company name, e.g. `905 — AI Engineer` → `905 — AI Engineer — Прасолов та Партнери`) — `vacancies.markdown_path` in DB is never updated to match, so `GET /api/vacancies/{id}/jd` 404s ("JD not found") even though the vacancy card still renders fine in the Flutter list (list only needs DB fields, not the file). Symptom reported by user as "vacancy is on disk but doesn't show in Flutter" — actually shows, just fails to open. Fixed manually this session via `scripts/vacancy_track.py update --path ...` for all 3 found live cases (#904, #905, #870); 2 more broken paths found (#53, #83) but both are old `declined`/`done` legacy rows predating the `{id} — {role} — {company}` folder convention — left alone, not actionable.
+**Why:** current convention folders always start with `{id} — ` — this makes auto-repair safe and unambiguous (no guessing which folder belongs to which vacancy).
+**Fix direction:** startup hygiene check, same pattern as `database.reset_stuck_statuses()` (`db/database.py:210`, wired into `agent.py:88` before workers start) — for every vacancy whose `markdown_path` doesn't `Path.exists()`, glob `vacancies/inbox/{user_id}/{id} — *` for a single match and rewrite `markdown_path` to `{match}/JD.md`; log a warning listing any row that doesn't resolve to exactly one match (don't guess, don't auto-fix ambiguous/legacy cases — flag for manual look, same as #53/#83 above). Also worth a standalone on-demand script (`scripts/fix_vacancy_paths.py`) for the same logic, so it can be run without a full restart.
+**Found via:** user report "905 — на диске есть, но плохо втянулась" → traced through `/api/vacancies/{id}/jd` returning 404 despite the vacancy appearing correctly in `GET /api/vacancies` (stage=inbox, all fields present) — the desync only breaks the detail/JD view, not the list.
 
 ### Per-archetype skeletal building-block constructs in PROFILE.md, instead of free-form Phase 3 generation (added 2026-07-25)
 **What:** Phase 3 currently writes each role's CV prose freely from the full PROFILE.md context every time. Instead, define fixed, pre-approved "skeletal" phrasing blocks per role/experience, tagged by archetype (delivery, discovery, execution, etc.) — reusable building blocks that Phase 3 selects and lightly adapts per vacancy, rather than generating prose from scratch out of the whole ambient profile.

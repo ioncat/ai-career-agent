@@ -337,6 +337,40 @@ async def test_generate_auto_detected_ukrainian_uses_candidate_name_uk(tmp_path)
     assert "Candidate name: Олексій Бондаренко" in phase3_prompt_sent
 
 
+@pytest.mark.asyncio
+async def test_generate_auto_detected_english_ignores_dou_cyrillic_metadata(tmp_path):
+    """language='auto' must trust JD_analysis.md's own `JD Language` field over
+    a raw Cyrillic scan of the whole JD.md. Found live on vacancy #915: DOU
+    injects a localized date/"remote" label ("29 июля 2026", "удаленно") into
+    an otherwise fully English JD.md — the old naive scan flipped the whole CV
+    to Ukrainian on that Cyrillic metadata alone."""
+    jd_dir = tmp_path / "vacancies" / "dou" / "2026-07" / "915"
+    jd_dir.mkdir(parents=True)
+    jd_path = jd_dir / "JD.md"
+    jd_path.write_text(
+        "# Product Owner\n\n29 июля 2026\n\nудаленно\n\nResponsibilities:\n- Own the backlog.",
+        encoding="utf-8",
+    )
+    (jd_dir / "JD_analysis.md").write_text(
+        "**Role:** Product Owner\n**Company:** ICONIC21\n**JD Language:** en\n",
+        encoding="utf-8",
+    )
+    vacancy_row = _make_vacancy_row(jd_path)
+    llm = _make_llm(side_effect=[_PHASE3_DRAFT, _PHASE35_SAMPLE])
+    ctx = _make_ctx(tmp_path, llm)
+    ctx.deps.candidate_name = "Alex Bondarenko"
+    ctx.deps.candidate_name_uk = "Олексій Бондаренко"
+    mock_db = _mock_db(vacancy_row=vacancy_row)
+
+    with patch("tools.cv_generate.database", mock_db):
+        await cv_generate(ctx, 1, language="auto")
+
+    phase3_prompt_sent = llm.complete.await_args_list[0].args[0]
+    assert "Target language: English" in phase3_prompt_sent
+    assert "Candidate name: Alex Bondarenko" in phase3_prompt_sent
+    assert (jd_path.parent / "Alex_Bondarenko_CV.md").exists()
+
+
 # ── _next_version_path ────────────────────────────────────────────────────────
 
 def test_next_version_path_returns_base_when_missing(tmp_path):

@@ -22,7 +22,8 @@ User will provide:
 1. **NEVER copy-paste JD phrases verbatim** — absorb meaning, rewrite in natural language
 2. **NEVER change actual job titles** — dishonest and verifiable
 3. **NEVER fabricate experience** — if it doesn't exist, don't claim it
-4. **NEVER remove a work experience entry** — every job in PROFILE.md stays in CV. Early career entries (before the cutoff year in PROFILE.md) omitted by default unless directly relevant.
+4. **NEVER remove a work experience entry** — every job in PROFILE.md stays in CV. Early career entries (before the cutoff year in PROFILE.md) omitted by default unless directly relevant. This includes the current/most recent role — never drop it even if it looks less relevant to the JD than an older role.
+4b. **EXPERIENCE order is ALWAYS strict reverse-chronological — most recent role first.** Never reorder by relevance or "lead with the strongest match." If the Adaptation Plan says "lead with X," that means strengthen X's framing/word choice within its own chronological slot, not move it to the top of the list. Found live on vacancy #922: HostiServer PO (2018–2021) was moved to the top over InsulaLabs/Marketplace (2022–2025), breaking chronology candidates and recruiters both expect by default.
 5. **CV language = input language** — English input → English CV; Ukrainian input → Ukrainian CV
 6. **Do not self-apply "Senior"** unless officially held
 7. **Avoid AI clichés** — "AI-Native", "AI-Driven mindset" etc.

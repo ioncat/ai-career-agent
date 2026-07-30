@@ -330,6 +330,8 @@ Then: full Phase 1 analysis → full Phase 2 fit assessment.
 
 **Recommendation logic:** blockers ≠ нет OR fit < 5 → `decline` always (VScore cannot override). No blockers + fit 5–6: VScore ≥ 7.5 → `take a chance — premium opportunity`; VScore < 5.5 → `decline — not worth the effort`. Fit ≥ 7 + VScore < 5.5 → `apply — limited upside`. DB stores base value only (`apply` / `take a chance` / `decline`).
 
+`decline` is an advisory recommendation label only — it does NOT block Phase 3. The user is always asked "Генерируем CV?" (see Pipeline Flow above) regardless of recommendation; if they say yes, Phase 3 must produce a real CV draft (Adaptation Plan always provides reframing actions, see phase2_fit.md), never a refusal placeholder. The decision to skip generation belongs to the user, not the pipeline.
+
 **Re-analysis (Повторить Phase 1+2):** if `JD_analysis.md` already exists in the vacancy folder, save the new analysis to `[vacancy_folder]/Claude Desktop/JD_analysis.md` — never overwrite the original. Create the subfolder silently.
 
 **Phase 3.5 self-review — append to JD_analysis.md after user approval:**
