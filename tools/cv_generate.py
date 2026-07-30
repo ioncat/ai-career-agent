@@ -50,6 +50,34 @@ log = logging.getLogger(__name__)
 
 _PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
 
+_ISO_LANGUAGE_NAMES = {
+    "en": "English",
+    "uk": "Ukrainian",
+    "ru": "Russian",
+    "pl": "Polish",
+    "de": "German",
+    "es": "Spanish",
+}
+
+
+def _detect_cv_language(jd_text: str, analysis_text: str) -> str:
+    """Resolve CV language for 'auto' mode.
+
+    Prefers the JD Language Phase 1 already computed (JD_analysis.md's
+    `**JD Language:** xx` field, phase1_analysis.md section 1.0) — that
+    detection explicitly ignores URL, page title, and localized date/location
+    metadata. Falls back to a naive Cyrillic scan of the raw JD text only if
+    the field is missing (malformed/legacy analysis file). A bare Cyrillic
+    scan over the whole JD.md misfires on DOU-sourced JDs, which carry a
+    localized date/"remote" label (e.g. "29 июля 2026", "удаленно") even when
+    the JD body itself is English — found live on vacancy #915.
+    """
+    m = re.search(r"\*\*JD Language:\*\*\s*([a-zA-Z]{2})", analysis_text)
+    if m:
+        code = m.group(1).lower()
+        return _ISO_LANGUAGE_NAMES.get(code, code.upper())
+    return "Ukrainian" if any('Ѐ' <= c <= 'ӿ' for c in jd_text) else "English"
+
 
 async def cv_generate(
     ctx: RunContext[AgentDeps],
@@ -96,9 +124,9 @@ async def cv_generate(
     jd_text = jd_path.read_text(encoding="utf-8")
     analysis_text = analysis_path.read_text(encoding="utf-8")
 
-    # Auto-detect language from JD: any Cyrillic → Ukrainian, else English
+    # Auto-detect language from the Phase 1-computed JD Language field.
     if language.lower() == "auto":
-        language = "Ukrainian" if any('Ѐ' <= c <= 'ӿ' for c in jd_text) else "English"
+        language = _detect_cv_language(jd_text, analysis_text)
         log.info("cv_generate: auto-detected language=%s for vacancy_id=%d", language, vacancy_id)
 
     # Candidate name follows CV language — PROFILE.md's own rule (English →
