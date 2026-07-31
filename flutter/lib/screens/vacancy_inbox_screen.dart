@@ -564,6 +564,14 @@ class SkipConfirmDialog extends StatefulWidget {
 
 class _SkipConfirmDialogState extends State<SkipConfirmDialog> {
   late final Set<int> _checked;
+  // Which rows show their full blocker-reason text. Collapsed (1 line,
+  // ellipsis) by default and expanded on tap — a fixed maxLines on every
+  // row either truncated long content-stage JD quotes unreadably or made
+  // every row tall regardless of whether its reason needed the room
+  // (2026-07-31, explicit user ask, rejected a per-vacancy detail modal —
+  // "лишние клики нам не нужны" — in favor of keeping everything in one
+  // screen).
+  final Set<int> _expanded = {};
 
   @override
   void initState() {
@@ -597,38 +605,86 @@ class _SkipConfirmDialogState extends State<SkipConfirmDialog> {
                 itemCount: widget.vacancies.length,
                 itemBuilder: (ctx, i) {
                   final v = widget.vacancies[i];
-                  // Reasons already read (title-stage: which allowlist term is
-                  // missing; content-stage: "category: quoted JD line") — show
-                  // right under the title so the user can decide skip/keep
-                  // without leaving the dialog (2026-07-30, explicit user ask
-                  // — content-stage reasons especially aren't obvious from
-                  // the title alone, unlike title-stage).
-                  return CheckboxListTile(
-                    controlAffinity: ListTileControlAffinity.leading,
-                    isThreeLine: v.blockerReasons.isNotEmpty,
-                    value: _checked.contains(v.id),
-                    title: Text(
-                      '${v.role} — ${v.company}',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    subtitle: v.blockerReasons.isEmpty
-                        ? null
-                        : Text(
-                            v.blockerReasons.join('\n'),
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: cs.onSurfaceVariant,
+                  final isChecked = _checked.contains(v.id);
+                  final isExpanded = _expanded.contains(v.id);
+                  final hasReasons = v.blockerReasons.isNotEmpty;
+
+                  // Custom row instead of CheckboxListTile — that widget
+                  // toggles the checkbox on ANY tap across the whole tile,
+                  // which would fight with tapping the reason text to
+                  // expand/collapse it independently.
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Checkbox(
+                          value: isChecked,
+                          onChanged: (checked) => setState(() {
+                            if (checked ?? false) {
+                              _checked.add(v.id);
+                            } else {
+                              _checked.remove(v.id);
+                            }
+                          }),
+                        ),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '${v.role} — ${v.company}',
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
+                                if (hasReasons)
+                                  GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
+                                    onTap: () => setState(() {
+                                      if (isExpanded) {
+                                        _expanded.remove(v.id);
+                                      } else {
+                                        _expanded.add(v.id);
+                                      }
+                                    }),
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(top: 2),
+                                      child: Row(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Icon(
+                                            isExpanded
+                                                ? Icons.expand_less
+                                                : Icons.expand_more,
+                                            size: 16,
+                                            color: cs.onSurfaceVariant,
+                                          ),
+                                          const SizedBox(width: 2),
+                                          Expanded(
+                                            child: Text(
+                                              v.blockerReasons.join('\n'),
+                                              maxLines: isExpanded ? null : 1,
+                                              overflow: isExpanded
+                                                  ? TextOverflow.visible
+                                                  : TextOverflow.ellipsis,
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodySmall
+                                                  ?.copyWith(color: cs.onSurfaceVariant),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
-                    onChanged: (checked) => setState(() {
-                      if (checked ?? false) {
-                        _checked.add(v.id);
-                      } else {
-                        _checked.remove(v.id);
-                      }
-                    }),
+                        ),
+                      ],
+                    ),
                   );
                 },
               ),
