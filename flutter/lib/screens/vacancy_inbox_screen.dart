@@ -148,33 +148,21 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
   /// matching vacancy at once, unlike the manual multi-select actions where
   /// the selection itself is the deliberate step.
   Future<void> _skipAllByStage(List<VacancyListItem> visible, String stage, String stageLabel) async {
-    final ids = visible.where((v) => v.blockerStage == stage).map((v) => v.id).toList();
-    if (ids.isEmpty) return;
+    final matched = visible.where((v) => v.blockerStage == stage).toList();
+    if (matched.isEmpty) return;
 
-    final confirmed = await showDialog<bool>(
+    // Lists every matching vacancy with its own checkbox (default: all
+    // checked) instead of a bare count — a blind "skip N" confirm commits
+    // based on a number alone; seeing the actual list lets the user rescue
+    // a pre-filter false-positive without aborting the whole batch
+    // (2026-07-28, explicit user ask).
+    final selectedIds = await showDialog<List<int>>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Skip all $stageLabel?'),
-        content: Text(
-          'This will archive ${ids.length} vacancy${ids.length == 1 ? '' : 'ies'} '
-          'flagged by the $stageLabel pre-filter check. This can\'t be undone in bulk.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
-            child: Text('Skip ${ids.length}'),
-          ),
-        ],
-      ),
+      builder: (context) => SkipConfirmDialog(stageLabel: stageLabel, vacancies: matched),
     );
-    if (confirmed != true) return;
+    if (selectedIds == null || selectedIds.isEmpty) return;
 
-    await _runBatch('Skip', (id) => _repo.decline(id), ids: ids);
+    await _runBatch('Skip', (id) => _repo.decline(id), ids: selectedIds);
   }
 
   void _onSkipped() {
@@ -546,6 +534,103 @@ List<VacancyListItem> _filter(List<VacancyListItem> all) {
                   )
                 : const _NoSelectionPlaceholder(),
           ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Skip-all-by-stage confirm dialog ──────────────────────────────────────────
+
+/// Lists every vacancy a "Skip all {stage}-blocked" action would archive,
+/// each with its own checkbox (default: all checked) — pops the still-checked
+/// ids on confirm, or an empty list on Cancel/dismiss. 2026-07-28: replaces a
+/// bare count-only confirm, which committed based on a number alone with no
+/// way to rescue a single pre-filter false-positive short of aborting the
+/// whole batch.
+class SkipConfirmDialog extends StatefulWidget {
+  final String stageLabel;
+  final List<VacancyListItem> vacancies;
+
+  const SkipConfirmDialog({
+    super.key,
+    required this.stageLabel,
+    required this.vacancies,
+  });
+
+  @override
+  State<SkipConfirmDialog> createState() => _SkipConfirmDialogState();
+}
+
+class _SkipConfirmDialogState extends State<SkipConfirmDialog> {
+  late final Set<int> _checked;
+
+  @override
+  void initState() {
+    super.initState();
+    _checked = widget.vacancies.map((v) => v.id).toSet();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return AlertDialog(
+      title: Text('Skip ${widget.stageLabel}?'),
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Flagged by the ${widget.stageLabel} pre-filter check. '
+              'Uncheck any you want to keep — this can\'t be undone in bulk.',
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: cs.onSurfaceVariant),
+            ),
+            const SizedBox(height: 8),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: widget.vacancies.length,
+                itemBuilder: (ctx, i) {
+                  final v = widget.vacancies[i];
+                  return CheckboxListTile(
+                    dense: true,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    value: _checked.contains(v.id),
+                    title: Text(
+                      '${v.role} — ${v.company}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    onChanged: (checked) => setState(() {
+                      if (checked ?? false) {
+                        _checked.add(v.id);
+                      } else {
+                        _checked.remove(v.id);
+                      }
+                    }),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(<int>[]),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _checked.isEmpty
+              ? null
+              : () => Navigator.of(context).pop(_checked.toList()),
+          style: FilledButton.styleFrom(backgroundColor: cs.error),
+          child: Text('Skip ${_checked.length}'),
         ),
       ],
     );

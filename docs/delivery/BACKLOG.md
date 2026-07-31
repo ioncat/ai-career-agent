@@ -1,6 +1,6 @@
 # career-agent — Backlog
 
-> Last updated: 2026-07-30
+> Last updated: 2026-07-31
 > Rules: [documentation-conventions.md](documentation-conventions.md) · History: [CHANGELOG.md](CHANGELOG.md) · Specs: [Epics/](Epics/)
 
 **Priority legend:**
@@ -102,6 +102,17 @@
 
 ---
 
+### "Mark as applied" is structurally unreachable for any vacancy without a saved Phase 2 analysis — blocks manual-apply tracking (found 2026-07-31, vacancy #904, NovaPay)
+**What:** `flutter/lib/screens/vacancy_detail_screen.dart:820` — `if (p2 == null) { return _JdModeView(...) }`. The Applied toggle (`_toggleApplied`/`_ActionBar`, lines ~1400-1800) only exists inside `_ActionBar`, which is only ever built in the post-analysis branch (`p2 != null`). `_JdModeView` (the pre-analysis screen — Skip/Analyze/Check-blockers buttons) has no Applied control at all, anywhere. So a vacancy with no saved `analysis_json.p2` — whether because analysis never ran, or (like #904) because a CV/Cover was generated manually outside the tracked pipeline and no `JD_analysis.md` was ever saved — can **never** be marked applied through the UI, no matter what's actually on disk or what the user actually did.
+**Why it matters (user's framing):** real workflow — sometimes the user submits an application by hand with whatever CV they have (not necessarily pipeline-generated), then wants to mark the vacancy as applied in the tracker. Backend has zero gating for this (`web/api.py:1442` `api_set_applied` just toggles the flag unconditionally, no status/analysis check) — the block is Flutter-only, an accidental side effect of routing on `p2 == null` for the whole screen layout, not a deliberate rule.
+**Confirmed still broken for #904** even after this session's DB patch (`status` → `cover_generated`, `company` → `NovaPay`, see ticket above) — the gate is `p2 == null`, not `status`, and #904 has no `analysis_json.p2` and no way to get one (no `JD_analysis.md` was ever saved).
+**Fix direction:** give `_JdModeView` its own Applied toggle (reuse `_toggleApplied`/`VacancyRepository.setApplied` — already gate-free on the backend), or restructure so the Applied control lives outside the `p2 == null` branch entirely (e.g. hoist it to a layout wrapper both views share). Either way: applied-tracking should never depend on analysis having run.
+**Relationship to the `markdown_path`-repair ticket's extension (P1, "no mechanism reconciles manually-added documents"):** same trigger case (#904), but fixing that ticket does NOT fix this one — its proposed fix bumps `vacancies.status` based on files found on disk, but this bug's gate is `analysis_json.p2 == null`, not `status`. Status backfill leaves #904 exactly as blocked as before. Treat as two independent fixes, not one.
+**Not the first `_JdModeView`-is-missing-a-feature bug:** CHANGELOG 2026-07-27 already fixed "pre-analysis JD view never showed salary" — same shape of issue (the pre-analysis screen quietly lacks something the full post-analysis screen has). Worth an audit of `_JdModeView` for other missing parity items instead of fixing these one at a time as each is separately discovered.
+**Found via:** user unable to mark #904 as applied after manually submitting it; traced the missing button to the `p2 == null` branch controlling which screen variant renders.
+
+---
+
 ## 🟠 P1
 
 ### Source badge wrong/missing for job boards outside Djinni/DOU/LinkedIn — manual-add flow needed (added 2026-07-29, found via vacancies #870/#828, both Work.UA)
@@ -120,6 +131,14 @@
 **Why:** current convention folders always start with `{id} — ` — this makes auto-repair safe and unambiguous (no guessing which folder belongs to which vacancy).
 **Fix direction:** startup hygiene check, same pattern as `database.reset_stuck_statuses()` (`db/database.py:210`, wired into `agent.py:88` before workers start) — for every vacancy whose `markdown_path` doesn't `Path.exists()`, glob `vacancies/inbox/{user_id}/{id} — *` for a single match and rewrite `markdown_path` to `{match}/JD.md`; log a warning listing any row that doesn't resolve to exactly one match (don't guess, don't auto-fix ambiguous/legacy cases — flag for manual look, same as #53/#83 above). Also worth a standalone on-demand script (`scripts/fix_vacancy_paths.py`) for the same logic, so it can be run without a full restart.
 **Found via:** user report "905 — на диске есть, но плохо втянулась" → traced through `/api/vacancies/{id}/jd` returning 404 despite the vacancy appearing correctly in `GET /api/vacancies` (stage=inbox, all fields present) — the desync only breaks the detail/JD view, not the list.
+
+**Extension (added 2026-07-31, found via vacancy #904, NovaPay) — broader than path repair, two related gaps:**
+1. **Vacancy card doesn't auto-refresh when analysis/CV/Cover complete for manually-worked vacancies.** User's framing: "не обновляється картка вакансії, вона сама не запускає цей механізм." Needs investigation into whether this is the Flutter polling path (`vacancy_list_provider.dart`'s `since`-param poll, `folderVacanciesProvider`) simply not picking up DB changes fast enough, or something deeper — scope this before designing a fix.
+2. **No mechanism reconciles manually-added documents in a vacancy folder back into the DB.** Concrete case: #904 — `Alex Bondarenko_CV.md`, `Олексій Бондаренко_CV.pdf`, and `Олексій Бондаренко_Cover.md` all exist on disk (full pipeline clearly ran, manually, outside the tracked flow — likely a direct Claude Code chat session), but `vacancies.status` was still `"fetched"`, `company` was `NULL`, and **`JD_analysis.md` doesn't exist on disk at all** — meaning Phase 1/2 output was never saved anywhere, violating SKILL.md's own hard rule ("`JD_analysis.md` MUST be written to disk BEFORE Quick Scan is shown"). Manually patched `status`→`cover_generated` and `company`→`NovaPay` for #904 this session; **could not backfill `analysis_json.p1/p2`** — there's no source file to read Fit/VScore/recommendation from, that data is simply gone.
+**Fix direction for the extension:** a refresh-time reconciliation job (same startup-hygiene family as the path-repair job above) that, for each vacancy folder, checks for the presence of `[Name]_CV.md` / `_Cover.md` / `.pdf` files and bumps `vacancies.status` accordingly if the DB status is behind what's actually on disk (e.g. status=`fetched` but a CV file exists → at least `cv_generated`). Cannot recover missing `JD_analysis.md`/`analysis_json` content after the fact — the real fix there is upstream: make it harder to skip the mandatory "write `JD_analysis.md` before showing Quick Scan" rule in manual/chat-driven sessions, not just detect the aftermath.
+**Found via:** user request to "add the #904 folder to the database", surfaced that it was fetched-only in DB despite finished CV+Cover on disk, and that `JD_analysis.md` was missing entirely.
+
+---
 
 ### Per-archetype skeletal building-block constructs in PROFILE.md, instead of free-form Phase 3 generation (added 2026-07-25)
 **What:** Phase 3 currently writes each role's CV prose freely from the full PROFILE.md context every time. Instead, define fixed, pre-approved "skeletal" phrasing blocks per role/experience, tagged by archetype (delivery, discovery, execution, etc.) — reusable building blocks that Phase 3 selects and lightly adapts per vacancy, rather than generating prose from scratch out of the whole ambient profile.
