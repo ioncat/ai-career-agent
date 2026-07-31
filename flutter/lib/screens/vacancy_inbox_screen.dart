@@ -577,7 +577,7 @@ class _SkipConfirmDialogState extends State<SkipConfirmDialog> {
     return AlertDialog(
       title: Text('Skip ${widget.stageLabel}?'),
       content: SizedBox(
-        width: 420,
+        width: 620,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -597,15 +597,31 @@ class _SkipConfirmDialogState extends State<SkipConfirmDialog> {
                 itemCount: widget.vacancies.length,
                 itemBuilder: (ctx, i) {
                   final v = widget.vacancies[i];
+                  // Reasons already read (title-stage: which allowlist term is
+                  // missing; content-stage: "category: quoted JD line") — show
+                  // right under the title so the user can decide skip/keep
+                  // without leaving the dialog (2026-07-30, explicit user ask
+                  // — content-stage reasons especially aren't obvious from
+                  // the title alone, unlike title-stage).
                   return CheckboxListTile(
-                    dense: true,
                     controlAffinity: ListTileControlAffinity.leading,
+                    isThreeLine: v.blockerReasons.isNotEmpty,
                     value: _checked.contains(v.id),
                     title: Text(
                       '${v.role} — ${v.company}',
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    subtitle: v.blockerReasons.isEmpty
+                        ? null
+                        : Text(
+                            v.blockerReasons.join('\n'),
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: cs.onSurfaceVariant,
+                                ),
+                          ),
                     onChanged: (checked) => setState(() {
                       if (checked ?? false) {
                         _checked.add(v.id);
