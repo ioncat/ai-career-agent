@@ -7,7 +7,12 @@ import 'package:career_agent/screens/vacancy_inbox_screen.dart';
 // "Skip all {stage}-blocked" with a checklist of the actual vacancies, so a
 // pre-filter false-positive can be excluded without aborting the batch.
 
-VacancyListItem _item(int id, {String role = 'Role', String company = 'Co'}) =>
+VacancyListItem _item(
+  int id, {
+  String role = 'Role',
+  String company = 'Co',
+  List<String> blockerReasons = const [],
+}) =>
     VacancyListItem(
       id: id,
       role: '$role $id',
@@ -15,6 +20,7 @@ VacancyListItem _item(int id, {String role = 'Role', String company = 'Co'}) =>
       site: 'djinni',
       url: 'https://example.com/$id',
       status: 'inbox',
+      blockerReasons: blockerReasons,
     );
 
 Future<List<int>?> _openDialog(
@@ -126,6 +132,34 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(result, isEmpty);
+  });
+
+  testWidgets('shows blocker reasons under the title when present', (tester) async {
+    final vacancies = [
+      _item(1, blockerReasons: [
+        'igaming: "5+ years of Product Management experience within iGaming."',
+      ]),
+      _item(2), // no reasons — subtitle should be absent for this row
+    ];
+    await _openDialog(tester, vacancies);
+
+    expect(
+      find.textContaining('igaming: "5+ years of Product Management'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('multiple reasons for one vacancy are all shown', (tester) async {
+    final vacancies = [
+      _item(1, blockerReasons: [
+        'title: "Product Owner Lead"',
+        'igaming: "5+ років на посаді Product Owner бажано в gambling"',
+      ]),
+    ];
+    await _openDialog(tester, vacancies);
+
+    expect(find.textContaining('title: "Product Owner Lead"'), findsOneWidget);
+    expect(find.textContaining('igaming: "5+ років'), findsOneWidget);
   });
 
   testWidgets('unchecking everything disables the Skip button', (tester) async {
