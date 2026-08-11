@@ -534,6 +534,35 @@ async def test_new_vacancy_active_not_disturbed(client):
     assert row["status"] == "analyzing"
 
 
+@pytest.mark.asyncio
+async def test_new_vacancy_applied_not_bumped(client):
+    """Applied vacancy re-published with newer date → left untouched, not bumped.
+
+    Regression for 2026-08-11: an already-applied vacancy is settled, not
+    "still deciding" — bumping published_at here falsely resurfaced old
+    applications at the top of the date-sorted Applied view (found live via
+    #574/#80/#76/#497, all with published_at bumped to "today" while
+    updated_at, the last real DB touch, was weeks-to-months stale).
+    """
+    uid = await database.insert_user(name="AppliedUser", telegram_chat_id=5007, skill_type="pm")
+    url = "https://djinni.co/jobs/405/"
+
+    vid = await database.insert_vacancy(url=url, user_id=uid, published_at="2026-06-01T10:00:00")
+    await database.update_vacancy_status(vid, "cv_generated")
+    await database.set_vacancy_applied(vid, True)
+
+    resp = client.post("/api/new-vacancy", json={
+        "url": url,
+        "user_id": uid,
+        "published_at": "2026-08-11T10:00:00",
+    })
+    assert resp.status_code == 409
+    row = await database.get_vacancy_by_id(vid)
+    assert row["published_at"] == "2026-06-01T10:00:00"  # untouched
+    assert row["status"] == "cv_generated"
+    assert row["applied"] == 1
+
+
 # ── PATCH /api/vacancies/{id}/applied ─────────────────────────────────────────
 
 @pytest.mark.asyncio
