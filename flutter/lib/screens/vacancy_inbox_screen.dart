@@ -195,6 +195,7 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
 
   bool _filterExpanded = false;
   Set<String> _statusFilter = {};
+  Set<String> _siteFilter = {};
   bool _starredOnly = false;
   bool _blockedOnly = false;
   DateTime? _dateFrom;
@@ -211,6 +212,7 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
 
   int get _activeFilterCount =>
       _statusFilter.length +
+      _siteFilter.length +
       (_starredOnly ? 1 : 0) +
       (_blockedOnly ? 1 : 0) +
       (_dateFrom != null || _dateTo != null ? 1 : 0);
@@ -233,6 +235,9 @@ List<VacancyListItem> _filter(List<VacancyListItem> all) {
         }
       }
       if (_statusFilter.isNotEmpty && !_statusFilter.contains(v.status)) {
+        return false;
+      }
+      if (_siteFilter.isNotEmpty && !_siteFilter.contains(v.site)) {
         return false;
       }
       if (_starredOnly && !v.starred) return false;
@@ -276,6 +281,7 @@ List<VacancyListItem> _filter(List<VacancyListItem> all) {
   void _clearAllFilters() {
     setState(() {
       _statusFilter = {};
+      _siteFilter = {};
       _starredOnly = false;
       _blockedOnly = false;
       _dateFrom = null;
@@ -291,6 +297,8 @@ List<VacancyListItem> _filter(List<VacancyListItem> all) {
     final listState = ref.watch(vacancyListProvider).valueOrNull;
     final filtered = _filter(vacancies);
     final availableStatuses = vacancies.map((v) => v.status).toSet();
+    final availableSites =
+        vacancies.map((v) => v.site).where((s) => s.isNotEmpty).toSet();
 
     // Sync _selected with polling updates (status changes, or any other field
     // edited server-side — salary, applied, starred, etc. all bump updated_at).
@@ -429,6 +437,15 @@ List<VacancyListItem> _filter(List<VacancyListItem> all) {
                         _statusFilter = Set.from(_statusFilter)..remove(s);
                       } else {
                         _statusFilter = Set.from(_statusFilter)..add(s);
+                      }
+                    }),
+                    availableSites: availableSites,
+                    selectedSites: _siteFilter,
+                    onSiteToggle: (s) => setState(() {
+                      if (_siteFilter.contains(s)) {
+                        _siteFilter = Set.from(_siteFilter)..remove(s);
+                      } else {
+                        _siteFilter = Set.from(_siteFilter)..add(s);
                       }
                     }),
                     starredOnly: _starredOnly,
@@ -949,6 +966,9 @@ class InboxFilterPanel extends StatelessWidget {
   final Set<String> availableStatuses;
   final Set<String> selectedStatuses;
   final ValueChanged<String> onStatusToggle;
+  final Set<String> availableSites;
+  final Set<String> selectedSites;
+  final ValueChanged<String> onSiteToggle;
   final bool starredOnly;
   final VoidCallback onToggleStarred;
   final bool blockedOnly;
@@ -966,6 +986,9 @@ class InboxFilterPanel extends StatelessWidget {
     required this.availableStatuses,
     required this.selectedStatuses,
     required this.onStatusToggle,
+    required this.availableSites,
+    required this.selectedSites,
+    required this.onSiteToggle,
     required this.starredOnly,
     required this.onToggleStarred,
     required this.blockedOnly,
@@ -987,6 +1010,9 @@ class InboxFilterPanel extends StatelessWidget {
     'cv_generated': 'CV Ready',
     'cover_generated': 'Cover Ready',
   };
+
+  static String _siteLabel(String site) =>
+      site.isEmpty ? site : site[0].toUpperCase() + site.substring(1);
 
   static String _fmtDate(DateTime d) {
     const months = [
@@ -1032,6 +1058,31 @@ class InboxFilterPanel extends StatelessWidget {
                   ),
                   selected: selected,
                   onSelected: (_) => onStatusToggle(s),
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                  visualDensity: VisualDensity.compact,
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 10),
+          ],
+          if (availableSites.isNotEmpty) ...[
+            Text('Source',
+                style: labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: availableSites.map((s) {
+                final selected = selectedSites.contains(s);
+                return FilterChip(
+                  label: Text(
+                    _siteLabel(s),
+                    style: Theme.of(context).textTheme.labelSmall,
+                  ),
+                  selected: selected,
+                  onSelected: (_) => onSiteToggle(s),
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   padding:
                       const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
