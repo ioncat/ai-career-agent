@@ -529,7 +529,12 @@ class _AnalyzingView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final label = status == 'analyzing' ? 'Analyzing...' : 'In queue for analysis...';
+    final label = switch (status) {
+      'analyzing' => 'Analyzing...',
+      'fetching' => 'Fetching job description...',
+      'queued' => 'Queued for fetching...',
+      _ => 'In queue for analysis...',
+    };
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -817,6 +822,17 @@ class _VacancyDetailScreenState extends ConsumerState<VacancyDetailScreen>
 
     // analysis_queued / analyzing — spinner only, no point fetching analysis yet
     if (status == 'analysis_queued' || status == 'analyzing') {
+      return _AnalyzingView(status: status);
+    }
+
+    // queued / fetching — webhook already inserted the DB row (card shows
+    // instantly) but RSSWatcher hasn't written JD.md yet (polls every 30s,
+    // core/rss_watcher.py). Opening the detail view in that window used to
+    // hit GET /api/vacancies/{id}/jd before the file existed and surface a
+    // raw "Failed to load JD: Exception: JD not found" — same data, just not
+    // there yet. Spinner instead; parent list polling flips status once
+    // fetch_jd() finishes, which rebuilds this into the real JD view.
+    if (status == 'queued' || status == 'fetching') {
       return _AnalyzingView(status: status);
     }
 

@@ -87,6 +87,15 @@ async def fetch_jd(deps: AgentDeps, url: str) -> int:
                 title=doc.title,
                 site=site,
                 user_id=deps.user_id,
+                # Explicit — the schema default is 'fetched'. Without this, a
+                # row inserted here is already "done" in the DB the instant it
+                # exists, even though markdown_path is still NULL; any failure
+                # below (dedup lookup, etc.) then leaves it permanently
+                # orphaned — no retry mechanism ever revisits a 'fetched' row
+                # (only 'fetching'/'queued' are covered by RSSWatcher's retry
+                # loop and reset_stuck_statuses()). Found live 2026-08-11,
+                # vacancy #106 stuck this way for a full day.
+                status="fetching",
             )
         except Exception as exc:
             log.warning("fetch_jd: insert failed (%s), refetching existing", exc)
@@ -118,22 +127,11 @@ async def fetch_jd(deps: AgentDeps, url: str) -> int:
 
     log.info("fetch_jd: saved JD.md → %s", jd_path)
 
-    # ── EPIC-26: content hash + duplicate detection ───────────────────────────
-    _norm_text = re.sub(r"\s+", " ", doc.markdown.lower())
-    content_hash = hashlib.sha256(_norm_text.encode()).hexdigest()
-    original_id = await database.find_duplicate(
-        deps.user_id,
-        content_hash,
-        database._normalize_title(doc.title or "", doc.company),
-        doc.company or "",
-        exclude_id=vacancy_id,
-    )
-    if original_id is not None:
-        log.info("fetch_jd: duplicate of v#%d — marking v#%d", original_id, vacancy_id)
-        await database.set_duplicate_of(vacancy_id, original_id)
-    await database.set_content_hash(vacancy_id, content_hash)
-
     # ── Update DB with final path and parsed fields ───────────────────────────
+    # Done BEFORE duplicate detection (below) on purpose: the file is already
+    # on disk at this point, so the DB should reflect that immediately. If
+    # dedup lookup then fails, the vacancy is still fully usable (JD openable,
+    # status transitions to 'fetched' below) instead of silently orphaned.
     markdown_path = str(jd_path)
     if existing and existing["status"] in ("queued", "fetching"):
         await database.update_vacancy_fields(
@@ -142,6 +140,27 @@ async def fetch_jd(deps: AgentDeps, url: str) -> int:
         )
     else:
         await database.update_vacancy_fields(vacancy_id, markdown_path=markdown_path)
+
+    # ── EPIC-26: content hash + duplicate detection ───────────────────────────
+    # Non-fatal — a dedup failure shouldn't undo the successful fetch above.
+    try:
+        _norm_text = re.sub(r"\s+", " ", doc.markdown.lower())
+        content_hash = hashlib.sha256(_norm_text.encode()).hexdigest()
+        original_id = await database.find_duplicate(
+            deps.user_id,
+            content_hash,
+            database._normalize_title(doc.title or "", doc.company),
+            doc.company or "",
+            exclude_id=vacancy_id,
+        )
+        if original_id is not None:
+            log.info("fetch_jd: duplicate of v#%d — marking v#%d", original_id, vacancy_id)
+            await database.set_duplicate_of(vacancy_id, original_id)
+        await database.set_content_hash(vacancy_id, content_hash)
+    except Exception as exc:
+        log.warning("fetch_jd: dedup step failed for v#%d (non-fatal): %s", vacancy_id, exc)
+
+    await database.update_vacancy_status(vacancy_id, "fetched")
 
     log.info("fetch_jd: done vacancy_id=%d title=%r", vacancy_id, doc.title)
     return vacancy_id

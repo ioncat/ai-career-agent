@@ -56,6 +56,7 @@ def _mock_dedup(mock_db) -> None:
     mock_db.find_duplicate = AsyncMock(return_value=None)
     mock_db.set_content_hash = AsyncMock()
     mock_db.set_duplicate_of = AsyncMock()
+    mock_db.update_vacancy_status = AsyncMock()
 
 
 def _vacancy_row(
@@ -570,6 +571,7 @@ async def test_fetch_jd_marks_duplicate_when_found(tmp_path):
         mock_db.find_duplicate = AsyncMock(return_value=5)  # original found
         mock_db.set_content_hash = AsyncMock()
         mock_db.set_duplicate_of = AsyncMock()
+        mock_db.update_vacancy_status = AsyncMock()
 
         await fetch_jd(deps, "https://djinni.co/jobs/999/")
 
@@ -592,3 +594,107 @@ async def test_fetch_jd_no_duplicate_call_when_none(tmp_path):
         await fetch_jd(deps, "https://djinni.co/jobs/888/")
 
     mock_db.set_duplicate_of.assert_not_awaited()
+
+
+# ── Stuck-row regression (2026-08-11, vacancy #106) ─────────────────────────
+#
+# Root cause: insert_vacancy() defaults status to 'fetched' (schema default)
+# when no status kwarg is passed. A fresh-URL insert used to omit it, so the
+# row was already "done" the instant it existed in the DB — even though
+# markdown_path was still NULL. Any failure between that insert and the final
+# markdown_path write (e.g. the dedup lookup) then left the row permanently
+# orphaned: no retry mechanism ever revisits a 'fetched' row (only
+# 'fetching'/'queued' are covered by RSSWatcher's retry loop and
+# reset_stuck_statuses()). Flutter surfaced it as a raw "Failed to load JD:
+# Exception: JD not found" that never resolved, even on refresh.
+
+@pytest.mark.asyncio
+async def test_fetch_jd_inserts_new_vacancy_as_fetching(tmp_path):
+    doc = _make_doc()
+    parser = AsyncMock()
+    parser.fetch_markdown = AsyncMock(return_value=doc)
+    deps = _make_deps(tmp_path, parser)
+
+    with patch("tools.cv_fetch_jd.database") as mock_db:
+        mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
+        mock_db.insert_vacancy = AsyncMock(return_value=200)
+        mock_db.update_vacancy_fields = AsyncMock()
+        _mock_dedup(mock_db)
+
+        await fetch_jd(deps, "https://djinni.co/jobs/123/")
+
+    call_kwargs = mock_db.insert_vacancy.call_args.kwargs
+    assert call_kwargs["status"] == "fetching"
+
+
+@pytest.mark.asyncio
+async def test_fetch_jd_transitions_to_fetched_on_success(tmp_path):
+    doc = _make_doc()
+    parser = AsyncMock()
+    parser.fetch_markdown = AsyncMock(return_value=doc)
+    deps = _make_deps(tmp_path, parser)
+
+    with patch("tools.cv_fetch_jd.database") as mock_db:
+        mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
+        mock_db.insert_vacancy = AsyncMock(return_value=201)
+        mock_db.update_vacancy_fields = AsyncMock()
+        _mock_dedup(mock_db)
+
+        await fetch_jd(deps, "https://djinni.co/jobs/123/")
+
+    mock_db.update_vacancy_status.assert_awaited_once_with(201, "fetched")
+
+
+@pytest.mark.asyncio
+async def test_fetch_jd_markdown_path_saved_before_dedup_runs(tmp_path):
+    """markdown_path must reach the DB even if the dedup step never runs —
+    ordering regression, not just a mock-call-count check."""
+    doc = _make_doc()
+    parser = AsyncMock()
+    parser.fetch_markdown = AsyncMock(return_value=doc)
+    deps = _make_deps(tmp_path, parser)
+
+    calls: list[str] = []
+
+    async def _update_fields(*a, **kw):
+        calls.append("update_vacancy_fields")
+
+    async def _find_duplicate(*a, **kw):
+        calls.append("find_duplicate")
+        return None
+
+    with patch("tools.cv_fetch_jd.database") as mock_db:
+        mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
+        mock_db.insert_vacancy = AsyncMock(return_value=202)
+        mock_db.update_vacancy_fields = AsyncMock(side_effect=_update_fields)
+        mock_db.find_duplicate = AsyncMock(side_effect=_find_duplicate)
+        mock_db.set_content_hash = AsyncMock()
+        mock_db.set_duplicate_of = AsyncMock()
+        mock_db.update_vacancy_status = AsyncMock()
+
+        await fetch_jd(deps, "https://djinni.co/jobs/123/")
+
+    assert calls == ["update_vacancy_fields", "find_duplicate"]
+
+
+@pytest.mark.asyncio
+async def test_fetch_jd_dedup_failure_does_not_block_fetched_status(tmp_path):
+    """Regression for vacancy #106: a dedup-step exception must not leave the
+    vacancy stuck at an intermediate status with no retry path."""
+    doc = _make_doc()
+    parser = AsyncMock()
+    parser.fetch_markdown = AsyncMock(return_value=doc)
+    deps = _make_deps(tmp_path, parser)
+
+    with patch("tools.cv_fetch_jd.database") as mock_db:
+        mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
+        mock_db.insert_vacancy = AsyncMock(return_value=203)
+        mock_db.update_vacancy_fields = AsyncMock()
+        mock_db.find_duplicate = AsyncMock(side_effect=RuntimeError("db locked"))
+        mock_db.update_vacancy_status = AsyncMock()
+
+        result = await fetch_jd(deps, "https://djinni.co/jobs/123/")
+
+    assert result == 203
+    mock_db.update_vacancy_fields.assert_awaited_once()
+    mock_db.update_vacancy_status.assert_awaited_once_with(203, "fetched")
