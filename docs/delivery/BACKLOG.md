@@ -25,6 +25,16 @@
 
 ---
 
+### 🟡 P2 — "Analyzed <date>" chip lies — reads generic `updated_at`, not real Phase 2 completion time (found 2026-08-11, vacancy #597)
+**What:** `_AnalyzedChip` (`flutter/lib/screens/vacancy_detail_screen.dart:2029`) is fed `vacancy.updatedAt` and labeled "Analyzed {date}". `updated_at` is a generic last-touched timestamp bumped by ~10 unrelated write paths in `db/database.py` (applied toggle, starred toggle, salary edit, blocker check, republish bump, dedup `set_duplicate_of`, status transitions, etc.) — none of which mean "Phase 1+2 ran." Confirmed live on #597: chip showed "Analyzed 11.08.2026 16:38" (today), but `pipeline_runs` has no phase2 row newer than 2026-07-10 — the real last analysis. Exact trigger for today's `updated_at` bump not identified (agent.log doesn't log PATCH requests at all — separate gap, see below) but irrelevant to the fix: *any* future unrelated touch reproduces the same false claim, by design.
+**Fix direction:**
+- Backend: vacancy-detail response should include the real Phase 2 completion time — query `pipeline_runs` for the latest `phase='phase2' AND status='done'` row's `finished_at` (column already exists, no migration needed; historical data already populated for most vacancies).
+- Flutter: add `analyzedAt` to the model backing the detail screen, thread it into `_AnalyzedChip` instead of `updatedAt`; rename the widget's param `updatedAt` → `analyzedAt` so a future reuse can't silently wire the wrong field again. Vacancies with no phase2 pipeline_runs row (pre-table-existence legacy rows) → hide the chip, same as the existing null-guard.
+**Also found, smaller/separate:** `agent.log` has zero PATCH-request logging — made root-causing "what touched this row" for #597 impossible via logs alone, had to reason from code paths only. Worth a one-line addition (log vacancy_id + endpoint on every state-mutating PATCH) next time this file is touched — not blocking this ticket.
+**Estimate:** ~45-60 min (small API query addition + Flutter field wiring + rename + 1-2 tests).
+
+---
+
 ### 🔴 P0 — `ClaudeCodeProvider` error message drops stdout, only surfaces stderr — real failure reason never reaches DB/UI (found 2026-08-10, vacancy #1073)
 **What:** `core/llm_client.py` ~lines 700-736 — `_read_stdout()` captures the CLI's stdout into `output_lines` (also written live to `logs/cli_debug.log`), `_read_stderr()` separately captures `stderr_lines`. On non-zero exit, the error-raising block only reads `stderr_lines`:
 ```python
