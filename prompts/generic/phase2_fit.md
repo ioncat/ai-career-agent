@@ -111,7 +111,6 @@ Valid warnings:
 - High competition (30+ applicants visible)
 - 6+ step hiring pipeline
 - Mandatory test assignment
-- No salary mentioned
 - No public info about company
 
 If career track diverges significantly from candidate's target role type:
