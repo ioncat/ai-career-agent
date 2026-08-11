@@ -332,7 +332,6 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
     final jdAsync = ref.watch(vacancyJdProvider(widget.vacancyId));
     final role = widget.vacancy?.role ?? '';
     final company = widget.vacancy?.company ?? '';
-    final salary = widget.vacancy?.salary ?? '';
     final health = ref.watch(healthProvider).valueOrNull ?? HealthStatus.checking;
     final workerAvailable = health == HealthStatus.online;
 
@@ -359,9 +358,8 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                           style: Theme.of(context).textTheme.titleSmall,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis),
-                      if (company.isNotEmpty || salary.isNotEmpty)
-                        Text(
-                            [company, salary].where((s) => s.isNotEmpty).join('  ·  '),
+                      if (company.isNotEmpty)
+                        Text(company,
                             style: Theme.of(context)
                                 .textTheme
                                 .bodySmall
@@ -454,6 +452,38 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                   ),
                 ),
               ],
+            ],
+          ),
+        ),
+        // Salary / vacancy id — own full-width block, not squeezed into the
+        // action bar's title column (was cramped + collided with the icon
+        // row there, 2026-08-11 user feedback).
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerLowest.withValues(alpha: 0.9),
+            border: Border(
+              bottom: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.15)),
+            ),
+          ),
+          child: Row(
+            children: [
+              _SalaryInline(
+                salary: widget.vacancy?.salary,
+                fontSize: 16,
+                onSave: (v) async {
+                  await _repo.updateSalary(widget.vacancyId, v);
+                  ref.read(vacancyListProvider.notifier).refresh();
+                },
+              ),
+              const Spacer(),
+              Text('#${widget.vacancyId}',
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.copyWith(color: cs.onSurfaceVariant.withValues(alpha: 0.6)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis),
             ],
           ),
         ),
@@ -2302,8 +2332,9 @@ class _AnalyzedChip extends StatelessWidget {
 class _SalaryInline extends StatefulWidget {
   final String? salary;
   final Future<void> Function(String) onSave;
+  final double fontSize;
 
-  const _SalaryInline({this.salary, required this.onSave});
+  const _SalaryInline({this.salary, required this.onSave, this.fontSize = 12});
 
   @override
   State<_SalaryInline> createState() => _SalaryInlineState();
@@ -2360,14 +2391,17 @@ class _SalaryInlineState extends State<_SalaryInline> {
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.attach_money, size: 14, color: cs.primary),
+          Icon(Icons.attach_money, size: widget.fontSize + 2, color: cs.primary),
           const SizedBox(width: 4),
           SizedBox(
-            width: 200,
+            width: 220,
             child: TextField(
               controller: _ctrl,
               autofocus: true,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurface),
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: cs.onSurface, fontSize: widget.fontSize),
               decoration: InputDecoration(
                 isDense: true,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -2415,7 +2449,7 @@ class _SalaryInlineState extends State<_SalaryInline> {
           children: [
             Icon(
               Icons.attach_money,
-              size: 14,
+              size: widget.fontSize + 2,
               color: hasSalary ? cs.primary : cs.onSurfaceVariant.withValues(alpha: 0.45),
             ),
             const SizedBox(width: 3),
@@ -2426,11 +2460,12 @@ class _SalaryInlineState extends State<_SalaryInline> {
                         ? cs.onSurfaceVariant
                         : cs.onSurfaceVariant.withValues(alpha: 0.45),
                     fontStyle: hasSalary ? FontStyle.normal : FontStyle.italic,
+                    fontSize: widget.fontSize,
                   ),
             ),
             if (hasSalary) ...[
               const SizedBox(width: 4),
-              Icon(Icons.edit, size: 11, color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
+              Icon(Icons.edit, size: widget.fontSize - 1, color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
             ],
           ],
         ),
