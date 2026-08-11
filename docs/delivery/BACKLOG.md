@@ -1,6 +1,6 @@
 # career-agent — Backlog
 
-> Last updated: 2026-07-31
+> Last updated: 2026-08-11
 > Rules: [documentation-conventions.md](documentation-conventions.md) · History: [CHANGELOG.md](CHANGELOG.md) · Specs: [Epics/](Epics/)
 
 **Priority legend:**
@@ -22,6 +22,19 @@
 **Structural fix (covers 1 & 3):** "Per-archetype skeletal building-block constructs in PROFILE.md" (P1, below) — fixed, vetted phrasing blocks instead of free generation removes the fabrication/bleed *mechanism*, not just patches each individual leak as it's found.
 **Cheap fix (covers most of 4, and a slice of 1 & 2):** a deterministic, non-LLM lint pass right after Phase 3.5 saves the draft — regex-scan for em-dash characters and a maintained banned-phrase list — before the draft is ever shown to the user. Near-zero implementation cost, would have auto-caught a real chunk of today's manual fixes.
 **When to pick this up:** start with the cheap lint pass whenever there's a free slot — immediate ROI, no design work needed. The skeletal-blocks rewrite (1 & 3) is the bigger investment, save for later.
+
+---
+
+### 🔴 P0 — `ClaudeCodeProvider` error message drops stdout, only surfaces stderr — real failure reason never reaches DB/UI (found 2026-08-10, vacancy #1073)
+**What:** `core/llm_client.py` ~lines 700-736 — `_read_stdout()` captures the CLI's stdout into `output_lines` (also written live to `logs/cli_debug.log`), `_read_stderr()` separately captures `stderr_lines`. On non-zero exit, the error-raising block only reads `stderr_lines`:
+```python
+if proc.returncode != 0:
+    err = "".join(stderr_lines)[:300]
+    raise LLMError(f"claude CLI error (rc={proc.returncode}): {err}")
+```
+If the actual diagnostic text was printed to stdout instead (as it was here), `stderr_lines` is empty and the raised `LLMError` — which becomes `vacancies.analysis_error` in the DB and what the UI shows — is just `"claude CLI error (rc=1): "` with no body. Useless for debugging.
+**Found via:** vacancy #1073 analysis kept failing ~2-4s after start, 3 repeated attempts, all logged with the same empty-body error in `agent.log`. Root cause only found by reading `logs/cli_debug.log` directly: `Failed to authenticate: OAuth session expired and could not be refreshed` — present under the `--- RESPONSE (streaming) ---` (stdout) section, never in stderr. Not vacancy-specific — blocks every `claude_cli`-provider analysis until user re-authenticates.
+**Fix direction:** when `stderr_lines` is empty (or too short to be informative), fall back to the last N lines of `output_lines` in the raised error message. Cheap, isolated fix — no design work needed.
 
 ---
 
@@ -88,7 +101,7 @@
 
 ---
 
-### Phase 1 "Company" extraction ignores the already-known job-board company, invents a placeholder when the JD body anonymizes the end-client — corrupts DB `title` and hides the real company in Flutter (found 2026-07-30, vacancy #934, N-iX)
+### Phase 1 "Company" extraction ignores the already-known job-board company, invents a placeholder when the JD body anonymizes the end-client — corrupts DB `title` and hides the real company in Flutter (found 2026-07-30, vacancy #934, N-iX; recurred 2026-08-01, vacancy #972, BBE Marketing)
 **What:** `prompts/pm|generic/phase1_analysis.md:42` — `**Company:** [company name as written in JD]` — extracts strictly from JD body text. Common for staffing/BPO/recruiting-agency postings (Djinni especially) to anonymize the end-client in the body ("Our Client provides...") while the actual hiring company is known and already correct in `vacancies.company` (fetched from the job-board page itself, not the body). On #934 this produced `analysis_json.p1.company = "[undisclosed — insurance claims/services BPO, client-facing role via staffing partner]"` even though `vacancies.company = "N-iX"` was sitting right there, correct, the whole time.
 **Two downstream breakages from the one bad value:**
 1. `web/api.py:349` (`api_vacancies`) explicitly prefers `analysis_json.p1.company` over the correct `vacancies.company` for the Flutter-facing `company` field ("prefer analysis company... over RSS company") — no guard against the analysis value being a placeholder/prose-descriptor rather than an actual name, so the correct "N-iX" gets hidden behind the useless placeholder in the UI (this is the exact card the user screenshotted).
@@ -99,6 +112,7 @@
 - Trace and fix whatever write path let the placeholder leak into `vacancies.title`.
 **Manually fixed for #934 this session:** `vacancies.title` → `"Senior Product Owner"`, `analysis_json.p1.company` and `JD_analysis.md`'s two `Company:`/header lines → `"N-iX (end client undisclosed: insurance claims/services BPO)"`. `vacancies.company` was never wrong, untouched.
 **Found via:** user noticed the placeholder rendering in the Flutter Analysis tab where the company name should be (screenshot), despite the folder already being correctly named `934 — Senior Product Owner — N-iX` from the correct `vacancies.company` value.
+**Recurred 2026-08-01, vacancy #972 (BBE Marketing, Djinni):** same mechanism, different placeholder string — `analysis_json.p1.company` = `"[not stated in JD]"`, `vacancies.title` corrupted to `"Research Operations and Automation Lead — [not stated in JD]"`, while `vacancies.company` = `"BBE Marketing"` sat correct and unused the whole time (JD body genuinely never names the company). Manually fixed the same way: `title` → clean role name, `analysis_json.p1.company` and both `JD_analysis.md` `Company:`/header lines → `"BBE Marketing"`. Second confirmed live occurrence — still not fixed upstream.
 
 ---
 

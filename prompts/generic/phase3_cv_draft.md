@@ -32,6 +32,7 @@ User will provide:
 10. **Certifications** — include only if directly relevant to this vacancy; omit otherwise
 11. **NEVER use plural forms for things built or owned: no "systems", "portals", "platforms".** Name individual items specifically (singular each), or use "product" / "product suite" as a collective. Exception: "products" is allowed only when referring to multiple distinct products in context.
 12. **NEVER use third-person verbs anywhere in the CV** — no "Understands", "Knows", "Applies", "Works", "Brings", "Has". CV language = headline-style (no subject) or past-tense action verbs. Applies to Summary, bullets, and all prose.
+   - **Non-English output (Ukrainian, Russian, etc.):** same rule, different surface pattern — watch for "Має [experience]" / "Є [adjective]" (implied-subject present tense) and bare adjective-as-headline claims like "Технічно грамотний:" standing alone. Convert to parallel past-tense action verbs instead (e.g. "Керував", "Координував", "Читав і проєктував"). Found live on vacancy #937.
 13. **GitHub link — include only if vacancy has explicit engineering/code signal.** If candidate has a portfolio site, it covers GitHub; GitHub URL in header is redundant.
 14. **NEVER use em-dashes (—).** Use a period, comma, colon, or parentheses instead. A chained em-dash pair inside one sentence (a mid-sentence parenthetical insert) is a strong, well-known AI-writing tell — rewrite as two sentences or a parenthetical instead of reaching for a dash.
 
