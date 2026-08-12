@@ -986,6 +986,27 @@ async def get_vacancy_pipeline_runs(vacancy_id: int) -> list[dict]:
         return result
 
 
+async def get_last_phase_completion(vacancy_id: int, phase: str) -> str | None:
+    """Return finished_at of the most recent successful run of `phase`, or None.
+
+    Used to report a real "last analyzed" time (pipeline_runs) instead of
+    vacancies.updated_at, which is bumped by ~10 unrelated write paths
+    (applied/starred toggle, salary edit, republish bump, dedup, ...) and so
+    cannot be trusted to mean "this phase ran" (found live 2026-08-11, #597).
+    """
+    async with get_db() as db:
+        cursor = await db.execute(
+            """
+            SELECT finished_at FROM pipeline_runs
+            WHERE vacancy_id = ? AND phase = ? AND status = 'done'
+            ORDER BY finished_at DESC LIMIT 1
+            """,
+            (vacancy_id, phase),
+        )
+        row = await cursor.fetchone()
+        return row["finished_at"] if row else None
+
+
 # ── Push subscription helpers ─────────────────────────────────────────────────
 
 async def upsert_push_subscription(

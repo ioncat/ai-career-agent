@@ -1192,6 +1192,12 @@ async def api_vacancy_analysis(vacancy_id: int):
         who = _parse_quick_scan_field(md_path, "Who they want")
         if who:
             p2["who_they_want"] = who
+    # Real Phase 2 completion time — NOT vacancies.updated_at, which is bumped
+    # by unrelated write paths (applied/starred toggle, salary edit, republish
+    # bump, dedup, ...) and falsely implies re-analysis. Found live 2026-08-11.
+    analyzed_at = await database.get_last_phase_completion(vacancy_id, "phase2")
+    if analyzed_at is not None:
+        result["analyzed_at"] = analyzed_at
     return result
 
 
