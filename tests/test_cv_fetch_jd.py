@@ -15,6 +15,7 @@ from contracts.parsed_document import ParsedDocument
 from tools.cv_fetch_jd import (
     FetchError,
     _detect_site,
+    _enrich_company_website,
     _safe_folder_name,
     _url_slug,
     cv_fetch_jd,
@@ -42,12 +43,16 @@ def _make_ctx(tmp_path: Path, parser_adapter=None, user_id: int = 1) -> MagicMoc
     return ctx
 
 
-def _make_doc(title="Backend Dev", markdown="## Job\nGreat role.", company=None) -> ParsedDocument:
+def _make_doc(
+    title="Backend Dev", markdown="## Job\nGreat role.", company=None,
+    company_profile_url=None,
+) -> ParsedDocument:
     return ParsedDocument(
         title=title,
         markdown=markdown,
         source_url="https://djinni.co/jobs/123-backend/",
         company=company,
+        company_profile_url=company_profile_url,
     )
 
 
@@ -698,3 +703,131 @@ async def test_fetch_jd_dedup_failure_does_not_block_fetched_status(tmp_path):
     assert result == 203
     mock_db.update_vacancy_fields.assert_awaited_once()
     mock_db.update_vacancy_status.assert_awaited_once_with(203, "fetched")
+
+
+# ── company_website — fire-and-forget scheduling (2026-08-12) ──────────────
+
+@pytest.mark.asyncio
+async def test_fetch_jd_schedules_company_website_task(tmp_path):
+    doc = _make_doc(company="Acme Inc", company_profile_url="https://djinni.co/jobs/company-acme/")
+    parser = AsyncMock()
+    parser.fetch_markdown = AsyncMock(return_value=doc)
+    deps = _make_deps(tmp_path, parser)
+
+    with patch("tools.cv_fetch_jd.database") as mock_db, \
+         patch("tools.cv_fetch_jd.asyncio.create_task") as mock_create_task:
+        mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
+        mock_db.insert_vacancy = AsyncMock(return_value=300)
+        mock_db.update_vacancy_fields = AsyncMock()
+        _mock_dedup(mock_db)
+
+        await fetch_jd(deps, "https://djinni.co/jobs/123/")
+
+    assert mock_create_task.called
+    scheduled_coro = mock_create_task.call_args.args[0]
+    scheduled_coro.close()  # never actually run — avoid "never awaited" warning
+
+
+@pytest.mark.asyncio
+async def test_fetch_jd_no_task_when_company_profile_url_missing(tmp_path):
+    doc = _make_doc(company="Acme Inc", company_profile_url=None)
+    parser = AsyncMock()
+    parser.fetch_markdown = AsyncMock(return_value=doc)
+    deps = _make_deps(tmp_path, parser)
+
+    with patch("tools.cv_fetch_jd.database") as mock_db, \
+         patch("tools.cv_fetch_jd.asyncio.create_task") as mock_create_task:
+        mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
+        mock_db.insert_vacancy = AsyncMock(return_value=301)
+        mock_db.update_vacancy_fields = AsyncMock()
+        _mock_dedup(mock_db)
+
+        await fetch_jd(deps, "https://djinni.co/jobs/123/")
+
+    mock_create_task.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_fetch_jd_no_task_when_company_missing(tmp_path):
+    doc = _make_doc(company=None, company_profile_url="https://djinni.co/jobs/company-acme/")
+    parser = AsyncMock()
+    parser.fetch_markdown = AsyncMock(return_value=doc)
+    deps = _make_deps(tmp_path, parser)
+
+    with patch("tools.cv_fetch_jd.database") as mock_db, \
+         patch("tools.cv_fetch_jd.asyncio.create_task") as mock_create_task:
+        mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
+        mock_db.insert_vacancy = AsyncMock(return_value=302)
+        mock_db.update_vacancy_fields = AsyncMock()
+        _mock_dedup(mock_db)
+
+        await fetch_jd(deps, "https://djinni.co/jobs/123/")
+
+    mock_create_task.assert_not_called()
+
+
+# ── _enrich_company_website (2026-08-12) ────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_enrich_company_website_cache_hit_skips_fetch(tmp_path):
+    parser = AsyncMock()
+    deps = _make_deps(tmp_path, parser)
+
+    with patch("tools.cv_fetch_jd.database") as mock_db:
+        mock_db.get_company_website = AsyncMock(return_value="https://acme.com")
+        mock_db.update_vacancy_fields = AsyncMock()
+
+        await _enrich_company_website(deps, 42, "Acme Inc", "https://djinni.co/jobs/company-acme/")
+
+    parser.fetch_company_website.assert_not_called()
+    mock_db.update_vacancy_fields.assert_awaited_once_with(42, company_website="https://acme.com")
+
+
+@pytest.mark.asyncio
+async def test_enrich_company_website_cache_miss_fetches_and_persists(tmp_path):
+    parser = AsyncMock()
+    parser.fetch_company_website = AsyncMock(return_value="https://acme.com")
+    deps = _make_deps(tmp_path, parser)
+
+    with patch("tools.cv_fetch_jd.database") as mock_db:
+        mock_db.get_company_website = AsyncMock(return_value=None)
+        mock_db.update_vacancy_fields = AsyncMock()
+
+        await _enrich_company_website(deps, 42, "Acme Inc", "https://djinni.co/jobs/company-acme/")
+
+    parser.fetch_company_website.assert_awaited_once_with("https://djinni.co/jobs/company-acme/")
+    mock_db.update_vacancy_fields.assert_awaited_once_with(42, company_website="https://acme.com")
+
+
+@pytest.mark.asyncio
+async def test_enrich_company_website_no_website_found_does_not_write(tmp_path):
+    """A company with no website on file (e.g. an agency) — normal outcome,
+    not an error, nothing to persist."""
+    parser = AsyncMock()
+    parser.fetch_company_website = AsyncMock(return_value=None)
+    deps = _make_deps(tmp_path, parser)
+
+    with patch("tools.cv_fetch_jd.database") as mock_db:
+        mock_db.get_company_website = AsyncMock(return_value=None)
+        mock_db.update_vacancy_fields = AsyncMock()
+
+        await _enrich_company_website(deps, 42, "Gypsy Collective", "https://djinni.co/jobs/company-gypsy/")
+
+    mock_db.update_vacancy_fields.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_enrich_company_website_fails_open_on_error(tmp_path):
+    """A ParserError (or any exception) here must never propagate — this is
+    a nice-to-have background enrichment, not a pipeline dependency."""
+    parser = AsyncMock()
+    parser.fetch_company_website = AsyncMock(side_effect=ParserError("boom", url="x"))
+    deps = _make_deps(tmp_path, parser)
+
+    with patch("tools.cv_fetch_jd.database") as mock_db:
+        mock_db.get_company_website = AsyncMock(return_value=None)
+        mock_db.update_vacancy_fields = AsyncMock()
+
+        await _enrich_company_website(deps, 42, "Acme Inc", "https://djinni.co/jobs/company-acme/")  # must not raise
+
+    mock_db.update_vacancy_fields.assert_not_called()

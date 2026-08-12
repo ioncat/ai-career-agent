@@ -332,6 +332,7 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
     final jdAsync = ref.watch(vacancyJdProvider(widget.vacancyId));
     final role = widget.vacancy?.role ?? '';
     final company = widget.vacancy?.company ?? '';
+    final companyWebsite = widget.vacancy?.companyWebsite;
     final health = ref.watch(healthProvider).valueOrNull ?? HealthStatus.checking;
     final workerAvailable = health == HealthStatus.online;
 
@@ -359,13 +360,33 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis),
                       if (company.isNotEmpty)
-                        Text(company,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
-                                ?.copyWith(color: cs.onSurfaceVariant),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Text(company,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(color: cs.onSurfaceVariant),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis),
+                            ),
+                            if (companyWebsite != null && companyWebsite.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(left: 4),
+                                child: Tooltip(
+                                  message: companyWebsite,
+                                  child: InkWell(
+                                    onTap: () => launchUrl(Uri.parse(companyWebsite),
+                                        mode: LaunchMode.externalApplication),
+                                    child: Icon(Icons.language,
+                                        size: 14, color: cs.primary),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                     ],
                   ),
                 )
@@ -1910,6 +1931,9 @@ class _VacancyHero extends StatelessWidget {
     this.onSalaryChanged,
   });
 
+  static void _openWebsite(String url) =>
+      launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -1973,12 +1997,32 @@ class _VacancyHero extends StatelessWidget {
                   ),
                   if (company.isNotEmpty) ...[
                     const SizedBox(height: 6),
-                    Text(
-                      company,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            color: cs.onSurfaceVariant,
-                            fontWeight: FontWeight.w400,
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            company,
+                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                  color: cs.onSurfaceVariant,
+                                  fontWeight: FontWeight.w400,
+                                ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
+                        ),
+                        if (vacancy?.companyWebsite != null && vacancy!.companyWebsite!.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 6),
+                            child: Tooltip(
+                              message: vacancy!.companyWebsite!,
+                              child: InkWell(
+                                onTap: () => _openWebsite(vacancy!.companyWebsite!),
+                                child: Icon(Icons.language, size: 18, color: cs.primary),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ],
                   const SizedBox(height: 6),

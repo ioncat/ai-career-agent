@@ -196,6 +196,10 @@ async def init_db() -> None:
             # replaces string-matching blocker_reasons for a "title:" prefix,
             # which was considered and rejected as fragile. See schema.sql.
             "ALTER TABLE vacancies ADD COLUMN blocker_stage TEXT",
+            # Company website — from the site's company profile page (public,
+            # unauthenticated), fetched off the critical path and cached per
+            # company (2026-08-12). NULL = not yet fetched / no match found.
+            "ALTER TABLE vacancies ADD COLUMN company_website TEXT",
         ]:
             try:
                 await db.execute(migration)
@@ -430,6 +434,7 @@ async def update_vacancy_fields(
     markdown_path: str | None = None,
     salary: str | None = None,
     company: str | None = None,
+    company_website: str | None = None,
 ) -> None:
     """Update mutable fields of an existing vacancy (e.g. after fetching a queued record).
 
@@ -452,6 +457,9 @@ async def update_vacancy_fields(
     if company is not None:
         sets.append("company = ?")
         params.append(company)
+    if company_website is not None:
+        sets.append("company_website = ?")
+        params.append(company_website)
     if not sets:
         return
     params.append(vacancy_id)
@@ -461,6 +469,32 @@ async def update_vacancy_fields(
             params,
         )
         await db.commit()
+
+
+async def get_company_website(company: str, user_id: int | None) -> str | None:
+    """Return a cached company_website for `company`, if any prior vacancy
+    already has one on file. Case-insensitive exact match.
+
+    Cache-before-fetch: companies post multiple vacancies over time, so most
+    lookups skip the second HTTP request (company profile page) entirely
+    after the first vacancy from that company (2026-08-12).
+    """
+    if not company:
+        return None
+    async with get_db() as db:
+        cursor = await db.execute(
+            """
+            SELECT company_website FROM vacancies
+            WHERE company_website IS NOT NULL
+              AND LOWER(company) = LOWER(?)
+              AND (user_id = ? OR ? IS NULL)
+            ORDER BY updated_at DESC
+            LIMIT 1
+            """,
+            (company, user_id, user_id),
+        )
+        row = await cursor.fetchone()
+        return row["company_website"] if row else None
 
 
 async def get_vacancy_by_url(url: str) -> aiosqlite.Row | None:
