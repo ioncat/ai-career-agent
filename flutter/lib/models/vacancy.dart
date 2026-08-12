@@ -9,6 +9,10 @@ class VacancyListItem {
   final int id;
   final String role;
   final String company;
+  // Public company profile-page website, fetched off the critical path and
+  // cached per company — often absent right after a vacancy first arrives,
+  // backfills a few seconds later (2026-08-12).
+  final String? companyWebsite;
   final String site;
   final String url;
   final String status;
@@ -45,6 +49,7 @@ class VacancyListItem {
     required this.id,
     required this.role,
     required this.company,
+    this.companyWebsite,
     required this.site,
     required this.url,
     required this.status,
@@ -77,6 +82,7 @@ class VacancyListItem {
       // 'role' from p1 analysis; fallback to 'title' from DB row for unanalyzed vacancies
       role: json['role'] as String? ?? json['title'] as String? ?? '',
       company: json['company'] as String? ?? '',
+      companyWebsite: json['company_website'] as String?,
       site: json['site'] as String? ?? '',
       url: json['url'] as String? ?? '',
       status: json['status'] as String? ?? '',
@@ -108,6 +114,7 @@ class VacancyListItem {
         'id': id,
         'role': role,
         'company': company,
+        'company_website': companyWebsite,
         'site': site,
         'url': url,
         'status': status,

@@ -86,6 +86,47 @@ class ParserAdapter:
         log.debug("ParserAdapter: parsed %r → title=%r, md_len=%d", url, doc.title, len(doc.markdown))
         return doc
 
+    async def fetch_company_website(self, company_profile_url: str) -> str | None:
+        """Fetch a company PROFILE page (not a vacancy) and return its public
+        website link, or None if the page has no such field (a common,
+        normal outcome — not an error).
+
+        Called off the critical path (tools/cv_fetch_jd.py, fire-and-forget,
+        only for companies not already cached — see
+        db.database.get_company_website) — never awaited inline with the
+        main JD fetch.
+
+        Raises:
+            ParserError: jd-parser unreachable or returned 5xx. A 200 with
+            website=null is NOT an error — callers should treat that as
+            "no website on file", same as any other missing field.
+        """
+        endpoint = f"{self._base_url}/company-website"
+        log.debug("ParserAdapter.fetch_company_website → POST %s body=%r", endpoint, company_profile_url)
+
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout) as client:
+                resp = await client.post(endpoint, json={"url": company_profile_url})
+        except httpx.TransportError as exc:
+            raise ParserError(
+                f"jd-parser unreachable: {exc}",
+                url=company_profile_url,
+            ) from exc
+
+        if resp.status_code != 200:
+            detail = _extract_detail(resp)
+            log.error(
+                "ParserAdapter: POST /company-website returned %d for %r — %s",
+                resp.status_code, company_profile_url, detail,
+            )
+            raise ParserError(
+                f"jd-parser error {resp.status_code}: {detail}",
+                url=company_profile_url,
+                status_code=resp.status_code,
+            )
+
+        return resp.json().get("website")
+
     async def health(self) -> bool:
         """Check if jd-parser is alive. Returns True if healthy."""
         try:

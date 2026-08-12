@@ -54,6 +54,15 @@ SITES: dict = {
             "script",
             "style",
         ],
+        # Company profile page ("/jobs/company-{slug}/") link on the vacancy
+        # page — a SEPARATE request from the vacancy page, only followed
+        # later (2026-08-12, see BACKLOG.md — fetched off the critical path,
+        # cached per company). Its public "Веб-сайт:" field is a distinct
+        # thing from the ATS-connected "Company website:" block Djinni shows
+        # some logged-in users directly on the vacancy page — that one is
+        # login-gated and out of scope entirely.
+        "company_link_selector": 'a[href*="/jobs/company-"]',
+        "company_website_selector": 'a[data-analytics="company_page"]',
     },
 
     "jobs.dou.ua": {
@@ -70,6 +79,10 @@ SITES: dict = {
             "style",
             "iframe",
         ],
+        # DOU's company profile URL is derivable directly from the vacancy
+        # URL (strip the /vacancies/{id} suffix) — no DOM lookup needed on
+        # the vacancy page itself, unlike Djinni's company_link_selector.
+        "company_website_selector": ".company-info .site a",
     },
 }
 

@@ -72,6 +72,73 @@ async def test_update_vacancy_status():
     assert row["status"] == "analyzing"
 
 
+# ── company_website (2026-08-12) ────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_update_vacancy_fields_sets_company_website():
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/900/")
+    await database.update_vacancy_fields(vid, company_website="https://acme.com")
+
+    row = await database.get_vacancy_by_id(vid)
+    assert row["company_website"] == "https://acme.com"
+
+
+@pytest.mark.asyncio
+async def test_get_company_website_cache_hit():
+    uid = await database.insert_user(name="U1", telegram_chat_id=9001, skill_type="pm")
+    vid1 = await database.insert_vacancy(url="https://djinni.co/jobs/901/", user_id=uid, company="Acme Inc")
+    await database.update_vacancy_fields(vid1, company_website="https://acme.com")
+
+    result = await database.get_company_website("Acme Inc", user_id=uid)
+    assert result == "https://acme.com"
+
+
+@pytest.mark.asyncio
+async def test_get_company_website_case_insensitive():
+    uid = await database.insert_user(name="U2", telegram_chat_id=9002, skill_type="pm")
+    vid1 = await database.insert_vacancy(url="https://djinni.co/jobs/902/", user_id=uid, company="Acme Inc")
+    await database.update_vacancy_fields(vid1, company_website="https://acme.com")
+
+    result = await database.get_company_website("acme inc", user_id=uid)
+    assert result == "https://acme.com"
+
+
+@pytest.mark.asyncio
+async def test_get_company_website_no_match_returns_none():
+    uid = await database.insert_user(name="U3", telegram_chat_id=9003, skill_type="pm")
+    result = await database.get_company_website("Unknown Corp", user_id=uid)
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_get_company_website_ignores_null_values():
+    """A prior vacancy from the same company with no website on file yet
+    must not shadow a real cached value from a different row."""
+    uid = await database.insert_user(name="U4", telegram_chat_id=9004, skill_type="pm")
+    vid1 = await database.insert_vacancy(url="https://djinni.co/jobs/903/", user_id=uid, company="Acme Inc")
+    vid2 = await database.insert_vacancy(url="https://djinni.co/jobs/904/", user_id=uid, company="Acme Inc")
+    await database.update_vacancy_fields(vid2, company_website="https://acme.com")
+
+    result = await database.get_company_website("Acme Inc", user_id=uid)
+    assert result == "https://acme.com"
+
+
+@pytest.mark.asyncio
+async def test_get_company_website_scoped_to_user():
+    uid1 = await database.insert_user(name="U5", telegram_chat_id=9005, skill_type="pm")
+    uid2 = await database.insert_user(name="U6", telegram_chat_id=9006, skill_type="pm")
+    vid1 = await database.insert_vacancy(url="https://djinni.co/jobs/905/", user_id=uid1, company="Acme Inc")
+    await database.update_vacancy_fields(vid1, company_website="https://acme.com")
+
+    result = await database.get_company_website("Acme Inc", user_id=uid2)
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_get_company_website_empty_company_returns_none():
+    assert await database.get_company_website("", user_id=1) is None
+
+
 @pytest.mark.asyncio
 async def test_list_vacancies():
     await database.insert_vacancy(url="https://djinni.co/jobs/1/")

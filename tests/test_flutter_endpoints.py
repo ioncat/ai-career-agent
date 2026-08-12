@@ -103,6 +103,29 @@ async def test_list_vacancies_applied_starred_are_bool(client, db_with_vacancies
 
 
 @pytest.mark.asyncio
+async def test_list_vacancies_includes_company_website(client, db_with_vacancies):
+    """company_website (2026-08-12) passes through the generic SELECT * row
+    dict — no dedicated extraction code, unlike analysis_json fields."""
+    database.configure(db_with_vacancies / "test.db")
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/30", user_id=1, company="Acme Inc")
+    await database.update_vacancy_fields(vid, company_website="https://acme.com")
+
+    resp = client.get("/api/vacancies")
+    item = resp.json()[0]
+    assert item["company_website"] == "https://acme.com"
+
+
+@pytest.mark.asyncio
+async def test_vacancy_detail_includes_company_website(client, db_with_vacancies):
+    database.configure(db_with_vacancies / "test.db")
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/31", user_id=1, company="Acme Inc")
+    await database.update_vacancy_fields(vid, company_website="https://acme.com")
+
+    resp = client.get(f"/api/vacancies/{vid}")
+    assert resp.json()["company_website"] == "https://acme.com"
+
+
+@pytest.mark.asyncio
 async def test_list_vacancies_analysis_fields_extracted(client, db_with_vacancies):
     database.configure(db_with_vacancies / "test.db")
     vid = await database.insert_vacancy(url="https://djinni.co/jobs/3", user_id=1)

@@ -15,6 +15,7 @@ Folder layout:
     vacancies/inbox/{user_id}/{id} — {role} — {company}/JD.md
 """
 
+import asyncio
 import hashlib
 import logging
 import re
@@ -162,8 +163,41 @@ async def fetch_jd(deps: AgentDeps, url: str) -> int:
 
     await database.update_vacancy_status(vacancy_id, "fetched")
 
+    # Company website — fire-and-forget, off the critical path (2026-08-12,
+    # see BACKLOG.md). Never awaited here: the vacancy is already saved and
+    # visible to the user by this point, and the website field is a nice-to-
+    # have, not something anything downstream depends on.
+    if doc.company and doc.company_profile_url:
+        asyncio.create_task(
+            _enrich_company_website(deps, vacancy_id, doc.company, doc.company_profile_url)
+        )
+
     log.info("fetch_jd: done vacancy_id=%d title=%r", vacancy_id, doc.title)
     return vacancy_id
+
+
+async def _enrich_company_website(
+    deps: AgentDeps, vacancy_id: int, company: str, company_profile_url: str,
+) -> None:
+    """Background enrichment: cache-check first (companies post multiple
+    vacancies over time, so most calls skip the fetch entirely), else fetch
+    the company's separate profile page and persist its website.
+
+    Fail-open — never raises. This is a nice-to-have field, not something
+    the pipeline depends on; any error just logs.
+    """
+    try:
+        cached = await database.get_company_website(company, deps.user_id)
+        if cached:
+            await database.update_vacancy_fields(vacancy_id, company_website=cached)
+            log.info("fetch_jd: company_website cache hit for v#%d (%s)", vacancy_id, company)
+            return
+        website = await deps.parser_adapter.fetch_company_website(company_profile_url)
+        if website:
+            await database.update_vacancy_fields(vacancy_id, company_website=website)
+            log.info("fetch_jd: company_website fetched for v#%d: %s", vacancy_id, website)
+    except Exception as exc:
+        log.warning("fetch_jd: company_website enrichment failed for v#%d (non-fatal): %s", vacancy_id, exc)
 
 
 async def cv_fetch_jd(ctx: RunContext[AgentDeps], url: str) -> str:

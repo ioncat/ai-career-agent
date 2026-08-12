@@ -151,6 +151,61 @@ async def test_fetch_markdown_timeout_error_raises_parser_error():
             await _adapter().fetch_markdown(_URL)
 
 
+# ── fetch_company_website (2026-08-12) ───────────────────────────────────────
+
+_COMPANY_URL = "https://djinni.co/jobs/company-gypsy-collective/"
+
+
+@pytest.mark.asyncio
+async def test_fetch_company_website_returns_url():
+    MockClient, _ = _mock_client(200, {"website": "https://www.gypsy.co/"})
+    with patch("adapters.parser_adapter.httpx.AsyncClient", MockClient):
+        result = await _adapter().fetch_company_website(_COMPANY_URL)
+    assert result == "https://www.gypsy.co/"
+
+
+@pytest.mark.asyncio
+async def test_fetch_company_website_none_is_not_an_error():
+    """website=null (page fetched fine, just no field) must return None,
+    not raise — a company without a listed site is a normal outcome."""
+    MockClient, _ = _mock_client(200, {"website": None})
+    with patch("adapters.parser_adapter.httpx.AsyncClient", MockClient):
+        result = await _adapter().fetch_company_website(_COMPANY_URL)
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_fetch_company_website_posts_to_correct_endpoint():
+    MockClient, _ = _mock_client(200, {"website": None})
+    with patch("adapters.parser_adapter.httpx.AsyncClient", MockClient):
+        await _adapter().fetch_company_website(_COMPANY_URL)
+    call_args = MockClient.return_value.__aenter__.return_value.post.call_args
+    assert call_args[0][0] == f"{_BASE}/company-website"
+    assert call_args[1]["json"] == {"url": _COMPANY_URL}
+
+
+@pytest.mark.asyncio
+async def test_fetch_company_website_503_raises_parser_error():
+    MockClient, _ = _mock_client(503, {"detail": "fetch_failed"})
+    with patch("adapters.parser_adapter.httpx.AsyncClient", MockClient):
+        with pytest.raises(ParserError) as exc_info:
+            await _adapter().fetch_company_website(_COMPANY_URL)
+    assert exc_info.value.status_code == 503
+
+
+@pytest.mark.asyncio
+async def test_fetch_company_website_transport_error_raises_parser_error():
+    async_client = AsyncMock()
+    async_client.post.side_effect = httpx.ConnectError("refused")
+    MockClient = MagicMock()
+    MockClient.return_value.__aenter__ = AsyncMock(return_value=async_client)
+    MockClient.return_value.__aexit__ = AsyncMock(return_value=None)
+
+    with patch("adapters.parser_adapter.httpx.AsyncClient", MockClient):
+        with pytest.raises(ParserError):
+            await _adapter().fetch_company_website(_COMPANY_URL)
+
+
 # ── health ────────────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
