@@ -99,6 +99,7 @@ def _parse_html(html: str, url: str, site_key: str | None) -> tuple[str, str, st
 
     company = _extract_company(url, soup, site_key, title)
 
+    requirements_markdown = ""
     if site_key and site_key in SITES:
         cfg = SITES[site_key]
         content = soup.select_one(cfg["content_selector"])
@@ -109,6 +110,15 @@ def _parse_html(html: str, url: str, site_key: str | None) -> tuple[str, str, st
         for sel in cfg.get("garbage_selectors", []):
             for el in content.select(sel):
                 el.decompose()
+
+        req_selector = cfg.get("requirements_selector")
+        if req_selector:
+            req_el = soup.select_one(req_selector)
+            if req_el is not None:
+                for sel in cfg.get("requirements_garbage_selectors", []):
+                    for el in req_el.select(sel):
+                        el.decompose()
+                requirements_markdown = _to_markdown(str(req_el)).strip()
     else:
         log.info("No site config for %r — generic extraction", urlparse(url).netloc)
         content = soup.find("body") or soup
@@ -117,6 +127,8 @@ def _parse_html(html: str, url: str, site_key: str | None) -> tuple[str, str, st
                 el.decompose()
 
     markdown = _to_markdown(str(content)).strip()
+    if requirements_markdown:
+        markdown = f"{markdown}\n\n## Vacancy Requirements\n\n{requirements_markdown}"
     return title, markdown, company
 
 

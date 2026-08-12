@@ -1,6 +1,6 @@
 # career-agent — Backlog
 
-> Last updated: 2026-08-11
+> Last updated: 2026-08-12
 > Rules: [documentation-conventions.md](documentation-conventions.md) · History: [CHANGELOG.md](CHANGELOG.md) · Specs: [Epics/](Epics/)
 
 **Priority legend:**
@@ -13,25 +13,8 @@
 
 ## 📌 Now
 
-### 🟠 P1 — Djinni's structured requirements sidebar (English level, years, remote, countries) never reaches JD.md — pre-filter is blind to it unless the JD prose happens to repeat it (found 2026-08-11)
-**What:** every Djinni vacancy page renders an unauthenticated `<aside><div class="card card-body">` sidebar with the poster's structured criteria — confirmed live on `/jobs/842445-product-manager-igaming`:
-```
-Виключно від 4 років досвіду       (years, deterministic)
-Тільки віддалено                    (remote-only)
-Країни Європи та Україна            (countries)
-Англійська B1 – Середній            (span.csc--language: .csc__primary "Англійська" / .csc__secondary "B1 – Середній")
-Українська Носій мови
-Product Manager                     (category)
-Зайнятість: Fulltime
-Домен: Advertising / Marketing
-```
-`services/parser/config.py`'s djinni.co `content_selector` (`.job-post__description`) does NOT include this — confirmed via DOM inspection (`desc.contains(reqNode) === false`, it's a sibling column, not nested). It never reaches `JD.md`, so neither Phase 1+2 nor the existing Stage 2 content pre-filter (`tools/cv_prefilter.py`, EPIC-27 — which already has `english: C1, C2, or C1-C2 required (mine: B2/Upper-Intermediate)` as a configured Critical Blocker line in `PROFILE.md`) ever sees it unless the JD *body* prose happens to restate the same requirement — the #1120 IGaming example didn't (zero occurrences of "English" in the body text at all), even though this vacancy structurally requires English B1.
-**Distinct from the login-gated block:** Djinni also renders a *second*, separately-classed `class="card card-body mb-1"` block that compares these same requirements against the *logged-in* user's own Djinni profile (✓/✗ per line) — that one genuinely requires an authenticated session and is explicitly out of scope (rejected — fragile, ToS risk). This ticket is about the first, always-public sidebar only.
-**Fix direction:**
-1. `services/parser/config.py`: add a second selector for djinni.co (the `aside .card.card-body` sidebar) alongside the existing `content_selector`; `services/parser/app.py:_parse_html()` merges its text into the markdown (clearly delimited, e.g. under a `## Vacancy Requirements` heading) before/after the JD body. New test file `services/parser/test_app.py` (no test coverage exists for this service currently) covering the merge.
-2. Once present in `JD.md`, the English-level line is now in a **consistent, structured format** (`{Language} {CEFR level} – {label}`) rather than free prose — worth a new deterministic Stage 1 check (same pattern as `apply_title_stage` in `tools/cv_prefilter.py`) that parses it and compares against `PROFILE.md`'s `english:` blocker line via a CEFR ordering (A1<A2<B1<B2<C1<C2), auto-triggered same as the title check (not manual-only like today's Stage 2). Handle both UA-locale ("Англійська") and EN-locale ("English") renders — fetch's `Accept-Language` header currently mixes both (`crawler.py:_random_headers()`).
-**Explicitly out of scope for this ticket:** years/remote/countries checks — the sidebar text will already flow into Phase 1+2's normal context once (1) ships, no new code needed for those; a deterministic Stage 1 check for them (like the language one) can be a fast follow if it proves valuable, not bundled here.
-**Estimate:** ~2-2.5h (parser selector + merge + new test file ~45min; CEFR-ordering language check + locale handling ~60-75min; wiring into the existing auto-check-title call site + `tools/cv_prefilter.py` tests ~30-45min).
+### 🧊 Icebox — deterministic Stage 1 checks for years/remote/countries (fast follow to the Djinni requirements-sidebar delivery, 2026-08-12)
+**What:** the requirements sidebar (years experience, remote-only, countries) now flows into `JD.md` (delivered 2026-08-12 — see CHANGELOG), but only the English-level line got a dedicated deterministic Stage 1 check so far. Phase 1+2 already sees the rest as normal JD context, so this isn't urgent — worth a fast follow only if it proves valuable in practice (same `apply_title_stage`/`apply_language_stage` pattern in `tools/cv_prefilter.py`).
 
 ---
 
