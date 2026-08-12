@@ -11,9 +11,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from tools.cv_prefilter import (
+    _check_english_level,
     _check_title_allowlist,
     _check_title_domain_signals,
     _parse_prefilter_output,
+    apply_language_stage,
     apply_title_stage,
     cv_prefilter,
 )
@@ -202,6 +204,58 @@ def test_title_domain_signals_empty_title_does_not_flag():
     assert _check_title_domain_signals(None) is None
 
 
+# ── _check_english_level (Djinni requirements sidebar, 2026-08-11) ─────────────
+
+_JD_WITH_C1 = (
+    "# Product Manager\n\nSome JD body with no language mention at all.\n\n"
+    "## Vacancy Requirements\n\nВиключно від 4 років досвіду\n"
+    "Англійська C1 – Просунутий\nУкраїнська Носій мови\n"
+)
+
+_JD_WITH_B1 = (
+    "# Product Manager\n\nSome JD body.\n\n"
+    "## Vacancy Requirements\n\nАнглійська B1 – Середній\n"
+)
+
+_JD_WITH_ENGLISH_LOCALE = (
+    "# Product Manager\n\n## Vacancy Requirements\n\nEnglish C2 – Proficient\n"
+)
+
+
+def test_english_level_flags_requirement_above_candidate():
+    reason = _check_english_level(_JD_WITH_C1)
+    assert reason is not None
+    assert reason.startswith("english:")
+    assert "C1" in reason
+
+
+def test_english_level_no_flag_when_at_or_below_candidate():
+    assert _check_english_level(_JD_WITH_B1) is None
+
+
+def test_english_level_handles_english_locale_render():
+    reason = _check_english_level(_JD_WITH_ENGLISH_LOCALE)
+    assert reason is not None
+    assert "C2" in reason
+
+
+def test_english_level_no_requirements_section_returns_none():
+    assert _check_english_level("# Product Manager\n\nJust a JD body.") is None
+
+
+def test_english_level_requirements_section_without_language_line_returns_none():
+    jd = "# Product Manager\n\n## Vacancy Requirements\n\nТільки віддалено\n"
+    assert _check_english_level(jd) is None
+
+
+def test_english_level_ignores_casual_mention_outside_requirements_section():
+    """A JD body mentioning 'English C1' in prose (not Djinni's structured
+    field) must never trigger a false blocker — only the requirements
+    section counts."""
+    jd = "# Product Manager\n\nWe need English C1 speakers on the team ideally.\n"
+    assert _check_english_level(jd) is None
+
+
 # ── apply_title_stage (auto-trigger helper, 2026-07-23) ────────────────────────
 
 @pytest.mark.asyncio
@@ -237,6 +291,33 @@ async def test_apply_title_stage_domain_signal_also_writes():
     assert result is True
     args, kwargs = mock_db.set_vacancy_blocker.call_args
     assert args[2][0].startswith("igaming:")
+
+
+# ── apply_language_stage (Djinni requirements sidebar, 2026-08-11) ─────────────
+
+@pytest.mark.asyncio
+async def test_apply_language_stage_writes_blocker_on_mismatch():
+    mock_db = _mock_db()
+    with patch("tools.cv_prefilter.database", mock_db):
+        result = await apply_language_stage(1, _JD_WITH_C1)
+
+    assert result is True
+    mock_db.set_vacancy_blocker.assert_awaited_once()
+    args, kwargs = mock_db.set_vacancy_blocker.call_args
+    assert args[0] == 1
+    assert args[1] is True
+    assert args[2][0].startswith("english:")
+    assert kwargs["stage"] == "title"
+
+
+@pytest.mark.asyncio
+async def test_apply_language_stage_no_write_when_within_candidate_level():
+    mock_db = _mock_db()
+    with patch("tools.cv_prefilter.database", mock_db):
+        result = await apply_language_stage(1, _JD_WITH_B1)
+
+    assert result is False
+    mock_db.set_vacancy_blocker.assert_not_awaited()
 
 
 # ── cv_prefilter ─────────────────────────────────────────────────────────────

@@ -38,6 +38,22 @@ SITES: dict = {
             "style",
             "iframe",
         ],
+        # Structured poster-set criteria (years, remote, countries, language
+        # levels, domain, employment type) — rendered unauthenticated, but a
+        # sibling of content_selector, not nested inside it, so it was never
+        # reaching JD.md (found 2026-08-11). Distinct from the *personalized*
+        # profile-match card (also `.card.card-body`, extra `.mb-1` class) —
+        # that one only renders for a logged-in session and never appears in
+        # our always-anonymous fetch, so the broader selector below can't
+        # collide with it in practice.
+        "requirements_selector": "aside .card.card-body",
+        "requirements_garbage_selectors": [
+            "a",
+            "button",
+            ".btn",
+            "script",
+            "style",
+        ],
     },
 
     "jobs.dou.ua": {

@@ -37,10 +37,12 @@ def _make_row(
     url: str,
     status: str = "queued",
     title: str = "",
+    markdown_path: str | None = None,
 ) -> MagicMock:
     row = MagicMock()
     row.__getitem__ = lambda self, key: {
         "id": vacancy_id, "url": url, "status": status, "title": title,
+        "markdown_path": markdown_path,
     }[key]
     return row
 
@@ -182,6 +184,82 @@ async def test_poll_once_title_stage_failure_is_non_fatal():
         await watcher._poll_once()  # must not raise
 
     mock_db.update_vacancy_status.assert_any_await(42, "fetched")
+
+
+# ── language stage wiring (2026-08-11) ──────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_poll_once_runs_language_stage_when_title_stage_clean(tmp_path):
+    """Language stage only fires once title/domain passed clean — same
+    short-circuit ordering cv_prefilter() itself uses."""
+    jd_path = tmp_path / "JD.md"
+    jd_path.write_text("## Vacancy Requirements\n\nАнглійська C1 – Просунутий\n", encoding="utf-8")
+
+    watcher, _ = _make_watcher()
+    row = _make_row(42, "https://djinni.co/jobs/42/", title="Product Manager")
+    mock_db = _mock_db([row])
+    mock_db.get_auto_check_title = AsyncMock(return_value=True)
+    mock_db.get_vacancy_by_id = AsyncMock(
+        return_value=_make_row(42, "https://djinni.co/jobs/42/", title="Product Manager", markdown_path=str(jd_path))
+    )
+    mock_apply_title = AsyncMock(return_value=False)
+    mock_apply_language = AsyncMock(return_value=True)
+
+    with patch("core.rss_watcher.database", mock_db), \
+         patch("tools.cv_fetch_jd.fetch_jd", AsyncMock(return_value=42)), \
+         patch("tools.cv_prefilter.apply_title_stage", mock_apply_title), \
+         patch("tools.cv_prefilter.apply_language_stage", mock_apply_language), \
+         patch("core.rss_watcher.RSSWatcher._push_result", AsyncMock()):
+        await watcher._poll_once()
+
+    mock_apply_language.assert_awaited_once()
+    args = mock_apply_language.call_args.args
+    assert args[0] == 42
+    assert "Англійська C1" in args[1]
+
+
+@pytest.mark.asyncio
+async def test_poll_once_skips_language_stage_when_title_stage_blocked():
+    watcher, _ = _make_watcher()
+    row = _make_row(42, "https://djinni.co/jobs/42/", title="Product Marketing Lead")
+    mock_db = _mock_db([row])
+    mock_db.get_auto_check_title = AsyncMock(return_value=True)
+    mock_db.get_vacancy_by_id = AsyncMock(
+        return_value=_make_row(42, "https://djinni.co/jobs/42/", title="Product Marketing Lead", markdown_path="/tmp/JD.md")
+    )
+    mock_apply_title = AsyncMock(return_value=True)
+    mock_apply_language = AsyncMock(return_value=False)
+
+    with patch("core.rss_watcher.database", mock_db), \
+         patch("tools.cv_fetch_jd.fetch_jd", AsyncMock(return_value=42)), \
+         patch("tools.cv_prefilter.apply_title_stage", mock_apply_title), \
+         patch("tools.cv_prefilter.apply_language_stage", mock_apply_language), \
+         patch("core.rss_watcher.RSSWatcher._push_result", AsyncMock()):
+        await watcher._poll_once()
+
+    mock_apply_language.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_poll_once_skips_language_stage_when_markdown_path_missing():
+    watcher, _ = _make_watcher()
+    row = _make_row(42, "https://djinni.co/jobs/42/", title="Product Manager")
+    mock_db = _mock_db([row])
+    mock_db.get_auto_check_title = AsyncMock(return_value=True)
+    mock_db.get_vacancy_by_id = AsyncMock(
+        return_value=_make_row(42, "https://djinni.co/jobs/42/", title="Product Manager", markdown_path=None)
+    )
+    mock_apply_title = AsyncMock(return_value=False)
+    mock_apply_language = AsyncMock(return_value=False)
+
+    with patch("core.rss_watcher.database", mock_db), \
+         patch("tools.cv_fetch_jd.fetch_jd", AsyncMock(return_value=42)), \
+         patch("tools.cv_prefilter.apply_title_stage", mock_apply_title), \
+         patch("tools.cv_prefilter.apply_language_stage", mock_apply_language), \
+         patch("core.rss_watcher.RSSWatcher._push_result", AsyncMock()):
+        await watcher._poll_once()
+
+    mock_apply_language.assert_not_awaited()
 
 
 @pytest.mark.asyncio

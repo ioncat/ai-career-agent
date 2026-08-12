@@ -19,6 +19,7 @@ import logging
 import re
 from contextlib import suppress
 from dataclasses import dataclass
+from pathlib import Path
 
 from core.deps import AgentDeps
 from core.settings import Settings
@@ -176,7 +177,7 @@ class RSSWatcher:
         """
         from tools.cv_analyze import cv_analyze  # local import to avoid circular
         from tools.cv_fetch_jd import fetch_jd
-        from tools.cv_prefilter import apply_title_stage
+        from tools.cv_prefilter import apply_language_stage, apply_title_stage
 
         source = self._source_label(url)
         display = rss_title or url
@@ -253,7 +254,16 @@ class RSSWatcher:
                 if await database.get_auto_check_title(self._deps.user_id):
                     v = await database.get_vacancy_by_id(vacancy_id)
                     if v is not None:
-                        await apply_title_stage(vacancy_id, v["title"] or "")
+                        blocked = await apply_title_stage(vacancy_id, v["title"] or "")
+                        # Language check only if title stage passed clean — a
+                        # second deterministic write here would overwrite the
+                        # first blocker's reason, same short-circuit ordering
+                        # cv_prefilter() itself uses (title/domain before content).
+                        if not blocked and v["markdown_path"]:
+                            jd_path = Path(v["markdown_path"])
+                            if jd_path.exists():
+                                jd_text = jd_path.read_text(encoding="utf-8")
+                                await apply_language_stage(vacancy_id, jd_text)
             except Exception as exc:
                 log.warning("RSSWatcher: title stage failed v#%d (non-fatal): %s", vacancy_id, exc)
 

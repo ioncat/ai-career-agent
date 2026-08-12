@@ -123,6 +123,52 @@ def _check_title_domain_signals(title: str) -> str | None:
     return None
 
 
+# Djinni's own "Vacancy Requirements" sidebar (structured, poster-set,
+# unauthenticated — merged into JD.md by services/parser as of 2026-08-11,
+# see BACKLOG.md) states the required English level in a consistent format
+# ("Англійська B1 – Середній" / "English B1 – Intermediate") regardless of
+# whether the JD body prose ever mentions it at all — confirmed on vacancy
+# #1120, whose body had zero occurrences of "English" despite structurally
+# requiring B1. Scoped to search ONLY the merged "## Vacancy Requirements"
+# section (not the whole JD) so a casual JD-body mention ("English-speaking
+# clients") can never trigger a false blocker — only Djinni's own configured
+# hard requirement field can.
+_CEFR_ORDER = ["A1", "A2", "B1", "B2", "C1", "C2"]
+_CEFR_RANK = {level: i for i, level in enumerate(_CEFR_ORDER)}
+
+# Mirrors PROFILE.md's Critical Blockers `english:` line ("... required
+# (mine: B2/Upper-Intermediate)") — hardcoded here rather than parsed from
+# PROFILE.md at runtime, same rationale as _TITLE_ALLOWLIST above: this is a
+# deterministic code path, not a prompt for an LLM to read.
+_CANDIDATE_ENGLISH_LEVEL = "B2"
+
+_REQUIREMENTS_SECTION_RE = re.compile(r"##\s*Vacancy Requirements")
+_LANGUAGE_LEVEL_RE = re.compile(
+    r"(?:Англійська|English)\D{0,20}?\b(A1|A2|B1|B2|C1|C2)\b", re.IGNORECASE
+)
+
+
+def _check_english_level(jd_text: str) -> str | None:
+    """Deterministic pre-check: does Djinni's structured requirements sidebar
+    (merged into JD.md under "## Vacancy Requirements") require an English
+    level above the candidate's? Returns None if clean, absent, or unparseable
+    (fail-open — never a false blocker), or a reason string to short-circuit on.
+    """
+    m = _REQUIREMENTS_SECTION_RE.search(jd_text)
+    if not m:
+        return None
+    section = jd_text[m.end():]
+    level_match = _LANGUAGE_LEVEL_RE.search(section)
+    if not level_match:
+        return None
+    required = level_match.group(1).upper()
+    if required not in _CEFR_RANK:
+        return None
+    if _CEFR_RANK[required] <= _CEFR_RANK[_CANDIDATE_ENGLISH_LEVEL]:
+        return None
+    return f"english: JD requires {required}, candidate is {_CANDIDATE_ENGLISH_LEVEL}"
+
+
 def _parse_prefilter_output(text: str) -> tuple[bool, list[str], bool]:
     """Parse the BLOCKED:/REASONS: format.
 
@@ -181,6 +227,29 @@ async def apply_title_stage(vacancy_id: int, title: str) -> bool:
     await database.set_vacancy_blocker(
         vacancy_id, True, [reason],
         raw_output=f"BLOCKED: yes\n- {reason}\n(deterministic title check — no LLM call)",
+        stage="title",
+    )
+    return True
+
+
+async def apply_language_stage(vacancy_id: int, jd_text: str) -> bool:
+    """Run the deterministic English-level check (Stage 1 — no LLM) against
+    Djinni's structured requirements sidebar and write a blocker if it fails.
+    Returns True if a blocker was set.
+
+    Called automatically on vacancy ingestion (RSSWatcher) alongside
+    apply_title_stage, only when that check passed clean — same short-circuit
+    precedent as cv_prefilter()'s own title-then-content ordering, so a
+    blocker write is never overwritten by a second, unrelated deterministic
+    check firing right after it.
+    """
+    reason = _check_english_level(jd_text)
+    if reason is None:
+        return False
+    log.info("apply_language_stage: v#%d flagged at ingestion (no LLM call): %s", vacancy_id, reason)
+    await database.set_vacancy_blocker(
+        vacancy_id, True, [reason],
+        raw_output=f"BLOCKED: yes\n- {reason}\n(deterministic language check — no LLM call)",
         stage="title",
     )
     return True
