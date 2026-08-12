@@ -915,6 +915,7 @@ class _VacancyDetailScreenState extends ConsumerState<VacancyDetailScreen>
                           p2: p2,
                           vacancyId: widget.vacancyId,
                           vacancy: widget.vacancy,
+                          analyzedAt: analysis.analyzedAt,
                           salary: widget.vacancy?.salary,
                           onSalaryChanged: (v) async {
                             final apiUrl = ref.read(settingsProvider).valueOrNull?.apiUrl ?? 'http://localhost:8080';
@@ -1896,6 +1897,7 @@ class _VacancyHero extends StatelessWidget {
   final VacancyListItem? vacancy;
   final int vacancyId;
   final String? salary;
+  final String? analyzedAt;
   final Future<void> Function(String)? onSalaryChanged;
 
   const _VacancyHero({
@@ -1904,6 +1906,7 @@ class _VacancyHero extends StatelessWidget {
     required this.vacancyId,
     this.vacancy,
     this.salary,
+    this.analyzedAt,
     this.onSalaryChanged,
   });
 
@@ -1913,7 +1916,6 @@ class _VacancyHero extends StatelessWidget {
     final role    = p1?.role.isNotEmpty == true ? p1!.role : (vacancy?.role ?? '');
     final company = p1?.company.isNotEmpty == true ? p1!.company : (vacancy?.company ?? '');
     final publishedAt = vacancy?.publishedAt;
-    final updatedAt   = vacancy?.updatedAt;
     // category moves to Quick Overview block, not used in hero
 
     return Column(
@@ -2017,16 +2019,16 @@ class _VacancyHero extends StatelessWidget {
                 ],
               ),
             ),
-            if (publishedAt != null || updatedAt != null) ...[
+            if (publishedAt != null || analyzedAt != null) ...[
               const SizedBox(width: 8),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   if (publishedAt != null)
                     _PostedChip(publishedAt: publishedAt, cs: cs),
-                  if (updatedAt != null) ...[
+                  if (analyzedAt != null) ...[
                     if (publishedAt != null) const SizedBox(height: 4),
-                    _AnalyzedChip(updatedAt: updatedAt, cs: cs),
+                    _AnalyzedChip(analyzedAt: analyzedAt!, cs: cs),
                   ],
                 ],
               ),
@@ -2295,16 +2297,20 @@ class _PostedChip extends StatelessWidget {
 }
 
 class _AnalyzedChip extends StatelessWidget {
-  final String updatedAt;
+  // Real Phase 2 completion time (pipeline_runs.finished_at), NOT
+  // vacancy.updatedAt — updatedAt is bumped by unrelated writes (applied/
+  // starred toggle, salary edit, republish bump, dedup, ...) and falsely
+  // implies re-analysis. Found live 2026-08-11, vacancy #597.
+  final String analyzedAt;
   final ColorScheme cs;
 
-  const _AnalyzedChip({required this.updatedAt, required this.cs});
+  const _AnalyzedChip({required this.analyzedAt, required this.cs});
 
   static DateTime _asUtc(String iso) => parseBackendUtc(iso).toLocal();
 
   String _fmtLocal() {
     try {
-      final dt  = _asUtc(updatedAt);
+      final dt  = _asUtc(analyzedAt);
       final dd  = dt.day.toString().padLeft(2, '0');
       final mm  = dt.month.toString().padLeft(2, '0');
       final yy  = dt.year.toString();
@@ -2312,7 +2318,7 @@ class _AnalyzedChip extends StatelessWidget {
       final min = dt.minute.toString().padLeft(2, '0');
       return '$dd.$mm.$yy $hh:$min';
     } catch (_) {
-      return updatedAt;
+      return analyzedAt;
     }
   }
 

@@ -137,8 +137,13 @@ class VacancyListItem {
 class VacancyAnalysis {
   final Phase1Data? p1;
   final Phase2Data? p2;
+  // Real Phase 2 completion time (pipeline_runs), NOT vacancy.updatedAt —
+  // updatedAt is bumped by unrelated writes (applied/starred toggle, salary
+  // edit, republish bump, dedup, ...) and falsely implies re-analysis.
+  // Found live 2026-08-11, vacancy #597.
+  final String? analyzedAt;
 
-  const VacancyAnalysis({this.p1, this.p2});
+  const VacancyAnalysis({this.p1, this.p2, this.analyzedAt});
 
   factory VacancyAnalysis.fromJson(Map<String, dynamic> json) {
     return VacancyAnalysis(
@@ -148,6 +153,7 @@ class VacancyAnalysis {
       p2: json['p2'] != null
           ? Phase2Data.fromJson(json['p2'] as Map<String, dynamic>)
           : null,
+      analyzedAt: json['analyzed_at'] as String?,
     );
   }
 }

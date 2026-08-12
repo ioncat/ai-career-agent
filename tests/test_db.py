@@ -127,6 +127,45 @@ async def test_update_pipeline_run_error():
     assert "timeout" in runs[0]["error_message"]
 
 
+@pytest.mark.asyncio
+async def test_get_last_phase_completion_returns_finished_at():
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/23/")
+    run_id = await database.insert_pipeline_run(vid, "phase2")
+    await database.update_pipeline_run(run_id, "done", result_path="vacancies/job-23/analysis.md")
+
+    result = await database.get_last_phase_completion(vid, "phase2")
+    assert result is not None
+
+
+@pytest.mark.asyncio
+async def test_get_last_phase_completion_none_when_no_run():
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/24/")
+    result = await database.get_last_phase_completion(vid, "phase2")
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_get_last_phase_completion_ignores_error_runs():
+    """A failed run must not be reported as 'last analyzed' — only 'done' counts."""
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/25/")
+    run_id = await database.insert_pipeline_run(vid, "phase2")
+    await database.update_pipeline_run(run_id, "error", error_message="LLM timeout")
+
+    result = await database.get_last_phase_completion(vid, "phase2")
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_get_last_phase_completion_ignores_other_phase():
+    """phase1 completion must not leak into a phase2 query."""
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/26/")
+    run_id = await database.insert_pipeline_run(vid, "phase1")
+    await database.update_pipeline_run(run_id, "done", result_path="vacancies/job-26/jd.md")
+
+    result = await database.get_last_phase_completion(vid, "phase2")
+    assert result is None
+
+
 # ── users ─────────────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio

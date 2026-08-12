@@ -216,6 +216,37 @@ async def test_analysis_endpoint_valid_against_pydantic(client, db_with_vacancie
     assert aj.p2 is not None
 
 
+@pytest.mark.asyncio
+async def test_analysis_endpoint_includes_analyzed_at_from_pipeline_runs(client, db_with_vacancies):
+    """analyzed_at must come from pipeline_runs (real Phase 2 completion),
+    not vacancies.updated_at — regression for 2026-08-11, vacancy #597."""
+    database.configure(db_with_vacancies / "test.db")
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/12", user_id=1)
+    aj_data = json.loads(_make_analysis_json())
+    await database.patch_analysis_json(vid, "p1", aj_data["p1"])
+    await database.patch_analysis_json(vid, "p2", aj_data["p2"])
+    run_id = await database.insert_pipeline_run(vid, "phase2")
+    await database.update_pipeline_run(run_id, "done", result_path="vacancies/job-12/analysis.md")
+
+    resp = client.get(f"/api/vacancies/{vid}/analysis")
+    body = resp.json()
+    assert body["analyzed_at"] is not None
+
+
+@pytest.mark.asyncio
+async def test_analysis_endpoint_omits_analyzed_at_without_pipeline_run(client, db_with_vacancies):
+    """No phase2 pipeline_runs row (e.g. legacy data) → key absent, not null."""
+    database.configure(db_with_vacancies / "test.db")
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/13", user_id=1)
+    aj_data = json.loads(_make_analysis_json())
+    await database.patch_analysis_json(vid, "p1", aj_data["p1"])
+    await database.patch_analysis_json(vid, "p2", aj_data["p2"])
+
+    resp = client.get(f"/api/vacancies/{vid}/analysis")
+    body = resp.json()
+    assert "analyzed_at" not in body
+
+
 # ── GET /api/vacancies/{id}/cv ────────────────────────────────────────────────
 
 @pytest.mark.asyncio
