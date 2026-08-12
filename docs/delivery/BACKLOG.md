@@ -13,6 +13,27 @@
 
 ## 📌 Now
 
+### 🟡 P2 — Capture `Company website` (Djinni + DOU company profile pages), cached per-company, fetched off the critical path (added 2026-08-12)
+**What:** user wants the candidate-facing company site URL captured alongside JD data — useful for research before applying. Investigated three sources live:
+1. The ad-hoc "Company website:" + "DOU company page:" block shown directly on some Djinni vacancy pages, next to "Connected to ATS" — **confirmed login-gated** (user checked: only visible logged in). Off the table, same reason as the earlier requirements-sidebar ticket's rejected personalized-match card.
+2. Djinni's own company PROFILE page (`/jobs/company-{slug}/`, linked from the vacancy page's company name) — has a public, unauthenticated `Веб-сайт:` field (`a[data-analytics="company_page"]`) — confirmed live, e.g. Gypsy Collective → `https://www.gypsy.co/`.
+3. DOU's company PROFILE page (`/companies/{slug}/`, derivable directly from the vacancy URL by stripping `/vacancies/{id}` — no DOM lookup needed) — has a public `.company-info .site a[href]` field — confirmed live, e.g. Paybis → `https://paybis.com`.
+Sources 2+3 are real and unauthenticated, but require a **second HTTP request** (to the company profile page, separate from the vacancy page) — `crawler.py`'s polite 2-5s delay would double per-vacancy fetch time if done inline/blocking.
+**Optimization plan (user-approved, 2026-08-12):**
+- **Cache per company, not per vacancy** — new `database.get_company_website(company, user_id)` looks up an existing non-null `company_website` from any prior vacancy with the same `company` name before ever fetching; the second HTTP request only happens for a genuinely new, never-seen company. Companies post multiple vacancies over time, so most fetches skip the second request entirely after the first.
+- **Off the critical path** — fetched as a fire-and-forget background task (`asyncio.create_task`) AFTER the vacancy is already saved/visible in Inbox, not inside `fetch_jd()`'s awaited return path. The card appears immediately; `company_website` backfills a few seconds later. Fail-open — any error just logs, never surfaces as a user-facing failure (same philosophy as the pre-filter).
+**Scope (all layers):**
+1. `db/schema.sql` + migration: new `vacancies.company_website TEXT` column. `db/database.py`: `update_vacancy_fields()` gains the param; new `get_company_website(company, user_id)` cache lookup.
+2. `services/parser/config.py` + `app.py`: extract `company_profile_url` from the vacancy page during the existing `/parse` call (djinni: DOM link `a[href*="/jobs/company-"]`; DOU: derived from the vacancy URL string, no DOM lookup) — added to `ParsedDocument`. New lightweight `POST /company-website` endpoint (input: profile URL) that fetches just that page and extracts the site link (djinni: `a[data-analytics="company_page"]`; DOU: `.company-info .site a`) — not a full markdown parse, just one string out.
+3. `contracts/parsed_document.py` + `adapters/parser_adapter.py`: mirror `company_profile_url`; new `ParserAdapter.fetch_company_website(url)`.
+4. `tools/cv_fetch_jd.py`: after the existing save flow, fire-and-forget task — cache lookup first, else calls the new adapter method, persists via `update_vacancy_fields`.
+5. `web/api.py`: expose `company_website` in vacancy list/detail responses.
+6. Flutter: `VacancyListItem`/model gains `companyWebsite`; clickable link in the header (same `launchUrl` pattern as the existing "Open JD" button).
+7. Tests across all of the above + one more live end-to-end verification against a real fetched page (same method used for the requirements-sidebar ticket).
+**Estimate:** ~3.5-4.5h (parser selectors + new endpoint ~60-75min; adapter/contracts ~20-30min; DB migration + cache lookup ~30-40min; fire-and-forget wiring in cv_fetch_jd.py ~40-50min; API expose ~15-20min; Flutter model+UI ~45-60min; live verification ~15-20min). Larger than the requirements-sidebar ticket — spans parser, DB, adapter, backend API, and Flutter, not just parser+prefilter.
+
+---
+
 ### 🧊 Icebox — deterministic Stage 1 checks for years/remote/countries (fast follow to the Djinni requirements-sidebar delivery, 2026-08-12)
 **What:** the requirements sidebar (years experience, remote-only, countries) now flows into `JD.md` (delivered 2026-08-12 — see CHANGELOG), but only the English-level line got a dedicated deterministic Stage 1 check so far. Phase 1+2 already sees the rest as normal JD context, so this isn't urgent — worth a fast follow only if it proves valuable in practice (same `apply_title_stage`/`apply_language_stage` pattern in `tools/cv_prefilter.py`).
 
