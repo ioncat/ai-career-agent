@@ -13,6 +13,28 @@
 
 ## 📌 Now
 
+### 🟠 P1 — Djinni's structured requirements sidebar (English level, years, remote, countries) never reaches JD.md — pre-filter is blind to it unless the JD prose happens to repeat it (found 2026-08-11)
+**What:** every Djinni vacancy page renders an unauthenticated `<aside><div class="card card-body">` sidebar with the poster's structured criteria — confirmed live on `/jobs/842445-product-manager-igaming`:
+```
+Виключно від 4 років досвіду       (years, deterministic)
+Тільки віддалено                    (remote-only)
+Країни Європи та Україна            (countries)
+Англійська B1 – Середній            (span.csc--language: .csc__primary "Англійська" / .csc__secondary "B1 – Середній")
+Українська Носій мови
+Product Manager                     (category)
+Зайнятість: Fulltime
+Домен: Advertising / Marketing
+```
+`services/parser/config.py`'s djinni.co `content_selector` (`.job-post__description`) does NOT include this — confirmed via DOM inspection (`desc.contains(reqNode) === false`, it's a sibling column, not nested). It never reaches `JD.md`, so neither Phase 1+2 nor the existing Stage 2 content pre-filter (`tools/cv_prefilter.py`, EPIC-27 — which already has `english: C1, C2, or C1-C2 required (mine: B2/Upper-Intermediate)` as a configured Critical Blocker line in `PROFILE.md`) ever sees it unless the JD *body* prose happens to restate the same requirement — the #1120 IGaming example didn't (zero occurrences of "English" in the body text at all), even though this vacancy structurally requires English B1.
+**Distinct from the login-gated block:** Djinni also renders a *second*, separately-classed `class="card card-body mb-1"` block that compares these same requirements against the *logged-in* user's own Djinni profile (✓/✗ per line) — that one genuinely requires an authenticated session and is explicitly out of scope (rejected — fragile, ToS risk). This ticket is about the first, always-public sidebar only.
+**Fix direction:**
+1. `services/parser/config.py`: add a second selector for djinni.co (the `aside .card.card-body` sidebar) alongside the existing `content_selector`; `services/parser/app.py:_parse_html()` merges its text into the markdown (clearly delimited, e.g. under a `## Vacancy Requirements` heading) before/after the JD body. New test file `services/parser/test_app.py` (no test coverage exists for this service currently) covering the merge.
+2. Once present in `JD.md`, the English-level line is now in a **consistent, structured format** (`{Language} {CEFR level} – {label}`) rather than free prose — worth a new deterministic Stage 1 check (same pattern as `apply_title_stage` in `tools/cv_prefilter.py`) that parses it and compares against `PROFILE.md`'s `english:` blocker line via a CEFR ordering (A1<A2<B1<B2<C1<C2), auto-triggered same as the title check (not manual-only like today's Stage 2). Handle both UA-locale ("Англійська") and EN-locale ("English") renders — fetch's `Accept-Language` header currently mixes both (`crawler.py:_random_headers()`).
+**Explicitly out of scope for this ticket:** years/remote/countries checks — the sidebar text will already flow into Phase 1+2's normal context once (1) ships, no new code needed for those; a deterministic Stage 1 check for them (like the language one) can be a fast follow if it proves valuable, not bundled here.
+**Estimate:** ~2-2.5h (parser selector + merge + new test file ~45min; CEFR-ordering language check + locale handling ~60-75min; wiring into the existing auto-check-title call site + `tools/cv_prefilter.py` tests ~30-45min).
+
+---
+
 ### ★ Systemic: CV self-review/audit phases optimize for JD-surface-matching, not ground truth — 4 known failure classes, none structurally fixed (added 2026-07-30) — HIGH PRIORITY
 **Orienting note, not a new ticket** — every existing "check" step (Phase 3.5 self-review, Phase 3.6 Signal Audit) is built to optimize keyword/tone match against the JD, not to verify the draft against ground truth or its own house rules. That's the one root mechanism behind four separate, currently-open failure classes — which is why manual per-vacancy polish keeps costing real time every session despite all the automated analysis passes that already exist.
 1. **Fact fabrication via JD-vocabulary bleed** — self-review has no PROFILE.md grounding check. See "Phase 3 CV draft fabricates experience..." ticket directly below (MAX PRIORITY, #844). Fresh evidence 2026-07-30: vacancy #934's HostiServer paragraph gained "Facilitated stakeholder workshops" — literally lifted from the JD's own responsibilities line, zero backing anywhere in PROFILE.md — caught only by the user's manual re-read, not by any pipeline step.
@@ -25,13 +47,8 @@
 
 ---
 
-### 🟡 P2 — "Analyzed <date>" chip lies — reads generic `updated_at`, not real Phase 2 completion time (found 2026-08-11, vacancy #597)
-**What:** `_AnalyzedChip` (`flutter/lib/screens/vacancy_detail_screen.dart:2029`) is fed `vacancy.updatedAt` and labeled "Analyzed {date}". `updated_at` is a generic last-touched timestamp bumped by ~10 unrelated write paths in `db/database.py` (applied toggle, starred toggle, salary edit, blocker check, republish bump, dedup `set_duplicate_of`, status transitions, etc.) — none of which mean "Phase 1+2 ran." Confirmed live on #597: chip showed "Analyzed 11.08.2026 16:38" (today), but `pipeline_runs` has no phase2 row newer than 2026-07-10 — the real last analysis. Exact trigger for today's `updated_at` bump not identified (agent.log doesn't log PATCH requests at all — separate gap, see below) but irrelevant to the fix: *any* future unrelated touch reproduces the same false claim, by design.
-**Fix direction:**
-- Backend: vacancy-detail response should include the real Phase 2 completion time — query `pipeline_runs` for the latest `phase='phase2' AND status='done'` row's `finished_at` (column already exists, no migration needed; historical data already populated for most vacancies).
-- Flutter: add `analyzedAt` to the model backing the detail screen, thread it into `_AnalyzedChip` instead of `updatedAt`; rename the widget's param `updatedAt` → `analyzedAt` so a future reuse can't silently wire the wrong field again. Vacancies with no phase2 pipeline_runs row (pre-table-existence legacy rows) → hide the chip, same as the existing null-guard.
-**Also found, smaller/separate:** `agent.log` has zero PATCH-request logging — made root-causing "what touched this row" for #597 impossible via logs alone, had to reason from code paths only. Worth a one-line addition (log vacancy_id + endpoint on every state-mutating PATCH) next time this file is touched — not blocking this ticket.
-**Estimate:** ~45-60 min (small API query addition + Flutter field wiring + rename + 1-2 tests).
+### 🧊 Icebox — `agent.log` has zero PATCH-request logging (found 2026-08-11, investigating vacancy #597)
+**What:** none of the state-mutating `PATCH /api/vacancies/{id}/*` endpoints (applied, starred, salary, ...) log anything — made root-causing "what touched this row's `updated_at`" for #597 impossible via logs alone, had to reason from code paths only. Worth a one-line addition (log vacancy_id + endpoint on every state-mutating PATCH) next time `web/api.py` is touched. Not blocking anything currently.
 
 ---
 
