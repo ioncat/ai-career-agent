@@ -6,6 +6,10 @@
 
 ---
 
+## 2026-08-13
+
+- **Bug fix — Applied folder sorted a just-applied vacancy second, not first.** Found live: user clicked "applied" on #1139, it landed below #1149 instead of at the top. Root cause: the Applied folder sorted by `published_at` (when the JOB was posted) — a 2026-07-26 decision that made sense before there was any "when did I apply" signal to sort by, but never actually answered the question the folder exists to answer. New `vacancies.applied_at` column, set the moment `set_vacancy_applied()` toggles `applied` on (cleared back to `NULL` on un-apply) — deliberately its own field, not reusing `updated_at`, which is bumped by ~10 unrelated write paths (same class of bug as the "Analyzed" chip fix, 2026-08-12). `folderVacanciesProvider`'s Applied branch now sorts by `appliedAt` descending, superseding the 2026-07-26 published_at decision. 4 new tests (2 backend `applied_at` set/clear, 2 Flutter sort). DB audit: 65 already-applied vacancies had `applied_at IS NULL` (predate this column) — backfilled from `updated_at` (the closest available proxy; the true original apply moment isn't recoverable), DB backed up first (`agent.db.20260813_202307_pre_applied_at_backfill.bak`).
+
 ## 2026-08-12
 
 - **Company website captured (Djinni + DOU), cached per company, fetched off the critical path.** User wanted the company site URL alongside JD data. Investigated 3 sources live: Djinni's ATS-connected inline "Company website:" block is login-gated (confirmed by user, out of scope, same class of blocker as the earlier requirements-sidebar personalized-match card) — but both sites' company PROFILE pages (a separate page from the vacancy, linked from the company name) have a real public, unauthenticated website field, confirmed against real fetched pages: Gypsy Collective → `https://www.gypsy.co/` (Djinni), Paybis → `https://paybis.com` (DOU).

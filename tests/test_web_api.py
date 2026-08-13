@@ -592,6 +592,31 @@ async def test_set_applied_false(client):
 
 
 @pytest.mark.asyncio
+async def test_set_applied_true_sets_applied_at(client):
+    """applied_at (2026-08-13) — the Applied folder sorts by this, not
+    published_at/updated_at. Must be set the moment applied is toggled on."""
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/502/")
+
+    resp = client.patch(f"/api/vacancies/{vid}/applied", json={"applied": True})
+    assert resp.status_code == 200
+
+    row = await database.get_vacancy_by_id(vid)
+    assert row["applied_at"] is not None
+
+
+@pytest.mark.asyncio
+async def test_set_applied_false_clears_applied_at(client):
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/503/")
+    await database.set_vacancy_applied(vid, True)
+
+    resp = client.patch(f"/api/vacancies/{vid}/applied", json={"applied": False})
+    assert resp.status_code == 200
+
+    row = await database.get_vacancy_by_id(vid)
+    assert row["applied_at"] is None
+
+
+@pytest.mark.asyncio
 async def test_set_applied_not_found(client):
     """PATCH /api/vacancies/9999/applied returns 404 for missing vacancy."""
     resp = client.patch("/api/vacancies/9999/applied", json={"applied": True})

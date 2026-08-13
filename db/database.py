@@ -200,6 +200,12 @@ async def init_db() -> None:
             # unauthenticated), fetched off the critical path and cached per
             # company (2026-08-12). NULL = not yet fetched / no match found.
             "ALTER TABLE vacancies ADD COLUMN company_website TEXT",
+            # When the user marked applied=1 — the Applied folder sorts by
+            # this, not published_at (job posting date, unrelated to when the
+            # user applied) or updated_at (bumped by ~10 unrelated write
+            # paths). Found live 2026-08-13: a vacancy applied to seconds ago
+            # showed up second, not first. NULL = never applied / un-applied.
+            "ALTER TABLE vacancies ADD COLUMN applied_at TEXT",
         ]:
             try:
                 await db.execute(migration)
@@ -790,10 +796,20 @@ async def update_published_at(vacancy_id: int, published_at: str) -> None:
 
 
 async def set_vacancy_applied(vacancy_id: int, applied: bool) -> None:
-    """Set applied flag for a vacancy. 1 = CV submitted, 0 = not submitted."""
+    """Set applied flag for a vacancy. 1 = CV submitted, 0 = not submitted.
+
+    applied_at records the moment this was actually toggled — the Applied
+    folder sorts by it (not published_at, which is when the JOB was posted,
+    not when the user applied to it; not updated_at, which is bumped by ~10
+    unrelated write paths — same class of bug as the "Analyzed" chip fix,
+    2026-08-12). Cleared back to NULL when un-applying, since it's no longer
+    a real "applied" event.
+    """
+    applied_at_expr = "datetime('now')" if applied else "NULL"
     async with get_db() as db:
         await db.execute(
-            "UPDATE vacancies SET applied = ?, updated_at = datetime('now') WHERE id = ?",
+            f"UPDATE vacancies SET applied = ?, applied_at = {applied_at_expr}, "
+            "updated_at = datetime('now') WHERE id = ?",
             (1 if applied else 0, vacancy_id),
         )
         await db.commit()
