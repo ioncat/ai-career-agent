@@ -175,11 +175,19 @@ final vacancyListProvider =
 // Folders where "freshest" means our own last action on the vacancy
 // (analysis finished / CV+cover generated), not how recently the JD itself
 // was posted — sorted by updated_at instead of the backend's default
-// published_at order. Inbox/Applied/Archive keep published_at (explicit
-// user decision, 2026-07-26): Inbox is about JD freshness on the market,
-// Applied/Archive are terminal states where "when we acted on it" is less
-// useful than "which JD is newest" for browsing.
+// published_at order. Inbox/Archive keep published_at: Inbox is about JD
+// freshness on the market, Archive is a terminal state where "which JD is
+// newest" beats "when we acted on it" for browsing.
 const kUpdatedAtSortedFolders = {'analyzed', 'processed'};
+
+int _compareByNullableIso(String? aIso, String? bIso) {
+  final aTime = aIso != null ? parseBackendUtc(aIso) : null;
+  final bTime = bIso != null ? parseBackendUtc(bIso) : null;
+  if (aTime == null && bTime == null) return 0;
+  if (aTime == null) return 1;
+  if (bTime == null) return -1;
+  return bTime.compareTo(aTime); // descending — most recent first
+}
 
 final folderVacanciesProvider =
     Provider.family<List<VacancyListItem>, String>((ref, folder) {
@@ -187,14 +195,15 @@ final folderVacanciesProvider =
   if (state == null) return [];
   final filtered = state.vacancies.where((v) => _folderMatch(v, folder)).toList();
   if (kUpdatedAtSortedFolders.contains(folder)) {
-    filtered.sort((a, b) {
-      final aTime = a.updatedAt != null ? parseBackendUtc(a.updatedAt!) : null;
-      final bTime = b.updatedAt != null ? parseBackendUtc(b.updatedAt!) : null;
-      if (aTime == null && bTime == null) return 0;
-      if (aTime == null) return 1;
-      if (bTime == null) return -1;
-      return bTime.compareTo(aTime); // descending — most recently updated first
-    });
+    filtered.sort((a, b) => _compareByNullableIso(a.updatedAt, b.updatedAt));
+  } else if (folder == 'applied') {
+    // applied_at (2026-08-13) — when the user actually marked it applied,
+    // not published_at (job posting date, unrelated) or updated_at (bumped
+    // by ~10 unrelated write paths, same class of bug as the "Analyzed"
+    // chip fix). Found live: a vacancy applied to seconds ago showed up
+    // second, not first. Supersedes the 2026-07-26 published_at decision —
+    // that one didn't have an applied_at field to sort by yet.
+    filtered.sort((a, b) => _compareByNullableIso(a.appliedAt, b.appliedAt));
   }
   return filtered;
 });

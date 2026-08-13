@@ -27,6 +27,9 @@ class VacancyListItem {
   final String? analysisError;
   final bool starred;
   final bool applied;
+  // When applied was actually toggled on — Applied folder sorts by this,
+  // not publishedAt/updatedAt (2026-08-13). Null when never applied.
+  final String? appliedAt;
   final String? salary;
   final List<String> roleTags;
   final int? duplicateOf;
@@ -64,6 +67,7 @@ class VacancyListItem {
     this.analysisError,
     this.starred = false,
     this.applied = false,
+    this.appliedAt,
     this.salary,
     this.roleTags = const [],
     this.duplicateOf,
@@ -97,6 +101,7 @@ class VacancyListItem {
       analysisError: json['analysis_error'] as String?,
       starred: json['starred'] as bool? ?? false,
       applied: json['applied'] as bool? ?? false,
+      appliedAt: json['applied_at'] as String?,
       salary: json['salary'] as String?,
       roleTags: _parseStringList(json['role_tags']),
       duplicateOf: json['duplicate_of'] as int?,
@@ -129,6 +134,7 @@ class VacancyListItem {
         'analysis_error': analysisError,
         'starred': starred,
         'applied': applied,
+        'applied_at': appliedAt,
         'salary': salary,
         'role_tags': roleTags,
         'duplicate_of': duplicateOf,
