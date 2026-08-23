@@ -1101,10 +1101,19 @@ async def api_vacancy_restore(vacancy_id: int):
 
     Restores to 'analyzed' if analysis_json exists, otherwise 'fetched'.
     Preserves all analysis data — only status changes.
+
+    Exception: a vacancy declined by give_up_fetch (MAX_FETCH_ATTEMPTS reached)
+    has no markdown_path — JD.md was never written. Restoring those straight to
+    'fetched' left the row claiming "ready" with no JD to show, surfacing as
+    "Failed to load JD: Exception: JD not found" in Flutter (found live 2026-08-15,
+    v#1154). Route those to 'queued' instead, so RSSWatcher retries the fetch.
     """
     row = await database.get_vacancy_by_id(vacancy_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Vacancy not found")
+    if not row["analysis_json"] and not row["markdown_path"]:
+        await database.requeue_fetch(vacancy_id)
+        return {"id": vacancy_id, "status": "queued"}
     restore_status = "analyzed" if row["analysis_json"] else "fetched"
     await database.update_vacancy_status(vacancy_id, restore_status)
     return {"id": vacancy_id, "status": restore_status}
