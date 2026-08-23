@@ -650,6 +650,22 @@ async def give_up_fetch(vacancy_id: int, error: str | None) -> None:
         await db.commit()
 
 
+async def requeue_fetch(vacancy_id: int) -> None:
+    """Re-queue a vacancy that gave up fetching (status='declined', no markdown_path).
+
+    Sets status='queued' (picked up by RSSWatcher._poll_once), resets
+    fetch_attempts to 0 (otherwise the next single failure would immediately
+    hit MAX_FETCH_ATTEMPTS again and re-decline it) and clears analysis_error.
+    """
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE vacancies SET status = 'queued', fetch_attempts = 0, "
+            "analysis_error = NULL, updated_at = datetime('now') WHERE id = ?",
+            (vacancy_id,),
+        )
+        await db.commit()
+
+
 async def clear_analysis_error(vacancy_id: int) -> None:
     """Clear analysis_error when vacancy is re-queued for analysis."""
     async with get_db() as db:
