@@ -1,6 +1,6 @@
 # career-agent — Backlog
 
-> Last updated: 2026-08-12
+> Last updated: 2026-08-15
 > Rules: [documentation-conventions.md](documentation-conventions.md) · History: [CHANGELOG.md](CHANGELOG.md) · Specs: [Epics/](Epics/)
 
 **Priority legend:**
@@ -376,6 +376,17 @@ No dual-availability state — the button's visibility is a direct, deterministi
 ---
 
 ## 🐛 Bugs
+
+### Phase 1+2 never sees `vacancies.salary` — analysis calls comp "not stated" when it's actually known (found 2026-08-15, vacancy #1154)
+**What:** `vacancies.salary` (e.g. `"5000"` for #1154, N1X — extracted from the RSS listing/site metadata, not JD body text) is never passed into Phase 1/2. `tools/cv_analyze.py:69-117` builds the LLM input from `jd_text` (raw `JD.md`) alone; `prompts/pm|generic/phase1_analysis.md`'s own `## Input` section says only "the full text of the job description" — no salary field anywhere in the prompt chain. #1154's JD.md genuinely has no salary mention in its body (confirmed via grep), so Phase 2 correctly reported "no comp stated" from *its own input* — but the DB already had the real number the whole time, unused. User caught it live: assistant repeated the "no comp stated" hidden-risk verbatim without cross-checking the `salary` field already visible in the same `vacancy_track.py get` output.
+**Fix direction:** `tools/cv_analyze.py` should include `vacancy["salary"]` (when non-null) in the Phase 1 input context (e.g. a `**Listed salary:** {salary}` line prepended to `jd_text`), and `phase1_analysis.md`'s `## Input` section updated to document it — so comp-related hidden-risk/warning text reflects what the system actually knows, not just what's in the JD body.
+**Found via:** user pointed out the salary discrepancy after re-reading the assistant's own risk summary for #1154 against the DB record already fetched earlier in the same session.
+
+### Stage 2 Critical Blocker prefilter can false-positive when JD's required level equals candidate's own (found 2026-08-15, vacancy #795)
+**What:** `prompts/pm|generic/prefilter.md` Stage 2 LLM check flagged #795 BLOCKED for "english: JD requires Upper-Intermediate, candidate is B2" — but Upper-Intermediate *is* B2 (candidate's own level), and the JD literally said "Upper-Intermediate або вище" (or higher), which the candidate meets, not fails. PROFILE.md's `## Critical Blockers` only wants a block for strictly-above-B2 (C1/C2) — the LLM reacted to an English-requirement mention without checking the specific level against the rule.
+**Why:** Stage 1's deterministic regex (`tools/cv_prefilter.py:_check_english_level`) only fires on a literal CEFR code merged from Djinni's structured sidebar — #795 predates that merge (no `## Vacancy Requirements` section in its JD.md), so it fell through to Stage 2 LLM judgment, which got it wrong.
+**Fix direction:** tighten the english-blocker instruction in `prompts/pm|generic/prefilter.md` to spell out the CEFR order + "Upper-Intermediate = B2" equivalence and require the JD's stated level to be strictly higher than the candidate's, not just present.
+**Found via:** user asking why Djinni pinged them about #795; traced JD.md text + PROFILE.md Critical Blockers rule; false-positive flag cleared on #795 directly in DB.
 
 ### Check other past CVs for "SaaS platform" mischaracterization of HostiServer (found 2026-07-27)
 **Context:** vacancy #828's CV said "SaaS platform" for HostiServer, but the platform (billing, CRM, ticketing, DMCA compliance) was internal tooling for HostiServer's own hosting operations — never sold externally as SaaS. PROFILE.md's own text already said "ERP-like platform for operational process automation"; CV generation had drifted from it. Fixed for #828 (`internal operational platform`); other past vacancy CVs referencing HostiServer likely carry the same inaccurate framing and weren't audited.
