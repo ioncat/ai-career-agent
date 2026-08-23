@@ -46,6 +46,7 @@ Most applicants are generic candidates. The HM's first screening question is: **
 - **No narrative** — not "I find this role interesting because..." — show, don't explain interest
 - **Closing line gender:** adapt to candidate (рада/радий — read from PROFILE.md context)
 - **NEVER use em-dashes (—).** Use a period, comma, or "and"/"because" instead. A chained em-dash pair inside one sentence is a strong, well-known AI-writing tell — this is a personal message, it should read like one.
+- **Write at B2 English level — plain, direct vocabulary and sentence structure, no idiom.** Candidate's actual English level is B2 (per PROFILE.md → Settings). Avoid idiomatic/literary phrasing that signals native-level fluency — "safety net", "closing the loop", "ends up owning", "no stone unturned", chained metaphors, or any turn of phrase a B2 speaker wouldn't naturally produce or confidently defend if asked about it in an interview. This includes any illustrative example phrases inside this prompt file itself — those show the *pattern*, not text to reproduce; write an original line in the same spirit, in plain B2 words. Found recurring across multiple covers (e.g. vacancy #1169).
 
 ---
 

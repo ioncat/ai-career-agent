@@ -96,6 +96,14 @@ Run this as an explicit, separate pass over the CV draft — not a general impre
 
 ---
 
+## B2 Language Check (internal only — do NOT output label, but MANDATORY)
+
+Candidate's actual English level is B2 (per PROFILE.md → Settings). Read every sentence in SUMMARY and EXPERIENCE for idiomatic or literary phrasing that signals native-level fluency — e.g. "safety net", "closing the loop", "ends up owning", "no stone unturned", chained metaphors, or any turn of phrase a B2 speaker wouldn't naturally produce or confidently defend if asked about it in an interview. Also flag phrasing lifted near-verbatim from this prompt file's own examples/templates — a recurring failure mode where an illustrative example gets reproduced instead of generating an original equivalent.
+
+**If found: add to ❌ (not ⚠️/🔧) and rewrite in plain, direct B2 vocabulary before output.** Found recurring across multiple CVs/covers (e.g. vacancy #1169) — treat as a hard gate, not a scan-and-hope pass, same class of check as the Voice Check above.
+
+---
+
 ## Company Tone & Positioning Check (internal only — do NOT output label)
 
 1. **Detect company type** from JD: `enterprise | scaleup | startup | founder-led`
