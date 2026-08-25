@@ -169,6 +169,91 @@ def _check_english_level(jd_text: str) -> str | None:
     return f"english: JD requires {required}, candidate is {_CANDIDATE_ENGLISH_LEVEL}"
 
 
+# Same structured sidebar as _check_english_level above, different field:
+# the country-list line always sits directly before Djinni's
+# "Країни, де розглядаємо кандидатів" / "Countries where we consider
+# candidates" label (confirmed across a corpus scan of fetched JD.md files,
+# 2026-08-25 — values seen: "Весь світ" / "Весь мир" (no restriction),
+# "Україна", "Країни Європи та Україна" (both include the candidate),
+# "Країни ЄС", "Канада" (both exclude the candidate — this is the exact case
+# that slipped through on vacancy #1060, though that specific vacancy
+# predates the sidebar-merge feature entirely, 2026-08-12, so it never had
+# this section to check in the first place). Same fail-open contract as
+# _check_english_level: absent/unparseable/no-restriction all return None.
+_COUNTRY_LIST_RE = re.compile(
+    r"\*\*\s*([^*]+?)\s*\*\*\s*\n+\s*"
+    r"(?:Країни, де розглядаємо кандидатів|Countries where we consider candidates)",
+    re.IGNORECASE,
+)
+# No-restriction phrasing seen in the wild — checked before requiring an
+# explicit Ukraine/Україна mention, so "Весь світ" doesn't false-positive.
+_NO_RESTRICTION_WORDS = ("світ", "world", "anywhere")
+
+# Mirrors PROFILE.md's Critical Blockers `location:` line ("must reside in
+# EU/Poland/Romania/etc. (I'm in Ukraine)") — hardcoded here for the same
+# reason _CANDIDATE_ENGLISH_LEVEL is: deterministic code path, not a prompt.
+_CANDIDATE_COUNTRY_WORDS = ("україна", "ukraine")
+
+
+# Same section, the field one level up from the country line (both are
+# nested bullets right before the country label — see _COUNTRY_LIST_RE).
+# Observed values (corpus scan, 2026-08-25): "Тільки віддалено" (69 of 84
+# samples) is the clean case; the rest list Office and/or Hybrid alongside
+# Remote ("Офіс, Віддалена робота, Гібридний формат роботи", "Офіс або
+# віддалено", ...). Deliberately simple binary per explicit user instruction
+# — anything that isn't bare remote-only is a signal, no attempt yet to rank
+# "remote is one of three options" vs "office-or-remote" by severity.
+_REMOTE_FORMAT_RE = re.compile(
+    r"\*\*\s*([^*]+?)\s*\*\*\s*\n+\s*\*\s*\*\*\s*[^*]+?\s*\*\*\s*\n+\s*"
+    r"(?:Країни, де розглядаємо кандидатів|Countries where we consider candidates)",
+    re.IGNORECASE,
+)
+_REMOTE_ONLY_WORDS = ("тільки віддалено", "full remote", "remote only", "fully remote")
+
+
+def _check_remote_format(jd_text: str) -> str | None:
+    """Deterministic pre-check: does Djinni's structured requirements sidebar
+    list anything other than remote-only (Office, Hybrid)? Returns None if
+    clean, absent, or unparseable (fail-open), or a reason string to flag —
+    advisory only, same as the other structured-sidebar checks, not a hard
+    decline.
+    """
+    m = _REQUIREMENTS_SECTION_RE.search(jd_text)
+    if not m:
+        return None
+    section = jd_text[m.end():]
+    fmt_match = _REMOTE_FORMAT_RE.search(section)
+    if not fmt_match:
+        return None
+    fmt = fmt_match.group(1).strip()
+    low = fmt.lower()
+    if any(phrase in low for phrase in _REMOTE_ONLY_WORDS):
+        return None
+    return f"remote_format: JD lists {fmt!r} (not remote-only)"
+
+
+def _check_country(jd_text: str) -> str | None:
+    """Deterministic pre-check: does Djinni's structured requirements sidebar
+    list countries that exclude Ukraine? Returns None if clean, absent, or
+    unparseable (fail-open — never a false blocker), or a reason string to
+    short-circuit on.
+    """
+    m = _REQUIREMENTS_SECTION_RE.search(jd_text)
+    if not m:
+        return None
+    section = jd_text[m.end():]
+    country_match = _COUNTRY_LIST_RE.search(section)
+    if not country_match:
+        return None
+    countries = country_match.group(1).strip()
+    low = countries.lower()
+    if any(word in low for word in _NO_RESTRICTION_WORDS):
+        return None
+    if any(word in low for word in _CANDIDATE_COUNTRY_WORDS):
+        return None
+    return f"location: JD only considers candidates from {countries!r}, candidate is in Ukraine"
+
+
 def _parse_prefilter_output(text: str) -> tuple[bool, list[str], bool]:
     """Parse the BLOCKED:/REASONS: format.
 
@@ -250,6 +335,34 @@ async def apply_language_stage(vacancy_id: int, jd_text: str) -> bool:
     await database.set_vacancy_blocker(
         vacancy_id, True, [reason],
         raw_output=f"BLOCKED: yes\n- {reason}\n(deterministic language check — no LLM call)",
+        stage="title",
+    )
+    return True
+
+
+async def apply_location_stage(vacancy_id: int, jd_text: str) -> bool:
+    """Run the deterministic country + remote-format checks (Stage 1 — no
+    LLM) against Djinni's structured requirements sidebar and write a blocker
+    if either fails. Returns True if a blocker was set.
+
+    Both checks read the same "## Vacancy Requirements" section — bundled
+    into one stage/one write (not two separate apply_*_stage calls) so a
+    vacancy failing both doesn't have the first write overwritten by the
+    second, the same short-circuit concern apply_title_stage's docstring
+    describes for title-then-language.
+
+    Called automatically on vacancy ingestion (RSSWatcher) alongside
+    apply_title_stage/apply_language_stage, only when neither of those
+    already flagged it.
+    """
+    reasons = [r for r in (_check_country(jd_text), _check_remote_format(jd_text)) if r is not None]
+    if not reasons:
+        return False
+    log.info("apply_location_stage: v#%d flagged at ingestion (no LLM call): %s", vacancy_id, reasons)
+    await database.set_vacancy_blocker(
+        vacancy_id, True, reasons,
+        raw_output="BLOCKED: yes\n" + "\n".join(f"- {r}" for r in reasons)
+        + "\n(deterministic location check — no LLM call)",
         stage="title",
     )
     return True

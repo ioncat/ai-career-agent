@@ -11,11 +11,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from tools.cv_prefilter import (
+    _check_country,
     _check_english_level,
+    _check_remote_format,
     _check_title_allowlist,
     _check_title_domain_signals,
     _parse_prefilter_output,
     apply_language_stage,
+    apply_location_stage,
     apply_title_stage,
     cv_prefilter,
 )
@@ -315,6 +318,125 @@ async def test_apply_language_stage_no_write_when_within_candidate_level():
     mock_db = _mock_db()
     with patch("tools.cv_prefilter.database", mock_db):
         result = await apply_language_stage(1, _JD_WITH_B1)
+
+    assert result is False
+    mock_db.set_vacancy_blocker.assert_not_awaited()
+
+
+# ── _check_country / _check_remote_format (Djinni requirements sidebar,
+#    2026-08-25 — same structured section _check_english_level reads) ─────────
+
+_JD_EU_ONLY = (
+    "# Product Manager\n\n## Vacancy Requirements\n\n"
+    "  * **Тільки віддалено**\n"
+    "  * ** Країни ЄС **\n\n"
+    "Країни, де розглядаємо кандидатів\n\n"
+    "  * **Англійська B2 – Вище середнього**\n"
+)
+
+_JD_UKRAINE_AND_EUROPE = (
+    "# Product Manager\n\n## Vacancy Requirements\n\n"
+    "  * **Тільки віддалено**\n"
+    "  * ** Країни Європи та Україна **\n\n"
+    "Країни, де розглядаємо кандидатів\n\n"
+    "  * **Англійська B2 – Вище середнього**\n"
+)
+
+_JD_WORLDWIDE = (
+    "# Product Manager\n\n## Vacancy Requirements\n\n"
+    "  * **Тільки віддалено**\n"
+    "  * ** Весь світ **\n\n"
+    "Країни, де розглядаємо кандидатів\n\n"
+)
+
+_JD_HYBRID_FORMAT = (
+    "# Product Manager\n\n## Vacancy Requirements\n\n"
+    "  * **Офіс, Віддалена робота, Гібридний формат роботи**\n"
+    "  * ** Україна **\n\n"
+    "Країни, де розглядаємо кандидатів\n\n"
+)
+
+
+def test_check_country_flags_eu_only_for_ukraine_candidate():
+    reason = _check_country(_JD_EU_ONLY)
+    assert reason is not None
+    assert reason.startswith("location:")
+    assert "ЄС" in reason
+
+
+def test_check_country_no_flag_when_ukraine_included():
+    assert _check_country(_JD_UKRAINE_AND_EUROPE) is None
+
+
+def test_check_country_no_flag_worldwide():
+    assert _check_country(_JD_WORLDWIDE) is None
+
+
+def test_check_country_no_requirements_section_returns_none():
+    assert _check_country("# Product Manager\n\nJust a JD body.") is None
+
+
+def test_check_country_ignores_casual_mention_outside_requirements_section():
+    jd = "# Product Manager\n\nWe only hire from EU countries ideally.\n"
+    assert _check_country(jd) is None
+
+
+def test_check_remote_format_no_flag_when_remote_only():
+    assert _check_remote_format(_JD_EU_ONLY) is None
+
+
+def test_check_remote_format_flags_hybrid_office_listing():
+    reason = _check_remote_format(_JD_HYBRID_FORMAT)
+    assert reason is not None
+    assert reason.startswith("remote_format:")
+    assert "Гібридний" in reason
+
+
+def test_check_remote_format_no_requirements_section_returns_none():
+    assert _check_remote_format("# Product Manager\n\nJust a JD body.") is None
+
+
+# ── apply_location_stage (2026-08-25) ──────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_apply_location_stage_writes_blocker_on_country_mismatch():
+    mock_db = _mock_db()
+    with patch("tools.cv_prefilter.database", mock_db):
+        result = await apply_location_stage(1, _JD_EU_ONLY)
+
+    assert result is True
+    mock_db.set_vacancy_blocker.assert_awaited_once()
+    args, kwargs = mock_db.set_vacancy_blocker.call_args
+    assert args[0] == 1
+    assert args[1] is True
+    assert args[2][0].startswith("location:")
+    assert kwargs["stage"] == "title"
+
+
+@pytest.mark.asyncio
+async def test_apply_location_stage_writes_both_reasons_when_both_fail():
+    jd = (
+        "# Product Manager\n\n## Vacancy Requirements\n\n"
+        "  * **Офіс, Віддалена робота, Гібридний формат роботи**\n"
+        "  * ** Країни ЄС **\n\n"
+        "Країни, де розглядаємо кандидатів\n\n"
+    )
+    mock_db = _mock_db()
+    with patch("tools.cv_prefilter.database", mock_db):
+        result = await apply_location_stage(1, jd)
+
+    assert result is True
+    args, kwargs = mock_db.set_vacancy_blocker.call_args
+    assert len(args[2]) == 2
+    assert any(r.startswith("location:") for r in args[2])
+    assert any(r.startswith("remote_format:") for r in args[2])
+
+
+@pytest.mark.asyncio
+async def test_apply_location_stage_no_write_when_clean():
+    mock_db = _mock_db()
+    with patch("tools.cv_prefilter.database", mock_db):
+        result = await apply_location_stage(1, _JD_UKRAINE_AND_EUROPE)
 
     assert result is False
     mock_db.set_vacancy_blocker.assert_not_awaited()
