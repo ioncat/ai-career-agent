@@ -263,6 +263,37 @@ async def test_poll_once_skips_language_stage_when_markdown_path_missing():
 
 
 @pytest.mark.asyncio
+async def test_poll_once_runs_location_stage_when_title_and_language_pass_clean():
+    """apply_location_stage (2026-08-25) runs only after both prior
+    deterministic stages pass clean — same short-circuit chain as
+    apply_title_stage -> apply_language_stage."""
+    watcher, _ = _make_watcher()
+    row = _make_row(42, "https://djinni.co/jobs/42/", title="Product Manager")
+    mock_db = _mock_db([row])
+    mock_db.get_auto_check_title = AsyncMock(return_value=True)
+    mock_db.get_vacancy_by_id = AsyncMock(
+        return_value=_make_row(42, "https://djinni.co/jobs/42/", title="Product Manager", markdown_path="/tmp/JD.md")
+    )
+    mock_apply_title = AsyncMock(return_value=False)
+    mock_apply_language = AsyncMock(return_value=False)
+    mock_apply_location = AsyncMock(return_value=True)
+
+    with patch("core.rss_watcher.database", mock_db), \
+         patch("tools.cv_fetch_jd.fetch_jd", AsyncMock(return_value=42)), \
+         patch("tools.cv_prefilter.apply_title_stage", mock_apply_title), \
+         patch("tools.cv_prefilter.apply_language_stage", mock_apply_language), \
+         patch("tools.cv_prefilter.apply_location_stage", mock_apply_location), \
+         patch("pathlib.Path.exists", return_value=True), \
+         patch("pathlib.Path.read_text", return_value="## Vacancy Requirements\n\n** Країни ЄС **\n"), \
+         patch("core.rss_watcher.RSSWatcher._push_result", AsyncMock()):
+        await watcher._poll_once()
+
+    mock_apply_location.assert_awaited_once()
+    args = mock_apply_location.call_args.args
+    assert args[0] == 42
+
+
+@pytest.mark.asyncio
 async def test_poll_once_skips_when_no_queued():
     watcher, bot = _make_watcher()
     mock_db = _mock_db([])

@@ -4,6 +4,19 @@ Compare the JD below against `## Critical Blockers` above. Flag only explicit
 conflicts — not a fit assessment.
 
 Rules:
+- If a `## Vacancy Requirements` section is present, it's Djinni's own
+  structured requirements sidebar (poster-set, not JD-body prose) — treat
+  every line there as an authoritative hard requirement, not a casual
+  mention. English level, country/remote-format, and years-of-experience
+  are already checked deterministically before this prompt ever runs (see
+  `tools/cv_prefilter.py`'s `_check_english_level`/`_check_country`/
+  `_check_remote_format`) — you won't be asked to re-derive those. Still
+  read the section carefully for anything the deterministic checks don't
+  cover (e.g. domain, seniority) rather than skimming past it as a benefits
+  list. Found live on vacancy #1060 (2026-08-25): a body-prose mention
+  ("Fully remote work from anywhere in Europe") read as a perk, not a hard
+  geographic restriction — this exact section is where that restriction is
+  actually authoritative.
 - Only bullets under a REQUIREMENTS-type heading ("Requirements", "What
   we're looking for", "Must have", "Qualifications", "Що важливо") count as
   something the candidate must already possess. A plain bullet there is a
