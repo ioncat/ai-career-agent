@@ -1,6 +1,6 @@
 # career-agent — Backlog
 
-> Last updated: 2026-08-15
+> Last updated: 2026-08-25
 > Rules: [documentation-conventions.md](documentation-conventions.md) · History: [CHANGELOG.md](CHANGELOG.md) · Specs: [Epics/](Epics/)
 
 **Priority legend:**
@@ -377,11 +377,6 @@ No dual-availability state — the button's visibility is a direct, deterministi
 
 ## 🐛 Bugs
 
-### Phase 1+2 never sees `vacancies.salary` — analysis calls comp "not stated" when it's actually known (found 2026-08-15, vacancy #1154)
-**What:** `vacancies.salary` (e.g. `"5000"` for #1154, N1X — extracted from the RSS listing/site metadata, not JD body text) is never passed into Phase 1/2. `tools/cv_analyze.py:69-117` builds the LLM input from `jd_text` (raw `JD.md`) alone; `prompts/pm|generic/phase1_analysis.md`'s own `## Input` section says only "the full text of the job description" — no salary field anywhere in the prompt chain. #1154's JD.md genuinely has no salary mention in its body (confirmed via grep), so Phase 2 correctly reported "no comp stated" from *its own input* — but the DB already had the real number the whole time, unused. User caught it live: assistant repeated the "no comp stated" hidden-risk verbatim without cross-checking the `salary` field already visible in the same `vacancy_track.py get` output.
-**Fix direction:** `tools/cv_analyze.py` should include `vacancy["salary"]` (when non-null) in the Phase 1 input context (e.g. a `**Listed salary:** {salary}` line prepended to `jd_text`), and `phase1_analysis.md`'s `## Input` section updated to document it — so comp-related hidden-risk/warning text reflects what the system actually knows, not just what's in the JD body.
-**Found via:** user pointed out the salary discrepancy after re-reading the assistant's own risk summary for #1154 against the DB record already fetched earlier in the same session.
-
 ### Stage 2 Critical Blocker prefilter can false-positive when JD's required level equals candidate's own (found 2026-08-15, vacancy #795)
 **What:** `prompts/pm|generic/prefilter.md` Stage 2 LLM check flagged #795 BLOCKED for "english: JD requires Upper-Intermediate, candidate is B2" — but Upper-Intermediate *is* B2 (candidate's own level), and the JD literally said "Upper-Intermediate або вище" (or higher), which the candidate meets, not fails. PROFILE.md's `## Critical Blockers` only wants a block for strictly-above-B2 (C1/C2) — the LLM reacted to an English-requirement mention without checking the specific level against the rule.
 **Why:** Stage 1's deterministic regex (`tools/cv_prefilter.py:_check_english_level`) only fires on a literal CEFR code merged from Djinni's structured sidebar — #795 predates that merge (no `## Vacancy Requirements` section in its JD.md), so it fell through to Stage 2 LLM judgment, which got it wrong.
@@ -426,6 +421,8 @@ No dual-availability state — the button's visibility is a direct, deterministi
 ---
 
 ## 🧊 Icebox (P3+)
+
+- **Up/Down keyboard-scroll for the Detail panel** — currently mouse-only (deliberate scope cut, 2026-08-25, see keyboard-nav CHANGELOG entries). Would need Detail content to actually claim keyboard focus on click (it doesn't today) plus per-tab scroll wiring (JD/CV/Cover each have their own scroll context) — real effort, not a quick add. User: fine to drop if too much work.
 
 - **Idea: extend deterministic (regex/keyword) pre-filter to some content-stage blockers** (2026-07-25) — title-stage runs as free/reliable Python regex; user asked if content-stage (LLM-judged: `english`/`location`/`domain`/`igaming`/`ab_testing`/`okr`/`ai_agents`/`automation_tools`/`seniority`/`payments`) could too. Not uniformly safe — most are shaped "hands-on X required" and share the exact Requirements-vs-Responsibilities ambiguity already fixed once for the LLM path (2026-07-23). Full category-by-category risk split + suggested pilot (`igaming`+`seniority` only) in [prefilter-content-stage-regex-idea.md](../discovery/prefilter-content-stage-regex-idea.md).
 - **Research: does Ollama's `think`/`effort` parameter actually grade reasoning depth, and in which local models?** (idea, 2026-07-17, ties to [EPIC-27](Epics/EPIC-27-per-phase-llm-routing.md) / `docs/discovery/prefilter-local-model-selection.md`) — found while debugging the Critical Blocker pre-filter: a direct `think=low` vs `think=high` comparison on `gemma4:e2b` showed no measurable difference in reasoning length/depth (<1%), while `think=off` vs any `think=<level>` clearly does matter (on/off, not graduated). Working theory: Ollama's `think` API param is a generic slot — some architectures (gpt-oss, some Qwen3 variants) use the string value to modulate depth, but Gemma 4's `ollama show` capability listing is a plain boolean (`thinking`, no levels), so the level is likely ignored. Not confirmed against source, just one comparison + the model card. Two separate questions worth a real answer someday: (1) does the `think` level string do ANYTHING model-observable for architectures that don't advertise graduated support, or is it silently ignored; (2) which of our locally-available models (qwen3:8b, phi4:14b, etc.) genuinely support graduated effort vs boolean-only. Not blocking — current pre-filter work treats `effort=medium` as just "thinking on" and moves forward on that basis.

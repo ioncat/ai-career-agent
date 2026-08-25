@@ -7,7 +7,7 @@ The candidate's profile is already in your system context (PROFILE.md).
 
 ## Input
 
-User will provide the full text of the job description.
+User will provide the full text of the job description. If a `**Listed salary:** ...` line appears before the JD text, it comes from site/RSS metadata the JD body itself may not mention — treat it as known, real compensation data for the `compensation` dim in §1.7 (Step 4), not as "not stated." If that line is absent, compensation really is unknown — do not invent a number.
 
 ---
 
@@ -211,6 +211,17 @@ vacancy_score = round(
    domain_score/5*25 + remote_policy/3*10 + compensation/3*5) / 10,
   1)
 ```
+
+**Do not compute this by hand.** Once the 8 dims are scored, run it through the actual deterministic script and use that output verbatim — for both the `**VScore:** X.X/10` line below and the `vacancy_score` field in the DB write (`vacancy_track.py update-json`). Manual arithmetic on this formula has produced a wrong prose value while the DB got the right one, twice (vacancies #1268, #1192, 2026-08-25) — the two numbers must come from a single computation, not be derived twice from memory.
+
+```bash
+python -c "
+from contracts.pipeline import VacScoreDims
+from core.vacscore import compute_vacancy_score
+print(compute_vacancy_score(VacScoreDims(company_tier=N, seniority=N, market_scope=N, company_type=N, company_stage_fit=N, domain_score=N, remote_policy=N, compensation=N)))
+"
+```
+Substitute the 8 scored dims for `N`, run it, use the printed number everywhere below.
 
 **Step 4 — Output:**
 

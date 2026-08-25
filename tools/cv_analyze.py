@@ -76,6 +76,16 @@ async def cv_analyze(ctx: RunContext[AgentDeps], vacancy_id: int) -> str:
 
     jd_text = jd_path.read_text(encoding="utf-8")
 
+    # ── Fold in the DB-known salary, if any ───────────────────────────────────
+    # `vacancies.salary` is often extracted from RSS/site metadata, not JD.md's
+    # own body — without this, Phase 1's compensation scoring and Phase 2's
+    # comp-related hidden-risk text reason from "not stated" while the system
+    # already knows the number. Found live on #1154 (2026-08-15) and confirmed
+    # recurring on #1192 (2026-08-25, DOU/RSS-sourced this time).
+    salary = vacancy["salary"]
+    if salary:
+        jd_text = f"**Listed salary:** {salary}\n\n{jd_text}"
+
     # ── Load prompts from disk (skill_type-routed) ───────────────────────────
     skill_type = ctx.deps.skill_type
     skill_dir = _PROMPTS_DIR / skill_type
@@ -101,6 +111,11 @@ async def cv_analyze(ctx: RunContext[AgentDeps], vacancy_id: int) -> str:
         return f"⚠️ Ошибка Claude на фазе 1:\n{exc}"
 
     await database.update_pipeline_run(run1_id, status="done")
+
+    # ── Reconcile §1.7 VScore prose with the deterministic dim-table value ────
+    # Must happen before Phase 2 sees phase1_output and before JD_analysis.md is
+    # written, so both stay consistent with what the DB will store.
+    phase1_output = _reconcile_vacancy_score(phase1_output)
 
     # ── Update DB title from Phase 1 header ──────────────────────────────────
     extracted_title = _extract_vacancy_title(phase1_output)
@@ -300,6 +315,12 @@ _DIM_PATTERNS: dict[str, re.Pattern] = {
     "compensation":      re.compile(r"(?m)^\|\s*compensation\s*\|\s*(\d+)/3"),
 }
 
+# Phase 1 §1.7 prose line: "**VScore:** 8.4/10" — the LLM derives this by hand in
+# free text; it can drift from the dim table it wrote just above. See
+# _reconcile_vacancy_score() — DB always uses the deterministic value computed
+# from the dim table, this regex lets us make the saved markdown match it too.
+_VSCORE_LINE_RE = re.compile(r"(\*\*VScore:\*\*\s*)\d+(?:\.\d+)?(\s*/\s*10)", re.IGNORECASE)
+
 # Phase 2 Internal Analysis fit table: "| Domain fit | 7 | comment |"
 _FIT_DIM_PATTERNS: dict[str, re.Pattern] = {
     "domain_fit":      re.compile(r"(?im)^\|\s*Domain fit\s*\|\s*(\d+(?:\.\d+)?)\s*\|"),
@@ -346,6 +367,21 @@ def _parse_vacscore_dims(phase1: str) -> VacScoreDims | None:
         return VacScoreDims(**values)
     except Exception:
         return None
+
+
+def _reconcile_vacancy_score(phase1: str) -> str:
+    """Overwrite the §1.7 '**VScore:** X.X/10' prose line with the value computed
+    deterministically from the dim table on the same page. The LLM writes both by
+    hand in one pass and the two can disagree (found live on vacancies #1268 and
+    #1192, 2026-08-25 — DB always had the correct script-computed value, the saved
+    markdown didn't). Returns phase1 unchanged if dims or the VScore line aren't
+    found, so this never fails the pipeline — it only fixes what it can verify.
+    """
+    dims = _parse_vacscore_dims(phase1)
+    if dims is None or not _VSCORE_LINE_RE.search(phase1):
+        return phase1
+    correct_score = compute_vacancy_score(dims)
+    return _VSCORE_LINE_RE.sub(rf"\g<1>{correct_score:.1f}\g<2>", phase1, count=1)
 
 
 def _parse_company_type(company_type_score: int) -> str:
