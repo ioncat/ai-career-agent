@@ -47,6 +47,11 @@ Universal principle: never make the candidate appear to be something they are no
 
 ```
 Phase 1 + Phase 2  [run immediately on JD input, no confirmation needed]
+  → Before running Phase 1: check `salary` on the vacancy DB row (`vacancy_track.py get --id [id]`).
+    If non-null, prepend `**Listed salary:** [value]` before the JD text you hand to Phase 1 —
+    `salary` is often extracted from RSS/site metadata the JD.md body never mentions, so skipping
+    this check makes Phase 1 score compensation as "not stated" when the system already knows it.
+    Found live twice (#1154, #1192) — see BACKLOG/CHANGELOG 2026-08-25.
   → Create folder vacancies/inbox/[user_id]/[Role — Company]/   [silent]
   → Save full output to JD_analysis.md   [silent — no confirmation needed]
   → Save p1+p2 to DB analysis_json       [silent — see Analysis JSON section below]

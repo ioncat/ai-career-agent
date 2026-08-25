@@ -104,6 +104,7 @@ def _make_vacancy_row(
     title: str = "Backend Dev",
     url: str = "https://djinni.co/jobs/123-backend/",
     analysis_json: str | None = None,
+    salary: str | None = None,
 ) -> MagicMock:
     """Build a mock aiosqlite.Row for a vacancy."""
     data = {
@@ -113,6 +114,7 @@ def _make_vacancy_row(
         "url": url,
         "status": "fetched",
         "analysis_json": analysis_json,
+        "salary": salary,
     }
     row = MagicMock()
     row.__getitem__ = lambda self, key: data[key]
@@ -269,6 +271,45 @@ async def test_analyze_skips_title_update_when_no_header(tmp_path):
         await cv_analyze(ctx, 1)
 
     mock_db.update_vacancy_fields.assert_not_awaited()
+
+
+# ── cv_analyze — salary injection ──────────────────────────────────────────────
+# `vacancies.salary` is often known (RSS/site metadata) even when JD.md's own
+# body says nothing about comp — without this, Phase 1/2 score compensation
+# as "not stated". Found live on #1154 (2026-08-15) and #1192 (2026-08-25).
+
+@pytest.mark.asyncio
+async def test_analyze_prepends_salary_when_present(tmp_path):
+    jd_path = _write_jd(tmp_path, content="# Backend Dev\n\nNo comp mentioned here.")
+    vacancy_row = _make_vacancy_row(jd_path, salary="$3000-5000")
+    llm = _make_llm(side_effect=["Phase 1 output", _VALID_PHASE2])
+    ctx = _make_ctx(tmp_path, llm)
+    mock_db = _mock_db(vacancy_row=vacancy_row)
+
+    with patch("tools.cv_analyze.database", mock_db):
+        await cv_analyze(ctx, 1)
+
+    phase1_call_user = llm.complete.call_args_list[0][0][0]
+    assert "**Listed salary:** $3000-5000" in phase1_call_user
+    assert phase1_call_user.index("**Listed salary:**") < phase1_call_user.index("No comp mentioned here.")
+    # Phase 2 gets the full jd_text too (it's re-included in phase2_user).
+    phase2_call_user = llm.complete.call_args_list[1][0][0]
+    assert "**Listed salary:** $3000-5000" in phase2_call_user
+
+
+@pytest.mark.asyncio
+async def test_analyze_no_salary_line_when_null(tmp_path):
+    jd_path = _write_jd(tmp_path)
+    vacancy_row = _make_vacancy_row(jd_path, salary=None)
+    llm = _make_llm(side_effect=["Phase 1 output", _VALID_PHASE2])
+    ctx = _make_ctx(tmp_path, llm)
+    mock_db = _mock_db(vacancy_row=vacancy_row)
+
+    with patch("tools.cv_analyze.database", mock_db):
+        await cv_analyze(ctx, 1)
+
+    phase1_call_user = llm.complete.call_args_list[0][0][0]
+    assert "**Listed salary:**" not in phase1_call_user
 
 
 # ── cv_analyze — happy path ───────────────────────────────────────────────────

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/vacancy.dart';
 import '../providers/list_panel_provider.dart';
@@ -27,6 +28,13 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
   bool _crossFolderNav = false;
   final _searchController = TextEditingController();
   String _searchQuery = '';
+  // Own FocusNode for the keyboard-shortcuts region (2026-08-25) —
+  // `autofocus: true` alone lost the race against some other widget for
+  // initial focus after a fresh app start (found live: Up/Down worked after
+  // interacting with the app, not on a cold start). Explicitly requesting
+  // focus here on every card click makes it self-healing regardless of who
+  // won that first-frame race, instead of depending on it going right once.
+  final _keyboardFocusNode = FocusNode(debugLabel: 'VacancyInboxKeyboardNav');
 
   // ── Mass actions (BACKLOG "Batch Analysis Mode") ──────────────────────────
   bool _multiSelectMode = false;
@@ -42,7 +50,9 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
   double? _dragWidth;
 
   VacancyRepository get _repo {
-    final apiUrl = ref.read(settingsProvider).valueOrNull?.apiUrl ?? 'http://localhost:8080';
+    final apiUrl =
+        ref.read(settingsProvider).valueOrNull?.apiUrl ??
+        'http://localhost:8080';
     return VacancyRepository(baseUrl: apiUrl);
   }
 
@@ -94,7 +104,11 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
   /// `ids` defaults to the manual multi-select set; pass an explicit list to
   /// drive a batch without ever entering multi-select mode (e.g. "Skip all
   /// with blockers" — auto-selects everything flagged, no manual picking).
-  Future<void> _runBatch(String label, Future<void> Function(int id) action, {List<int>? ids}) async {
+  Future<void> _runBatch(
+    String label,
+    Future<void> Function(int id) action, {
+    List<int>? ids,
+  }) async {
     final targetIds = ids ?? _selectedIds.toList();
     setState(() {
       _batchRunning = true;
@@ -119,16 +133,20 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
     _exitMultiSelect();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(failed == 0
-            ? '$label: $succeeded/${targetIds.length} done'
-            : '$label: $succeeded/${targetIds.length} done, $failed failed'),
+        content: Text(
+          failed == 0
+              ? '$label: $succeeded/${targetIds.length} done'
+              : '$label: $succeeded/${targetIds.length} done, $failed failed',
+        ),
         backgroundColor: failed == 0 ? null : Colors.orange,
       ),
     );
   }
 
-  Future<void> _batchAnalyze() => _runBatch('Analyze', (id) => _repo.analyze(id));
-  Future<void> _batchCheckBlockers() => _runBatch('Check blockers', (id) => _repo.runPrefilter(id));
+  Future<void> _batchAnalyze() =>
+      _runBatch('Analyze', (id) => _repo.analyze(id));
+  Future<void> _batchCheckBlockers() =>
+      _runBatch('Check blockers', (id) => _repo.runPrefilter(id));
   Future<void> _batchSkip() => _runBatch('Skip', (id) => _repo.decline(id));
 
   /// Standalone action — never enters multi-select, no manual picking.
@@ -147,7 +165,11 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
   /// Confirms first regardless — a single accidental click archives every
   /// matching vacancy at once, unlike the manual multi-select actions where
   /// the selection itself is the deliberate step.
-  Future<void> _skipAllByStage(List<VacancyListItem> visible, String stage, String stageLabel) async {
+  Future<void> _skipAllByStage(
+    List<VacancyListItem> visible,
+    String stage,
+    String stageLabel,
+  ) async {
     final matched = visible.where((v) => v.blockerStage == stage).toList();
     if (matched.isEmpty) return;
 
@@ -158,7 +180,8 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
     // (2026-07-28, explicit user ask).
     final selectedIds = await showDialog<List<int>>(
       context: context,
-      builder: (context) => SkipConfirmDialog(stageLabel: stageLabel, vacancies: matched),
+      builder: (context) =>
+          SkipConfirmDialog(stageLabel: stageLabel, vacancies: matched),
     );
     if (selectedIds == null || selectedIds.isEmpty) return;
 
@@ -179,6 +202,76 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
       next = filtered[idx - 1];
     }
     setState(() => _selected = next);
+    _scrollSelectedIntoView();
+  }
+
+  /// Up/Down keyboard navigation (2026-08-25) — steps the current selection
+  /// by one position within the visible list, clamped at both ends (no
+  /// wraparound, no next/prev fallback the way _onSkipped needs — nothing
+  /// has been removed from the list here, just moving the cursor).
+  void _moveSelection(int delta) {
+    final vacancies = ref.read(folderVacanciesProvider(widget.folder));
+    final filtered = _filter(vacancies);
+    if (filtered.isEmpty) return;
+    final currentId = _selected?.id;
+    final idx = currentId == null
+        ? -1
+        : filtered.indexWhere((v) => v.id == currentId);
+    final nextIdx = (idx < 0 ? 0 : idx + delta).clamp(0, filtered.length - 1);
+    setState(() {
+      _selected = filtered[nextIdx];
+      _crossFolderNav = false;
+    });
+    ref.read(readVacanciesProvider.notifier).markRead(_selected!.id);
+    _scrollSelectedIntoView();
+  }
+
+  /// Delete key (2026-08-25) — confirm, then archive (same `decline` action
+  /// as the existing Skip button/flow — "archive" IS the declined status,
+  /// see core/vacancy_stage.py) and advance via the same logic Skip already
+  /// uses (_onSkipped), so the keyboard path and the mouse path land on the
+  /// exact same next vacancy.
+  Future<void> _deleteSelected() async {
+    final target = _selected;
+    if (target == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => ArchiveConfirmDialog(vacancy: target),
+    );
+    if (confirmed != true) return;
+    try {
+      await _repo.decline(target.id);
+      if (!mounted) return;
+      _onSkipped();
+      ref.read(vacancyListProvider.notifier).refresh();
+      _keyboardFocusNode.requestFocus();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  /// Scrolls the list panel so the currently selected vacancy's card is
+  /// visible (2026-08-25) — without this, Up/Down keeps changing `_selected`
+  /// correctly (detail panel updates) but the highlighted card in the list
+  /// can walk off-screen with nothing visibly indicating where selection
+  /// went. No-ops harmlessly if the card is already visible or not
+  /// currently mounted (e.g. filtered out this frame).
+  void _scrollSelectedIntoView() {
+    final id = _selected?.id;
+    if (id == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = GlobalObjectKey(id).currentContext;
+      if (ctx != null) {
+        Scrollable.ensureVisible(
+          ctx,
+          duration: const Duration(milliseconds: 150),
+          alignment: 0.5,
+        );
+      }
+    });
   }
 
   void _selectByIdAny(int id) {
@@ -190,6 +283,8 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
         _crossFolderNav = true;
       });
       ref.read(readVacanciesProvider.notifier).markRead(id);
+      _keyboardFocusNode.requestFocus();
+      _scrollSelectedIntoView();
     }
   }
 
@@ -202,13 +297,13 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
   DateTime? _dateTo;
 
   String get _title => switch (widget.folder) {
-        'inbox'     => 'Inbox',
-        'analyzed'  => 'Analyzed',
-        'processed' => 'Processed',
-        'applied'   => 'Applied',
-        'archive'   => 'Archive',
-        _           => 'Vacancies',
-      };
+    'inbox' => 'Inbox',
+    'analyzed' => 'Analyzed',
+    'processed' => 'Processed',
+    'applied' => 'Applied',
+    'archive' => 'Archive',
+    _ => 'Vacancies',
+  };
 
   int get _activeFilterCount =>
       _statusFilter.length +
@@ -220,10 +315,11 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _keyboardFocusNode.dispose();
     super.dispose();
   }
 
-List<VacancyListItem> _filter(List<VacancyListItem> all) {
+  List<VacancyListItem> _filter(List<VacancyListItem> all) {
     final q = _searchQuery;
     return all.where((v) {
       if (q.isNotEmpty) {
@@ -297,8 +393,10 @@ List<VacancyListItem> _filter(List<VacancyListItem> all) {
     final listState = ref.watch(vacancyListProvider).valueOrNull;
     final filtered = _filter(vacancies);
     final availableStatuses = vacancies.map((v) => v.status).toSet();
-    final availableSites =
-        vacancies.map((v) => v.site).where((s) => s.isNotEmpty).toSet();
+    final availableSites = vacancies
+        .map((v) => v.site)
+        .where((s) => s.isNotEmpty)
+        .toSet();
 
     // Sync _selected with polling updates (status changes, or any other field
     // edited server-side — salary, applied, starred, etc. all bump updated_at).
@@ -316,7 +414,9 @@ List<VacancyListItem> _filter(List<VacancyListItem> all) {
 
     // Clear selection if selected vacancy no longer in this folder or filtered out
     // Skip cleanup during cross-folder navigation (badge → original in Archive, etc.)
-    if (!_crossFolderNav && _selected != null && !filtered.any((v) => v.id == _selected!.id)) {
+    if (!_crossFolderNav &&
+        _selected != null &&
+        !filtered.any((v) => v.id == _selected!.id)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) setState(() => _selected = null);
       });
@@ -325,197 +425,276 @@ List<VacancyListItem> _filter(List<VacancyListItem> all) {
     final cs = Theme.of(context).colorScheme;
     final hasFilters = _searchQuery.isNotEmpty || _activeFilterCount > 0;
 
-    final panelState = ref.watch(listPanelProvider).valueOrNull ?? const ListPanelState();
+    final panelState =
+        ref.watch(listPanelProvider).valueOrNull ?? const ListPanelState();
     final panelCollapsed = panelState.collapsed;
     final panelWidth = _dragWidth ?? panelState.width;
 
+    // Keyboard navigation (2026-08-25) — Up/Down move the selection, Delete
+    // archives it. Scoped to the LIST PANEL only (wrapped further below,
+    // around the master SizedBox), not the whole Row — clicking into the
+    // Detail panel doesn't move Flutter's focus anywhere (nothing there
+    // requests it), so wrapping the whole row meant Up/Down always paged
+    // vacancies even with the mouse sitting in Detail, hijacking the
+    // expected "scroll this panel" behavior there (found live, 2026-08-25,
+    // explicit user ask to split it this way — Detail scrolling stays
+    // mouse-only, arrows just stop paging vacancies while focus is there).
+    //
+    // CallbackShortcuts must be the ANCESTOR of the Focus node that actually
+    // holds focus, not the other way around — key events bubble UP from the
+    // focused leaf toward the root, so CallbackShortcuts only sees them if
+    // it sits above the focused node in the tree. Had this backwards on the
+    // first pass (Focus wrapping CallbackShortcuts) — compiled and passed
+    // every test because nothing exercises real key-event bubbling through
+    // the live screen, but never actually worked (found live, 2026-08-25).
     return Row(
       children: [
         // Master: vacancy list — resizable + collapsible (2026-07-25).
         // Collapsed entirely (not just width:0) when hidden — reopened via
         // the nav rail toggle (app_shell.dart), not from inside this panel.
         if (!panelCollapsed) ...[
-        SizedBox(
-          width: panelWidth,
-          child: Container(
-            color: cs.surface,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                InboxListHeader(
-                  title: _title,
-                  visibleCount: filtered.length,
-                  totalCount: vacancies.length,
-                  onRefresh: () =>
-                      ref.read(vacancyListProvider.notifier).refresh(),
-                  pollingState: listState,
-                  filterCount: _activeFilterCount,
-                  filterExpanded: _filterExpanded,
-                  onToggleFilter: () =>
-                      setState(() => _filterExpanded = !_filterExpanded),
-                  titleBlockedCount: filtered.where((v) => v.blockerStage == 'title').length,
-                  onSkipAllTitleBlocked: _batchRunning
-                      ? null
-                      : () => _skipAllByStage(filtered, 'title', 'title-blocked'),
-                  contentBlockedCount: filtered.where((v) => v.blockerStage == 'content').length,
-                  onSkipAllContentBlocked: _batchRunning
-                      ? null
-                      : () => _skipAllByStage(filtered, 'content', 'content-blocked'),
-                  multiSelectActive: _multiSelectMode,
-                  onToggleMultiSelect: _batchRunning ? null : _toggleMultiSelectMode,
-                ),
-                // Lives right below the header (same row as the toggle that
-                // turns it on) — not at the bottom of the list — so entering
-                // Mass Action shows its controls where the mode was switched
-                // on, above search/filter (2026-07-26, explicit user ask).
-                // _batchRunning alone (no multi-select) covers standalone
-                // batches like "Skip all with blockers" — same progress UI,
-                // no manual selection involved.
-                if (_multiSelectMode || _batchRunning)
-                  InboxBatchActionBar(
-                    count: _selectedIds.length,
-                    running: _batchRunning,
-                    runningLabel: _batchLabel,
-                    done: _batchDone,
-                    total: _batchTotal,
-                    onAnalyze: _selectedIds.isEmpty || _batchRunning ? null : _batchAnalyze,
-                    onCheckBlockers: _selectedIds.isEmpty || _batchRunning ? null : _batchCheckBlockers,
-                    onSkip: _selectedIds.isEmpty || _batchRunning ? null : _batchSkip,
-                    onCancel: _batchRunning ? null : _exitMultiSelect,
-                  ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-                  child: TextField(
-                    controller: _searchController,
-                    onChanged: (v) =>
-                        setState(() => _searchQuery = v.trim().toLowerCase()),
-                    style: Theme.of(context).textTheme.bodySmall,
-                    decoration: InputDecoration(
-                      hintText: 'Search role or company…',
-                      hintStyle: Theme.of(context)
-                          .textTheme
-                          .bodySmall
-                          ?.copyWith(color: cs.onSurfaceVariant),
-                      prefixIcon: Icon(Icons.search,
-                          size: 18, color: cs.onSurfaceVariant),
-                      suffixIcon: _searchQuery.isNotEmpty
-                          ? IconButton(
-                              icon: Icon(Icons.close,
-                                  size: 16, color: cs.onSurfaceVariant),
-                              onPressed: () => setState(() {
-                                _searchController.clear();
-                                _searchQuery = '';
-                              }),
-                              splashRadius: 14,
-                            )
-                          : null,
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 8),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide:
-                            BorderSide(color: cs.outlineVariant, width: 1),
+          CallbackShortcuts(
+            bindings: {
+              const SingleActivator(LogicalKeyboardKey.arrowDown): () =>
+                  _moveSelection(1),
+              const SingleActivator(LogicalKeyboardKey.arrowUp): () =>
+                  _moveSelection(-1),
+              const SingleActivator(LogicalKeyboardKey.delete): _deleteSelected,
+            },
+            child: Focus(
+              focusNode: _keyboardFocusNode,
+              autofocus: true,
+              child: SizedBox(
+                width: panelWidth,
+                child: Container(
+                  color: cs.surface,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      InboxListHeader(
+                        title: _title,
+                        visibleCount: filtered.length,
+                        totalCount: vacancies.length,
+                        onRefresh: () =>
+                            ref.read(vacancyListProvider.notifier).refresh(),
+                        pollingState: listState,
+                        filterCount: _activeFilterCount,
+                        filterExpanded: _filterExpanded,
+                        onToggleFilter: () =>
+                            setState(() => _filterExpanded = !_filterExpanded),
+                        titleBlockedCount: filtered
+                            .where((v) => v.blockerStage == 'title')
+                            .length,
+                        onSkipAllTitleBlocked: _batchRunning
+                            ? null
+                            : () => _skipAllByStage(
+                                filtered,
+                                'title',
+                                'title-blocked',
+                              ),
+                        contentBlockedCount: filtered
+                            .where((v) => v.blockerStage == 'content')
+                            .length,
+                        onSkipAllContentBlocked: _batchRunning
+                            ? null
+                            : () => _skipAllByStage(
+                                filtered,
+                                'content',
+                                'content-blocked',
+                              ),
+                        multiSelectActive: _multiSelectMode,
+                        onToggleMultiSelect: _batchRunning
+                            ? null
+                            : _toggleMultiSelectMode,
                       ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide:
-                            BorderSide(color: cs.outlineVariant, width: 1),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: cs.primary, width: 1.5),
-                      ),
-                    ),
-                  ),
-                ),
-                if (_filterExpanded && !_multiSelectMode)
-                  InboxFilterPanel(
-                    availableStatuses: availableStatuses,
-                    selectedStatuses: _statusFilter,
-                    onStatusToggle: (s) => setState(() {
-                      if (_statusFilter.contains(s)) {
-                        _statusFilter = Set.from(_statusFilter)..remove(s);
-                      } else {
-                        _statusFilter = Set.from(_statusFilter)..add(s);
-                      }
-                    }),
-                    availableSites: availableSites,
-                    selectedSites: _siteFilter,
-                    onSiteToggle: (s) => setState(() {
-                      if (_siteFilter.contains(s)) {
-                        _siteFilter = Set.from(_siteFilter)..remove(s);
-                      } else {
-                        _siteFilter = Set.from(_siteFilter)..add(s);
-                      }
-                    }),
-                    starredOnly: _starredOnly,
-                    onToggleStarred: () =>
-                        setState(() => _starredOnly = !_starredOnly),
-                    blockedOnly: _blockedOnly,
-                    onToggleBlocked: () =>
-                        setState(() => _blockedOnly = !_blockedOnly),
-                    dateFrom: _dateFrom,
-                    dateTo: _dateTo,
-                    onPickFrom: _pickDateFrom,
-                    onPickTo: _pickDateTo,
-                    onClearDates: () =>
-                        setState(() { _dateFrom = null; _dateTo = null; }),
-                    hasActiveFilters: _activeFilterCount > 0 || _searchQuery.isNotEmpty,
-                    onClearAll: _clearAllFilters,
-                  ),
-                Divider(
-                  height: 1,
-                  thickness: 1,
-                  color: cs.outlineVariant.withValues(alpha: 0.2),
-                ),
-                Expanded(
-                  child: filtered.isEmpty
-                      ? (hasFilters
-                          ? _NoResults(
-                              query: _searchController.text.isEmpty
-                                  ? null
-                                  : _searchController.text)
-                          : _EmptyState(folder: widget.folder))
-                      : InboxVacancyList(
-                          vacancies: filtered,
-                          todayDividerBasis: widget.folder == 'inbox'
-                              ? TodayDividerBasis.publishedAt
-                              : kUpdatedAtSortedFolders.contains(widget.folder)
-                                  ? TodayDividerBasis.updatedAt
-                                  : null,
-                          selectedId: _selected?.id,
-                          onSelect: (v) {
-                            setState(() {
-                              _selected = v;
-                              _crossFolderNav = false;
-                            });
-                            ref.read(readVacanciesProvider.notifier).markRead(v.id);
-                          },
-                          onTapRelated: _selectByIdAny,
-                          multiSelectMode: _multiSelectMode,
-                          checkedIds: _selectedIds,
-                          onCheckToggle: _toggleCheck,
-                          onLongPress: _enterMultiSelect,
+                      // Lives right below the header (same row as the toggle that
+                      // turns it on) — not at the bottom of the list — so entering
+                      // Mass Action shows its controls where the mode was switched
+                      // on, above search/filter (2026-07-26, explicit user ask).
+                      // _batchRunning alone (no multi-select) covers standalone
+                      // batches like "Skip all with blockers" — same progress UI,
+                      // no manual selection involved.
+                      if (_multiSelectMode || _batchRunning)
+                        InboxBatchActionBar(
+                          count: _selectedIds.length,
+                          running: _batchRunning,
+                          runningLabel: _batchLabel,
+                          done: _batchDone,
+                          total: _batchTotal,
+                          onAnalyze: _selectedIds.isEmpty || _batchRunning
+                              ? null
+                              : _batchAnalyze,
+                          onCheckBlockers: _selectedIds.isEmpty || _batchRunning
+                              ? null
+                              : _batchCheckBlockers,
+                          onSkip: _selectedIds.isEmpty || _batchRunning
+                              ? null
+                              : _batchSkip,
+                          onCancel: _batchRunning ? null : _exitMultiSelect,
                         ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                        child: TextField(
+                          controller: _searchController,
+                          onChanged: (v) => setState(
+                            () => _searchQuery = v.trim().toLowerCase(),
+                          ),
+                          style: Theme.of(context).textTheme.bodySmall,
+                          decoration: InputDecoration(
+                            hintText: 'Search role or company…',
+                            hintStyle: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: cs.onSurfaceVariant),
+                            prefixIcon: Icon(
+                              Icons.search,
+                              size: 18,
+                              color: cs.onSurfaceVariant,
+                            ),
+                            suffixIcon: _searchQuery.isNotEmpty
+                                ? IconButton(
+                                    icon: Icon(
+                                      Icons.close,
+                                      size: 16,
+                                      color: cs.onSurfaceVariant,
+                                    ),
+                                    onPressed: () => setState(() {
+                                      _searchController.clear();
+                                      _searchQuery = '';
+                                    }),
+                                    splashRadius: 14,
+                                  )
+                                : null,
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(
+                              vertical: 8,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(
+                                color: cs.outlineVariant,
+                                width: 1,
+                              ),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(
+                                color: cs.outlineVariant,
+                                width: 1,
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(
+                                color: cs.primary,
+                                width: 1.5,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (_filterExpanded && !_multiSelectMode)
+                        InboxFilterPanel(
+                          availableStatuses: availableStatuses,
+                          selectedStatuses: _statusFilter,
+                          onStatusToggle: (s) => setState(() {
+                            if (_statusFilter.contains(s)) {
+                              _statusFilter = Set.from(_statusFilter)
+                                ..remove(s);
+                            } else {
+                              _statusFilter = Set.from(_statusFilter)..add(s);
+                            }
+                          }),
+                          availableSites: availableSites,
+                          selectedSites: _siteFilter,
+                          onSiteToggle: (s) => setState(() {
+                            if (_siteFilter.contains(s)) {
+                              _siteFilter = Set.from(_siteFilter)..remove(s);
+                            } else {
+                              _siteFilter = Set.from(_siteFilter)..add(s);
+                            }
+                          }),
+                          starredOnly: _starredOnly,
+                          onToggleStarred: () =>
+                              setState(() => _starredOnly = !_starredOnly),
+                          blockedOnly: _blockedOnly,
+                          onToggleBlocked: () =>
+                              setState(() => _blockedOnly = !_blockedOnly),
+                          dateFrom: _dateFrom,
+                          dateTo: _dateTo,
+                          onPickFrom: _pickDateFrom,
+                          onPickTo: _pickDateTo,
+                          onClearDates: () => setState(() {
+                            _dateFrom = null;
+                            _dateTo = null;
+                          }),
+                          hasActiveFilters:
+                              _activeFilterCount > 0 || _searchQuery.isNotEmpty,
+                          onClearAll: _clearAllFilters,
+                        ),
+                      Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: cs.outlineVariant.withValues(alpha: 0.2),
+                      ),
+                      Expanded(
+                        child: filtered.isEmpty
+                            ? (hasFilters
+                                  ? _NoResults(
+                                      query: _searchController.text.isEmpty
+                                          ? null
+                                          : _searchController.text,
+                                    )
+                                  : _EmptyState(folder: widget.folder))
+                            : InboxVacancyList(
+                                vacancies: filtered,
+                                todayDividerBasis: widget.folder == 'inbox'
+                                    ? TodayDividerBasis.publishedAt
+                                    : kUpdatedAtSortedFolders.contains(
+                                        widget.folder,
+                                      )
+                                    ? TodayDividerBasis.updatedAt
+                                    : null,
+                                selectedId: _selected?.id,
+                                onSelect: (v) {
+                                  setState(() {
+                                    _selected = v;
+                                    _crossFolderNav = false;
+                                  });
+                                  ref
+                                      .read(readVacanciesProvider.notifier)
+                                      .markRead(v.id);
+                                  _keyboardFocusNode.requestFocus();
+                                },
+                                onTapRelated: _selectByIdAny,
+                                multiSelectMode: _multiSelectMode,
+                                checkedIds: _selectedIds,
+                                onCheckToggle: _toggleCheck,
+                                onLongPress: _enterMultiSelect,
+                              ),
+                      ),
+                    ],
+                  ),
                 ),
-              ],
+              ),
             ),
           ),
-        ),
         ],
         // Vertical divider — draggable to resize the panel above. Hit area
         // is wider (8px) than the visual line (1px) — a 1px drag target is
         // unhittable with a mouse.
         MouseRegion(
-          cursor: panelCollapsed ? MouseCursor.defer : SystemMouseCursors.resizeColumn,
+          cursor: panelCollapsed
+              ? MouseCursor.defer
+              : SystemMouseCursors.resizeColumn,
           child: GestureDetector(
             behavior: HitTestBehavior.translucent,
             onHorizontalDragUpdate: panelCollapsed
                 ? null
                 : (details) => setState(() {
-                      _dragWidth = (panelWidth + details.delta.dx)
-                          .clamp(kListPanelMinWidth, kListPanelMaxWidth);
-                    }),
+                    _dragWidth = (panelWidth + details.delta.dx).clamp(
+                      kListPanelMinWidth,
+                      kListPanelMaxWidth,
+                    );
+                  }),
             onHorizontalDragEnd: panelCollapsed
                 ? null
                 : (_) {
@@ -548,6 +727,7 @@ List<VacancyListItem> _filter(List<VacancyListItem> all) {
                     vacancy: _selected!,
                     onSkipped: _onSkipped,
                     onNavigateTo: _selectByIdAny,
+                    onApplied: _onSkipped,
                   )
                 : const _NoSelectionPlaceholder(),
           ),
@@ -610,10 +790,9 @@ class _SkipConfirmDialogState extends State<SkipConfirmDialog> {
             Text(
               'Flagged by the ${widget.stageLabel} pre-filter check. '
               'Uncheck any you want to keep — this can\'t be undone in bulk.',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: cs.onSurfaceVariant),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
             ),
             const SizedBox(height: 8),
             Flexible(
@@ -669,7 +848,8 @@ class _SkipConfirmDialogState extends State<SkipConfirmDialog> {
                                     child: Padding(
                                       padding: const EdgeInsets.only(top: 2),
                                       child: Row(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Icon(
                                             isExpanded
@@ -689,7 +869,9 @@ class _SkipConfirmDialogState extends State<SkipConfirmDialog> {
                                               style: Theme.of(context)
                                                   .textTheme
                                                   .bodySmall
-                                                  ?.copyWith(color: cs.onSurfaceVariant),
+                                                  ?.copyWith(
+                                                    color: cs.onSurfaceVariant,
+                                                  ),
                                             ),
                                           ),
                                         ],
@@ -722,6 +904,46 @@ class _SkipConfirmDialogState extends State<SkipConfirmDialog> {
           child: Text('Skip ${_checked.length}'),
         ),
       ],
+    );
+  }
+}
+
+// Single-vacancy archive confirm (2026-08-25) — the Delete-key keyboard path.
+// Enter confirms (bound explicitly below, do not rely on AlertDialog default
+// behavior — a single FilledButton is not automatically wired to Enter),
+// Escape cancels, mirrors clicking Cancel/Archive with the mouse.
+class ArchiveConfirmDialog extends StatelessWidget {
+  final VacancyListItem vacancy;
+
+  const ArchiveConfirmDialog({super.key, required this.vacancy});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    void confirm() => Navigator.of(context).pop(true);
+    void cancel() => Navigator.of(context).pop(false);
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.enter): confirm,
+        const SingleActivator(LogicalKeyboardKey.numpadEnter): confirm,
+        const SingleActivator(LogicalKeyboardKey.space): confirm,
+        const SingleActivator(LogicalKeyboardKey.escape): cancel,
+      },
+      child: Focus(
+        autofocus: true,
+        child: AlertDialog(
+          title: const Text('Archive this vacancy?'),
+          content: Text('${vacancy.role} — ${vacancy.company}'),
+          actions: [
+            TextButton(onPressed: cancel, child: const Text('Cancel')),
+            FilledButton(
+              onPressed: confirm,
+              style: FilledButton.styleFrom(backgroundColor: cs.error),
+              child: const Text('Archive'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -825,7 +1047,11 @@ class InboxListHeader extends StatelessWidget {
                     child: Badge(
                       label: Text('${titleBlockedCount + contentBlockedCount}'),
                       backgroundColor: cs.error,
-                      child: Icon(Icons.playlist_remove, size: 20, color: cs.error),
+                      child: Icon(
+                        Icons.playlist_remove,
+                        size: 20,
+                        color: cs.error,
+                      ),
                     ),
                   ),
                   onSelected: (action) => action?.call(),
@@ -878,7 +1104,9 @@ class InboxListHeader extends StatelessWidget {
                   color: multiSelectActive ? cs.primary : cs.onSurfaceVariant,
                 ),
                 onPressed: onToggleMultiSelect,
-                tooltip: multiSelectActive ? 'Exit selection' : 'Select multiple',
+                tooltip: multiSelectActive
+                    ? 'Exit selection'
+                    : 'Select multiple',
                 style: IconButton.styleFrom(
                   minimumSize: const Size(32, 32),
                   padding: EdgeInsets.zero,
@@ -890,9 +1118,7 @@ class InboxListHeader extends StatelessWidget {
                   isLabelVisible: filterCount > 0,
                   label: Text('$filterCount'),
                   child: Icon(
-                    filterExpanded
-                        ? Icons.filter_list_off
-                        : Icons.filter_list,
+                    filterExpanded ? Icons.filter_list_off : Icons.filter_list,
                     size: 20,
                     color: filterCount > 0 ? cs.primary : cs.onSurfaceVariant,
                   ),
@@ -947,9 +1173,9 @@ class InboxListHeader extends StatelessWidget {
                       ? '$totalCount ${totalCount == 1 ? 'vacancy' : 'vacancies'}'
                       : '$visibleCount / $totalCount vacancies',
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: cs.secondary,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelMedium?.copyWith(color: cs.secondary),
                 ),
               ),
             ],
@@ -1016,8 +1242,18 @@ class InboxFilterPanel extends StatelessWidget {
 
   static String _fmtDate(DateTime d) {
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return '${months[d.month - 1]} ${d.day}';
   }
@@ -1043,8 +1279,10 @@ class InboxFilterPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (statuses.isNotEmpty) ...[
-            Text('Status',
-                style: labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+            Text(
+              'Status',
+              style: labelSmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
             const SizedBox(height: 6),
             Wrap(
               spacing: 6,
@@ -1059,8 +1297,10 @@ class InboxFilterPanel extends StatelessWidget {
                   selected: selected,
                   onSelected: (_) => onStatusToggle(s),
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 0,
+                  ),
                   visualDensity: VisualDensity.compact,
                 );
               }).toList(),
@@ -1068,8 +1308,10 @@ class InboxFilterPanel extends StatelessWidget {
             const SizedBox(height: 10),
           ],
           if (availableSites.isNotEmpty) ...[
-            Text('Source',
-                style: labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+            Text(
+              'Source',
+              style: labelSmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
             const SizedBox(height: 6),
             Wrap(
               spacing: 6,
@@ -1084,8 +1326,10 @@ class InboxFilterPanel extends StatelessWidget {
                   selected: selected,
                   onSelected: (_) => onSiteToggle(s),
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 0,
+                  ),
                   visualDensity: VisualDensity.compact,
                 );
               }).toList(),
@@ -1102,8 +1346,10 @@ class InboxFilterPanel extends StatelessWidget {
                   size: 14,
                   color: starredOnly ? cs.primary : cs.onSurfaceVariant,
                 ),
-                label: Text('Starred',
-                    style: Theme.of(context).textTheme.labelSmall),
+                label: Text(
+                  'Starred',
+                  style: Theme.of(context).textTheme.labelSmall,
+                ),
                 selected: starredOnly,
                 onSelected: (_) => onToggleStarred(),
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -1119,8 +1365,10 @@ class InboxFilterPanel extends StatelessWidget {
                   size: 14,
                   color: blockedOnly ? cs.error : cs.onSurfaceVariant,
                 ),
-                label: Text('Title blocked',
-                    style: Theme.of(context).textTheme.labelSmall),
+                label: Text(
+                  'Title blocked',
+                  style: Theme.of(context).textTheme.labelSmall,
+                ),
                 selected: blockedOnly,
                 onSelected: (_) => onToggleBlocked(),
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -1130,8 +1378,10 @@ class InboxFilterPanel extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          Text('Published',
-              style: labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+          Text(
+            'Published',
+            style: labelSmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
           const SizedBox(height: 6),
           Row(
             children: [
@@ -1144,8 +1394,10 @@ class InboxFilterPanel extends StatelessWidget {
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 6),
-                child: Text('—',
-                    style: labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+                child: Text(
+                  '—',
+                  style: labelSmall?.copyWith(color: cs.onSurfaceVariant),
+                ),
               ),
               Expanded(
                 child: _DateButton(
@@ -1178,7 +1430,10 @@ class InboxFilterPanel extends StatelessWidget {
                 ),
                 style: TextButton.styleFrom(
                   minimumSize: Size.zero,
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
               ),
@@ -1287,6 +1542,12 @@ class InboxVacancyList extends StatelessWidget {
 
   Widget _buildCard(VacancyListItem v) {
     return Padding(
+      // GlobalObjectKey(v.id) (2026-08-25) — not for widget identity (that's
+      // still ProcessingWrapper's ValueKey below), but so keyboard nav can
+      // find this exact list item's context and Scrollable.ensureVisible()
+      // it when Up/Down moves selection off-screen. Stable across rebuilds
+      // as long as the same vacancy id is used, no map to maintain.
+      key: GlobalObjectKey(v.id),
       padding: const EdgeInsets.only(bottom: 8),
       child: ProcessingWrapper(
         key: ValueKey('pw_${v.id}'),
@@ -1298,7 +1559,9 @@ class InboxVacancyList extends StatelessWidget {
           onTapRelated: onTapRelated,
           multiSelectMode: multiSelectMode,
           checked: checkedIds.contains(v.id),
-          onCheckToggle: onCheckToggle == null ? null : () => onCheckToggle!(v.id),
+          onCheckToggle: onCheckToggle == null
+              ? null
+              : () => onCheckToggle!(v.id),
           onLongPress: onLongPress == null ? null : () => onLongPress!(v.id),
         ),
       ),
@@ -1350,9 +1613,9 @@ class _SectionHeader extends StatelessWidget {
             child: Text(
               label,
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: cs.onSurfaceVariant,
-                    letterSpacing: 0.5,
-                  ),
+                color: cs.onSurfaceVariant,
+                letterSpacing: 0.5,
+              ),
             ),
           ),
           Expanded(child: Divider(color: cs.outlineVariant, thickness: 1)),
@@ -1374,9 +1637,9 @@ class _NothingForTodayNote extends StatelessWidget {
         child: Text(
           'Nothing for today',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: cs.onSurfaceVariant,
-                fontStyle: FontStyle.italic,
-              ),
+            color: cs.onSurfaceVariant,
+            fontStyle: FontStyle.italic,
+          ),
         ),
       ),
     );
@@ -1418,15 +1681,19 @@ class InboxBatchActionBar extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: BoxDecoration(
         color: cs.surfaceContainerHigh,
-        border: Border(top: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.4))),
+        border: Border(
+          top: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.4)),
+        ),
       ),
       child: running
           ? Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('$runningLabel: $done/$total',
-                    style: Theme.of(context).textTheme.labelMedium),
+                Text(
+                  '$runningLabel: $done/$total',
+                  style: Theme.of(context).textTheme.labelMedium,
+                ),
                 const SizedBox(height: 6),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(4),
@@ -1444,8 +1711,10 @@ class InboxBatchActionBar extends StatelessWidget {
           // narrow-panel constraint that caused the badge-row overflow bug).
           : Row(
               children: [
-                Text('$count selected',
-                    style: Theme.of(context).textTheme.labelMedium),
+                Text(
+                  '$count selected',
+                  style: Theme.of(context).textTheme.labelMedium,
+                ),
                 const Spacer(),
                 IconButton(
                   tooltip: 'Cancel',
@@ -1502,8 +1771,8 @@ class _NoResults extends StatelessWidget {
         msg,
         textAlign: TextAlign.center,
         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
       ),
     );
   }
@@ -1517,20 +1786,21 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final msg = switch (folder) {
-      'inbox'     => 'No new vacancies.\nThe RSS pipeline will add them automatically.',
-      'analyzed'  => 'No analyzed vacancies yet.',
+      'inbox' =>
+        'No new vacancies.\nThe RSS pipeline will add them automatically.',
+      'analyzed' => 'No analyzed vacancies yet.',
       'processed' => 'No CVs or covers generated yet.',
-      'applied'   => 'No applications sent yet.',
-      'archive'   => 'Archive is empty.',
-      _           => 'No vacancies.',
+      'applied' => 'No applications sent yet.',
+      'archive' => 'Archive is empty.',
+      _ => 'No vacancies.',
     };
     return Center(
       child: Text(
         msg,
         textAlign: TextAlign.center,
         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
       ),
     );
   }
@@ -1545,15 +1815,17 @@ class _NoSelectionPlaceholder extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.work_outline,
-              size: 48,
-              color: Theme.of(context).colorScheme.onSurfaceVariant),
+          Icon(
+            Icons.work_outline,
+            size: 48,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
           const SizedBox(height: 12),
           Text(
             'Select a vacancy',
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),

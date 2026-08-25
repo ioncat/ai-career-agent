@@ -765,6 +765,12 @@ class VacancyDetailScreen extends ConsumerStatefulWidget {
   final VacancyListItem? vacancy;
   final VoidCallback? onSkipped;
   final void Function(int vacancyId)? onNavigateTo;
+  // Fires after Applied is toggled ON (2026-08-25) — Applied relocates the
+  // vacancy to a different folder just like Skip/Delete does, so the caller
+  // (vacancy_inbox_screen.dart) advances the keyboard selection the same
+  // way it does after _onSkipped. Does NOT fire on toggle-OFF — un-applying
+  // doesn't necessarily move the card out of the folder currently in view.
+  final VoidCallback? onApplied;
 
   const VacancyDetailScreen({
     super.key,
@@ -773,6 +779,7 @@ class VacancyDetailScreen extends ConsumerStatefulWidget {
     this.vacancy,
     this.onSkipped,
     this.onNavigateTo,
+    this.onApplied,
   });
 
   @override
@@ -906,7 +913,7 @@ class _VacancyDetailScreenState extends ConsumerState<VacancyDetailScreen>
                 onDismiss: () => setState(() => _errorBannerDismissed = true),
               ),
             // Sticky action bar
-            _ActionBar(vacancyId: widget.vacancyId, url: widget.url, role: role, status: status, vacancy: widget.vacancy, tabController: _tabController),
+            _ActionBar(vacancyId: widget.vacancyId, url: widget.url, role: role, status: status, vacancy: widget.vacancy, tabController: _tabController, onApplied: widget.onApplied),
             // Tab bar
             TabBar(
               controller: _tabController,
@@ -1444,6 +1451,7 @@ class _ActionBar extends ConsumerStatefulWidget {
   final String status;
   final VacancyListItem? vacancy;
   final TabController tabController;
+  final VoidCallback? onApplied;
 
   const _ActionBar({
     required this.vacancyId,
@@ -1452,6 +1460,7 @@ class _ActionBar extends ConsumerStatefulWidget {
     required this.tabController,
     this.status = 'analyzed',
     this.vacancy,
+    this.onApplied,
   });
 
   @override
@@ -1521,7 +1530,14 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
     setState(() { _applied = next; _loadingApplied = true; });
     try {
       await _repo.setApplied(widget.vacancyId, next);
-      if (mounted) ref.read(vacancyListProvider.notifier).refresh();
+      if (mounted) {
+        ref.read(vacancyListProvider.notifier).refresh();
+        // Only on toggle-ON: Applied relocates the vacancy to a different
+        // folder, same as Skip/Delete, so the keyboard selection advances
+        // the same way (2026-08-25). Toggle-OFF doesn't get the same
+        // treatment — un-applying doesn't necessarily move the card.
+        if (next) widget.onApplied?.call();
+      }
     } catch (_) {
       if (mounted) setState(() => _applied = !next);
     } finally {

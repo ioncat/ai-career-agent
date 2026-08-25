@@ -14,6 +14,7 @@ from tools.cv_analyze import (
     _parse_phase2_data,
     _parse_vacscore_dims,
     _rec_label_to_base,
+    _reconcile_vacancy_score,
     _split_semicolons,
 )
 
@@ -185,6 +186,35 @@ def test_parse_vacscore_dims_partial_table_returns_none():
     partial = "| company_tier | 3/4 | reason |\n| seniority | 4/4 | reason |"
     result = _parse_vacscore_dims(partial)
     assert result is None  # not all 8 dims present
+
+
+# ── _reconcile_vacancy_score ──────────────────────────────────────────────────
+# Found live on vacancies #1268 and #1192 (2026-08-25): the LLM writes the §1.7
+# "**VScore:** X.X/10" prose by hand and it can drift from the dim table on the
+# same page. PHASE1_SAMPLE above is itself an example — its dims compute to 9.0,
+# not the 8.1 written in the prose line.
+
+def test_reconcile_vacancy_score_fixes_mismatch():
+    fixed = _reconcile_vacancy_score(PHASE1_SAMPLE)
+    assert "**VScore:** 9.0/10" in fixed
+    assert "**VScore:** 8.1/10" not in fixed
+
+
+def test_reconcile_vacancy_score_only_touches_the_vscore_line():
+    fixed = _reconcile_vacancy_score(PHASE1_SAMPLE)
+    # Everything else (role, dim table, role balance) must survive untouched.
+    assert "**Role:** Product Manager" in fixed
+    assert "| company_tier | 4/4 | top global brand |" in fixed
+
+
+def test_reconcile_vacancy_score_noop_without_dim_table():
+    text = "**Role:** PM\n**VScore:** 5.0/10\nNo dim table here."
+    assert _reconcile_vacancy_score(text) == text
+
+
+def test_reconcile_vacancy_score_noop_without_vscore_line():
+    text = PHASE1_SAMPLE.replace("**VScore:** 8.1/10", "")
+    assert _reconcile_vacancy_score(text) == text
 
 
 # ── _parse_fit_dimensions ─────────────────────────────────────────────────────
