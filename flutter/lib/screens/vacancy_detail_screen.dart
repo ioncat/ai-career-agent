@@ -2104,7 +2104,63 @@ class _VacancyHero extends StatelessWidget {
           reasons: vacancy?.blockerReasons ?? const [],
           compact: true,
         ),
+        if (p2.warnings.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          _WarningsBanner(warnings: p2.warnings),
+        ],
       ],
+    );
+  }
+}
+
+/// Standalone, high-visibility warnings block — pulled out of Quick Overview
+/// (2026-08-26): a JD-structured warning (e.g. hybrid format tied to a specific
+/// office city) was correctly flagged by Phase 2, but buried as one small row
+/// among Category/Key Barriers/Hidden Risks in Quick Overview and went unnoticed
+/// (vacancy #1228). Shown right under the Fit/Attraction + pre-filter block so
+/// it can't be missed before the candidate decides to apply.
+class _WarningsBanner extends StatelessWidget {
+  final List<String> warnings;
+
+  const _WarningsBanner({required this.warnings});
+
+  @override
+  Widget build(BuildContext context) {
+    const bg = Color(0xFFFFF8E1);
+    const border = Color(0xFFFFB300);
+    const fg = Color(0xFF8D5A00);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: border, width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, size: 20, color: fg),
+              SizedBox(width: 8),
+              Text(
+                'Warnings',
+                style: TextStyle(fontWeight: FontWeight.w700, color: fg, fontSize: 15),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ...warnings.map((w) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(
+                  '•  $w',
+                  style: const TextStyle(color: fg, fontSize: 13.5, height: 1.35),
+                ),
+              )),
+        ],
+      ),
     );
   }
 }
@@ -2569,8 +2625,7 @@ class _QuickOverviewCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final hasContent = p2.category.isNotEmpty ||
         p2.keyBarriers.isNotEmpty ||
-        p2.hiddenRisks.isNotEmpty ||
-        p2.warnings.isNotEmpty;
+        p2.hiddenRisks.isNotEmpty;
 
     if (!hasContent) return const SizedBox.shrink();
 
@@ -2603,15 +2658,6 @@ class _QuickOverviewCard extends StatelessWidget {
               text: p2.hiddenRisks.join('; '),
               icon: Icons.warning_amber_rounded,
               iconColor: cs.error,
-            ),
-          ],
-          if (p2.warnings.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            _OverviewRow(
-              label: 'Warnings',
-              text: p2.warnings.join('; '),
-              icon: Icons.info_outline,
-              iconColor: const Color(0xFFF57F17),
             ),
           ],
         ],

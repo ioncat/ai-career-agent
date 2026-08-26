@@ -6,6 +6,10 @@
 
 ---
 
+## 2026-08-26
+
+- **Bug fix — Phase 2 `warnings` were correctly flagged but easy to miss in the Flutter UI.** Found live on vacancy #1228 (Meest China): Phase 2 correctly flagged the hybrid format (office 2 days/week specifically at the company's Kyiv office, near metro "Deviivska") as a warning, but it was rendered as one small text row inside `_QuickOverviewCard`, mixed in with Category/Key Barriers/Hidden Risks — the user read the Fit/Attraction/pre-filter block at the top and missed it. New standalone `_WarningsBanner` widget (`vacancy_detail_screen.dart`): a larger, amber-colored card placed directly under the Fit/Attraction scores + pre-filter banner (top of the Analysis tab), separated from the pros/cons analysis further down. Warnings row removed from `_QuickOverviewCard` to avoid duplication. `flutter analyze` clean; not manually verified in the running desktop app — no browser-preview path exists for this Flutter desktop build in this environment.
+
 ## 2026-08-25
 
 - **Bug fix — `scripts/profile_merge.py` crashed on Windows whenever the `claude` CLI's UTF-8 output (or the script's own confirmation print) contained non-ASCII characters (em dashes, checkmark emoji).** Found live while resolving Phase 2.5 objections for vacancy #1235: `subprocess.run(..., text=True)` decoded the CLI's stdout using the default Windows console codepage (cp1252), not UTF-8, so any non-Latin1 byte crashed the reader thread and left `result.stdout` as `None`; the script's own final `print(f"... ✅ ...")` hit the same cp1252 wall on encode, even after the decode side was fixed. Fix: `subprocess.run()` now passes `encoding="utf-8", errors="replace"` explicitly, and the script reconfigures `sys.stdout`/`sys.stderr` to UTF-8 at import time (same pattern already used in `scripts/vacancy_track.py`). Verified against two real Phase 2.5 write-backs on vacancy #1235 (RBAC/UAT evidence, then a data-migration correction) — both saved cleanly to `progressive_profile`.
