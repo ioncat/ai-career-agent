@@ -1,6 +1,6 @@
 # career-agent — Backlog
 
-> Last updated: 2026-08-25
+> Last updated: 2026-08-26 (session 2)
 > Rules: [documentation-conventions.md](documentation-conventions.md) · History: [CHANGELOG.md](CHANGELOG.md) · Specs: [Epics/](Epics/)
 
 **Priority legend:**
@@ -12,6 +12,9 @@
 ---
 
 ## 📌 Now
+
+### ✅ Delivered this session (2026-08-26) — Warnings UI fix
+`_WarningsBanner` — Phase 2 `warnings` (e.g. hybrid-format/office-city flags) moved out of `_QuickOverviewCard`'s buried row into a standalone, prominent amber block under Fit/Attraction+pre-filter (`vacancy_detail_screen.dart`). Found live on vacancy #1228 (Meest China) — warning was correct but invisible. Full write-up: [CHANGELOG.md → 2026-08-26](CHANGELOG.md). Follow-up audit (keyBarriers/hiddenRisks, same pattern) tracked below in P2.
 
 ### 🧊 Icebox — deterministic Stage 1 checks for years/remote/countries (fast follow to the Djinni requirements-sidebar delivery, 2026-08-12)
 **What:** the requirements sidebar (years experience, remote-only, countries) now flows into `JD.md` (delivered 2026-08-12 — see CHANGELOG), but only the English-level line got a dedicated deterministic Stage 1 check so far. Phase 1+2 already sees the rest as normal JD context, so this isn't urgent — worth a fast follow only if it proves valuable in practice (same `apply_title_stage`/`apply_language_stage` pattern in `tools/cv_prefilter.py`).
@@ -78,6 +81,21 @@ If the actual diagnostic text was printed to stdout instead (as it was here), `s
 ---
 
 ## 🔴 P0
+
+### `published_at` doesn't mean "published on the job board" in most cases — actually ingestion/fetch time (found 2026-08-26, vacancy #1228)
+**What:** two separate gaps, both confirmed live:
+1. **Manual/direct-URL path never captures a real platform date at all.** `tools/cv_fetch_jd.py`, `scripts/vacancy_track.py`, and `services/parser/app.py`'s `_parse_html()` (returns `title, markdown, company, company_profile_url` — no date) never scrape the job board's own "Опубліковано ..." line. For #1228, `published_at == created_at` to the second (2026-08-23 09:33:48) — pure ingestion timestamp. Confirmed live on Djinni's real page: actual text is **"Опубліковано 20 серпня"** — 3 days before our `created_at`.
+2. **Even the RSS/job-monitor auto-path silently overrides the real feed `pubDate`.** `web/api.py:728` `_sanitize_published_at()` replaces the feed's claimed date with "now" whenever it's >24h stale or in the future relative to first-seen time (deliberate guard against 2026-07-24 stale-pubDate incident, see code comment) — correct in intent, but means even "real" dates aren't always real.
+3. **UI compounds it**: `_PostedChip` (`vacancy_detail_screen.dart:2404`) literally renders `'Posted ${_relativeTime()}'` with no distinction between "platform published" and "we discovered it" — reads as authoritative to the user.
+**Why:** user's own workflow assumption ("published_at = when the job was posted on the platform") doesn't hold for manually-added/direct-URL vacancies (the more common path via `/analyze`), and only partially holds for RSS-sourced ones.
+**Fix direction (scoped, not started):**
+- Djinni: the requirements sidebar scrape already exists (`requirements_selector: "aside .card.card-body"`, `services/parser/config.py`) — the "Опубліковано ..." text sits nearby in the DOM but is confirmed NOT inside that selector (not present in scraped `## Vacancy Requirements` block for #1228). Needs a fresh look at raw HTML to find the right selector, then parse Ukrainian month-name dates (no year in the string — assume current year, roll back to prior year if the parsed date would be in the future).
+- Thread through: `services/parser/app.py` `_parse_html()` return tuple + `ParsedDocument` contract (`contracts/parsed_document.py`) + `adapters/parser_adapter.py` + `tools/cv_fetch_jd.py` → `insert_vacancy(published_at=...)`.
+- DOU not investigated — separate site config, may or may not expose the same data.
+- Cheap interim option (not chosen yet): relabel `_PostedChip` to "Added"/"Загружено" for honesty until real scraping lands, so the UI stops implying a platform date it doesn't have.
+**Found via:** user's own suspicion, confirmed by reading `web/api.py`/`database.py`/`cv_fetch_jd.py` (no date capture in the manual path) and one live check of Djinni's actual page (`https://djinni.co/jobs/843985-product-manager`) showing "Опубліковано 20 серпня" vs our stored 23 серпня.
+
+---
 
 ### Phase 3.6 Signal Audit operates at sentence granularity, not clause granularity — noise rides along on valid clauses (found 2026-07-25)
 **What:** `prompts/pm|generic/phase3_6_signal_audit.md` maps whole sentences to JD signals. A compound sentence with one signal-mapping clause and one noise clause gets marked ✅ entirely — the noise clause is never independently flagged. Found on vacancy #828 (Go Offer): "Managed enterprise customer relationships end-to-end — pre-sales, pilot negotiation, onboarding, and ongoing account management — translating direct client feedback into product priorities" — only the tail clause maps to a Go Offer signal (client feedback → priorities); the middle (pre-sales/pilot negotiation/account management) is pure enterprise-sales vocabulary with zero JD signal, and risks reading as a sales/CS background for a role that wants roadmap/engineering ownership. Same pattern on a second sentence, where a strong factual clause carried an unrelated meta-commentary tail past the audit unflagged.
@@ -309,6 +327,11 @@ No dual-availability state — the button's visibility is a direct, deterministi
 **Scope:** Flutter detail screen — new section/tab rendering the stored `analysis_json` (or raw markdown) content; decide whether to show structured (parsed p1/p2 fields) or raw markdown.
 
 ## 🟡 P2
+
+### Audit other Phase 1/2 fields for the same "correctly flagged but buried in UI" gap (added 2026-08-26)
+**What:** the `_WarningsBanner` fix (2026-08-26, see CHANGELOG) solved this for `p2.warnings` — check whether `hiddenRisks`/`keyBarriers` inside `_QuickOverviewCard` have the same visibility problem, or whether their current row treatment is prominent enough.
+**Why:** vacancy #1228 — backend correctly flagged a hybrid-Kyiv-office warning, but the user missed it because it sat as one small row among other fields; confirmed a real product decision (not cosmetic), see memory `feedback_critical_ui_signals_must_be_prominent`. Same rendering pattern may hide other decision-relevant signals.
+**Scope:** review `_QuickOverviewCard` in `vacancy_detail_screen.dart` for `keyBarriers`/`hiddenRisks`; decide per-field whether it needs its own prominent block like warnings, or stays list-style because it's lower-stakes.
 
 ### Backfill garbled `company` on 188 pre-existing Djinni vacancies (added 2026-07-25)
 **What:** 188 Djinni-sourced vacancies have a `company` value that's actually a truncated RSS-description sentence fragment (e.g. `"Headway Inc is a global tech company, revolutionizing..."` instead of `"Headway Inc"`) — root cause fixed same day (the correctly-parsed company from `services/parser`'s `<title>`-tag extraction now gets persisted, see CHANGELOG), but these 188 rows predate the fix and are stuck with the bad value.
