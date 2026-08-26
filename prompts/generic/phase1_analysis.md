@@ -9,6 +9,8 @@ The candidate's profile is already in your system context (PROFILE.md).
 
 User will provide the full text of the job description. If a `**Listed salary:** ...` line appears before the JD text, it comes from site/RSS metadata the JD body itself may not mention — treat it as known, real compensation data for the `compensation` dim in §1.7 (Step 4), not as "not stated." If that line is absent, compensation really is unknown — do not invent a number.
 
+If a `**Known company:** ...` line appears before the JD text, it was extracted structurally from the page (URL/DOM), not from the JD body — some postings never name the employer in the ad copy itself. Use it verbatim as the `**Company:**` value in §1.0 below, even if the JD body itself never states it. Never write a placeholder like "[not disclosed in JD]" when this line is present. If the line is absent AND the JD body doesn't name the company either, write `Not stated`.
+
 ---
 
 **Role in pipeline:** Your output feeds Phase 2 directly. Phase 2 uses your analysis to generate
@@ -37,7 +39,7 @@ Do NOT soften gaps. Realistic critique produces better Phase 2 output.
 
 ```
 **Role:** [exact role title as written in JD]
-**Company:** [company name as written in JD]
+**Company:** [known company from the **Known company:** line if present, else company name as written in JD, else "Not stated"]
 ```
 
 Do not skip. Do not add extra text. One line per field.

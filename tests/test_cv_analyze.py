@@ -105,6 +105,7 @@ def _make_vacancy_row(
     url: str = "https://djinni.co/jobs/123-backend/",
     analysis_json: str | None = None,
     salary: str | None = None,
+    company: str | None = None,
 ) -> MagicMock:
     """Build a mock aiosqlite.Row for a vacancy."""
     data = {
@@ -115,6 +116,7 @@ def _make_vacancy_row(
         "status": "fetched",
         "analysis_json": analysis_json,
         "salary": salary,
+        "company": company,
     }
     row = MagicMock()
     row.__getitem__ = lambda self, key: data[key]
@@ -310,6 +312,47 @@ async def test_analyze_no_salary_line_when_null(tmp_path):
 
     phase1_call_user = llm.complete.call_args_list[0][0][0]
     assert "**Listed salary:**" not in phase1_call_user
+
+
+# ── cv_analyze — company injection ──────────────────────────────────────────────
+# `vacancies.company` is extracted structurally by the parser (URL/DOM), not
+# from the JD body — some Djinni postings never name the employer in the ad
+# copy itself. Without this, Phase 1 writes a placeholder like
+# "[not disclosed in JD]" instead of the known name. Found live on #1284 and
+# #1297 (2026-08-26).
+
+@pytest.mark.asyncio
+async def test_analyze_prepends_company_when_present(tmp_path):
+    jd_path = _write_jd(tmp_path, content="# Backend Dev\n\nEmployer not named here.")
+    vacancy_row = _make_vacancy_row(jd_path, company="Coinask")
+    llm = _make_llm(side_effect=["Phase 1 output", _VALID_PHASE2])
+    ctx = _make_ctx(tmp_path, llm)
+    mock_db = _mock_db(vacancy_row=vacancy_row)
+
+    with patch("tools.cv_analyze.database", mock_db):
+        await cv_analyze(ctx, 1)
+
+    phase1_call_user = llm.complete.call_args_list[0][0][0]
+    assert "**Known company:** Coinask" in phase1_call_user
+    assert phase1_call_user.index("**Known company:**") < phase1_call_user.index("Employer not named here.")
+    # Phase 2 gets the full jd_text too (it's re-included in phase2_user).
+    phase2_call_user = llm.complete.call_args_list[1][0][0]
+    assert "**Known company:** Coinask" in phase2_call_user
+
+
+@pytest.mark.asyncio
+async def test_analyze_no_company_line_when_null(tmp_path):
+    jd_path = _write_jd(tmp_path)
+    vacancy_row = _make_vacancy_row(jd_path, company=None)
+    llm = _make_llm(side_effect=["Phase 1 output", _VALID_PHASE2])
+    ctx = _make_ctx(tmp_path, llm)
+    mock_db = _mock_db(vacancy_row=vacancy_row)
+
+    with patch("tools.cv_analyze.database", mock_db):
+        await cv_analyze(ctx, 1)
+
+    phase1_call_user = llm.complete.call_args_list[0][0][0]
+    assert "**Known company:**" not in phase1_call_user
 
 
 # ── cv_analyze — happy path ───────────────────────────────────────────────────
