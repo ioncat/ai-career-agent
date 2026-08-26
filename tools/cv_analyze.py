@@ -86,6 +86,17 @@ async def cv_analyze(ctx: RunContext[AgentDeps], vacancy_id: int) -> str:
     if salary:
         jd_text = f"**Listed salary:** {salary}\n\n{jd_text}"
 
+    # ── Fold in the DB-known company, if any ──────────────────────────────────
+    # Company is extracted structurally by the parser (URL/DOM), not from the
+    # JD body — some Djinni postings never name the employer in the ad copy
+    # itself. Without this, Phase 1 has no way to know the company and writes
+    # a placeholder like "[not disclosed in JD]" into §1.0, which then also
+    # clobbers the DB title via _extract_vacancy_title(). Found live on #1284
+    # and #1297 (2026-08-26).
+    company = vacancy["company"]
+    if company:
+        jd_text = f"**Known company:** {company}\n\n{jd_text}"
+
     # ── Load prompts from disk (skill_type-routed) ───────────────────────────
     skill_type = ctx.deps.skill_type
     skill_dir = _PROMPTS_DIR / skill_type

@@ -52,6 +52,11 @@ Phase 1 + Phase 2  [run immediately on JD input, no confirmation needed]
     `salary` is often extracted from RSS/site metadata the JD.md body never mentions, so skipping
     this check makes Phase 1 score compensation as "not stated" when the system already knows it.
     Found live twice (#1154, #1192) — see BACKLOG/CHANGELOG 2026-08-25.
+  → Same check for `company` on the vacancy DB row. If non-null, prepend `**Known company:** [value]`
+    before the JD text — `company` is extracted structurally by the parser (URL/DOM), and some Djinni
+    postings never name the employer in the ad copy body itself. Skipping this makes Phase 1 write a
+    placeholder like "[not disclosed in JD]" into §1.0, which also clobbers the DB title. Found live
+    on #1284 and #1297 (2026-08-26).
   → Create folder vacancies/inbox/[user_id]/[Role — Company]/   [silent]
   → Save full output to JD_analysis.md   [silent — no confirmation needed]
   → Save p1+p2 to DB analysis_json       [silent — see Analysis JSON section below]
