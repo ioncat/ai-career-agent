@@ -119,7 +119,8 @@ Certified AI-Empowered SAFe® Product Owner/Product Manager
 - Contacts: **copy verbatim** from PROFILE.md → `## Contacts` — markdown links, exact separators, all four items including portfolio. **NEVER use plain-text URLs. NEVER omit portfolio link.** Never add GitHub (rule 14).
 
 **Headline options:**
-- Default: `Product Owner / Product Manager`
+- **Headline always tracks the JD's own term.** JD says "Product Manager" → headline is `Product Manager`. JD says "Product Owner" → headline is `Product Owner`. This applies regardless of what any individual role's title in EXPERIENCE says (e.g. InsulaLabs is contractually fixed as "Product Owner" per rule 24b — that does NOT pull the headline toward a combined "Product Manager / Product Owner"). Confirmed 2026-08-25 (vacancy #1235).
+- If the JD itself uses both terms interchangeably or is ambiguous → combined `Product Manager / Product Owner` is the fallback default.
 - Adjust only if role archetype strongly differs (e.g. `Technical Program Manager`)
 
 **AI Tooling Paragraph — mandatory for all roles with any AI/product/digital signal:**

@@ -15,6 +15,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 _PROJECT_ROOT = Path(__file__).parent.parent
 _PROMPT_PATH = _PROJECT_ROOT / "prompts" / "pm" / "phase2_5_writeback.md"
 
@@ -68,6 +73,8 @@ def _call_llm(system: str, user: str) -> str:
         cmd,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         timeout=timeout,
         cwd=str(_PROJECT_ROOT),
     )
