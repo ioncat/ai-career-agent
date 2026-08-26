@@ -111,9 +111,29 @@ Narrative = a small story. Even 2–3 sentences must feel like the candidate spe
 
 ---
 
-## Output Format — ALWAYS TWO VARIANTS SIDE-BY-SIDE
+## Output Format — Variant C (Micro) is the default
 
-Generate **Варіант A** and **Варіант B** simultaneously. Display as two columns for direct comparison. User picks one (or requests a mix). Save only the approved version.
+**Default: generate Варіант C only.** It reads fastest, most people don't read a cover closely, so it must lead with the one thing that matters. Generate A and B only when the user explicitly asks for options/variants, or when Variant C genuinely doesn't fit the vacancy (see below).
+
+---
+
+**ВАРІАНТ C — Micro (default for most cases)**
+Two short paragraphs, no bullets, no header rhetoric. Paragraph 1: one sentence combining category signal with the single strongest JD-matching credential/claim (e.g. a required certification, the core delivery pattern). Paragraph 2: the standard broad-invitation closing (see Rules above). Nothing else — no pain-recognition sentence, no specific evidence. Confirmed 2026-08-26 (vacancy #1297) as the new default format for most vacancies.
+
+**Template (language matches vacancy language):**
+```
+[Greeting per company type]
+
+[1 sentence: category signal + strongest conceptual credential/claim relevant to this JD — no company names, no metrics.]
+
+[Standard broad-invitation closing — see Rules above.]
+
+[Candidate name]
+```
+
+Use Variant A (narrative) or B (bullets) instead of C only when:
+- The user explicitly asks to see options, or asks for "как обычно, два варианта"
+- The vacancy has a strong, specific pain signal in the JD that a 2-sentence cover would waste (rare — most JDs don't need it)
 
 ---
 
