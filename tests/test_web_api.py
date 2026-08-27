@@ -691,6 +691,39 @@ async def test_set_salary_not_found(client):
     assert resp.status_code == 404
 
 
+# ── PATCH /api/vacancies/{id}/tags ────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_set_tags(client):
+    """PATCH /api/vacancies/{id}/tags persists comma-separated value in DB."""
+    await database.insert_user(name="Tags1", telegram_chat_id=7210, skill_type="pm")
+    vid = await database.insert_vacancy(url="https://example.com/tags1", title="Tags Test", user_id=1)
+    resp = client.patch(f"/api/vacancies/{vid}/tags", json={"tags": "deftech,ai"})
+    assert resp.status_code == 200
+    assert resp.json()["tags"] == "deftech,ai"
+    row = await database.get_vacancy_by_id(vid)
+    assert row["tags"] == "deftech,ai"
+
+
+@pytest.mark.asyncio
+async def test_set_tags_clear(client):
+    """PATCH /api/vacancies/{id}/tags with empty string clears the field."""
+    await database.insert_user(name="Tags2", telegram_chat_id=7211, skill_type="pm")
+    vid = await database.insert_vacancy(url="https://example.com/tags2", title="Tags Clear", user_id=1)
+    await database.set_vacancy_tags(vid, "deftech")
+    resp = client.patch(f"/api/vacancies/{vid}/tags", json={"tags": ""})
+    assert resp.status_code == 200
+    row = await database.get_vacancy_by_id(vid)
+    assert row["tags"] is None
+
+
+@pytest.mark.asyncio
+async def test_set_tags_not_found(client):
+    """PATCH /api/vacancies/9999/tags returns 404 for missing vacancy."""
+    resp = client.patch("/api/vacancies/9999/tags", json={"tags": "deftech"})
+    assert resp.status_code == 404
+
+
 # ── POST /api/vacancies/{id}/analyze ─────────────────────────────────────────
 
 @pytest.mark.asyncio

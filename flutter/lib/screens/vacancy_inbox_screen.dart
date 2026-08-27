@@ -326,7 +326,8 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
         if (!v.role.toLowerCase().contains(q) &&
             !v.company.toLowerCase().contains(q) &&
             !v.id.toString().contains(q) &&
-            !v.roleTags.any((t) => t.toLowerCase().contains(q))) {
+            !v.roleTags.any((t) => t.toLowerCase().contains(q)) &&
+            !v.tags.any((t) => t.toLowerCase().contains(q))) {
           return false;
         }
       }

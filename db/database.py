@@ -206,6 +206,11 @@ async def init_db() -> None:
             # paths). Found live 2026-08-13: a vacancy applied to seconds ago
             # showed up second, not first. NULL = never applied / un-applied.
             "ALTER TABLE vacancies ADD COLUMN applied_at TEXT",
+            # Free-form user tags (comma-separated, e.g. "deftech,ai") — distinct
+            # from role_tags (auto-derived from role_balance, display-only, not
+            # stored). Used to flag batches of similar vacancies (e.g. a MilTech
+            # source) for tracking/filtering. 2026-08-27.
+            "ALTER TABLE vacancies ADD COLUMN tags TEXT",
         ]:
             try:
                 await db.execute(migration)
@@ -441,6 +446,7 @@ async def update_vacancy_fields(
     salary: str | None = None,
     company: str | None = None,
     company_website: str | None = None,
+    tags: str | None = None,
 ) -> None:
     """Update mutable fields of an existing vacancy (e.g. after fetching a queued record).
 
@@ -466,6 +472,9 @@ async def update_vacancy_fields(
     if company_website is not None:
         sets.append("company_website = ?")
         params.append(company_website)
+    if tags is not None:
+        sets.append("tags = ?")
+        params.append(tags)
     if not sets:
         return
     params.append(vacancy_id)
@@ -851,6 +860,16 @@ async def set_vacancy_salary(vacancy_id: int, salary: str) -> None:
         await db.commit()
 
 
+async def set_vacancy_tags(vacancy_id: int, tags: str) -> None:
+    """Set comma-separated user tags for a vacancy. Empty string clears the field."""
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE vacancies SET tags = ?, updated_at = datetime('now') WHERE id = ?",
+            (tags or None, vacancy_id),
+        )
+        await db.commit()
+
+
 async def list_vacancies(
     status: str | None = None,
     user_id: int | None = None,
@@ -881,8 +900,16 @@ async def list_vacancies(
         where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
         params.append(limit)
 
+        # COALESCE(published_at, created_at): RSS-sourced vacancies sort by their
+        # job-posting date as before; locally-added vacancies (via /analyze skill,
+        # no published_at) fall back to when we found out about them instead of
+        # sinking to the very end ordered oldest-first by id. Without this, once
+        # total vacancy count exceeds the caller's limit, every local addition
+        # became permanently invisible — found live 2026-08-27, vacancy #1303
+        # (added via /analyze, undetectable in Flutter's default 1000-row fetch
+        # despite being the newest thing in the DB).
         cursor = await db.execute(
-            f"SELECT * FROM vacancies {where} ORDER BY published_at DESC NULLS LAST, id ASC LIMIT ?",
+            f"SELECT * FROM vacancies {where} ORDER BY COALESCE(published_at, created_at) DESC, id DESC LIMIT ?",
             params,
         )
         return await cursor.fetchall()

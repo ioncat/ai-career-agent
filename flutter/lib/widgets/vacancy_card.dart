@@ -139,6 +139,7 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         if (v.site.isNotEmpty) SourceBadge(site: v.site),
+                        for (final tag in v.tags) _TagBadge(tag: tag),
                         if (isUnread) _NewBadge(),
                         if (v.republishedAt != null)
                           Tooltip(
@@ -305,6 +306,36 @@ class _NewBadge extends StatelessWidget {
         'New',
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
               color: const Color(0xFFE65100),
+              fontWeight: FontWeight.w700,
+              fontSize: 10,
+            ),
+      ),
+    );
+  }
+}
+
+// User-assigned free-form tag (e.g. "deftech") — distinct from role_tags
+// (auto-derived #discovery/#delivery/etc, shown lower on the card). Placed
+// in the top badge row, next to source, so batches of similarly-tagged
+// vacancies (e.g. a MilTech source) stay visually distinguishable at a
+// glance without opening the detail screen. 2026-08-27.
+class _TagBadge extends StatelessWidget {
+  final String tag;
+  const _TagBadge({required this.tag});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEDE7F6),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFF9575CD), width: 0.8),
+      ),
+      child: Text(
+        tag.toUpperCase(),
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: const Color(0xFF5E35B1),
               fontWeight: FontWeight.w700,
               fontSize: 10,
             ),

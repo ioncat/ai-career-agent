@@ -497,6 +497,15 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                   ref.read(vacancyListProvider.notifier).refresh();
                 },
               ),
+              const SizedBox(width: 16),
+              _TagsInline(
+                tags: widget.vacancy?.tags ?? const [],
+                fontSize: 16,
+                onSave: (v) async {
+                  await _repo.updateTags(widget.vacancyId, v);
+                  ref.read(vacancyListProvider.notifier).refresh();
+                },
+              ),
               const Spacer(),
               Text('#${widget.vacancyId}',
                   style: Theme.of(context)
@@ -948,6 +957,11 @@ class _VacancyDetailScreenState extends ConsumerState<VacancyDetailScreen>
                           onSalaryChanged: (v) async {
                             final apiUrl = ref.read(settingsProvider).valueOrNull?.apiUrl ?? 'http://localhost:8080';
                             await VacancyRepository(baseUrl: apiUrl).updateSalary(widget.vacancyId, v);
+                            ref.invalidate(vacancyListProvider);
+                          },
+                          onTagsChanged: (v) async {
+                            final apiUrl = ref.read(settingsProvider).valueOrNull?.apiUrl ?? 'http://localhost:8080';
+                            await VacancyRepository(baseUrl: apiUrl).updateTags(widget.vacancyId, v);
                             ref.invalidate(vacancyListProvider);
                           },
                         ),
@@ -1936,6 +1950,7 @@ class _VacancyHero extends StatelessWidget {
   final String? salary;
   final String? analyzedAt;
   final Future<void> Function(String)? onSalaryChanged;
+  final Future<void> Function(String)? onTagsChanged;
 
   const _VacancyHero({
     required this.p1,
@@ -1945,6 +1960,7 @@ class _VacancyHero extends StatelessWidget {
     this.salary,
     this.analyzedAt,
     this.onSalaryChanged,
+    this.onTagsChanged,
   });
 
   static void _openWebsite(String url) =>
@@ -1988,6 +2004,20 @@ class _VacancyHero extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // User tag badges (e.g. "DEFTECH") — shown above the title
+                  // itself, the most prominent spot on the screen, so a batch
+                  // of similarly-tagged vacancies stays identifiable at a
+                  // glance (2026-08-27).
+                  if ((vacancy?.tags ?? const []).isNotEmpty) ...[
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: [
+                        for (final tag in vacancy!.tags) _HeroTagBadge(tag: tag),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                  ],
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
@@ -2042,8 +2072,16 @@ class _VacancyHero extends StatelessWidget {
                     ),
                   ],
                   const SizedBox(height: 6),
-                  if (onSalaryChanged != null)
-                    _SalaryInline(salary: salary, onSave: onSalaryChanged!),
+                  Row(
+                    children: [
+                      if (onSalaryChanged != null)
+                        _SalaryInline(salary: salary, onSave: onSalaryChanged!),
+                      if (onTagsChanged != null) ...[
+                        const SizedBox(width: 16),
+                        _TagsInline(tags: vacancy?.tags ?? const [], onSave: onTagsChanged!),
+                      ],
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -2465,6 +2503,34 @@ class _AnalyzedChip extends StatelessWidget {
   }
 }
 
+// ── Hero tag badge ────────────────────────────────────────────────────────────
+
+class _HeroTagBadge extends StatelessWidget {
+  final String tag;
+  const _HeroTagBadge({required this.tag});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEDE7F6),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFF9575CD), width: 0.8),
+      ),
+      child: Text(
+        tag.toUpperCase(),
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: const Color(0xFF5E35B1),
+              fontWeight: FontWeight.w700,
+              fontSize: 11,
+              letterSpacing: 0.3,
+            ),
+      ),
+    );
+  }
+}
+
 // ── Salary inline edit ────────────────────────────────────────────────────────
 
 class _SalaryInline extends StatefulWidget {
@@ -2607,6 +2673,160 @@ class _SalaryInlineState extends State<_SalaryInline> {
             ],
           ],
         ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Tags inline edit ─────────────────────────────────────────────────────────
+// Mirrors _SalaryInline's click-to-edit pattern. Stores/edits as one
+// comma-separated string (matches the DB column and the PATCH payload);
+// display renders each comma-separated piece as its own chip.
+
+class _TagsInline extends StatefulWidget {
+  final List<String> tags;
+  final Future<void> Function(String) onSave;
+  final double fontSize;
+
+  const _TagsInline({this.tags = const [], required this.onSave, this.fontSize = 12});
+
+  @override
+  State<_TagsInline> createState() => _TagsInlineState();
+}
+
+class _TagsInlineState extends State<_TagsInline> {
+  bool _editing = false;
+  bool _saving = false;
+  late TextEditingController _ctrl;
+  late List<String> _committedTags;
+
+  @override
+  void initState() {
+    super.initState();
+    _committedTags = widget.tags;
+    _ctrl = TextEditingController(text: widget.tags.join(', '));
+  }
+
+  @override
+  void didUpdateWidget(_TagsInline old) {
+    super.didUpdateWidget(old);
+    if (old.tags != widget.tags && !_editing) {
+      _committedTags = widget.tags;
+      _ctrl.text = widget.tags.join(', ');
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final value = _ctrl.text.trim();
+    setState(() => _saving = true);
+    try {
+      await widget.onSave(value);
+      if (mounted) {
+        setState(() => _committedTags =
+            value.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList());
+      }
+    } finally {
+      if (mounted) setState(() { _saving = false; _editing = false; });
+    }
+  }
+
+  void _cancel() {
+    setState(() { _editing = false; _ctrl.text = _committedTags.join(', '); });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    if (_editing) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.label_outline, size: widget.fontSize + 2, color: cs.primary),
+          const SizedBox(width: 4),
+          SizedBox(
+            width: 220,
+            child: TextField(
+              controller: _ctrl,
+              autofocus: true,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: cs.onSurface, fontSize: widget.fontSize),
+              decoration: InputDecoration(
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                hintText: 'e.g. deftech, ai',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+              ),
+              onSubmitted: (_) => _save(),
+            ),
+          ),
+          const SizedBox(width: 4),
+          if (_saving)
+            const SizedBox(
+              width: 16, height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else ...[
+            IconButton(
+              icon: const Icon(Icons.check, size: 16),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+              onPressed: _save,
+              tooltip: 'Save',
+            ),
+            IconButton(
+              icon: const Icon(Icons.close, size: 16),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+              onPressed: _cancel,
+              tooltip: 'Cancel',
+            ),
+          ],
+        ],
+      );
+    }
+
+    final hasTags = _committedTags.isNotEmpty;
+    return Tooltip(
+      message: 'Click to edit tags',
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: () => setState(() => _editing = true),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.label_outline,
+                size: widget.fontSize + 2,
+                color: hasTags ? cs.primary : cs.onSurfaceVariant.withValues(alpha: 0.45),
+              ),
+              const SizedBox(width: 3),
+              Text(
+                hasTags ? _committedTags.join(', ') : 'Add tags…',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: hasTags
+                          ? cs.onSurfaceVariant
+                          : cs.onSurfaceVariant.withValues(alpha: 0.45),
+                      fontStyle: hasTags ? FontStyle.normal : FontStyle.italic,
+                      fontSize: widget.fontSize,
+                    ),
+              ),
+              if (hasTags) ...[
+                const SizedBox(width: 4),
+                Icon(Icons.edit, size: widget.fontSize - 1, color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
+              ],
+            ],
+          ),
         ),
       ),
     );

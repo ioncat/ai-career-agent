@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS vacancies (
     warnings      TEXT    NOT NULL DEFAULT '',
                                           -- semicolon-separated soft flags (imported from tracker or analysis)
     salary        TEXT,                   -- e.g. "$4500" or "3000–4500 USD"
+    tags          TEXT,                   -- comma-separated user tags, e.g. "deftech,ai" — free-form categorization, distinct from role_tags (auto-derived from role_balance)
     analysis_json TEXT,                   -- structured pipeline data per phase:
                                           -- {"p1":{company_type,role_archetype,role_balance,autonomy,dominant_culture},
                                           --  "p2":{fit_score,recommendation,category,key_barriers[],hidden_risks[],warnings[],salary,fit_dimensions{}},

@@ -1497,6 +1497,20 @@ async def api_set_salary(vacancy_id: int, req: SalaryUpdate):
     return {"vacancy_id": vacancy_id, "salary": req.salary}
 
 
+class TagsUpdate(BaseModel):
+    tags: str  # comma-separated, e.g. "deftech,ai"; empty string clears
+
+
+@app.patch("/api/vacancies/{vacancy_id}/tags")
+async def api_set_tags(vacancy_id: int, req: TagsUpdate):
+    """Set comma-separated user tags for a vacancy. Empty string clears the field."""
+    row = await database.get_vacancy_by_id(vacancy_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Vacancy not found")
+    await database.set_vacancy_tags(vacancy_id, req.tags)
+    return {"vacancy_id": vacancy_id, "tags": req.tags}
+
+
 # ── Notifications (EPIC-21 C5) ────────────────────────────────────────────────
 
 @app.get("/api/notifications")
