@@ -317,7 +317,11 @@ vacancies/
 **[user_id]** — read from `skill/active_user`. Plain integer string: `1`, `2`, etc.
 **[Role — Company]** — extracted from JD during analysis. Format: `Product Manager — Acme Corp`. Em dash ( — ).
 **Folder name format:** `{vacancy_id} — {Role — Company}` — e.g. `405 — Product Manager — MWDN`. ID from DB (upsert first, then mkdir).
+**With a tag** (see below): `{vacancy_id} — [TAG] — {Role — Company}` — e.g. `1303 — [DEFTECH] — AI Product Manager — Everstar`. Tag in brackets, uppercase, right after the ID so it's the first thing visible in a sorted folder listing.
 **DB title** — stores `Role — Company` only (without ID prefix).
+
+**Tags (user-assigned, free-form, comma-separated):**
+When the user flags a vacancy (or a batch/session) as belonging to a category — e.g. "these are deftech vacancies" — set the DB `tags` column via `vacancy_track.py update --id $VACANCY_ID --status [current status] --tags "deftech"` (multiple: `"deftech,ai"`), and include the primary tag in the folder name per the format above. This is distinct from `role_tags` (auto-derived from `role_balance`, display-only) — `tags` is explicit, persisted, and shown prominently in the Flutter UI (badge above the title, editable field next to Salary). Once a tag is set for a session/batch, apply it to every vacancy processed under that context without re-asking.
 
 **inbox_manual processed files** move to `vacancies/inbox/[user_id]/[Role — Company]/` — same standard.
 

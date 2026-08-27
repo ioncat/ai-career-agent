@@ -148,6 +148,17 @@ class VacancyRepository {
     if (response.statusCode != 200) throw Exception('Update salary failed: ${response.statusCode}');
   }
 
+  Future<void> updateTags(int vacancyId, String tags) async {
+    final uri = Uri.parse('$baseUrl/api/vacancies/$vacancyId/tags');
+    final response = await http
+        .patch(uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'tags': tags}))
+        .timeout(const Duration(seconds: 5));
+    if (response.statusCode == 404) throw Exception('Vacancy not found');
+    if (response.statusCode != 200) throw Exception('Update tags failed: ${response.statusCode}');
+  }
+
   Future<void> setApplied(int vacancyId, bool applied) async {
     final uri = Uri.parse('$baseUrl/api/vacancies/$vacancyId/applied');
     final response = await http

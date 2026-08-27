@@ -5,6 +5,13 @@ List<String> _parseStringList(dynamic raw) {
   return [];
 }
 
+// vacancies.tags is a raw comma-separated DB column (e.g. "deftech,ai"),
+// unlike role_tags/key_barriers which arrive as JSON arrays from analysis_json.
+List<String> _parseTags(dynamic raw) {
+  if (raw is! String || raw.isEmpty) return [];
+  return raw.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList();
+}
+
 class VacancyListItem {
   final int id;
   final String role;
@@ -31,6 +38,7 @@ class VacancyListItem {
   // not publishedAt/updatedAt (2026-08-13). Null when never applied.
   final String? appliedAt;
   final String? salary;
+  final List<String> tags;
   final List<String> roleTags;
   final int? duplicateOf;
   final String? republishedAt;
@@ -69,6 +77,7 @@ class VacancyListItem {
     this.applied = false,
     this.appliedAt,
     this.salary,
+    this.tags = const [],
     this.roleTags = const [],
     this.duplicateOf,
     this.republishedAt,
@@ -103,6 +112,7 @@ class VacancyListItem {
       applied: json['applied'] as bool? ?? false,
       appliedAt: json['applied_at'] as String?,
       salary: json['salary'] as String?,
+      tags: _parseTags(json['tags']),
       roleTags: _parseStringList(json['role_tags']),
       duplicateOf: json['duplicate_of'] as int?,
       republishedAt: json['republished_at'] as String?,
@@ -136,6 +146,7 @@ class VacancyListItem {
         'applied': applied,
         'applied_at': appliedAt,
         'salary': salary,
+        'tags': tags.join(','),
         'role_tags': roleTags,
         'duplicate_of': duplicateOf,
         'republished_at': republishedAt,

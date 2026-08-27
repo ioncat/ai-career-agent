@@ -101,8 +101,8 @@ async def cmd_upsert(url: str, title: str | None, user_id: int, path: str | None
 
 # ── update ────────────────────────────────────────────────────────────────────
 
-async def cmd_update(vacancy_id: int, status: str, path: str | None, title: str | None, salary: str | None) -> None:
-    """Update vacancy status. Optionally set/update markdown_path, title, salary."""
+async def cmd_update(vacancy_id: int, status: str, path: str | None, title: str | None, salary: str | None, tags: str | None = None) -> None:
+    """Update vacancy status. Optionally set/update markdown_path, title, salary, tags."""
     database.configure(_db_path())
     await database.init_db()
 
@@ -113,6 +113,8 @@ async def cmd_update(vacancy_id: int, status: str, path: str | None, title: str 
         fields["title"] = title
     if salary:
         fields["salary"] = salary
+    if tags:
+        fields["tags"] = tags
     if fields:
         await database.update_vacancy_fields(vacancy_id, **fields)
     await database.update_vacancy_status(vacancy_id, status)
@@ -264,6 +266,7 @@ def main() -> None:
     p_update.add_argument("--path", default=None, help="Update markdown_path")
     p_update.add_argument("--title", default=None, help="Update vacancy title")
     p_update.add_argument("--salary", default=None, help="Salary info, e.g. '$4500'")
+    p_update.add_argument("--tags", default=None, help="Comma-separated tags, e.g. 'deftech,ai'")
 
     # move-to-inbox
     p_move = sub.add_parser("move-to-inbox", help="Move inbox_manual folder to vacancies/inbox/{user_id}/")
@@ -308,6 +311,7 @@ def main() -> None:
                 path=args.path,
                 title=args.title,
                 salary=args.salary,
+                tags=args.tags,
             ))
         elif args.cmd == "update-json":
             asyncio.run(cmd_update_json(
