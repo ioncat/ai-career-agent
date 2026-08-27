@@ -1,6 +1,6 @@
 # career-agent — Backlog
 
-> Last updated: 2026-08-26 (session 2)
+> Last updated: 2026-08-27
 > Rules: [documentation-conventions.md](documentation-conventions.md) · History: [CHANGELOG.md](CHANGELOG.md) · Specs: [Epics/](Epics/)
 
 **Priority legend:**
@@ -457,6 +457,7 @@ No dual-availability state — the button's visibility is a direct, deterministi
 - **Telegram webhook mode** — config flag, currently long polling (push-only now, low value)
 - **asyncio.Queue → Redis** — when concurrent users justify it
 - **MCP Server** — Career Agent as tool for personal AI agents → [../discovery/mcp-server.md](../discovery/mcp-server.md)
+- **Conversational refinement gap (positioning question, not a ticket)** — real CV/cover quality currently only emerges through Claude Code dialogue (objection handling, self-review approval, signal-audit trims); Flutter app is a tracker/one-shot trigger, not where the work happens. Blocks any pivot toward a standalone (non-Claude-Code) user. Needs a decision, not code, before picking a direction → [../discovery/conversational-refinement-gap.md](../discovery/conversational-refinement-gap.md)
 - **Extensions** — `yt_transcribe.py`, `quote_store.py`, `email_draft.py`, job auto-submit (feasibility research first)
 - **Unit Economics Dashboard** — `GET /api/economics` + Chart.js (cost/vacancy, phase breakdown, cache efficiency, spend). ⚠️ Before aggregating `cost_usd`/`input_tokens`/`output_tokens`: `claude_cli` rows store these as literal `0` (not NULL, no real data — `core/llm_client.py:704-719`), indistinguishable from genuinely-free. Exclude/footnote `WHERE provider='claude_cli'` explicitly instead of summing — see [per-phase-llm-routing.md](../discovery/per-phase-llm-routing.md).
 - **Polish & docs** — README Mermaid diagrams, QUICKSTART.md, USER_GUIDE.md
