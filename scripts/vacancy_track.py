@@ -61,6 +61,8 @@ try:
 except ImportError:
     pass
 
+from core.vacancy_tags import classify as classify_tags
+from core.vacancy_tags import merge_tags
 from db import database
 
 
@@ -113,8 +115,23 @@ async def cmd_update(vacancy_id: int, status: str, path: str | None, title: str 
         fields["title"] = title
     if salary:
         fields["salary"] = salary
+
+    # Merge in explicit --tags plus keyword-based auto tags (see
+    # core/vacancy_tags.py) whenever a JD path is (re)attached here — this is
+    # the convergence point for the Claude Code /analyze skill's manual-inbox
+    # and batch flows, which never go through tools/cv_fetch_jd.py.
+    existing = await database.get_vacancy_by_id(vacancy_id)
+    current_tags = existing["tags"] if existing else None
     if tags:
-        fields["tags"] = tags
+        current_tags = merge_tags(current_tags, [t.strip() for t in tags.split(",") if t.strip()])
+    if path:
+        jd_file = Path(path)
+        if jd_file.exists():
+            auto_tags = classify_tags(jd_file.read_text(encoding="utf-8", errors="ignore"))
+            current_tags = merge_tags(current_tags, auto_tags)
+    if current_tags:
+        fields["tags"] = current_tags
+
     if fields:
         await database.update_vacancy_fields(vacancy_id, **fields)
     await database.update_vacancy_status(vacancy_id, status)

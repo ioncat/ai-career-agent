@@ -26,6 +26,8 @@ from pydantic_ai import RunContext
 
 from adapters.parser_adapter import ParserError
 from core.deps import AgentDeps
+from core.vacancy_tags import classify as classify_tags
+from core.vacancy_tags import merge_tags
 from db import database
 
 log = logging.getLogger(__name__)
@@ -134,13 +136,17 @@ async def fetch_jd(deps: AgentDeps, url: str) -> int:
     # dedup lookup then fails, the vacancy is still fully usable (JD openable,
     # status transitions to 'fetched' below) instead of silently orphaned.
     markdown_path = str(jd_path)
+    # Keyword-based segment tags (igaming/deftech/mobile/etc, see
+    # core/vacancy_tags.py) — additive, never clobbers a manually-set tag.
+    auto_tags = classify_tags(doc.markdown)
+    tags = merge_tags(existing["tags"] if existing else None, auto_tags)
     if existing and existing["status"] in ("queued", "fetching"):
         await database.update_vacancy_fields(
             vacancy_id, title=doc.title, site=site, markdown_path=markdown_path,
-            company=doc.company,
+            company=doc.company, tags=tags or None,
         )
     else:
-        await database.update_vacancy_fields(vacancy_id, markdown_path=markdown_path)
+        await database.update_vacancy_fields(vacancy_id, markdown_path=markdown_path, tags=tags or None)
 
     # ── EPIC-26: content hash + duplicate detection ───────────────────────────
     # Non-fatal — a dedup failure shouldn't undo the successful fetch above.
