@@ -17,18 +17,23 @@ import '../widgets/polling_progress_bar.dart';
 import '../widgets/processing_wrapper.dart' show SnakePainter;
 import '../widgets/status_line.dart';
 import 'vacancy_inbox_screen.dart';
+import 'analytics_screen.dart';
 import 'settings_screen.dart';
 
-// Nav destinations — 5-stage taxonomy (mirrors core/vacancy_stage.py) + Settings.
-// Order must match _AppShellState._folders below (index-aligned).
+// Nav destinations — 5-stage taxonomy (mirrors core/vacancy_stage.py) + Analytics + Settings.
+// Order must match _AppShellState._folders below (index-aligned for the first 5).
 const _kNavItems = [
   _NavItem(Icons.work,             Icons.work_outline,            'Inbox'),
   _NavItem(Icons.fact_check,       Icons.fact_check_outlined,      'Analyzed'),
   _NavItem(Icons.description,      Icons.description_outlined,     'Processed'),
   _NavItem(Icons.check_circle,     Icons.check_circle_outline,    'Applied'),
   _NavItem(Icons.archive,          Icons.archive_outlined,         'Archive'),
+  _NavItem(Icons.bar_chart,        Icons.bar_chart_outlined,       'Analytics'),
   _NavItem(Icons.settings,         Icons.settings_outlined,        'Settings'),
 ];
+
+const _kAnalyticsIndex = 5;
+const _kSettingsIndex = 6;
 
 // Canvas gradient (matches DESIGN.md decorative background)
 const _kCanvasGradient = LinearGradient(
@@ -219,7 +224,9 @@ class _AppShellState extends ConsumerState<AppShell> {
                                   child: _selectedIndex < _folders.length
                                       ? VacancyInboxScreen(
                                           folder: _folders[_selectedIndex])
-                                      : const SettingsScreen(),
+                                      : _selectedIndex == _kAnalyticsIndex
+                                          ? const AnalyticsScreen()
+                                          : const SettingsScreen(),
                                 ),
                               ],
                             ),
@@ -361,12 +368,18 @@ class _AppNavRail extends StatelessWidget {
                 ),
               ),
             ),
-            // Settings (index 5) — at the bottom, rarely used
+            // Analytics + Settings — at the bottom, rarely used
             _NavRailItem(
-              item: _kNavItems[5],
-              selected: selectedIndex == 5,
+              item: _kNavItems[_kAnalyticsIndex],
+              selected: selectedIndex == _kAnalyticsIndex,
+              badgeCount: 0,
+              onTap: () => onSelected(_kAnalyticsIndex),
+            ),
+            _NavRailItem(
+              item: _kNavItems[_kSettingsIndex],
+              selected: selectedIndex == _kSettingsIndex,
               badgeCount: unreadNotifCount,
-              onTap: () => onSelected(5),
+              onTap: () => onSelected(_kSettingsIndex),
             ),
             const SizedBox(height: 12),
           ],

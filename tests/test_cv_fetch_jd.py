@@ -70,6 +70,7 @@ def _vacancy_row(
     site: str = "djinni",
     markdown_path: str = "/vacancies/inbox/1/42 — Backend Dev/JD.md",
     status: str = "fetched",
+    tags: str | None = None,
 ) -> MagicMock:
     row = MagicMock()
     data = {
@@ -78,6 +79,7 @@ def _vacancy_row(
         "site": site,
         "markdown_path": markdown_path,
         "status": status,
+        "tags": tags,
     }
     row.__getitem__ = lambda self, key: data[key]
     return row
