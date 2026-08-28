@@ -125,6 +125,14 @@ Candidate's actual English level is B2 (per PROFILE.md → Settings). Read every
 
 ---
 
+## North Star Alignment Check (internal only — do NOT output label, but MANDATORY)
+
+Read the Phase 1 North Star sentence (§1.0.5). Read the drafted SUMMARY cold, as if seeing it for the first time. Does the SUMMARY read as a direct answer to the North Star, or does it just list generic competencies that could apply to any vacancy?
+
+**If it doesn't clearly answer the North Star: add to 🔧 (not ❌ — this is a positioning-strength gap, not a rule violation) with a specific rewrite direction naming which North Star sub-goal is missing.**
+
+---
+
 ## Primary Asset vs. Supporting Roles Check (internal only — do NOT output label)
 
 Every tailored CV has 1–2 roles that carry the primary fit signal for this vacancy's main requirement. All other roles are structurally weaker in direct relevance — but must not be left generic or neutral.

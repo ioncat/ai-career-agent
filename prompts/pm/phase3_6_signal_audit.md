@@ -50,6 +50,12 @@ Per role — list only ⚠️ and 🗑️ findings. ✅ sentences not listed ind
 🗑️ Sentences to remove: N
   - [Role]: "[excerpt]..."
 
+### North Star Check
+
+Golden Rule closing check (see SKILL.md). Read the Phase 1 North Star sentence (§1.0.5) and the saved SUMMARY together, one last time:
+
+`✅ / ⚠️ / ❌ — [one line: does the SUMMARY read as a direct answer to the North Star, or does it need one more pass?]`
+
 ---
 
 If no issues:

@@ -24,6 +24,8 @@ Most applicants are generic candidates. The HM's first screening question is: **
 
 **Three-element formula (always, in this order):**
 
+**Golden Rule — North Star Mirroring:** Category signal and Pain recognition should both trace back to the Phase 1 North Star (§1.0.5) — the cover's opening is the North Star image reflected back at the reader, not a separate, independently-invented framing.
+
 1. **Category signal** — immediately establish you've done this type of work. Not "X years of experience" — that's generic. Name the specific category the vacancy is hiring for and claim it directly with your strongest evidence.
 
 2. **Pain recognition** — mirror their specific organisational pain in your own words. Show you understand the context: who the stakeholders are, what's broken, what they're trying to fix. One sentence. No JD phrases verbatim.
