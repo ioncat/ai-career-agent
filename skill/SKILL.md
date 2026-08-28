@@ -15,6 +15,22 @@ description: >
 
 ---
 
+## Golden Rule — North Star Mirroring
+
+**Confirmed 2026-08-27, vacancy #1307.** Marketing's core principle applies across the whole pipeline: understand what's in the employer's head (the Phase 1 North Star — the one-sentence outcome the company is actually paying for) and consciously reflect that same image back through the CV and cover — not just by checking off individual JD signals, but by making the SUMMARY and cover opening recognizably answer the North Star sentence itself.
+
+This runs end to end, not as a single-phase check:
+- **Phase 1** — North Star (§1.0.5) is the source of truth; everything downstream traces back to it.
+- **Phase 2 Adaptation Plan** — reframing actions should point toward North Star language, not only toward individual signal coverage.
+- **Phase 3 CV draft** — the SUMMARY must consciously echo the North Star's own image (paraphrased, never JD-verbatim — see Phase 3.7 JD-Echo Risk) so the opening paragraph reads as a direct answer to "what result is this company buying."
+- **Phase 3.5 self-review** — includes a North Star Alignment check alongside the existing word-frequency/tools checks.
+- **Phase 3.6 signal audit** — ends with an explicit North Star Check line (✅/⚠️/❌) — the "четкая сверка" (clear compliance check) the pipeline closes on before Phase 4.
+- **Phase 4 Cover** — category signal + pain recognition should trace to the same North Star image, not a separate framing.
+
+Applies to both `pm` and `generic` skill_type prompt sets.
+
+---
+
 ## Language Rules
 
 **Output language** (user communication + JD_analysis.md):

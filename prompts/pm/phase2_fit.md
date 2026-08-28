@@ -185,6 +185,8 @@ This is advisory only — it informs the "Генерируем CV?" decision, it
 
 **Always (regardless of recommendation), provide reframing actions:**
 
+**Golden Rule — North Star Mirroring:** every reframing action should also serve the Phase 1 North Star (§1.0.5), not only individual signal coverage. The CV isn't just answering separate JD requirements — it's answering "what result is this company buying," expressed in the North Star sentence. Frame at least the lead reframing action in North Star terms.
+
 Provide 3–5 concrete reframing actions derived from the signal table. Each action = specific and actionable.
 
 Lead with archetype delta correction if JD archetype ≠ candidate's current CV framing.

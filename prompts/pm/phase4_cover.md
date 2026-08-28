@@ -49,6 +49,8 @@ The CV already contains all evidence. The cover must NOT repeat or reference spe
 
 **Three-element formula (always, in this order):**
 
+**Golden Rule — North Star Mirroring:** Category signal and Pain recognition should both trace back to the Phase 1 North Star (§1.0.5) — the cover's opening is the North Star image reflected back at the reader, not a separate, independently-invented framing.
+
 1. **Category signal** — establish the type of work at a conceptual level. Not "6+ years of PM experience" — that's generic. Not "at HostiServer I did X" — that's the CV. Instead: claim the category in terms of what kind of PM you are and how you work. Confident, not listed.
 
 2. **Pain recognition** — mirror their specific organisational pain in your own words. Show you understand the context: what's broken, what they're trying to fix. One sentence. No JD phrases verbatim. No evidence needed here — just understanding.

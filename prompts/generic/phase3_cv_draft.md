@@ -39,6 +39,10 @@ User will provide:
 
 ---
 
+## Golden Rule — North Star Mirroring (SUMMARY, primary rule)
+
+Before writing SUMMARY, re-read the Phase 1 North Star sentence (§1.0.5 in JD_analysis.md). The SUMMARY must read as a direct, paraphrased answer to it, not a generic positioning statement and never JD-verbatim (see rule 14 / Phase 3.7 JD-Echo Risk) — the same image the employer has in mind, reflected back in the candidate's own words. This takes priority over the default Tailoring Logic when the two would pull in different directions.
+
 ## CV Structure
 
 Output valid markdown exactly as shown below. Do NOT substitute `•` for `-`. Do NOT omit `#`/`##`/`###` prefixes. Do NOT skip blank lines before lists.
