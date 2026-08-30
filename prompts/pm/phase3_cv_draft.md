@@ -123,6 +123,7 @@ Certified AI-Empowered SAFe® Product Owner/Product Manager
 - Contacts: **copy verbatim** from PROFILE.md → `## Contacts` — markdown links, exact separators, all four items including portfolio. **NEVER use plain-text URLs. NEVER omit portfolio link.** Never add GitHub (rule 14).
 
 **Headline options:**
+- **Never append a narrow specialization qualifier like "(UX)" to the headline or Summary opening, even when the JD's own title uses it (confirmed 2026-08-30, vacancy #1333).** Candidate is explicit: he is not a UX specialist — UX is one part of Product work, not a separate title/discipline he claims. Headline stays plain "Product Manager" / "Product Owner"; UX signal goes into Summary/EXPERIENCE content, never into the title.
 - **Headline always tracks the JD's own term.** JD says "Product Manager" → headline is `Product Manager`. JD says "Product Owner" → headline is `Product Owner`. This applies regardless of what any individual role's title in EXPERIENCE says (e.g. InsulaLabs is contractually fixed as "Product Owner" per rule 24b — that does NOT pull the headline toward a combined "Product Manager / Product Owner"). Confirmed 2026-08-25 (vacancy #1235).
 - If the JD itself uses both terms interchangeably or is ambiguous → combined `Product Manager / Product Owner` is the fallback default.
 - Adjust only if role archetype strongly differs (e.g. `Technical Program Manager`)
@@ -130,7 +131,9 @@ Certified AI-Empowered SAFe® Product Owner/Product Manager
 **AI Tooling Paragraph — mandatory for all roles with any AI/product/digital signal:**
 
 1-component (most roles — daily practice only):
-> `AI tooling in daily practice (Claude, ChatGPT, Gemini) — requirements refinement, research synthesis, workflow validation. Personal portfolio at [ioncat.github.io](https://ioncat.github.io/).`
+> `AI tooling in daily practice (Claude, ChatGPT, Gemini) — requirements refinement, research synthesis, workflow validation, prototype creation. Personal portfolio at [ioncat.github.io](https://ioncat.github.io/).`
+
+**"Prototype creation" is a permanent, always-included item (confirmed 2026-08-28, vacancy #1332) — English and Ukrainian both. Unlike the rest of this list, it is not conditional on JD relevance.**
 
 2-component (AI/technical depth roles — explicit AI product ownership, LLM/technical PM, hands-on AI signal required):
 > `Built LLM pipelines hands-on — prompt architecture, context window management, response quality assessment — and applied that implementation depth to writing AI requirement specs complete enough for engineers to ship from. Active daily practice, not a side project. Personal portfolio at [ioncat.github.io](https://ioncat.github.io/).`

@@ -53,6 +53,163 @@ class TestClassify:
     def test_case_insensitive(self):
         assert classify("IGAMING COMPANY LOOKING FOR PM") == ["igaming"]
 
+    def test_deftech_strong_keyword_matches_regardless(self):
+        assert classify("We are a deftech startup building UAV software") == ["deftech"]
+
+    def test_deftech_miltech_keyword(self):
+        assert "deftech" in classify("Join our miltech recruitment agency")
+
+
+class TestDeftechCsrBoilerplate:
+    """Regression for 2026-08-31: an audit of applied vacancies found 5 of 10
+    "deftech"-tagged companies were false positives — the ubiquitous Ukrainian
+    job-posting CSR/DEI paragraph ("we support the armed forces", "we hire
+    military veterans", "we collect drones for charity") triggered the old
+    bare-substring keywords regardless of what the company actually builds."""
+
+    def test_support_armed_forces_boilerplate_does_not_tag_deftech(self):
+        text = "Ми системно підтримуємо сили оборони та долучаємось до ініціатив."
+        assert "deftech" not in classify(text)
+
+    def test_military_veterans_hiring_statement_does_not_tag_deftech(self):
+        text = "We proudly support diverse talent and military veterans."
+        assert "deftech" not in classify(text)
+
+    def test_volunteer_drone_collection_does_not_tag_deftech(self):
+        text = "Допомагаємо ЗСУ, збираємо дрони, підтримуємо дитячі будинки."
+        assert "deftech" not in classify(text)
+
+    def test_fundraising_for_armed_forces_does_not_tag_deftech(self):
+        text = "Кожен може приєднатися до збору коштів на збройні сили України."
+        assert "deftech" not in classify(text)
+
+    def test_real_deftech_still_matches_alongside_csr_boilerplate(self):
+        # A genuine defense-tech company can ALSO carry the same CSR
+        # paragraph — the strong keyword must still win.
+        text = (
+            "We are a deftech company building UAV systems. "
+            "We proudly support diverse talent and military veterans."
+        )
+        assert "deftech" in classify(text)
+
+    def test_weak_keyword_outside_boilerplate_still_matches(self):
+        # "military" used to actually describe the product, not CSR filler.
+        assert classify("We build military drone systems") == ["deftech"]
+
+
+class TestDeftechExtendedFalseContext:
+    """Regression for 2026-08-31 (external audit): the first CSR-boilerplate
+    fix only closed one false-positive class — 30 of 51 deftech-tagged
+    vacancies were still wrong via HR/EEO boilerplate, the cybersecurity
+    homonym, construction-drone use, and agency/recruiting mentions that
+    don't describe the posting company's own product."""
+
+    def test_english_veteran_hiring_boilerplate_does_not_tag(self):
+        text = "Our veteran career and empowerment program ensures veterans and active military personnel receive support."
+        assert "deftech" not in classify(text)
+
+    def test_military_leave_benefit_does_not_tag(self):
+        text = "Benefits include military leave policy and special health insurance options."
+        assert "deftech" not in classify(text)
+
+    def test_donation_to_defense_forces_does_not_tag(self):
+        text = "The company is among the top 10 largest donors to Ukraine's defense forces and humanitarian initiatives."
+        assert "deftech" not in classify(text)
+
+    def test_generic_defense_forces_charity_does_not_tag(self):
+        text = "Total contributions to the defense forces, social initiatives, and charitable projects have exceeded UAH 30M."
+        assert "deftech" not in classify(text)
+
+    def test_cyber_defense_homonym_does_not_tag(self):
+        text = "The customer is a one-stop-shop for online cyber defense solutions in information security."
+        assert "deftech" not in classify(text)
+
+    def test_client_defense_business_idiom_does_not_tag(self):
+        text = "Their team of experts put the client's defense ahead in order to solve the issue."
+        assert "deftech" not in classify(text)
+
+    def test_curly_apostrophe_still_strips_correctly(self):
+        # Same idiom as above, curly apostrophe (’, U+2019) — common in
+        # professionally typeset JD text, silently bypassed the ASCII-only
+        # pattern before text normalization was added.
+        text = "Their team of experts put the client’s defense ahead of everything."
+        assert "deftech" not in classify(text)
+
+    def test_construction_drone_scan_does_not_tag(self):
+        text = "AI-powered construction platform that connects lidar scans, drone scans, and 360 site capture."
+        assert "deftech" not in classify(text)
+
+    def test_dronedeploy_product_name_does_not_tag(self):
+        # Bare "drone" substring inside a construction-tech product name.
+        text = "Integrates with openspace, buildots, doxel, and dronedeploy for site management."
+        assert "deftech" not in classify(text)
+
+    def test_brave1_hackathon_mention_does_not_tag(self):
+        # Exact shape observed live (Artellence, ×4 postings) — Ukrainian
+        # phrasing, not translated, since that's the only form seen so far.
+        text = "Відвідуємо osint-конференції та хакатони, співпрацюємо з defensetech об'єднанням Brave1."
+        assert "deftech" not in classify(text)
+
+    def test_client_vertical_list_does_not_tag(self):
+        text = "We serve clients across several verticals, including healthcare, fintech, telecom, logistics, and defence."
+        assert "deftech" not in classify(text)
+
+    def test_miltech_domain_nice_to_have_does_not_tag(self):
+        text = "Nice to have: experience in the miltech domain; experience in edtech and fintech domains."
+        assert "deftech" not in classify(text)
+
+    def test_military_reservation_perk_does_not_tag(self):
+        text = "Benefits: full-remote work environment, military reservation, 20 business days of paid vacation."
+        assert "deftech" not in classify(text)
+
+    def test_serving_in_the_military_support_does_not_tag(self):
+        text = "Ongoing care and support for employees serving in the military."
+        assert "deftech" not in classify(text)
+
+    def test_military_teammates_support_does_not_tag(self):
+        text = "Since the invasion, our foundation has supported Ukraine and our military teammates."
+        assert "deftech" not in classify(text)
+
+    def test_real_deftech_still_matches_recruiting_agency_client_role(self):
+        # Contrast: an agency describing a SPECIFIC real defense-tech
+        # client's actual work still counts — only generic capability/
+        # networking mentions (tested above) are excluded.
+        text = (
+            "We are Everstar, the first recruiting agency in MilTech. "
+            "Our client builds technology for Ukraine's defense and is scaling fast — "
+            "looking for an AI Product Manager to grow internal products."
+        )
+        assert "deftech" in classify(text)
+
+
+class TestOutsourcingFalseContext:
+    """Regression for 2026-08-30: a full-DB audit found 6 of 162
+    outsourcing-tagged vacancies were false positives — bare "agency"/
+    "outsourc" matched a JD contrasting ITSELF against agency work, or a
+    client-side/vendor mention unrelated to the hiring company."""
+
+    def test_negation_vs_agency_does_not_tag_outsourcing(self):
+        text = "Product company background (vs agency/outsource)"
+        assert "outsourcing" not in classify(text)
+
+    def test_negation_not_agency_does_not_tag_outsourcing(self):
+        text = "Experience working on product platform development (not agency or client delivery projects)."
+        assert "outsourcing" not in classify(text)
+
+    def test_agency_fees_client_mention_does_not_tag_outsourcing(self):
+        text = "Automate localization and free up budget buried in agency fees and manual process."
+        assert "outsourcing" not in classify(text)
+
+    def test_partner_law_agency_benefit_does_not_tag_outsourcing(self):
+        text = "Law agency support through our partner law agency, regular performance reviews."
+        assert "outsourcing" not in classify(text)
+
+    def test_real_agency_company_still_matches(self):
+        assert "outsourcing" in classify("Come Back Agency supports US software and tech companies.")
+
+    def test_real_outsourcing_company_still_matches(self):
+        assert "outsourcing" in classify("Glorium Technologies is an innovative outsourcing company.")
+
 
 class TestMergeTags:
     def test_merge_into_empty(self):

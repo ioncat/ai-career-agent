@@ -101,15 +101,15 @@ The CV already contains all evidence. The cover must NOT repeat or reference spe
 
 ---
 
-## Narrative Variant — Voice Rule (NON-NEGOTIABLE)
+## First-Person Voice Rule (NON-NEGOTIABLE, applies to A and C)
 
-When Variant A (narrative) is selected, the text MUST be written in first person.
+**Variant A and Variant C (the default) must both be written in first person.** Confirmed 2026-08-30 (vacancy #1335) — a cover is a personal message, and an omitted-subject headline-style opener (fine for a CV) reads oddly here, like the candidate is describing someone else rather than speaking. Only Variant B (bullets) may use a neutral descriptive opener — its bullet format already reads as the candidate's own list, not third-person description.
 
-❌ Wrong: `"Product Owner з 5+ роками досвіду у B2B-платформах..."` — this describes someone, it is not a narrative.
+❌ Wrong: `"Product Owner з 5+ роками досвіду у B2B-платформах..."` — this describes someone, it is not the candidate speaking.
 
-✅ Right: `"Я — Product Owner, який працює з..."` / `"Займаюсь B2B-платформами, де..."` — told from the narrator's (candidate's) perspective.
+✅ Right: `"Я — Product Owner, який працює з..."` / `"Я Product Manager з досвідом..."` / `"Займаюсь B2B-платформами, де..."` — told from the narrator's (candidate's) perspective.
 
-Narrative = a small story. Even 2–3 sentences must feel like the candidate speaking, not a description of a CV entry. Variant B (bullets) may use a neutral descriptive opener — Variant A never may.
+Narrative = a small story. Even 2–3 sentences (or Variant C's single sentence) must feel like the candidate speaking, not a description of a CV entry.
 
 ---
 
@@ -126,7 +126,7 @@ Two short paragraphs, no bullets, no header rhetoric. Paragraph 1: one sentence 
 ```
 [Greeting per company type]
 
-[1 sentence: category signal + strongest conceptual credential/claim relevant to this JD — no company names, no metrics.]
+[1 sentence, first person: category signal + strongest conceptual credential/claim relevant to this JD — no company names, no metrics. E.g. "Я Product Manager з досвідом..." not "Product Manager з досвідом...".]
 
 [Standard broad-invitation closing — see Rules above.]
 

@@ -95,23 +95,24 @@ Pre-flight (ask once, before Phase 3):
   → Name variant: ask only if PROFILE.md → ## Name variants has more than one entry; single variant → use automatically, no ask
 
 Phase 3: CV Draft          [NOT shown to user — internal]
-Phase 3.5: Self-Review     [show to user, ask approval]
-  → Ask: "Вносим правки или всё ок?"
-  → Apply approved changes
+Phase 3.5: Self-Review     [review tables + verdict shown to user; CV body NEVER pasted in chat — see rule below]
   → Save [Name]_CV.md to existing folder (already created after Phase 1+2)
   → Generate PDF via http://localhost:8002/render → save PDF bytes
+  → Present a markdown link to the saved CV.md (and PDF) — per Rule 8, never paste the CV body itself
+  → Ask: "Вносим правки или всё ок?"
+  → Apply approved changes → re-save CV.md + PDF → re-present the link (still no inline text)
   → Save p3 to DB analysis_json          [silent — see Analysis JSON section below]
 
-Phase 3.6: Signal Audit    [runs after save, shown to user]
+Phase 3.6: Signal Audit    [runs after save, verdict shown to user — CV body still never pasted]
   → Read saved CV (EXPERIENCE section) + Signal Coverage Table from JD_analysis.md
   → For each sentence: assess value vs JD requirements (valuable / weak / remove)
   → Check coverage: all high/medium signals present in at least one role?
-  → Display audit report
-  → If 🗑️ sentences found: confirm with user → remove → re-save CV.md + PDF
+  → Display audit report (findings only, not the CV text)
+  → If 🗑️ sentences found: confirm with user → remove → re-save CV.md + PDF → re-present link
   → If ⚠️ only: present to user, they decide
   → If clean: proceed
 
-  → Display full CV text
+  → Present link to saved CV.md/PDF (Rule 8 — never paste full CV text in chat)
   → Ask: "Переходим к cover?"
 
   ↓ [OPT-IN, only if recommendation = apply AND fit_score ≥ 7, or user asks explicitly]
@@ -121,11 +122,11 @@ Phase 3.7: Editorial Audit  [opt-in final polish — see below]
   ↓ [user explicitly requests cover]
 
 Phase 4: Cover Message
-  → Review/approval cycle
+  → Review/approval cycle (verdict/summary in chat, never the full cover text — Rule 8)
   → Save [Name]_Cover.md
   → Generate PDF via http://localhost:8002/render → save [Name]_Cover.pdf
   → Save p4 to DB analysis_json          [silent — see Analysis JSON section below]
-  → Display full cover text
+  → Present link to saved Cover.md/PDF (Rule 8 — never paste full cover text in chat)
 ```
 
 **One question at a time. Never ask two questions in one message.**

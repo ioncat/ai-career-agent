@@ -38,6 +38,11 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
   Map<String, int> _primaryCounts = {};
   int _total = 0;
   int _untagged = 0;
+  // Same primary-tag slice, but only vacancies actually applied to (2026-08-24)
+  // — "where did my CVs actually go", not just "what's the market made of".
+  Map<String, int> _appliedCounts = {};
+  int _appliedTotal = 0;
+  int _appliedUntagged = 0;
 
   @override
   void didChangeDependencies() {
@@ -59,6 +64,9 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
       final vacancies = await repo.listVacancies(limit: 5000);
       final primaryCounts = <String, int>{};
       var untagged = 0;
+      final appliedCounts = <String, int>{};
+      var appliedUntagged = 0;
+      var appliedTotal = 0;
       for (final v in vacancies) {
         final primary = _primaryTag(v.tags);
         if (primary == null) {
@@ -66,12 +74,23 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
         } else {
           primaryCounts[primary] = (primaryCounts[primary] ?? 0) + 1;
         }
+        if (v.applied) {
+          appliedTotal++;
+          if (primary == null) {
+            appliedUntagged++;
+          } else {
+            appliedCounts[primary] = (appliedCounts[primary] ?? 0) + 1;
+          }
+        }
       }
       if (!mounted) return;
       setState(() {
         _primaryCounts = primaryCounts;
         _total = vacancies.length;
         _untagged = untagged;
+        _appliedCounts = appliedCounts;
+        _appliedTotal = appliedTotal;
+        _appliedUntagged = appliedUntagged;
         _loaded = true;
         _loading = false;
       });
@@ -116,12 +135,34 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
                   'Failed to load: $_error',
                   style: TextStyle(color: Theme.of(context).colorScheme.error),
                 )
-              else
+              else ...[
+                Text('Market', style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: 4),
+                Text(
+                  'Every vacancy seen — what the market is mostly made of.',
+                  style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                ),
+                const SizedBox(height: 16),
                 _TagChart(
                   tagCounts: _primaryCounts,
                   total: _total,
                   untagged: _untagged,
                 ),
+                const SizedBox(height: 40),
+                Text('Applied', style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: 4),
+                Text(
+                  'Same slice, only vacancies actually applied to — where the CVs went.',
+                  style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                ),
+                const SizedBox(height: 16),
+                _TagChart(
+                  tagCounts: _appliedCounts,
+                  total: _appliedTotal,
+                  untagged: _appliedUntagged,
+                  emptyMessage: 'No applications yet.',
+                ),
+              ],
             ],
           ),
         ),
@@ -134,8 +175,14 @@ class _TagChart extends StatelessWidget {
   final Map<String, int> tagCounts;
   final int total;
   final int untagged;
+  final String emptyMessage;
 
-  const _TagChart({required this.tagCounts, required this.total, required this.untagged});
+  const _TagChart({
+    required this.tagCounts,
+    required this.total,
+    required this.untagged,
+    this.emptyMessage = 'No vacancies loaded yet.',
+  });
 
   static const _palette = [
     Color(0xFF6750A4), Color(0xFF386A20), Color(0xFF8C4A2F),
@@ -148,7 +195,7 @@ class _TagChart extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
 
     if (total == 0) {
-      return Text('No vacancies loaded yet.', style: TextStyle(color: cs.onSurfaceVariant));
+      return Text(emptyMessage, style: TextStyle(color: cs.onSurfaceVariant));
     }
 
     final entries = tagCounts.entries.toList()
