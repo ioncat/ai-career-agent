@@ -296,6 +296,22 @@ async def test_apply_title_stage_domain_signal_also_writes():
     assert args[2][0].startswith("igaming:")
 
 
+@pytest.mark.asyncio
+async def test_apply_title_stage_casino_domain_signal_writes():
+    # Regression 2026-08-31: vacancy #898 "Casino Product Manager" was NOT
+    # caught by the deterministic title/domain check even though "Casino" is
+    # exactly as strong an igaming signal as "iGaming"/"Gambling"/"Betting" —
+    # those were the only words in _TITLE_DOMAIN_DENYLIST, "casino" was
+    # missing despite core/vacancy_tags.py's own igaming taxonomy listing it.
+    mock_db = _mock_db()
+    with patch("tools.cv_prefilter.database", mock_db):
+        result = await apply_title_stage(1, "Casino Product Manager")
+
+    assert result is True
+    args, kwargs = mock_db.set_vacancy_blocker.call_args
+    assert args[2][0].startswith("igaming:")
+
+
 # ── apply_language_stage (Djinni requirements sidebar, 2026-08-11) ─────────────
 
 @pytest.mark.asyncio

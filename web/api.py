@@ -785,6 +785,7 @@ async def api_new_vacancy(req: NewVacancyRequest):
                 # merge (never clobbers a manual tag) — safe to re-run on
                 # every republish, not just once.
                 md_path = existing["markdown_path"]
+                jd_text: str | None = None
                 if md_path:
                     jd_file = _PROJECT_ROOT / md_path if not Path(md_path).is_absolute() else Path(md_path)
                     if jd_file.exists():
@@ -796,6 +797,29 @@ async def api_new_vacancy(req: NewVacancyRequest):
                                 await database.set_vacancy_tags(existing["id"], new_tags)
                         except OSError as exc:
                             log.warning("api/new-vacancy: re-tag on republish failed v#%d (non-fatal): %s", existing["id"], exc)
+                # Stage 1 pre-filter (title/domain/language/location, deterministic
+                # — no LLM) normally runs inside RSSWatcher._process() right after a
+                # fresh fetch. on_vacancy_republished() sets status straight to
+                # 'fetched' (JD.md already exists, no re-fetch needed) instead of
+                # 'queued', so RSSWatcher's poll loop never picks the row up and this
+                # stage silently never ran — same shape of gap as the tagging fix
+                # right above. Found live 2026-08-31: vacancy #898 ("Casino Product
+                # Manager") republished with no Blocker badge, unlike its sibling
+                # #895 which only got flagged because the user manually ran Stage 2.
+                try:
+                    if await database.get_auto_check_title(existing["user_id"]):
+                        from tools.cv_prefilter import (
+                            apply_language_stage,
+                            apply_location_stage,
+                            apply_title_stage,
+                        )
+                        blocked = await apply_title_stage(existing["id"], existing["title"] or "")
+                        if not blocked and jd_text is not None:
+                            blocked = await apply_language_stage(existing["id"], jd_text)
+                            if not blocked:
+                                await apply_location_stage(existing["id"], jd_text)
+                except Exception as exc:
+                    log.warning("api/new-vacancy: prefilter stage 1 on republish failed v#%d (non-fatal): %s", existing["id"], exc)
                 log.info("api/new-vacancy: republished v#%d url=%s", existing["id"], req.url)
                 return {"vacancy_id": existing["id"], "status": "republished"}
             if not applied and status not in _ACTIVE_STATUSES:

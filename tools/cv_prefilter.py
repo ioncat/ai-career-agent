@@ -105,6 +105,7 @@ _TITLE_DOMAIN_DENYLIST = {
     "igaming": "igaming",
     "gambling": "igaming",
     "betting": "igaming",
+    "casino": "igaming",
     "mobile": "domain",
 }
 

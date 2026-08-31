@@ -510,6 +510,36 @@ async def test_new_vacancy_republish_missing_jd_file_is_non_fatal(client):
 
 
 @pytest.mark.asyncio
+async def test_new_vacancy_republish_runs_stage1_prefilter(client, tmp_path):
+    """Regression 2026-08-31 (vacancy #898): on_vacancy_republished() sets
+    status straight to 'fetched', bypassing RSSWatcher._process() entirely —
+    the only place Stage 1 (title/domain, deterministic) normally auto-runs.
+    A republished vacancy with a blocker-worthy title silently never got
+    checked. Republish must now run the same title stage RSSWatcher would."""
+    uid = await database.insert_user(name="RepubBlockerUser", telegram_chat_id=5011, skill_type="pm")
+    url = "https://jobs.dou.ua/companies/growe/vacancies/898/"
+    jd_path = tmp_path / "JD.md"
+    jd_path.write_text("We are Growe, a leading iGaming company.", encoding="utf-8")
+
+    vid = await database.insert_vacancy(
+        url=url, title="Casino Product Manager", user_id=uid, published_at="2026-06-01T10:00:00",
+    )
+    await database.update_vacancy_status(vid, "declined")
+    await database.update_vacancy_fields(vid, markdown_path=str(jd_path))
+
+    resp = client.post("/api/new-vacancy", json={
+        "url": url,
+        "user_id": uid,
+        "published_at": "2026-07-01T10:00:00",
+    })
+    assert resp.status_code == 201
+
+    row = await database.get_vacancy_by_id(vid)
+    assert row["blocker_flag"] == 1
+    assert "igaming" in row["blocker_reasons"]
+
+
+@pytest.mark.asyncio
 async def test_new_vacancy_republish_same_date_returns_409(client):
     """POST /api/new-vacancy for a declined vacancy with same/older published_at → 409."""
     uid = await database.insert_user(name="SameDateUser", telegram_chat_id=5002, skill_type="pm")
