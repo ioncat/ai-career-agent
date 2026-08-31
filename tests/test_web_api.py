@@ -438,6 +438,78 @@ async def test_new_vacancy_republish_declined(client):
 
 
 @pytest.mark.asyncio
+async def test_new_vacancy_republish_backfills_tags_when_untagged(client, tmp_path):
+    """Segment tags (igaming/deftech/mobile/...) are only ever computed
+    inside fetch_jd() — a reopened vacancy never goes through that function
+    again, so it stayed untagged forever even after reappearing in the
+    inbox. Found live 2026-08-31: republished pre-tagging-feature vacancies
+    had no tags and no path back to getting any."""
+    uid = await database.insert_user(name="RepubTagUser", telegram_chat_id=5008, skill_type="pm")
+    url = "https://djinni.co/jobs/401/"
+    jd_path = tmp_path / "JD.md"
+    jd_path.write_text("We are a leading iGaming company hiring for our mobile app.", encoding="utf-8")
+
+    vid = await database.insert_vacancy(url=url, user_id=uid, published_at="2026-06-01T10:00:00")
+    await database.update_vacancy_status(vid, "declined")
+    await database.update_vacancy_fields(vid, markdown_path=str(jd_path))
+
+    resp = client.post("/api/new-vacancy", json={
+        "url": url,
+        "user_id": uid,
+        "published_at": "2026-07-01T10:00:00",
+    })
+    assert resp.status_code == 201
+
+    row = await database.get_vacancy_by_id(vid)
+    tags = set((row["tags"] or "").split(","))
+    assert tags == {"igaming", "mobile"}
+
+
+@pytest.mark.asyncio
+async def test_new_vacancy_republish_preserves_existing_tags(client, tmp_path):
+    """merge_tags is additive — a republish must never clobber a tag
+    (manual or previously auto-assigned) already on the row."""
+    uid = await database.insert_user(name="RepubTagUser2", telegram_chat_id=5009, skill_type="pm")
+    url = "https://djinni.co/jobs/402/"
+    jd_path = tmp_path / "JD.md"
+    jd_path.write_text("Generic product manager role, no domain keywords here.", encoding="utf-8")
+
+    vid = await database.insert_vacancy(url=url, user_id=uid, published_at="2026-06-01T10:00:00")
+    await database.update_vacancy_status(vid, "declined")
+    await database.update_vacancy_fields(vid, markdown_path=str(jd_path))
+    await database.set_vacancy_tags(vid, "my-custom-tag")
+
+    resp = client.post("/api/new-vacancy", json={
+        "url": url,
+        "user_id": uid,
+        "published_at": "2026-07-01T10:00:00",
+    })
+    assert resp.status_code == 201
+
+    row = await database.get_vacancy_by_id(vid)
+    assert row["tags"] == "my-custom-tag"
+
+
+@pytest.mark.asyncio
+async def test_new_vacancy_republish_missing_jd_file_is_non_fatal(client):
+    """No markdown_path (or file missing on disk) — republish must still
+    succeed, just without a tag backfill."""
+    uid = await database.insert_user(name="RepubTagUser3", telegram_chat_id=5010, skill_type="pm")
+    url = "https://djinni.co/jobs/403/"
+
+    vid = await database.insert_vacancy(url=url, user_id=uid, published_at="2026-06-01T10:00:00")
+    await database.update_vacancy_status(vid, "declined")
+
+    resp = client.post("/api/new-vacancy", json={
+        "url": url,
+        "user_id": uid,
+        "published_at": "2026-07-01T10:00:00",
+    })
+    assert resp.status_code == 201
+    assert resp.json()["status"] == "republished"
+
+
+@pytest.mark.asyncio
 async def test_new_vacancy_republish_same_date_returns_409(client):
     """POST /api/new-vacancy for a declined vacancy with same/older published_at → 409."""
     uid = await database.insert_user(name="SameDateUser", telegram_chat_id=5002, skill_type="pm")

@@ -6,6 +6,11 @@
 
 ---
 
+## 2026-08-31
+
+- **Bug fix — republished vacancies never got auto-tagged, even after the tagging feature existed.** User noticed several Republished-badge Inbox cards with no tag chips at all. Root cause: `classify_tags()`/`merge_tags()` only ever runs inside `tools/cv_fetch_jd.py`'s `fetch_jd()` — the one and only call site in the whole codebase. `on_vacancy_republished()` (`db/database.py`, called from `web/api.py`'s `/api/new-vacancy` when a declined/skipped vacancy reappears in RSS) is a separate raw-SQL UPDATE path that never touches `tags`, so a reopened vacancy stayed untagged forever with no path back to getting any. Fixed at the call site: the republish branch in `web/api.py` now reads the vacancy's existing `JD.md` (via `markdown_path`), reclassifies it, and merges (additive — never clobbers a manually-set tag) into the `tags` column. Missing/unreadable file is non-fatal (wrapped in try/except, republish still succeeds) — matches the established legacy-file-gap precedent from the 2026-08-30 audit. 3 new tests (`tests/test_web_api.py`): backfill-when-untagged, preserve-existing-tags-on-merge, missing-JD-file-non-fatal. 1036/1036 full suite.
+- **Investigated the broader "454 of 1243 vacancies have no tags at all" question, prompted by the same screenshot — confirmed NOT a backfill bug.** Ran `classify()` fresh against every currently-untagged vacancy's `JD.md`: 73 have no `markdown_path` or an unreadable file (legacy, pre-dates the `{id} — ` folder convention, same "not actionable" call as the 2026-08-30 `markdown_path`-desync incident), and the remaining 381 are readable and genuinely match none of the 6 taxonomy categories — plain generic PM/PO postings with no igaming/deftech/mobile/outsourcing/b2b_saas/fintech/studio signal in the text. All 4 vacancy IDs visible in the reported screenshot (#285, #935, #941, #878) fall in this second bucket. No further action taken — an accurate reflection of content, not a defect.
+
 ## 2026-08-30
 
 - **Analytics screen: second chart for "Applied" (same primary-tag slice, only vacancies actually applied to).** User wanted to see not just "what the market is made of" but "where my CVs actually went" — same bar-chart component, filtered to `applied=true`, own count/percentage and empty state.

@@ -34,6 +34,8 @@ except ImportError:
 from contracts.pipeline import AnalysisJson
 from core import config_store
 from core import vacancy_stage
+from core.vacancy_tags import classify as classify_tags
+from core.vacancy_tags import merge_tags
 from db import database
 from web.reader import build_vacancy_view
 
@@ -773,6 +775,27 @@ async def api_new_vacancy(req: NewVacancyRequest):
         if req.published_at and req.published_at > (existing["published_at"] or ""):
             if status in ("declined", "skipped"):
                 await database.on_vacancy_republished(existing["id"], req.published_at)
+                # Segment tags (igaming/deftech/mobile/...) are only ever
+                # computed inside fetch_jd() — a vacancy reopened here never
+                # goes through that function again, so it silently stayed
+                # untagged forever even after reappearing in the inbox.
+                # Found live 2026-08-31: several republished DOU vacancies
+                # from before the tagging feature existed (2026-08-28) had
+                # no tags at all, with no path back to getting any. Additive
+                # merge (never clobbers a manual tag) — safe to re-run on
+                # every republish, not just once.
+                md_path = existing["markdown_path"]
+                if md_path:
+                    jd_file = _PROJECT_ROOT / md_path if not Path(md_path).is_absolute() else Path(md_path)
+                    if jd_file.exists():
+                        try:
+                            jd_text = jd_file.read_text(encoding="utf-8")
+                            auto_tags = classify_tags(jd_text)
+                            new_tags = merge_tags(existing["tags"], auto_tags)
+                            if new_tags:
+                                await database.set_vacancy_tags(existing["id"], new_tags)
+                        except OSError as exc:
+                            log.warning("api/new-vacancy: re-tag on republish failed v#%d (non-fatal): %s", existing["id"], exc)
                 log.info("api/new-vacancy: republished v#%d url=%s", existing["id"], req.url)
                 return {"vacancy_id": existing["id"], "status": "republished"}
             if not applied and status not in _ACTIVE_STATUSES:
