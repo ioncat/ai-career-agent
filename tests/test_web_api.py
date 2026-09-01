@@ -372,25 +372,27 @@ def test_sanitize_published_at_future_replaced():
 
 
 @pytest.mark.asyncio
-async def test_new_vacancy_stale_published_at_replaced_with_fetch_time(client):
-    """A brand-new vacancy with an implausibly old feed pubDate (>24h stale —
-    Djinni re-crawl/feed-lag artifact, found 2026-07-24 vacancy #823) gets
-    published_at replaced with fetch time, not silently buried in a
-    date-sorted inbox."""
-    uid = await database.insert_user(name="StaleDate", telegram_chat_id=6001, skill_type="pm")
-    before = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=5)
+async def test_new_vacancy_old_published_at_kept_verbatim(client):
+    """Regression 2026-09-01: an old feed pubDate is a real, honest signal —
+    it must NOT be replaced with the discovery time. A prior version of this
+    guard rejected anything >24h old (added 2026-07-24 for a one-off Djinni
+    re-crawl artifact), but that silently destroyed the real published_at for
+    223 logged vacancies across 4 catch-up-scan days (a new feed subscription
+    pulling in its currently-live backlog is a completely normal case, not an
+    anomaly) — found live via vacancy #1060's investigation. Only a FUTURE
+    date should ever be replaced (see test below)."""
+    uid = await database.insert_user(name="OldDate", telegram_chat_id=6001, skill_type="pm")
 
     resp = client.post("/api/new-vacancy", json={
         "url": "https://djinni.co/jobs/500/",
         "user_id": uid,
-        "published_at": "2026-06-01T10:00:00",  # weeks stale relative to "now"
+        "published_at": "2026-06-01T10:00:00",  # weeks old relative to "now" — real, must be kept
     })
     assert resp.status_code == 201
     vacancy_id = resp.json()["vacancy_id"]
 
     row = await database.get_vacancy_by_id(vacancy_id)
-    stored = datetime.datetime.fromisoformat(row["published_at"]).replace(tzinfo=datetime.timezone.utc)
-    assert stored >= before
+    assert row["published_at"] == "2026-06-01T10:00:00"
 
 
 @pytest.mark.asyncio

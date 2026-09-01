@@ -718,20 +718,24 @@ class NewVacancyRequest(BaseModel):
 
 
 # RSS pubDate is trusted verbatim from the feed (job-monitor's _parse_pub_date)
-# — normally fine, but a feed can serve a stale pubDate for a listing we're
-# only NOW seeing for the first time (re-crawl, feed lag, backfill). Found
-# 2026-07-24: Djinni served pubDate=2026-07-21 for a vacancy first fetched by
-# our poller on 2026-07-24 — it silently sorted 3 days down the date-sorted
-# inbox, looking to the user like it never arrived at all, when it had. 24h
-# is generous relative to the poll cadence (seconds-to-minutes) — a genuinely
-# fresh listing should never be older than that when we first see it.
-_PUBLISHED_AT_MAX_AGE = datetime.timedelta(hours=24)
-
-
+# — an OLD date is never rejected: it's a completely normal, honest signal
+# that we're just late to see a real listing (poller downtime, feed lag, or
+# — found live 2026-09-01 — a brand-new feed subscription's first "catch up
+# on what I missed while offline" scan, which correctly pulls in every
+# currently-live posting on that feed, most of them genuinely weeks old).
+# A version of this guard used to also reject anything >24h old (added
+# 2026-07-24 for a one-off Djinni re-crawl serving a wrong 3-day-old date for
+# something brand new) — but that rule couldn't tell "the feed lied" apart
+# from "this really is old and we're only now discovering it", which turned
+# out to be the far more common case: 223 logged rejections across 4 separate
+# catch-up-scan days, every one of them a real historical date silently
+# replaced with the discovery date, corrupting Inbox/Archive freshness sort
+# in the exact opposite direction this guard was built to prevent. The ONLY
+# value that can never be legitimate is a FUTURE date (clock skew, malformed
+# feed data) — a job posting cannot be published later than we're seeing it.
 def _sanitize_published_at(raw: str | None) -> str | None:
-    """Fall back to "now" (the moment we actually discovered it) when the
-    feed's claimed published_at is implausibly old or in the future, instead
-    of trusting it outright and silently distorting inbox freshness sort.
+    """Fall back to "now" only when the feed's claimed published_at is in the
+    future — any past date, however old, is trusted verbatim.
     """
     if not raw:
         return raw
@@ -742,9 +746,9 @@ def _sanitize_published_at(raw: str | None) -> str | None:
     except ValueError:
         return raw  # unparseable — leave as-is, not this guard's job to fix
     now = datetime.datetime.now(datetime.timezone.utc)
-    if parsed < now - _PUBLISHED_AT_MAX_AGE or parsed > now + datetime.timedelta(minutes=5):
+    if parsed > now + datetime.timedelta(minutes=5):
         log.warning(
-            "published_at sanity check failed (feed said %s, now=%s) — using fetch time instead",
+            "published_at sanity check failed (feed said %s, now=%s, in the future) — using fetch time instead",
             raw, now.isoformat(),
         )
         return now.strftime("%Y-%m-%dT%H:%M:%S")
