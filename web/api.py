@@ -803,6 +803,20 @@ async def _refresh_republished_vacancy(vacancy_id: int, url: str) -> None:
             fields["tags"] = new_tags
         if doc.title:
             fields["title"] = doc.title
+        if doc.company:
+            # Unlike salary/tags, `company` has no manual-edit path in
+            # Flutter — always safe to trust a fresh re-fetch's parser-
+            # extracted value over whatever's stored, even if something is
+            # already there. Found live 2026-09-01, vacancy #667: the
+            # original 2026-07-15 fetch predates the parser's company
+            # extraction maturing, so job-monitor's crude RSS-description
+            # "first line" heuristic (wrong here — the description opened
+            # with JD body prose, not a company-name line) went uncorrected
+            # forever, since a normal fetch_jd() re-fetch never happens once
+            # a vacancy already has a status past queued/fetching — only a
+            # republish's fresh re-fetch was ever going to get another shot
+            # at it, and this function didn't touch company until now.
+            fields["company"] = doc.company
         if not vacancy["salary"]:
             salary = _extract_salary(doc.markdown)
             if salary:

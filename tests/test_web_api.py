@@ -587,6 +587,44 @@ async def test_refresh_republished_vacancy_catches_blocker_missing_from_stale_fi
 
 
 @pytest.mark.asyncio
+async def test_refresh_republished_vacancy_corrects_garbled_company(tmp_path):
+    """Regression 2026-09-01 (vacancy #667): the original fetch predated the
+    parser's company extraction maturing, so job-monitor's crude RSS-
+    description heuristic left JD body prose sitting in `company` forever —
+    a normal fetch_jd() re-fetch never happens once a vacancy is past
+    queued/fetching, so only a republish's fresh re-fetch gets another shot.
+    Unlike salary/tags, company has no manual-edit path — always trusted
+    from a fresh re-fetch, even overwriting an existing (wrong) value."""
+    from web.api import _refresh_republished_vacancy
+
+    uid = await database.insert_user(name="RefreshCompanyUser", telegram_chat_id=5016, skill_type="pm")
+    url = "https://djinni.co/jobs/837388-product-manager-mobile-apps"
+    jd_path = tmp_path / "JD.md"
+    jd_path.write_text("# Product Manager (Mobile Apps)\n\nПро роль...", encoding="utf-8")
+
+    vid = await database.insert_vacancy(
+        url=url, title="Product Manager (Mobile Apps)", user_id=uid, published_at="2026-08-05T10:00:00",
+    )
+    await database.update_vacancy_fields(
+        vid, markdown_path=str(jd_path),
+        company="Про роль Шукаємо Product Manager, який перетворюватиме продуктові ідеї",
+    )
+
+    fresh_doc = ParsedDocument(
+        title="Product Manager (Mobile Apps)",
+        markdown="Про роль...",
+        source_url=url,
+        company="Traffic Corsar",
+    )
+    with patch("web.api.ParserAdapter") as mock_adapter_cls:
+        mock_adapter_cls.return_value.fetch_markdown = AsyncMock(return_value=fresh_doc)
+        await _refresh_republished_vacancy(vid, url)
+
+    row = await database.get_vacancy_by_id(vid)
+    assert row["company"] == "Traffic Corsar"
+
+
+@pytest.mark.asyncio
 async def test_refresh_republished_vacancy_backfills_salary_from_sidebar(tmp_path):
     """Regression 2026-09-01 (vacancy #1379): Djinni's RSS feed never embeds
     salary in the title, so a republish's fresh re-fetch is also a chance to
