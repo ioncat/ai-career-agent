@@ -1972,6 +1972,7 @@ class _VacancyHero extends StatelessWidget {
     final role    = p1?.role.isNotEmpty == true ? p1!.role : (vacancy?.role ?? '');
     final company = p1?.company.isNotEmpty == true ? p1!.company : (vacancy?.company ?? '');
     final publishedAt = vacancy?.publishedAt;
+    final appliedAt = vacancy?.appliedAt;
     // category moves to Quick Overview block, not used in hero
 
     return Column(
@@ -2117,7 +2118,7 @@ class _VacancyHero extends StatelessWidget {
                 ],
               ),
             ),
-            if (publishedAt != null || analyzedAt != null) ...[
+            if (publishedAt != null || analyzedAt != null || appliedAt != null) ...[
               const SizedBox(width: 8),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -2127,6 +2128,11 @@ class _VacancyHero extends StatelessWidget {
                   if (analyzedAt != null) ...[
                     if (publishedAt != null) const SizedBox(height: 4),
                     _AnalyzedChip(analyzedAt: analyzedAt!, cs: cs),
+                  ],
+                  if (appliedAt != null) ...[
+                    if (publishedAt != null || analyzedAt != null)
+                      const SizedBox(height: 4),
+                    _AppliedChip(appliedAt: appliedAt, cs: cs),
                   ],
                 ],
               ),
@@ -2408,6 +2414,59 @@ class _RecommendationCard extends StatelessWidget {
                 ],
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AppliedChip extends StatelessWidget {
+  // vacancy.appliedAt — the moment applied was actually toggled on
+  // (db/database.py:set_vacancy_applied), NOT updatedAt (bumped by ~10
+  // unrelated write paths — same class of bug the Analyzed chip already
+  // dodges via pipeline_runs.finished_at, 2026-08-11).
+  final String appliedAt;
+  final ColorScheme cs;
+
+  const _AppliedChip({required this.appliedAt, required this.cs});
+
+  static DateTime _asUtc(String iso) => parseBackendUtc(iso).toLocal();
+
+  String _fmtLocal() {
+    try {
+      final dt  = _asUtc(appliedAt);
+      final dd  = dt.day.toString().padLeft(2, '0');
+      final mm  = dt.month.toString().padLeft(2, '0');
+      final yy  = dt.year.toString();
+      final hh  = dt.hour.toString().padLeft(2, '0');
+      final min = dt.minute.toString().padLeft(2, '0');
+      return '$dd.$mm.$yy $hh:$min';
+    } catch (_) {
+      return appliedAt;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 28,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainer,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.send_outlined, size: 14, color: cs.onSurfaceVariant),
+          const SizedBox(width: 4),
+          Text(
+            'Applied ${_fmtLocal()}',
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
           ),
         ],
       ),
