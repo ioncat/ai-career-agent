@@ -16,6 +16,7 @@ from tools.cv_fetch_jd import (
     FetchError,
     _detect_site,
     _enrich_company_website,
+    _extract_salary_from_sidebar,
     _safe_folder_name,
     _url_slug,
     cv_fetch_jd,
@@ -71,6 +72,7 @@ def _vacancy_row(
     markdown_path: str = "/vacancies/inbox/1/42 — Backend Dev/JD.md",
     status: str = "fetched",
     tags: str | None = None,
+    salary: str | None = None,
 ) -> MagicMock:
     row = MagicMock()
     data = {
@@ -80,6 +82,7 @@ def _vacancy_row(
         "markdown_path": markdown_path,
         "status": status,
         "tags": tags,
+        "salary": salary,
     }
     row.__getitem__ = lambda self, key: data[key]
     return row
@@ -260,6 +263,89 @@ async def test_fetch_jd_processes_queued_vacancy(tmp_path):
     assert result == 55
     mock_db.insert_vacancy.assert_not_called()
     mock_db.update_vacancy_fields.assert_awaited_once()
+
+
+# ── _extract_salary_from_sidebar (2026-09-01, vacancy #1379) ───────────────────
+
+class TestExtractSalaryFromSidebar:
+    def test_extracts_range_from_requirements_bullet(self):
+        text = (
+            "## Vacancy Requirements\n\n"
+            "* **Виключно від 3 років досвіду**\n\n"
+            "  * **$2000-3000**\n\n"
+            "  * **Тільки офіс**\n"
+        )
+        assert _extract_salary_from_sidebar(text) == "$2000-3000"
+
+    def test_no_requirements_heading_returns_none(self):
+        assert _extract_salary_from_sidebar("Just a plain JD, no structured sidebar.") is None
+
+    def test_requirements_present_but_no_salary_bullet_returns_none(self):
+        text = (
+            "## Vacancy Requirements\n\n"
+            "* **Виключно від 6 років досвіду**\n\n"
+            "  * **Тільки віддалено**\n"
+            "  * ** Україна **\n"
+        )
+        assert _extract_salary_from_sidebar(text) is None
+
+    def test_dollar_figure_far_outside_window_is_not_matched(self):
+        # A $ amount appearing well past the structured bullet cluster (e.g.
+        # a company-revenue mention in JD body prose) must never be mistaken
+        # for the salary field — the search window is capped at 300 chars.
+        text = "## Vacancy Requirements\n\n" + ("filler " * 100) + "raised **$5,000,000** in funding."
+        assert _extract_salary_from_sidebar(text) is None
+
+    def test_empty_text_returns_none(self):
+        assert _extract_salary_from_sidebar("") is None
+
+
+@pytest.mark.asyncio
+async def test_fetch_jd_extracts_salary_from_sidebar_when_missing(tmp_path):
+    """Regression 2026-09-01 (vacancy #1379): Djinni's RSS feed never embeds
+    salary in the title (unlike DOU), so job-monitor's title-only extraction
+    always leaves it NULL — even though the poster's own salary field is
+    sitting right there in the fetched page's structured sidebar."""
+    doc = _make_doc(
+        title="Product Manager",
+        markdown="## Vacancy Requirements\n\n* **Виключно від 3 років досвіду**\n\n  * **$2000-3000**\n",
+    )
+    parser = AsyncMock()
+    parser.fetch_markdown = AsyncMock(return_value=doc)
+    deps = _make_deps(tmp_path, parser)
+
+    with patch("tools.cv_fetch_jd.database") as mock_db:
+        mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
+        mock_db.insert_vacancy = AsyncMock(return_value=1379)
+        mock_db.update_vacancy_fields = AsyncMock()
+        _mock_dedup(mock_db)
+
+        await fetch_jd(deps, "https://djinni.co/jobs/845729-product-manager/")
+
+    _, kwargs = mock_db.update_vacancy_fields.call_args
+    assert kwargs["salary"] == "$2000-3000"
+
+
+@pytest.mark.asyncio
+async def test_fetch_jd_never_overwrites_existing_salary(tmp_path):
+    """A salary already set (job-monitor's DOU-title extraction, or a user's
+    manual edit) must never be clobbered by a sidebar re-read."""
+    doc = _make_doc(markdown="## Vacancy Requirements\n\n  * **$9000-9999**\n")
+    parser = AsyncMock()
+    parser.fetch_markdown = AsyncMock(return_value=doc)
+    deps = _make_deps(tmp_path, parser)
+
+    queued = _vacancy_row(vacancy_id=55, status="queued", salary="$1000-1500")
+
+    with patch("tools.cv_fetch_jd.database") as mock_db:
+        mock_db.get_vacancy_by_url = AsyncMock(return_value=queued)
+        mock_db.update_vacancy_fields = AsyncMock()
+        _mock_dedup(mock_db)
+
+        await fetch_jd(deps, "https://djinni.co/jobs/555/")
+
+    _, kwargs = mock_db.update_vacancy_fields.call_args
+    assert kwargs["salary"] is None
 
 
 # ── cv_fetch_jd — PydanticAI tool (string return) ────────────────────────────

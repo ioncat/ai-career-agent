@@ -587,6 +587,41 @@ async def test_refresh_republished_vacancy_catches_blocker_missing_from_stale_fi
 
 
 @pytest.mark.asyncio
+async def test_refresh_republished_vacancy_backfills_salary_from_sidebar(tmp_path):
+    """Regression 2026-09-01 (vacancy #1379): Djinni's RSS feed never embeds
+    salary in the title, so a republish's fresh re-fetch is also a chance to
+    pick up the sidebar salary if the vacancy never got one."""
+    from web.api import _refresh_republished_vacancy
+
+    uid = await database.insert_user(name="RefreshSalaryUser", telegram_chat_id=5015, skill_type="pm")
+    url = "https://djinni.co/jobs/845729-product-manager/"
+    jd_path = tmp_path / "JD.md"
+    jd_path.write_text("# Product Manager\n\nNo structured fields here.", encoding="utf-8")
+
+    vid = await database.insert_vacancy(
+        url=url, title="Product Manager", user_id=uid, published_at="2026-08-05T10:00:00",
+    )
+    await database.update_vacancy_fields(vid, markdown_path=str(jd_path))
+
+    fresh_doc = ParsedDocument(
+        title="Product Manager",
+        markdown=(
+            "## Vacancy Requirements\n\n"
+            "* **Виключно від 3 років досвіду**\n\n"
+            "  * **$2000-3000**\n"
+        ),
+        source_url=url,
+        company="Міністерство Оборони України",
+    )
+    with patch("web.api.ParserAdapter") as mock_adapter_cls:
+        mock_adapter_cls.return_value.fetch_markdown = AsyncMock(return_value=fresh_doc)
+        await _refresh_republished_vacancy(vid, url)
+
+    row = await database.get_vacancy_by_id(vid)
+    assert row["salary"] == "$2000-3000"
+
+
+@pytest.mark.asyncio
 async def test_refresh_republished_vacancy_parser_error_is_non_fatal(tmp_path):
     from adapters.parser_adapter import ParserError
     from web.api import _refresh_republished_vacancy

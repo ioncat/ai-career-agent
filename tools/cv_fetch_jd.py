@@ -37,6 +37,41 @@ class FetchError(Exception):
     """JD fetch failed — network, parser, or filesystem error."""
 
 
+# Djinni's own structured "Vacancy Requirements" sidebar (merged into JD.md by
+# services/parser, 2026-08-11 — same field cv_prefilter.py reads for the
+# English/remote/country deterministic checks) lists a salary range as a bold
+# bullet ("**$2000-3000**") right after the experience-requirement line, when
+# the poster filled in Djinni's own salary field. Djinni's RSS feed never
+# embeds salary in the item title or description (unlike DOU: "..., $1400–
+# 1700, Київ") — job-monitor's salary extraction only ever reads the RSS
+# title, so for Djinni this left `salary` NULL even though the poster's own
+# value was sitting right there in the fetched page. Found live 2026-09-01,
+# vacancy #1379 ("до $3000" / "$2000-3000" on the live page, JD.md already
+# had it in the merged sidebar, `salary` column NULL).
+_REQUIREMENTS_HEADING_RE = re.compile(r"##\s*Vacancy Requirements")
+_SALARY_BULLET_RE = re.compile(r"\*\*\s*(\$\s*[\d,]+(?:\s*[-–—]\s*[\d,]+)?)\s*\*\*")
+# Search window capped to the first 300 chars after the heading — the
+# structured bullet cluster (experience/salary/remote/country) is a few short
+# lines; anything past that is JD body prose that could contain an unrelated
+# dollar figure (budget, revenue, another number).
+_SALARY_SEARCH_WINDOW = 300
+
+
+def _extract_salary_from_sidebar(jd_text: str) -> str | None:
+    """Deterministic pre-check: does Djinni's structured requirements sidebar
+    list a salary range? Returns None if absent or unparseable — never
+    guesses from JD body prose.
+    """
+    m = _REQUIREMENTS_HEADING_RE.search(jd_text)
+    if not m:
+        return None
+    window = jd_text[m.end():m.end() + _SALARY_SEARCH_WINDOW]
+    salary_match = _SALARY_BULLET_RE.search(window)
+    if not salary_match:
+        return None
+    return re.sub(r"\s+", "", salary_match.group(1))
+
+
 async def fetch_jd(deps: AgentDeps, url: str) -> int:
     """Fetch JD from URL, save to disk + DB. Returns vacancy_id.
 
@@ -140,13 +175,19 @@ async def fetch_jd(deps: AgentDeps, url: str) -> int:
     # core/vacancy_tags.py) — additive, never clobbers a manually-set tag.
     auto_tags = classify_tags(doc.markdown)
     tags = merge_tags(existing["tags"] if existing else None, auto_tags)
+    # Only fill in salary if nothing already set it (job-monitor's DOU-title
+    # extraction, or a user's manual edit) — never clobber a real value with
+    # a sidebar re-read.
+    salary = None if (existing and existing["salary"]) else _extract_salary_from_sidebar(doc.markdown)
     if existing and existing["status"] in ("queued", "fetching"):
         await database.update_vacancy_fields(
             vacancy_id, title=doc.title, site=site, markdown_path=markdown_path,
-            company=doc.company, tags=tags or None,
+            company=doc.company, tags=tags or None, salary=salary,
         )
     else:
-        await database.update_vacancy_fields(vacancy_id, markdown_path=markdown_path, tags=tags or None)
+        await database.update_vacancy_fields(
+            vacancy_id, markdown_path=markdown_path, tags=tags or None, salary=salary,
+        )
 
     # ── EPIC-26: content hash + duplicate detection ───────────────────────────
     # Non-fatal — a dedup failure shouldn't undo the successful fetch above.
