@@ -16,6 +16,9 @@
 ### ✅ Delivered this session (2026-08-26) — Warnings UI fix
 `_WarningsBanner` — Phase 2 `warnings` (e.g. hybrid-format/office-city flags) moved out of `_QuickOverviewCard`'s buried row into a standalone, prominent amber block under Fit/Attraction+pre-filter (`vacancy_detail_screen.dart`). Found live on vacancy #1228 (Meest China) — warning was correct but invisible. Full write-up: [CHANGELOG.md → 2026-08-26](CHANGELOG.md). Follow-up audit (keyBarriers/hiddenRisks, same pattern) tracked below in P2.
 
+### 🧊 Icebox — Background Activity Indicator (discovery only, 2026-09-01)
+**What:** second, more detailed indicator (icon + text list) showing what non-user-triggered background processes are currently doing — fetch/tag/screen a vacancy, republish refresh, company-website lookup, (rarely) auto-analyze in full_auto mode. Distinct from the existing `PollingProgressBar`, which is just Flutter's own list-refresh cadence and has zero actual backend-activity awareness (a misconception that started this discussion). Full write-up incl. concrete label/icon table and sketched backend architecture: [background-activity-indicator.md](../discovery/background-activity-indicator.md). Not designed in enough detail to implement yet — needs a design pass (see doc's Open Questions).
+
 ### 🧊 Icebox — deterministic Stage 1 checks for years/remote/countries (fast follow to the Djinni requirements-sidebar delivery, 2026-08-12)
 **What:** the requirements sidebar (years experience, remote-only, countries) now flows into `JD.md` (delivered 2026-08-12 — see CHANGELOG), but only the English-level line got a dedicated deterministic Stage 1 check so far. Phase 1+2 already sees the rest as normal JD context, so this isn't urgent — worth a fast follow only if it proves valuable in practice (same `apply_title_stage`/`apply_language_stage` pattern in `tools/cv_prefilter.py`).
 
