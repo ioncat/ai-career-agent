@@ -8,11 +8,13 @@ Run: python -m pytest tests/test_web_api.py -v
 """
 
 import datetime
+from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
 from fastapi.testclient import TestClient
 
+from contracts.parsed_document import ParsedDocument
 from core import config_store
 from db import database
 
@@ -537,6 +539,81 @@ async def test_new_vacancy_republish_runs_stage1_prefilter(client, tmp_path):
     row = await database.get_vacancy_by_id(vid)
     assert row["blocker_flag"] == 1
     assert "igaming" in row["blocker_reasons"]
+
+
+@pytest.mark.asyncio
+async def test_refresh_republished_vacancy_catches_blocker_missing_from_stale_file(tmp_path):
+    """Regression 2026-09-01 (vacancy #1060): the cached JD.md predates a
+    sidebar field the employer only added when they edited/republished the
+    posting (Djinni shows "Оновлено <date>" on the live page). Re-checking
+    the STALE file can never find it — only a fresh re-fetch can. Tests the
+    background helper directly (fire-and-forget, not observable through the
+    synchronous /api/new-vacancy response)."""
+    from web.api import _refresh_republished_vacancy
+
+    uid = await database.insert_user(name="RefreshUser", telegram_chat_id=5012, skill_type="pm")
+    url = "https://djinni.co/jobs/841345-business-analyst-product-owner"
+    jd_path = tmp_path / "JD.md"
+    jd_path.write_text("# Business Analyst / Product Owner\n\nNo structured fields here.", encoding="utf-8")
+
+    vid = await database.insert_vacancy(
+        url=url, title="Business Analyst / Product Owner", user_id=uid, published_at="2026-08-05T10:00:00",
+    )
+    await database.update_vacancy_fields(vid, markdown_path=str(jd_path))
+
+    fresh_doc = ParsedDocument(
+        title="Business Analyst / Product Owner",
+        markdown=(
+            "Business Analyst / Product Owner role.\n\n"
+            "## Vacancy Requirements\n\n"
+            "* **Тільки віддалено**\n"
+            "* **Країни ЄС**\n"
+            "Країни, де розглядаємо кандидатів\n"
+        ),
+        source_url=url,
+        company="Phoenixgame",
+    )
+    with patch("web.api.ParserAdapter") as mock_adapter_cls:
+        mock_adapter_cls.return_value.fetch_markdown = AsyncMock(return_value=fresh_doc)
+        await _refresh_republished_vacancy(vid, url)
+
+    row = await database.get_vacancy_by_id(vid)
+    assert row["blocker_flag"] == 1
+    assert "location" in row["blocker_reasons"]
+    assert "EU" in row["blocker_reasons"] or "ЄС" in row["blocker_reasons"]
+    assert "Vacancy Requirements" in jd_path.read_text(encoding="utf-8")
+
+
+@pytest.mark.asyncio
+async def test_refresh_republished_vacancy_parser_error_is_non_fatal(tmp_path):
+    from adapters.parser_adapter import ParserError
+    from web.api import _refresh_republished_vacancy
+
+    uid = await database.insert_user(name="RefreshUser2", telegram_chat_id=5013, skill_type="pm")
+    url = "https://djinni.co/jobs/999999-example"
+    jd_path = tmp_path / "JD.md"
+    jd_path.write_text("# Example", encoding="utf-8")
+
+    vid = await database.insert_vacancy(url=url, title="Example", user_id=uid, published_at="2026-08-05T10:00:00")
+    await database.update_vacancy_fields(vid, markdown_path=str(jd_path))
+
+    with patch("web.api.ParserAdapter") as mock_adapter_cls:
+        mock_adapter_cls.return_value.fetch_markdown = AsyncMock(side_effect=ParserError("down", url=url))
+        await _refresh_republished_vacancy(vid, url)  # must not raise
+
+    row = await database.get_vacancy_by_id(vid)
+    assert row["blocker_flag"] == 0
+
+
+@pytest.mark.asyncio
+async def test_refresh_republished_vacancy_no_markdown_path_is_noop():
+    from web.api import _refresh_republished_vacancy
+
+    uid = await database.insert_user(name="RefreshUser3", telegram_chat_id=5014, skill_type="pm")
+    url = "https://djinni.co/jobs/888888-example"
+    vid = await database.insert_vacancy(url=url, title="Example", user_id=uid, published_at="2026-08-05T10:00:00")
+
+    await _refresh_republished_vacancy(vid, url)  # must not raise, no markdown_path to work with
 
 
 @pytest.mark.asyncio

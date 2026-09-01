@@ -31,6 +31,7 @@ try:
 except ImportError:
     pass
 
+from adapters.parser_adapter import ParserAdapter, ParserError
 from contracts.pipeline import AnalysisJson
 from core import config_store
 from core import vacancy_stage
@@ -750,6 +751,68 @@ def _sanitize_published_at(raw: str | None) -> str | None:
     return raw
 
 
+async def _refresh_republished_vacancy(vacancy_id: int, url: str) -> None:
+    """Fire-and-forget: re-fetch a republished vacancy's JD from the live page
+    and re-run Stage 1 (title/language/location) against FRESH content.
+
+    on_vacancy_republished() only flips DB fields (status/published_at) — it
+    never re-fetches, so the synchronous tag/Stage-1 pass in api_new_vacancy
+    still reads whatever JD.md was saved at the ORIGINAL fetch, possibly
+    weeks stale. A republish usually means the employer edited the posting
+    (Djinni shows "Оновлено <date>" on the live page) — found live
+    2026-09-01, vacancy #1060: the live page now carries a "Країни ЄС"
+    (EU-only) sidebar field the stored JD.md never had, so the location
+    Stage-1 check (_check_country) had nothing to find no matter how many
+    times it re-ran against the cached file.
+
+    Runs in the background — never blocks the /api/new-vacancy response, same
+    precedent as _enrich_company_website in tools/cv_fetch_jd.py. Fail-open:
+    any error here is logged and swallowed, never surfaced to the caller.
+    """
+    from tools.cv_prefilter import apply_language_stage, apply_location_stage, apply_title_stage
+
+    try:
+        vacancy = await database.get_vacancy_by_id(vacancy_id)
+        if vacancy is None or not vacancy["markdown_path"]:
+            return
+        md_path = vacancy["markdown_path"]
+        jd_path = _PROJECT_ROOT / md_path if not Path(md_path).is_absolute() else Path(md_path)
+        if not jd_path.exists():
+            return
+
+        parser_url = os.getenv("PARSER_URL", "http://localhost:8001")
+        doc = await ParserAdapter(base_url=parser_url).fetch_markdown(url)
+        if doc.is_empty:
+            return
+
+        jd_path.write_text(
+            f"# {doc.title}\n\nSource: {doc.source_url}\n\n---\n\n{doc.markdown}",
+            encoding="utf-8",
+        )
+
+        auto_tags = classify_tags(doc.markdown)
+        new_tags = merge_tags(vacancy["tags"], auto_tags)
+        fields: dict = {}
+        if new_tags:
+            fields["tags"] = new_tags
+        if doc.title:
+            fields["title"] = doc.title
+        if fields:
+            await database.update_vacancy_fields(vacancy_id, **fields)
+
+        if not await database.get_auto_check_title(vacancy["user_id"]):
+            return
+        blocked = await apply_title_stage(vacancy_id, doc.title or vacancy["title"] or "")
+        if not blocked:
+            blocked = await apply_language_stage(vacancy_id, doc.markdown)
+            if not blocked:
+                await apply_location_stage(vacancy_id, doc.markdown)
+    except ParserError as exc:
+        log.warning("refresh-on-republish: parser failed v#%d (non-fatal): %s", vacancy_id, exc)
+    except Exception as exc:
+        log.warning("refresh-on-republish: failed v#%d (non-fatal): %s", vacancy_id, exc)
+
+
 @app.post("/api/new-vacancy", status_code=201)
 async def api_new_vacancy(req: NewVacancyRequest):
     """Webhook endpoint for job-monitor: queue a new vacancy for fetching.
@@ -820,6 +883,9 @@ async def api_new_vacancy(req: NewVacancyRequest):
                                 await apply_location_stage(existing["id"], jd_text)
                 except Exception as exc:
                     log.warning("api/new-vacancy: prefilter stage 1 on republish failed v#%d (non-fatal): %s", existing["id"], exc)
+                # Background re-fetch — the checks above only ever see the
+                # OLD cached JD.md. See _refresh_republished_vacancy docstring.
+                asyncio.create_task(_refresh_republished_vacancy(existing["id"], req.url))
                 log.info("api/new-vacancy: republished v#%d url=%s", existing["id"], req.url)
                 return {"vacancy_id": existing["id"], "status": "republished"}
             if not applied and status not in _ACTIVE_STATUSES:
