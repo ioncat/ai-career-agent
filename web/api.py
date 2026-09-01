@@ -794,7 +794,7 @@ async def _refresh_republished_vacancy(vacancy_id: int, url: str) -> None:
             encoding="utf-8",
         )
 
-        from tools.cv_fetch_jd import _extract_salary_from_sidebar
+        from tools.cv_fetch_jd import _extract_salary
 
         auto_tags = classify_tags(doc.markdown)
         new_tags = merge_tags(vacancy["tags"], auto_tags)
@@ -804,7 +804,7 @@ async def _refresh_republished_vacancy(vacancy_id: int, url: str) -> None:
         if doc.title:
             fields["title"] = doc.title
         if not vacancy["salary"]:
-            salary = _extract_salary_from_sidebar(doc.markdown)
+            salary = _extract_salary(doc.markdown)
             if salary:
                 fields["salary"] = salary
         if fields:

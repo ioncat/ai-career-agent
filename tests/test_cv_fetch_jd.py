@@ -16,6 +16,7 @@ from tools.cv_fetch_jd import (
     FetchError,
     _detect_site,
     _enrich_company_website,
+    _extract_salary_from_labeled_text,
     _extract_salary_from_sidebar,
     _safe_folder_name,
     _url_slug,
@@ -346,6 +347,55 @@ async def test_fetch_jd_never_overwrites_existing_salary(tmp_path):
 
     _, kwargs = mock_db.update_vacancy_fields.call_args
     assert kwargs["salary"] is None
+
+
+# ── _extract_salary_from_labeled_text (2026-09-01, LinkedIn/DOU/Djinni body-text salary) ──
+
+class TestExtractSalaryFromLabeledText:
+    """Regression 2026-09-01: audited all vacancies with salary=NULL for a $
+    figure appearing anywhere in JD body prose. 60 candidates, 45 were false
+    leads (company valuation, referral bonus, revenue/budget figures with no
+    salary label nearby) — only a $ figure directly adjacent to an explicit
+    label word (Salary/Compensation/Зарплата/Вилка/ставка) is trusted."""
+
+    def test_linkedin_style_compensation_range_per_hour(self):
+        text = "**Employment Type:** Contractor (Part-time)\n\n**Compensation:** $40 - $80/hour\n\n**Location:** Remote"
+        assert _extract_salary_from_labeled_text(text) == "$40-$80"
+
+    def test_ukrainian_zarplata_single_value(self):
+        text = "**Що ви отримаєте**\n\n  * **Зарплата:** $1,200 на старті."
+        assert _extract_salary_from_labeled_text(text) == "$1200"
+
+    def test_salary_label_range_en_dash(self):
+        text = "**Type:** Full-time, remote\n\n * **Salary:** $2,000 – $2,500\n\n * **Experience:** 3-5 years"
+        assert _extract_salary_from_labeled_text(text) == "$2000-$2500"
+
+    def test_vylka_bold_number_range(self):
+        text = "Вилка **$700–$1500** залежно від рівня та досвіду."
+        assert _extract_salary_from_labeled_text(text) == "$700-$1500"
+
+    def test_narrative_offer_sentence(self):
+        text = "Competitive salary pegged to the USD; We offer $600 salary + performance-based bonuses;"
+        assert _extract_salary_from_labeled_text(text) == "$600"
+
+    def test_no_label_no_match(self):
+        text = "Monthly volume up to $1M. Referral bonus up to $4,000 for a successful hire."
+        assert _extract_salary_from_labeled_text(text) is None
+
+    def test_unlabeled_valuation_figure_not_matched(self):
+        text = "12% of the company reserved for the team. Target — **$880M valuation** in 5 years."
+        assert _extract_salary_from_labeled_text(text) is None
+
+    def test_empty_text_returns_none(self):
+        assert _extract_salary_from_labeled_text("") is None
+
+    def test_takes_first_match_only(self):
+        # A single sentence naming two figures (e.g. a growth narrative) — the
+        # extractor is not equipped to judge which one is "the real offer",
+        # so it takes the first and leaves the judgment call to a human (see
+        # vacancy #308, deliberately excluded from the 2026-09-01 backfill).
+        text = "Прийшов на ставку $1200 — зараз отримує майже $3000."
+        assert _extract_salary_from_labeled_text(text) == "$1200"
 
 
 # ── cv_fetch_jd — PydanticAI tool (string return) ────────────────────────────

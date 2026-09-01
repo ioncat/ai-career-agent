@@ -72,6 +72,50 @@ def _extract_salary_from_sidebar(jd_text: str) -> str | None:
     return re.sub(r"\s+", "", salary_match.group(1))
 
 
+# Fallback for postings with no structured sidebar (LinkedIn imports, older
+# Djinni fetches predating the 2026-08-11 sidebar merge, or DOU — which never
+# has one at all): a salary explicitly labeled in the JD body's benefits
+# prose ("**Compensation:** $40 - $80/hour", "Зарплата: $1,200", "Вилка
+# **$700–$1500**"). Deliberately requires an explicit label word directly
+# adjacent to the $ figure — a bare unlabeled `$` anywhere in the body is too
+# noisy to trust (company valuation, referral bonus, revenue/budget figures
+# all matched during a 2026-09-01 audit of 60 candidate vacancies; only 15
+# carried an explicit label, the other 45 were false leads). Takes the FIRST
+# labeled match only — a JD naming a growth trajectory ("started at $1200,
+# now earns $3000") reads as one label-adjacent match on the first figure,
+# which is the closest available reading of "the offered rate", though this
+# specific narrative shape (vacancy #308) is inherently ambiguous and was
+# deliberately left out of the one-off 2026-09-01 backfill for that reason —
+# a human call, not something the regex itself can resolve.
+_LABELED_SALARY_RE = re.compile(
+    r"(?:salary|compensation|зарплат\w*|вилк\w*|ставк\w*)"
+    r"[^$\n]{0,40}"
+    r"(\$\s*[\d,]+(?:\s*(?:per\s+month|/month|/hour)?\s*[-–—]\s*\$?\s*[\d,]+)?)",
+    re.IGNORECASE,
+)
+_SALARY_UNIT_SUFFIX_RE = re.compile(r"per\s+month|/month|/hour", re.IGNORECASE)
+
+
+def _extract_salary_from_labeled_text(jd_text: str) -> str | None:
+    """Deterministic pre-check: does the JD body explicitly label a salary
+    figure? Returns None if no label-adjacent $ amount is found.
+    """
+    m = _LABELED_SALARY_RE.search(jd_text)
+    if not m:
+        return None
+    raw = _SALARY_UNIT_SUFFIX_RE.sub("", m.group(1))
+    raw = raw.replace(",", "").replace(" ", "")
+    return re.sub(r"[-–—]", "-", raw)
+
+
+def _extract_salary(jd_text: str) -> str | None:
+    """Best available salary signal: Djinni's structured sidebar first
+    (higher confidence, poster-filled field), then a labeled mention in JD
+    body prose as fallback.
+    """
+    return _extract_salary_from_sidebar(jd_text) or _extract_salary_from_labeled_text(jd_text)
+
+
 async def fetch_jd(deps: AgentDeps, url: str) -> int:
     """Fetch JD from URL, save to disk + DB. Returns vacancy_id.
 
@@ -178,7 +222,7 @@ async def fetch_jd(deps: AgentDeps, url: str) -> int:
     # Only fill in salary if nothing already set it (job-monitor's DOU-title
     # extraction, or a user's manual edit) — never clobber a real value with
     # a sidebar re-read.
-    salary = None if (existing and existing["salary"]) else _extract_salary_from_sidebar(doc.markdown)
+    salary = None if (existing and existing["salary"]) else _extract_salary(doc.markdown)
     if existing and existing["status"] in ("queued", "fetching"):
         await database.update_vacancy_fields(
             vacancy_id, title=doc.title, site=site, markdown_path=markdown_path,
