@@ -13,5 +13,20 @@
     "name": "Djinni | Product Manager / Owner",
     "url": "https://djinni.co/jobs/rss/?employment=remote&search_type=basic-search&primary_keyword=Product+Manager&primary_keyword=Product+Owner",
     "user_ids": ["CAREER_AGENT_USER_1"]
+  },
+  {
+    "name": "DOU | DefTech Product Manager",
+    "url": "https://jobs.dou.ua/vacancies/feeds/?search=deftech&category=Product%20Manager",
+    "user_ids": ["CAREER_AGENT_USER_1"]
+  },
+  {
+    "name": "DOU | DefTech Project Manager",
+    "url": "https://jobs.dou.ua/vacancies/feeds/?search=deftech&category=Project%20Manager",
+    "user_ids": ["CAREER_AGENT_USER_1"]
+  },
+  {
+    "name": "Djinni | DefTech Product Manager / Owner",
+    "url": "https://djinni.co/jobs/rss/?search_type=basic-search&primary_keyword=Product+Manager&primary_keyword=Product+Owner&editorial=miltech",
+    "user_ids": ["CAREER_AGENT_USER_1"]
   }
 ]

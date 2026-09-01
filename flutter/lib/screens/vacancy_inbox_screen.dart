@@ -291,6 +291,7 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
   bool _filterExpanded = false;
   Set<String> _statusFilter = {};
   Set<String> _siteFilter = {};
+  Set<String> _tagFilter = {};
   bool _starredOnly = false;
   bool _blockedOnly = false;
   DateTime? _dateFrom;
@@ -308,6 +309,7 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
   int get _activeFilterCount =>
       _statusFilter.length +
       _siteFilter.length +
+      _tagFilter.length +
       (_starredOnly ? 1 : 0) +
       (_blockedOnly ? 1 : 0) +
       (_dateFrom != null || _dateTo != null ? 1 : 0);
@@ -335,6 +337,9 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
         return false;
       }
       if (_siteFilter.isNotEmpty && !_siteFilter.contains(v.site)) {
+        return false;
+      }
+      if (_tagFilter.isNotEmpty && !v.tags.any(_tagFilter.contains)) {
         return false;
       }
       if (_starredOnly && !v.starred) return false;
@@ -379,6 +384,7 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
     setState(() {
       _statusFilter = {};
       _siteFilter = {};
+      _tagFilter = {};
       _starredOnly = false;
       _blockedOnly = false;
       _dateFrom = null;
@@ -398,6 +404,7 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
         .map((v) => v.site)
         .where((s) => s.isNotEmpty)
         .toSet();
+    final availableTags = vacancies.expand((v) => v.tags).toSet();
 
     // Sync _selected with polling updates (status changes, or any other field
     // edited server-side — salary, applied, starred, etc. all bump updated_at).
@@ -611,6 +618,15 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
                               _siteFilter = Set.from(_siteFilter)..remove(s);
                             } else {
                               _siteFilter = Set.from(_siteFilter)..add(s);
+                            }
+                          }),
+                          availableTags: availableTags,
+                          selectedTags: _tagFilter,
+                          onTagToggle: (t) => setState(() {
+                            if (_tagFilter.contains(t)) {
+                              _tagFilter = Set.from(_tagFilter)..remove(t);
+                            } else {
+                              _tagFilter = Set.from(_tagFilter)..add(t);
                             }
                           }),
                           starredOnly: _starredOnly,
@@ -1196,6 +1212,9 @@ class InboxFilterPanel extends StatelessWidget {
   final Set<String> availableSites;
   final Set<String> selectedSites;
   final ValueChanged<String> onSiteToggle;
+  final Set<String> availableTags;
+  final Set<String> selectedTags;
+  final ValueChanged<String> onTagToggle;
   final bool starredOnly;
   final VoidCallback onToggleStarred;
   final bool blockedOnly;
@@ -1216,6 +1235,9 @@ class InboxFilterPanel extends StatelessWidget {
     required this.availableSites,
     required this.selectedSites,
     required this.onSiteToggle,
+    required this.availableTags,
+    required this.selectedTags,
+    required this.onTagToggle,
     required this.starredOnly,
     required this.onToggleStarred,
     required this.blockedOnly,
@@ -1326,6 +1348,35 @@ class InboxFilterPanel extends StatelessWidget {
                   ),
                   selected: selected,
                   onSelected: (_) => onSiteToggle(s),
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 0,
+                  ),
+                  visualDensity: VisualDensity.compact,
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 10),
+          ],
+          if (availableTags.isNotEmpty) ...[
+            Text(
+              'Tags',
+              style: labelSmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: availableTags.map((t) {
+                final selected = selectedTags.contains(t);
+                return FilterChip(
+                  label: Text(
+                    t.toUpperCase(),
+                    style: Theme.of(context).textTheme.labelSmall,
+                  ),
+                  selected: selected,
+                  onSelected: (_) => onTagToggle(t),
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 4,
