@@ -48,6 +48,7 @@ class _JdModeView extends ConsumerStatefulWidget {
   /// When true: show "Restore to Inbox" instead of Analyze/Skip (used for declined-no-analysis).
   final bool restoreMode;
   final VoidCallback? onSkipped;
+  final VoidCallback? onApplied;
 
   const _JdModeView({
     super.key,
@@ -56,6 +57,7 @@ class _JdModeView extends ConsumerStatefulWidget {
     this.vacancy,
     this.restoreMode = false,
     this.onSkipped,
+    this.onApplied,
   });
 
   @override
@@ -72,6 +74,46 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
   // is no longer shown automatically (found unreliable/easy-to-miss in
   // practice, 2026-07-17) but raw_output/error are still worth a drill-down.
   Map<String, dynamic>? _lastPrefilterResult;
+
+  // Applied toggle (2026-09-02) — a fit worth applying to sometimes gets
+  // submitted before or without ever running Phase 1+2 analysis here (e.g.
+  // applied via LinkedIn Easy Apply, or on a whim before triage). Previously
+  // "Applied" only existed in the post-analysis tabbed _ActionBar, so a vacancy
+  // stuck in Inbox had no way to record that outside a DB edit.
+  late bool _applied;
+  bool _loadingApplied = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _applied = widget.vacancy?.applied ?? false;
+  }
+
+  @override
+  void didUpdateWidget(_JdModeView old) {
+    super.didUpdateWidget(old);
+    if (old.vacancy?.applied != widget.vacancy?.applied) _applied = widget.vacancy?.applied ?? false;
+  }
+
+  Future<void> _toggleApplied() async {
+    if (_loadingApplied) return;
+    final next = !_applied;
+    setState(() { _applied = next; _loadingApplied = true; });
+    try {
+      await _repo.setApplied(widget.vacancyId, next);
+      if (mounted) {
+        ref.read(vacancyListProvider.notifier).refresh();
+        // Same relocate-on-toggle-ON convention as the tabbed view's
+        // _ActionBar — Applied moves the card, so keyboard selection should
+        // advance the same way Skip/Delete already do.
+        if (next) widget.onApplied?.call();
+      }
+    } catch (_) {
+      if (mounted) setState(() => _applied = !next);
+    } finally {
+      if (mounted) setState(() => _loadingApplied = false);
+    }
+  }
 
   Future<void> _refresh() async {
     setState(() => _refreshing = true);
@@ -423,6 +465,39 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                   onPressed: () => _showActivityLog(context),
                 ),
               ),
+              // Applied toggle — same affordance the tabbed post-analysis view
+              // has always had, now also reachable pre-analysis (2026-09-02):
+              // applying happens outside this pipeline sometimes (LinkedIn Easy
+              // Apply, a quick manual submission before triage), and there was
+              // previously no way to record that without leaving Inbox first.
+              Tooltip(
+                message: _applied ? 'Mark as not applied' : 'Mark as applied',
+                child: _applied
+                    ? FilledButton.icon(
+                        onPressed: _loadingApplied ? null : _toggleApplied,
+                        icon: const Icon(Icons.check_circle, size: 16),
+                        label: const Text('Applied'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF2E7D32),
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          minimumSize: const Size(0, 36),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      )
+                    : OutlinedButton.icon(
+                        onPressed: _loadingApplied ? null : _toggleApplied,
+                        icon: const Icon(Icons.check_circle_outline, size: 16),
+                        label: const Text('Applied?'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: cs.onSurfaceVariant,
+                          side: BorderSide(color: cs.outlineVariant),
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          minimumSize: const Size(0, 36),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      ),
+              ),
+              const SizedBox(width: 8),
               if (widget.restoreMode) ...[
                 OutlinedButton.icon(
                   onPressed: _loadingRestore ? null : _restore,
@@ -894,7 +969,7 @@ class _VacancyDetailScreenState extends ConsumerState<VacancyDetailScreen>
         if (status == 'declined') {
           return _JdModeView(key: ValueKey(widget.vacancyId), vacancyId: widget.vacancyId, url: widget.url, vacancy: widget.vacancy, restoreMode: true);
         }
-        return _JdModeView(key: ValueKey(widget.vacancyId), vacancyId: widget.vacancyId, url: widget.url, vacancy: widget.vacancy, onSkipped: widget.onSkipped);
+        return _JdModeView(key: ValueKey(widget.vacancyId), vacancyId: widget.vacancyId, url: widget.url, vacancy: widget.vacancy, onSkipped: widget.onSkipped, onApplied: widget.onApplied);
       },
       data: (analysis) {
         final p1 = analysis.p1;
@@ -905,7 +980,7 @@ class _VacancyDetailScreenState extends ConsumerState<VacancyDetailScreen>
           if (status == 'declined') {
             return _JdModeView(key: ValueKey(widget.vacancyId), vacancyId: widget.vacancyId, url: widget.url, vacancy: widget.vacancy, restoreMode: true);
           }
-          return _JdModeView(key: ValueKey(widget.vacancyId), vacancyId: widget.vacancyId, url: widget.url, vacancy: widget.vacancy, onSkipped: widget.onSkipped);
+          return _JdModeView(key: ValueKey(widget.vacancyId), vacancyId: widget.vacancyId, url: widget.url, vacancy: widget.vacancy, onSkipped: widget.onSkipped, onApplied: widget.onApplied);
         }
 
         final role = p1?.role.isNotEmpty == true
