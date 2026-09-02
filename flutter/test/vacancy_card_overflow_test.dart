@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:career_agent/models/vacancy.dart';
 import 'package:career_agent/providers/read_vacancies_provider.dart';
 import 'package:career_agent/providers/settings_provider.dart';
+import 'package:career_agent/providers/vacancy_list_provider.dart';
 import 'package:career_agent/widgets/vacancy_card.dart';
 import 'package:career_agent/widgets/source_badge.dart';
 
@@ -25,11 +26,20 @@ class _FakeSettings extends SettingsNotifier {
   Future<AppSettings> build() async => const AppSettings();
 }
 
-Widget _harness(VacancyListItem vacancy, {double width = 260}) {
+class _FakeVacancyList extends VacancyListNotifier {
+  final List<VacancyListItem> _vacancies;
+  _FakeVacancyList(this._vacancies);
+
+  @override
+  Future<PollingState> build() async => PollingState(vacancies: _vacancies);
+}
+
+Widget _harness(VacancyListItem vacancy, {double width = 260, List<Override> extraOverrides = const []}) {
   return ProviderScope(
     overrides: [
       readVacanciesProvider.overrideWith(() => _FakeReadVacancies()),
       settingsProvider.overrideWith(() => _FakeSettings()),
+      ...extraOverrides,
     ],
     child: MaterialApp(
       home: Scaffold(
@@ -157,5 +167,41 @@ void main() {
     // accommodate a wrapped second line.
     final badgeSize = tester.getSize(find.byType(SourceBadge));
     expect(badgeSize.height, 24);
+  });
+
+  testWidgets('canonical vacancy shows a reciprocal Dup badge for a card that points at it', (tester) async {
+    // Regression 2026-09-02: #1431 (Djinni, canonical) showed no duplicate
+    // indicator at all, while its sibling #1432 (DOU, duplicateOf: 1431)
+    // showed "Dup #1431" — the relationship was only visible from one side
+    // of the pair. duplicatedByProvider derives the reverse map from the
+    // full loaded list so the canonical card can show it too.
+    final canonical = VacancyListItem(
+      id: 1431,
+      role: 'Product Manager (web)',
+      company: 'Kiss My Apps',
+      site: 'djinni',
+      url: 'https://example.com/1431',
+      status: 'fetched',
+    );
+    final duplicate = VacancyListItem(
+      id: 1432,
+      role: 'Product Manager (web)',
+      company: 'Kiss My Apps',
+      site: 'dou',
+      url: 'https://example.com/1432',
+      status: 'fetched',
+      duplicateOf: 1431,
+    );
+
+    await tester.pumpWidget(_harness(
+      canonical,
+      extraOverrides: [
+        vacancyListProvider.overrideWith(() => _FakeVacancyList([canonical, duplicate])),
+      ],
+    ));
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Dup #1432'), findsOneWidget);
   });
 }

@@ -47,6 +47,7 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
     final v = widget.vacancy;
     final readIds = ref.watch(readVacanciesProvider).valueOrNull ?? {};
     final isUnread = v.status == 'fetched' && !readIds.contains(v.id);
+    final duplicatedByThisVacancy = ref.watch(duplicatedByProvider)[v.id] ?? const <int>[];
 
     final highlighted = widget.multiSelectMode ? widget.checked : widget.selected;
     final bgColor = highlighted
@@ -165,6 +166,27 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
                                     : null,
                                 behavior: HitTestBehavior.opaque,
                                 child: _DuplicateBadge(originalId: v.duplicateOf!),
+                              ),
+                            ),
+                          ),
+                        // Reciprocal side: this card IS the canonical posting
+                        // some other row points at via duplicateOf — same
+                        // badge, reversed tooltip/direction, so the
+                        // relationship reads from either card.
+                        for (final dupId in duplicatedByThisVacancy)
+                          Tooltip(
+                            message: 'Same job also found on another source, posted as #$dupId.\nTap to view that posting.',
+                            preferBelow: false,
+                            child: MouseRegion(
+                              cursor: widget.onTapRelated != null
+                                  ? SystemMouseCursors.click
+                                  : MouseCursor.defer,
+                              child: GestureDetector(
+                                onTap: widget.onTapRelated != null
+                                    ? () => widget.onTapRelated!(dupId)
+                                    : null,
+                                behavior: HitTestBehavior.opaque,
+                                child: _DuplicateBadge(originalId: dupId),
                               ),
                             ),
                           ),

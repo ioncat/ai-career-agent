@@ -172,6 +172,25 @@ final vacancyListProvider =
     AsyncNotifierProvider<VacancyListNotifier, PollingState>(
         VacancyListNotifier.new);
 
+// Reverse of VacancyListItem.duplicateOf (2026-09-02) — `duplicateOf` is a
+// one-way pointer (the later-found posting points at the canonical one), so
+// the canonical card itself had no way to show it has a known duplicate
+// elsewhere. Found live: #1431 (Djinni, canonical) showed no badge at all,
+// while its sibling #1432 (DOU, duplicate_of=1431) showed "Dup #1431" — the
+// relationship was only visible from one side of the pair. Computed here
+// (not per-card) so every VacancyCard can look itself up by id in O(1)
+// without each one re-scanning the full list.
+final duplicatedByProvider = Provider<Map<int, List<int>>>((ref) {
+  final vacancies = ref.watch(vacancyListProvider).valueOrNull?.vacancies ?? const [];
+  final map = <int, List<int>>{};
+  for (final v in vacancies) {
+    final originalId = v.duplicateOf;
+    if (originalId == null) continue;
+    (map[originalId] ??= []).add(v.id);
+  }
+  return map;
+});
+
 // Folders where "freshest" means our own last action on the vacancy
 // (analysis finished / CV+cover generated), not how recently the JD itself
 // was posted — sorted by updated_at instead of the backend's default
