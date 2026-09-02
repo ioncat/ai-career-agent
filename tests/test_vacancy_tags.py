@@ -211,6 +211,45 @@ class TestOutsourcingFalseContext:
         assert "outsourcing" in classify("Glorium Technologies is an innovative outsourcing company.")
 
 
+class TestMobileFalseContext:
+    """Regression for 2026-09-02: user flagged vacancy #1432 ("Product
+    Manager (web)") as wrongly tagged mobile. A full-DB audit of all 199
+    mobile-tagged vacancies found 17 were false positives — bare "мобільн"
+    matching a corporate phone-plan benefit, a "subsidiary of mobile
+    operator X" domain descriptor, or a travel/flexibility requirement, none
+    of which say the product itself is mobile."""
+
+    def test_mobile_phone_benefit_does_not_tag_mobile(self):
+        text = "Медичне страхування та корпоративний мобільний зв'язок, сучасний офіс."
+        assert "mobile" not in classify(text)
+
+    def test_mobile_phone_benefit_instrumental_case_does_not_tag_mobile(self):
+        text = "Забезпечення технікою, мобільним зв'язком, корпоративні трансфери до офісу."
+        assert "mobile" not in classify(text)
+
+    def test_curly_apostrophe_still_strips_correctly(self):
+        text = "Медичне страхування та корпоративний мобільний зв’язок."
+        assert "mobile" not in classify(text)
+
+    def test_mobile_operator_subsidiary_does_not_tag_mobile(self):
+        text = "Ми ІТ компанія, заснована як дочірня компанія провідного мобільного оператора Vodafone Ukraine."
+        assert "mobile" not in classify(text)
+
+    def test_travel_flexibility_requirement_does_not_tag_mobile(self):
+        text = "Треба проявляти свій талант і рости разом із проєктами. Обов'язково бути мобільним та мати змогу відвідувати часті міжнародні відрядження."
+        assert "mobile" not in classify(text)
+
+    def test_real_mobile_product_still_matches(self):
+        text = "Шукаємо Product Manager, який відповідатиме за розвиток мобільного застосунку на двох платформах."
+        assert "mobile" in classify(text)
+
+    def test_ios_android_strong_keywords_unaffected_by_mobile_weak_list(self):
+        # ios/android stay in the always-on strong list — no false-positive
+        # context found for them in the audit, unlike bare "мобільн".
+        assert "mobile" in classify("Experience shipping iOS apps required")
+        assert "mobile" in classify("3+ years building Android products")
+
+
 class TestMergeTags:
     def test_merge_into_empty(self):
         assert merge_tags(None, ["igaming"]) == "igaming"

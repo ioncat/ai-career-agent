@@ -48,9 +48,12 @@ _TAXONOMY: dict[str, list[str]] = {
     "deftech": [
         "deftech", "uav",
     ],
+    # "мобільн"/"мобильн" excluded here — see _MOBILE_WEAK below, 2026-09-02.
+    # "mobile app"/"mobile game"/ios/android stay always-on: no false-positive
+    # context found for those in a full-DB audit of all 199 mobile-tagged
+    # vacancies.
     "mobile": [
         r"\bmobile app", r"\bmobile game", r"\bios\b", r"\bandroid\b",
-        "мобільн", "мобильн",
     ],
     # "outsourc"/bare agency excluded here — see _OUTSOURCING_AMBIGUOUS below,
     # 2026-08-30. The multi-word agency phrases here (digital/marketing/
@@ -151,6 +154,26 @@ _OUTSOURCING_FALSE_CONTEXT = re.compile(
     r"law agency",
 )
 
+# mobile-only: bare "мобільн"/"мобильн" collides with three unrelated
+# Ukrainian job-posting contexts, none about the product being mobile —
+# "мобільний зв'язок" (a corporate phone-plan benefit, e.g. "медичне
+# страхування та корпоративний мобільний зв'язок"), "мобільного оператора"
+# (a company describing itself as a subsidiary of a mobile TELECOM operator,
+# e.g. Vodafone Ukraine — a domain fact about the parent, not the product),
+# and "бути мобільним" (a travel/flexibility requirement, "must be mobile
+# for frequent business trips" — mobility, not app development). Found live
+# 2026-09-02, full audit of all 199 mobile-tagged vacancies: 17 were false
+# positives from exactly this pattern (#526, #527, #571, #637, #641, #643,
+# #757, #810, #908, #909, #1095, #1117, #1132, #1206, #1329... — full list in
+# CHANGELOG). Same strip-then-recheck approach as deftech/outsourcing above —
+# a genuine mobile-product mention elsewhere in the same text still counts.
+_MOBILE_WEAK = ["мобільн", "мобильн"]
+_MOBILE_WEAK_COMPILED = [re.compile(p) for p in _MOBILE_WEAK]
+_MOBILE_FALSE_CONTEXT = re.compile(
+    r"мобільн\w*\s+зв'?язо?к\w*|мобільного\s+оператора|"
+    r"бути\s+мобільним|міськ\w*\s+мобільність",
+)
+
 # Tags are non-exclusive by design (a vacancy can genuinely be both igaming
 # and studio, or deftech and outsourcing) — see the analytics discussion this
 # taxonomy came out of. For a single-owner view (a chart that needs to sum to
@@ -205,6 +228,13 @@ def classify(jd_text: str) -> list[str]:
         stripped = _OUTSOURCING_FALSE_CONTEXT.sub(" ", text)
         if any(p.search(stripped) for p in _OUTSOURCING_AMBIGUOUS_COMPILED):
             tags.append("outsourcing")
+    if "mobile" not in tags:
+        # Strong mobile keywords (_TAXONOMY) found nothing — check bare
+        # "мобільн"/"мобильн", but only against text with the known phone-
+        # benefit/telecom-parent/travel-mobility contexts stripped out.
+        stripped = _MOBILE_FALSE_CONTEXT.sub(" ", text)
+        if any(p.search(stripped) for p in _MOBILE_WEAK_COMPILED):
+            tags.append("mobile")
     return tags
 
 
