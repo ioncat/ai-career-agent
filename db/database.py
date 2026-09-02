@@ -57,8 +57,23 @@ def normalize_url(url: str) -> str:
     try:
         p = urlparse(stripped)
         # Normalise: lowercase scheme+host, strip path trailing slash, drop query+fragment
+        host = p.netloc.lower()
         path = p.path.rstrip("/") or "/"
-        return urlunparse((p.scheme.lower(), p.netloc.lower(), path, "", "", ""))
+        # deftech.dou.ua is a separate host mirroring the exact same postings
+        # already on jobs.dou.ua (same vacancy id in the path, just prefixed
+        # with an extra "/jobs" segment there) — DOU's own DefTech category
+        # page, not a distinct site. Without this, the two hosts never
+        # collapse to the same canonical URL, so get_vacancy_by_url() can't
+        # find the existing row and every deftech.dou.ua posting silently
+        # inserts a second, undetected duplicate. Found live 2026-09-02: all
+        # 4 deftech.dou.ua rows in the DB (#1303, #1336, #1337, #1338) had an
+        # un-linked jobs.dou.ua twin, 3 of them applied-to vacancies with a
+        # separate un-flagged "new" duplicate sitting in Inbox.
+        if host == "deftech.dou.ua":
+            host = "jobs.dou.ua"
+            if path.startswith("/jobs/"):
+                path = path[len("/jobs"):]
+        return urlunparse((p.scheme.lower(), host, path, "", "", ""))
     except Exception:
         return stripped
 

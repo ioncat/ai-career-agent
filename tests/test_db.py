@@ -459,6 +459,22 @@ class TestNormalizeUrl:
         url = "https://jobs.dou.ua/vacancies/123/?utm_source=rss"
         assert normalize_url(normalize_url(url)) == normalize_url(url)
 
+    def test_deftech_dou_ua_collapses_to_jobs_dou_ua(self):
+        # Regression 2026-09-02: deftech.dou.ua mirrors the exact same
+        # postings already on jobs.dou.ua (DOU's own DefTech category page,
+        # not a distinct site) — without this the two hosts never matched,
+        # so every deftech.dou.ua posting silently duplicated an existing
+        # jobs.dou.ua row. Found live: #1336 (applied, deftech.dou.ua) and
+        # #1415 (un-flagged duplicate, jobs.dou.ua) — same DOU vacancy id.
+        deftech = "https://deftech.dou.ua/jobs/companies/hiring-miltech-nda/vacancies/365428"
+        jobs = "https://jobs.dou.ua/companies/hiring-miltech-nda/vacancies/365428"
+        assert normalize_url(deftech) == normalize_url(jobs)
+        assert normalize_url(deftech) == jobs
+
+    def test_deftech_dou_ua_idempotent(self):
+        url = "https://deftech.dou.ua/jobs/companies/vytach/vacancies/365847"
+        assert normalize_url(normalize_url(url)) == normalize_url(url)
+
 
 # ── extract_site ──────────────────────────────────────────────────────────────
 
