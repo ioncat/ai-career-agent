@@ -23,7 +23,18 @@ class VacancyRepository {
   Future<List<VacancyListItem>> listVacancies({
     String? status,
     String? since,
-    int limit = 1000,
+    // Default raised 1000 -> 5000 (2026-09-02): the main Inbox/Applied/
+    // Archive list (vacancy_list_provider.dart, no explicit limit override)
+    // fetches everything and filters client-side by stage. Once total row
+    // count passed 1000, the backend's ORDER BY COALESCE(published_at,
+    // created_at) DESC cutoff silently dropped the OLDEST rows past that
+    // limit — including Applied vacancies (a small, important subset) that
+    // just happened to be old. Found live: vacancy #342 (applied 2026-07-02)
+    // invisible in Flutter — 1029 of 1339 total rows were newer than it, 23
+    // of the 85 total Applied rows were affected the same way. 5000 matches
+    // the limit analytics_screen.dart already uses for the same "need the
+    // full list" reason.
+    int limit = 5000,
   }) async {
     final params = <String, String>{'limit': '$limit'};
     if (status != null) params['status'] = status;
