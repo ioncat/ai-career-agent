@@ -86,11 +86,11 @@ If the actual diagnostic text was printed to stdout instead (as it was here), `s
 ## 🔴 P0
 
 ### `published_at` doesn't mean "published on the job board" in most cases — actually ingestion/fetch time (found 2026-08-26, vacancy #1228)
+**Delivered 2026-09-01** (see CHANGELOG): the RSS/job-monitor auto-path gap (was point 2 below) is fixed — `_sanitize_published_at()` no longer replaces a feed's old-but-real `pubDate` with "now"; it only rejects a future date now. Remaining scope below is still open.
 **What:** two separate gaps, both confirmed live:
 1. **Manual/direct-URL path never captures a real platform date at all.** `tools/cv_fetch_jd.py`, `scripts/vacancy_track.py`, and `services/parser/app.py`'s `_parse_html()` (returns `title, markdown, company, company_profile_url` — no date) never scrape the job board's own "Опубліковано ..." line. For #1228, `published_at == created_at` to the second (2026-08-23 09:33:48) — pure ingestion timestamp. Confirmed live on Djinni's real page: actual text is **"Опубліковано 20 серпня"** — 3 days before our `created_at`.
-2. **Even the RSS/job-monitor auto-path silently overrides the real feed `pubDate`.** `web/api.py:728` `_sanitize_published_at()` replaces the feed's claimed date with "now" whenever it's >24h stale or in the future relative to first-seen time (deliberate guard against 2026-07-24 stale-pubDate incident, see code comment) — correct in intent, but means even "real" dates aren't always real.
-3. **UI compounds it**: `_PostedChip` (`vacancy_detail_screen.dart:2404`) literally renders `'Posted ${_relativeTime()}'` with no distinction between "platform published" and "we discovered it" — reads as authoritative to the user.
-**Why:** user's own workflow assumption ("published_at = when the job was posted on the platform") doesn't hold for manually-added/direct-URL vacancies (the more common path via `/analyze`), and only partially holds for RSS-sourced ones.
+2. **UI compounds it**: `_PostedChip` (`vacancy_detail_screen.dart:2404`) literally renders `'Posted ${_relativeTime()}'` with no distinction between "platform published" and "we discovered it" — reads as authoritative to the user.
+**Why:** user's own workflow assumption ("published_at = when the job was posted on the platform") doesn't hold for manually-added/direct-URL vacancies (the more common path via `/analyze`).
 **Fix direction (scoped, not started):**
 - Djinni: the requirements sidebar scrape already exists (`requirements_selector: "aside .card.card-body"`, `services/parser/config.py`) — the "Опубліковано ..." text sits nearby in the DOM but is confirmed NOT inside that selector (not present in scraped `## Vacancy Requirements` block for #1228). Needs a fresh look at raw HTML to find the right selector, then parse Ukrainian month-name dates (no year in the string — assume current year, roll back to prior year if the parsed date would be in the future).
 - Thread through: `services/parser/app.py` `_parse_html()` return tuple + `ParsedDocument` contract (`contracts/parsed_document.py`) + `adapters/parser_adapter.py` + `tools/cv_fetch_jd.py` → `insert_vacancy(published_at=...)`.
@@ -330,6 +330,12 @@ No dual-availability state — the button's visibility is a direct, deterministi
 **Scope:** Flutter detail screen — new section/tab rendering the stored `analysis_json` (or raw markdown) content; decide whether to show structured (parsed p1/p2 fields) or raw markdown.
 
 ## 🟡 P2
+
+### Backlog structure simplification — BACKLOG.md itself (added 2026-09-01)
+**What:** BACKLOG.md violates its own documented contract (documentation-conventions.md) — mass 10-line-limit breaches, Now-section mixing, no stable entry IDs, done-markers inside open entries, duplicate content.
+**Why:** hard to read/edit/maintain for both human and AI agent; audited a marketplace `product-manager` skill as a possible fix — verdict: not applicable (broken package, wrong data model — ticket-per-file vs our single flat file).
+**Scope:** full analysis + step-by-step plan already written up.
+**Spec:** [../discovery/backlog-simplification.md](../discovery/backlog-simplification.md)
 
 ### Audit other Phase 1/2 fields for the same "correctly flagged but buried in UI" gap (added 2026-08-26)
 **What:** the `_WarningsBanner` fix (2026-08-26, see CHANGELOG) solved this for `p2.warnings` — check whether `hiddenRisks`/`keyBarriers` inside `_QuickOverviewCard` have the same visibility problem, or whether their current row treatment is prominent enough.
