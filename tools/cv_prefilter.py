@@ -23,6 +23,7 @@ from pydantic_ai import RunContext
 
 from core.deps import AgentDeps
 from core.llm_client import LLMUnavailableError
+from core.vacancy_tags import classify as classify_tags
 from db import database
 
 log = logging.getLogger(__name__)
@@ -369,6 +370,67 @@ async def apply_location_stage(vacancy_id: int, jd_text: str) -> bool:
     return True
 
 
+_MOBILE_EXPERIENCE_RE = re.compile(
+    r"(?:experience|hands-on|proficiency|background)\w*[^.\n]{0,40}"
+    r"(?:mobile app\w*|mobile game\w*|\bios\b|\bandroid\b|мобільн\w*|мобильн\w*)"
+    r"|"
+    r"(?:mobile app\w*|mobile game\w*|\bios\b|\bandroid\b|мобільн\w*|мобильн\w*)"
+    r"[^.\n]{0,40}(?:experience|hands-on)\w*"
+    r"|"
+    r"досвід\w*[^.\n]{0,40}мобільн\w*|мобільн\w*[^.\n]{0,40}досвід\w*"
+    r"|"
+    r"опыт\w*[^.\n]{0,40}мобильн\w*|мобильн\w*[^.\n]{0,40}опыт\w*",
+    re.IGNORECASE,
+)
+
+
+async def apply_domain_stage(vacancy_id: int, jd_text: str) -> bool:
+    """Run the deterministic mobile-domain check (Stage 1 — no LLM) and write
+    a blocker if the JD phrases mobile as an actual experience requirement.
+    Returns True if a blocker was set.
+
+    PROFILE.md's Critical Blockers list requires mobile app product
+    experience the candidate doesn't have ("mobile: mobile app product
+    experience required (none)"). Stage 2 (LLM content check) proved
+    unreliable at catching this from JD body text — found live 2026-09-02: 2
+    of 3 checked mobile-tagged vacancies were misses (#1441: "hands-on
+    experience with mobile apps for iOS and/or Android" said BLOCKED: no;
+    #725: "практичний досвід роботи з мобільними застосунками" also said
+    BLOCKED: no).
+
+    Uses core/vacancy_tags.py's classify() (the same function driving the
+    auto-tagging system) as a cheap first gate, but does NOT block on that
+    alone — its `ios`/`android` keywords are deliberately unconditional
+    (no false-positive context found for the *tag*, see 2026-09-02 cleanup),
+    which is fine for "does this company touch mobile" but too broad for
+    "does this role require mobile experience": #844 (MacPaw/Setapp) is
+    tagged mobile purely from "develops software for macOS and iOS" —
+    company-description, not a requirement — and correctly stayed unblocked
+    under Stage 2's judgment; blindly reusing the tag as the blocker trigger
+    would have wrongly blocked it. `_MOBILE_EXPERIENCE_RE` requires an
+    experience/hands-on/proficiency word near the mobile keyword (or the
+    Ukrainian/Russian "досвід"/"опыт" equivalents) — present in both real
+    misses, absent from #844.
+
+    Called automatically on vacancy ingestion (RSSWatcher) alongside
+    apply_title_stage/apply_language_stage/apply_location_stage, only when
+    none of those already flagged it.
+    """
+    if "mobile" not in classify_tags(jd_text):
+        return False
+    text = jd_text.replace("’", "'")
+    if not _MOBILE_EXPERIENCE_RE.search(text):
+        return False
+    reason = "mobile: JD requires mobile app product experience (candidate has none)"
+    log.info("apply_domain_stage: v#%d flagged at ingestion (no LLM call): %s", vacancy_id, reason)
+    await database.set_vacancy_blocker(
+        vacancy_id, True, [reason],
+        raw_output=f"BLOCKED: yes\n- {reason}\n(deterministic domain check — no LLM call)",
+        stage="title",
+    )
+    return True
+
+
 async def cv_prefilter(ctx: RunContext[AgentDeps], vacancy_id: int) -> dict:
     """Run the critical blocker pre-filter on a freshly-fetched vacancy.
 
@@ -410,13 +472,23 @@ async def cv_prefilter(ctx: RunContext[AgentDeps], vacancy_id: int) -> dict:
 
     run_id = await database.insert_pipeline_run(vacancy_id, phase="prefilter")
 
+    jd_text = jd_path.read_text(encoding="utf-8")
+
     title = vacancy["title"] or ""
+    check_kind = "title"
     deterministic_reason = _check_title_domain_signals(title) or _check_title_allowlist(title)
+    if (
+        deterministic_reason is None
+        and "mobile" in classify_tags(jd_text)
+        and _MOBILE_EXPERIENCE_RE.search(jd_text.replace("’", "'"))
+    ):
+        deterministic_reason = "mobile: JD requires mobile app product experience (candidate has none)"
+        check_kind = "domain"
     if deterministic_reason is not None:
         log.info("cv_prefilter: v#%d deterministic match (no LLM call): %s", vacancy_id, deterministic_reason)
         await database.set_vacancy_blocker(
             vacancy_id, True, [deterministic_reason],
-            raw_output=f"BLOCKED: yes\n- {deterministic_reason}\n(deterministic title check — no LLM call)",
+            raw_output=f"BLOCKED: yes\n- {deterministic_reason}\n(deterministic {check_kind} check — no LLM call)",
             stage="title",
         )
         await database.update_pipeline_run(run_id, status="done")
@@ -430,7 +502,6 @@ async def cv_prefilter(ctx: RunContext[AgentDeps], vacancy_id: int) -> dict:
             "provider_unavailable": False,
         }
 
-    jd_text = jd_path.read_text(encoding="utf-8")
     skill_dir = _PROMPTS_DIR / ctx.deps.skill_type
     prompt_path = skill_dir / "prefilter.md"
     if not prompt_path.exists():

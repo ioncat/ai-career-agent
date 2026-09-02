@@ -17,6 +17,7 @@ from tools.cv_prefilter import (
     _check_title_allowlist,
     _check_title_domain_signals,
     _parse_prefilter_output,
+    apply_domain_stage,
     apply_language_stage,
     apply_location_stage,
     apply_title_stage,
@@ -453,6 +454,66 @@ async def test_apply_location_stage_no_write_when_clean():
     mock_db = _mock_db()
     with patch("tools.cv_prefilter.database", mock_db):
         result = await apply_location_stage(1, _JD_UKRAINE_AND_EUROPE)
+
+    assert result is False
+    mock_db.set_vacancy_blocker.assert_not_awaited()
+
+
+# ── apply_domain_stage (2026-09-02) ─────────────────────────────────────────────
+# PROFILE.md's Critical Blockers require mobile app product experience the
+# candidate doesn't have. Stage 2 (LLM) proved unreliable at catching this
+# from JD body text — found live 2026-09-02: #1441 ("hands-on experience
+# with mobile apps for iOS and/or Android") and #725 ("практичний досвід
+# роботи з мобільними застосунками") both said BLOCKED: no. Reuses
+# core/vacancy_tags.py's classify() — the same function driving the
+# auto-tagging system — instead of a second, separately-maintained keyword
+# list.
+
+@pytest.mark.asyncio
+async def test_apply_domain_stage_writes_blocker_on_mobile_requirement():
+    mock_db = _mock_db()
+    jd = "Looking for a PM with hands-on experience with mobile apps for iOS and/or Android."
+    with patch("tools.cv_prefilter.database", mock_db):
+        result = await apply_domain_stage(1, jd)
+
+    assert result is True
+    mock_db.set_vacancy_blocker.assert_awaited_once()
+    args, kwargs = mock_db.set_vacancy_blocker.call_args
+    assert args[0] == 1
+    assert args[1] is True
+    assert args[2][0].startswith("mobile:")
+    assert kwargs["stage"] == "title"
+
+
+@pytest.mark.asyncio
+async def test_apply_domain_stage_ukrainian_mobile_requirement():
+    mock_db = _mock_db()
+    jd = "Практичний досвід роботи з мобільними застосунками або consumer digital products."
+    with patch("tools.cv_prefilter.database", mock_db):
+        result = await apply_domain_stage(1, jd)
+
+    assert result is True
+
+
+@pytest.mark.asyncio
+async def test_apply_domain_stage_company_description_mention_does_not_block():
+    # Same taxonomy the mobile tag already got a false-positive fix for
+    # (2026-09-02) — "develops software for macOS and iOS" describes the
+    # company's product portfolio, not a requirement on the candidate.
+    mock_db = _mock_db()
+    jd = "MacPaw is a software company that develops and distributes software for macOS and iOS."
+    with patch("tools.cv_prefilter.database", mock_db):
+        result = await apply_domain_stage(1, jd)
+
+    assert result is False
+    mock_db.set_vacancy_blocker.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_apply_domain_stage_no_write_when_no_mobile_signal():
+    mock_db = _mock_db()
+    with patch("tools.cv_prefilter.database", mock_db):
+        result = await apply_domain_stage(1, "We are hiring a Product Manager to own our web platform roadmap.")
 
     assert result is False
     mock_db.set_vacancy_blocker.assert_not_awaited()

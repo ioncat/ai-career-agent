@@ -177,7 +177,7 @@ class RSSWatcher:
         """
         from tools.cv_analyze import cv_analyze  # local import to avoid circular
         from tools.cv_fetch_jd import fetch_jd
-        from tools.cv_prefilter import apply_language_stage, apply_location_stage, apply_title_stage
+        from tools.cv_prefilter import apply_domain_stage, apply_language_stage, apply_location_stage, apply_title_stage
 
         source = self._source_label(url)
         display = rss_title or url
@@ -265,7 +265,9 @@ class RSSWatcher:
                                 jd_text = jd_path.read_text(encoding="utf-8")
                                 blocked = await apply_language_stage(vacancy_id, jd_text)
                                 if not blocked:
-                                    await apply_location_stage(vacancy_id, jd_text)
+                                    blocked = await apply_location_stage(vacancy_id, jd_text)
+                                if not blocked:
+                                    await apply_domain_stage(vacancy_id, jd_text)
             except Exception as exc:
                 log.warning("RSSWatcher: title stage failed v#%d (non-fatal): %s", vacancy_id, exc)
 

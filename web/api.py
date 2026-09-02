@@ -773,7 +773,7 @@ async def _refresh_republished_vacancy(vacancy_id: int, url: str) -> None:
     precedent as _enrich_company_website in tools/cv_fetch_jd.py. Fail-open:
     any error here is logged and swallowed, never surfaced to the caller.
     """
-    from tools.cv_prefilter import apply_language_stage, apply_location_stage, apply_title_stage
+    from tools.cv_prefilter import apply_domain_stage, apply_language_stage, apply_location_stage, apply_title_stage
 
     try:
         vacancy = await database.get_vacancy_by_id(vacancy_id)
@@ -830,7 +830,9 @@ async def _refresh_republished_vacancy(vacancy_id: int, url: str) -> None:
         if not blocked:
             blocked = await apply_language_stage(vacancy_id, doc.markdown)
             if not blocked:
-                await apply_location_stage(vacancy_id, doc.markdown)
+                blocked = await apply_location_stage(vacancy_id, doc.markdown)
+            if not blocked:
+                await apply_domain_stage(vacancy_id, doc.markdown)
     except ParserError as exc:
         log.warning("refresh-on-republish: parser failed v#%d (non-fatal): %s", vacancy_id, exc)
     except Exception as exc:
@@ -896,6 +898,7 @@ async def api_new_vacancy(req: NewVacancyRequest):
                 try:
                     if await database.get_auto_check_title(existing["user_id"]):
                         from tools.cv_prefilter import (
+                            apply_domain_stage,
                             apply_language_stage,
                             apply_location_stage,
                             apply_title_stage,
@@ -904,7 +907,9 @@ async def api_new_vacancy(req: NewVacancyRequest):
                         if not blocked and jd_text is not None:
                             blocked = await apply_language_stage(existing["id"], jd_text)
                             if not blocked:
-                                await apply_location_stage(existing["id"], jd_text)
+                                blocked = await apply_location_stage(existing["id"], jd_text)
+                            if not blocked:
+                                await apply_domain_stage(existing["id"], jd_text)
                 except Exception as exc:
                     log.warning("api/new-vacancy: prefilter stage 1 on republish failed v#%d (non-fatal): %s", existing["id"], exc)
                 # Background re-fetch — the checks above only ever see the
@@ -1068,8 +1073,10 @@ async def api_import_jd(req: ImportJdRequest):
     # auto-trigger as RSSWatcher._process(), see 2026-07-23 CHANGELOG entry.
     try:
         if await database.get_auto_check_title(req.user_id):
-            from tools.cv_prefilter import apply_title_stage
-            await apply_title_stage(vacancy_id, title)
+            from tools.cv_prefilter import apply_domain_stage, apply_title_stage
+            blocked = await apply_title_stage(vacancy_id, title)
+            if not blocked:
+                await apply_domain_stage(vacancy_id, req.content)
     except Exception as exc:
         log.warning("import-jd: title stage failed v#%d (non-fatal): %s", vacancy_id, exc)
 
