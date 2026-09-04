@@ -430,183 +430,199 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
               bottom: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.15)),
             ),
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (role.isNotEmpty)
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(role,
-                          style: Theme.of(context).textTheme.titleSmall,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis),
-                      if (company.isNotEmpty)
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Flexible(
-                              child: Text(company,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodySmall
-                                      ?.copyWith(color: cs.onSurfaceVariant),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis),
-                            ),
-                            if (companyWebsite != null && companyWebsite.isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(left: 4),
-                                child: Tooltip(
-                                  message: companyWebsite,
-                                  child: InkWell(
-                                    onTap: () => launchUrl(Uri.parse(companyWebsite),
-                                        mode: LaunchMode.externalApplication),
-                                    child: Icon(Icons.language,
-                                        size: 14, color: cs.primary),
-                                  ),
+              // Row 1 — title + secondary icon actions. Split out from the
+              // primary action buttons below (2026-09-04, user feedback: the
+              // single combined row truncated the title hard — "Senior
+              // Product M..." — once the detail panel narrowed even a
+              // little). Title now gets the full row width to itself.
+              Row(
+                children: [
+                  if (role.isNotEmpty)
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(role,
+                              style: Theme.of(context).textTheme.titleSmall,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                          if (company.isNotEmpty)
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Flexible(
+                                  child: Text(company,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(color: cs.onSurfaceVariant),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis),
                                 ),
-                              ),
-                          ],
-                        ),
-                    ],
-                  ),
-                )
-              else
-                const Spacer(),
-              if (widget.url.isNotEmpty)
-                IconButton(
-                  icon: Icon(Icons.open_in_new, size: 18, color: cs.onSurfaceVariant),
-                  tooltip: 'Open JD',
-                  onPressed: () => launchUrl(Uri.parse(widget.url),
-                      mode: LaunchMode.externalApplication),
-                ),
-              if (widget.vacancy?.folderPath != null)
-                IconButton(
-                  icon: Icon(Icons.folder_open_outlined, size: 18, color: cs.onSurfaceVariant),
-                  tooltip: 'Open folder',
-                  onPressed: () => Process.run('explorer.exe', [widget.vacancy!.folderPath!]),
-                ),
-              Tooltip(
-                message: 'Refresh vacancy data',
-                child: IconButton(
-                  icon: _refreshing
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                      : Icon(Icons.sync_rounded, size: 18, color: cs.onSurfaceVariant),
-                  onPressed: _refreshing ? null : _refresh,
-                ),
-              ),
-              if (widget.url.isNotEmpty)
-                Tooltip(
-                  message: 'Re-fetch from source — re-pull the JD from the live posting page '
-                      '(not the cached copy, not the RSS feed). For a vacancy fetched too early, '
-                      'e.g. while the job board was still moderating it.',
-                  child: IconButton(
-                    icon: _loadingRefetch
-                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                        : Icon(Icons.cloud_download_outlined, size: 18, color: cs.onSurfaceVariant),
-                    onPressed: _loadingRefetch ? null : _refetchFromSource,
-                  ),
-                ),
-              Tooltip(
-                message: 'Activity log — pipeline runs + LLM calls (incl. pre-filter checks). '
-                    'Only reachable from this JD view before analysis — the tabbed Activity tab '
-                    'only appears once Phase 1+2 analysis exists.',
-                child: IconButton(
-                  icon: Icon(Icons.history_rounded, size: 18, color: cs.onSurfaceVariant),
-                  onPressed: () => _showActivityLog(context),
-                ),
-              ),
-              // Skip moved leftmost of this button cluster (2026-09-04, user
-              // request) — it's the heaviest-used action on this pre-analysis
-              // phase and Applied? sitting first was in the way.
-              if (widget.restoreMode) ...[
-                OutlinedButton.icon(
-                  onPressed: _loadingRestore ? null : _restore,
-                  icon: _loadingRestore
-                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Icon(Icons.inbox_outlined, size: 16),
-                  label: const Text('Restore to Inbox'),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: cs.primary.withValues(alpha: 0.5)),
-                    foregroundColor: cs.primary,
-                  ),
-                ),
-                const SizedBox(width: 8),
-              ] else ...[
-                OutlinedButton(
-                  onPressed: _loadingDecline ? null : _decline,
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: cs.error),
-                    foregroundColor: cs.error,
-                  ),
-                  child: _loadingDecline
-                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Text('Skip'),
-                ),
-                const SizedBox(width: 8),
-              ],
-              // Applied toggle — same affordance the tabbed post-analysis view
-              // has always had, now also reachable pre-analysis (2026-09-02):
-              // applying happens outside this pipeline sometimes (LinkedIn Easy
-              // Apply, a quick manual submission before triage), and there was
-              // previously no way to record that without leaving Inbox first.
-              Tooltip(
-                message: _applied ? 'Mark as not applied' : 'Mark as applied',
-                child: _applied
-                    ? FilledButton.icon(
-                        onPressed: _loadingApplied ? null : _toggleApplied,
-                        icon: const Icon(Icons.check_circle, size: 16),
-                        label: const Text('Applied'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF2E7D32),
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          minimumSize: const Size(0, 36),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                      )
-                    : OutlinedButton.icon(
-                        onPressed: _loadingApplied ? null : _toggleApplied,
-                        icon: const Icon(Icons.check_circle_outline, size: 16),
-                        label: const Text('Applied?'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: cs.onSurfaceVariant,
-                          side: BorderSide(color: cs.outlineVariant),
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          minimumSize: const Size(0, 36),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
+                                if (companyWebsite != null && companyWebsite.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 4),
+                                    child: Tooltip(
+                                      message: companyWebsite,
+                                      child: InkWell(
+                                        onTap: () => launchUrl(Uri.parse(companyWebsite),
+                                            mode: LaunchMode.externalApplication),
+                                        child: Icon(Icons.language,
+                                            size: 14, color: cs.primary),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                        ],
                       ),
-              ),
-              const SizedBox(width: 8),
-              if (!widget.restoreMode) ...[
-                Tooltip(
-                  message: 'Run the critical-blocker pre-filter manually (EPIC-27) — not auto-triggered yet',
-                  child: OutlinedButton.icon(
-                    onPressed: _loadingPrefilter ? null : _checkBlockers,
-                    icon: _loadingPrefilter
-                        ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Icon(Icons.block_outlined, size: 16),
-                    label: const Text('Check blockers'),
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: cs.outlineVariant),
-                      foregroundColor: cs.onSurfaceVariant,
+                    )
+                  else
+                    const Spacer(),
+                  if (widget.url.isNotEmpty)
+                    IconButton(
+                      icon: Icon(Icons.open_in_new, size: 18, color: cs.onSurfaceVariant),
+                      tooltip: 'Open JD',
+                      onPressed: () => launchUrl(Uri.parse(widget.url),
+                          mode: LaunchMode.externalApplication),
+                    ),
+                  if (widget.vacancy?.folderPath != null)
+                    IconButton(
+                      icon: Icon(Icons.folder_open_outlined, size: 18, color: cs.onSurfaceVariant),
+                      tooltip: 'Open folder',
+                      onPressed: () => Process.run('explorer.exe', [widget.vacancy!.folderPath!]),
+                    ),
+                  Tooltip(
+                    message: 'Refresh vacancy data',
+                    child: IconButton(
+                      icon: _refreshing
+                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                          : Icon(Icons.sync_rounded, size: 18, color: cs.onSurfaceVariant),
+                      onPressed: _refreshing ? null : _refresh,
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Tooltip(
-                  message: workerAvailable ? '' : 'Analysis worker unavailable — start agent.py',
-                  child: FilledButton.icon(
-                    onPressed: _loadingAnalyze || !workerAvailable ? null : _analyze,
-                    icon: _loadingAnalyze
-                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : const Icon(Icons.analytics_outlined, size: 16),
-                    label: const Text('Analyze'),
+                  if (widget.url.isNotEmpty)
+                    Tooltip(
+                      message: 'Re-fetch from source — re-pull the JD from the live posting page '
+                          '(not the cached copy, not the RSS feed). For a vacancy fetched too early, '
+                          'e.g. while the job board was still moderating it.',
+                      child: IconButton(
+                        icon: _loadingRefetch
+                            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                            : Icon(Icons.cloud_download_outlined, size: 18, color: cs.onSurfaceVariant),
+                        onPressed: _loadingRefetch ? null : _refetchFromSource,
+                      ),
+                    ),
+                  Tooltip(
+                    message: 'Activity log — pipeline runs + LLM calls (incl. pre-filter checks). '
+                        'Only reachable from this JD view before analysis — the tabbed Activity tab '
+                        'only appears once Phase 1+2 analysis exists.',
+                    child: IconButton(
+                      icon: Icon(Icons.history_rounded, size: 18, color: cs.onSurfaceVariant),
+                      onPressed: () => _showActivityLog(context),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
+              const SizedBox(height: 8),
+              // Row 2 — primary action buttons. Wrap (not Row) so a narrow
+              // panel flows them to a further line instead of overflowing —
+              // same pattern used for the inbox card's badge cluster.
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  // Skip moved leftmost of this button cluster (2026-09-04,
+                  // user request) — it's the heaviest-used action on this
+                  // pre-analysis phase and Applied? sitting first was in the way.
+                  if (widget.restoreMode)
+                    OutlinedButton.icon(
+                      onPressed: _loadingRestore ? null : _restore,
+                      icon: _loadingRestore
+                          ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(Icons.inbox_outlined, size: 16),
+                      label: const Text('Restore to Inbox'),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: cs.primary.withValues(alpha: 0.5)),
+                        foregroundColor: cs.primary,
+                      ),
+                    )
+                  else
+                    OutlinedButton(
+                      onPressed: _loadingDecline ? null : _decline,
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: cs.error),
+                        foregroundColor: cs.error,
+                      ),
+                      child: _loadingDecline
+                          ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Text('Skip'),
+                    ),
+                  // Applied toggle — same affordance the tabbed post-analysis
+                  // view has always had, now also reachable pre-analysis
+                  // (2026-09-02): applying happens outside this pipeline
+                  // sometimes (LinkedIn Easy Apply, a quick manual submission
+                  // before triage), and there was previously no way to record
+                  // that without leaving Inbox first.
+                  Tooltip(
+                    message: _applied ? 'Mark as not applied' : 'Mark as applied',
+                    child: _applied
+                        ? FilledButton.icon(
+                            onPressed: _loadingApplied ? null : _toggleApplied,
+                            icon: const Icon(Icons.check_circle, size: 16),
+                            label: const Text('Applied'),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xFF2E7D32),
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              minimumSize: const Size(0, 36),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                          )
+                        : OutlinedButton.icon(
+                            onPressed: _loadingApplied ? null : _toggleApplied,
+                            icon: const Icon(Icons.check_circle_outline, size: 16),
+                            label: const Text('Applied?'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: cs.onSurfaceVariant,
+                              side: BorderSide(color: cs.outlineVariant),
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              minimumSize: const Size(0, 36),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                          ),
+                  ),
+                  if (!widget.restoreMode) ...[
+                    Tooltip(
+                      message: 'Run the critical-blocker pre-filter manually (EPIC-27) — not auto-triggered yet',
+                      child: OutlinedButton.icon(
+                        onPressed: _loadingPrefilter ? null : _checkBlockers,
+                        icon: _loadingPrefilter
+                            ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Icon(Icons.block_outlined, size: 16),
+                        label: const Text('Check blockers'),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: cs.outlineVariant),
+                          foregroundColor: cs.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                    Tooltip(
+                      message: workerAvailable ? '' : 'Analysis worker unavailable — start agent.py',
+                      child: FilledButton.icon(
+                        onPressed: _loadingAnalyze || !workerAvailable ? null : _analyze,
+                        icon: _loadingAnalyze
+                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            : const Icon(Icons.analytics_outlined, size: 16),
+                        label: const Text('Analyze'),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ],
           ),
         ),
