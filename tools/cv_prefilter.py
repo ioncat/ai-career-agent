@@ -150,7 +150,7 @@ _LANGUAGE_LEVEL_RE = re.compile(
 )
 
 
-def _check_english_level(jd_text: str) -> str | None:
+def _check_english_level_sidebar(jd_text: str) -> str | None:
     """Deterministic pre-check: does Djinni's structured requirements sidebar
     (merged into JD.md under "## Vacancy Requirements") require an English
     level above the candidate's? Returns None if clean, absent, or unparseable
@@ -169,6 +169,107 @@ def _check_english_level(jd_text: str) -> str | None:
     if _CEFR_RANK[required] <= _CEFR_RANK[_CANDIDATE_ENGLISH_LEVEL]:
         return None
     return f"english: JD requires {required}, candidate is {_CANDIDATE_ENGLISH_LEVEL}"
+
+
+# Body-prose English-level check (2026-09-04) — extends the Djinni-sidebar-only
+# check above to non-Djinni sources (DOU never has a "## Vacancy Requirements"
+# sidebar at all — confirmed missing on vacancy #1461, "English at Advanced
+# (C1) level or higher" sat only in the JD body, and Stage 2 (LLM) had
+# already run on that same vacancy and missed it too — same
+# unreliable-on-explicit-text pattern documented for the mobile domain check
+# above).
+#
+# docs/discovery/prefilter-content-stage-regex-idea.md (2026-07-25) flagged
+# `english` as "borderline" for a naive regex — real risk demonstrated
+# 2026-07-23 (CHANGELOG) was a Responsibilities-bullet ("run A/B tests") being
+# misread as a Requirements-bullet ("hands-on A/B testing required"). Solved
+# here with a section-boundary parser (the exact deterministic fix that
+# discovery doc says the LLM-only categories still need): only text between a
+# "Requirements"-shaped heading and the next heading is scanned, so a language
+# mention anywhere else in the JD (Responsibilities, About Us, Nice to Have)
+# can never match. A soft-requirement word on the same line ("plus", "nice to
+# have", "ideally", "буде плюсом") still excludes it even inside that section,
+# since "Requirements" sections sometimes end with a soft ask.
+_REQUIREMENTS_HEADING_RE = re.compile(
+    r"(?im)^#{1,6}\s*(?:requirements?|must.?have|what (?:you.ll need|we.re looking for)|"
+    r"вимоги|необхідні? навички|необхідно|обов.язков\w*|требовани\w*)\s*$"
+)
+_NEXT_HEADING_RE = re.compile(r"(?m)^#{1,6}\s+\S")
+_ENGLISH_WORD_RE = re.compile(r"english|англ[іi]йськ\w*|английск\w*", re.IGNORECASE)
+_SOFT_REQUIREMENT_RE = re.compile(
+    r"\bplus\b|nice.to.have|\bbonus\b|preferred|advantage|desirable|ideally|"
+    r"would be an?\b|перевагою|буде плюсом|бажано|приветствується|приветствуется|"
+    r"преимуществом",
+    re.IGNORECASE,
+)
+_LEVEL_WORD_TO_CEFR = {
+    "native": "C2",
+    "fluent": "C2",
+    # "proficient"/"proficiency" deliberately excluded (2026-09-04) — too
+    # ambiguous, confirmed live: #658 "Working proficiency in English" and
+    # #1287 "English proficiency at Intermediate level or higher" both use
+    # the word to describe a level well BELOW C2 ("working"/"intermediate"
+    # qualifies it down), the opposite of what the bare word suggests.
+    "advanced": "C1",
+    "upper-intermediate": "B2",
+    "upper intermediate": "B2",
+}
+_LEVEL_WORD_RE = re.compile(
+    r"\b(" + "|".join(re.escape(w) for w in _LEVEL_WORD_TO_CEFR) + r")\b", re.IGNORECASE
+)
+
+
+def _extract_requirements_section(jd_text: str) -> str | None:
+    """Return the text between a Requirements-shaped heading and the next
+    markdown heading, or None if no such heading is found — the same
+    section-boundary technique that fixed the LLM's Responsibilities-vs-
+    Requirements confusion (2026-07-23 CHANGELOG), applied deterministically.
+    """
+    m = _REQUIREMENTS_HEADING_RE.search(jd_text)
+    if not m:
+        return None
+    start = m.end()
+    next_m = _NEXT_HEADING_RE.search(jd_text, start)
+    end = next_m.start() if next_m else len(jd_text)
+    return jd_text[start:end]
+
+
+def _check_english_level_body(jd_text: str) -> str | None:
+    """Deterministic pre-check: does the JD body's own Requirements section
+    (not Djinni's structured sidebar) state an English level above the
+    candidate's? Scoped to that section only, and to lines free of a
+    soft-requirement word — see module comment above for why. Returns None if
+    clean, absent, or unparseable (fail-open), or a reason string to flag.
+    """
+    section = _extract_requirements_section(jd_text)
+    if not section:
+        return None
+    for line in section.splitlines():
+        if not _ENGLISH_WORD_RE.search(line):
+            continue
+        if _SOFT_REQUIREMENT_RE.search(line):
+            continue
+        code_match = re.search(r"\b(A1|A2|B1|B2|C1|C2)\b", line)
+        if code_match:
+            required = code_match.group(1).upper()
+        else:
+            word_match = _LEVEL_WORD_RE.search(line)
+            if not word_match:
+                continue
+            required = _LEVEL_WORD_TO_CEFR[word_match.group(1).lower()]
+        if _CEFR_RANK[required] <= _CEFR_RANK[_CANDIDATE_ENGLISH_LEVEL]:
+            continue
+        snippet = line.strip()[:100]
+        return f"english: JD Requirements section requires {required} ({snippet!r}), candidate is {_CANDIDATE_ENGLISH_LEVEL}"
+    return None
+
+
+def _check_english_level(jd_text: str) -> str | None:
+    """Combined deterministic English-level check — Djinni sidebar first
+    (highest confidence, poster-configured field), then the JD body's own
+    Requirements section as a fallback for sources without a sidebar (DOU).
+    """
+    return _check_english_level_sidebar(jd_text) or _check_english_level_body(jd_text)
 
 
 # Same structured sidebar as _check_english_level above, different field:

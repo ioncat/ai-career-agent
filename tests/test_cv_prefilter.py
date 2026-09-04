@@ -13,6 +13,7 @@ import pytest
 from tools.cv_prefilter import (
     _check_country,
     _check_english_level,
+    _check_english_level_body,
     _check_remote_format,
     _check_title_allowlist,
     _check_title_domain_signals,
@@ -258,6 +259,80 @@ def test_english_level_ignores_casual_mention_outside_requirements_section():
     section counts."""
     jd = "# Product Manager\n\nWe need English C1 speakers on the team ideally.\n"
     assert _check_english_level(jd) is None
+
+
+# ── _check_english_level_body (DOU/non-Djinni Requirements section, 2026-09-04) ─
+
+_JD_DOU_STYLE_C1 = (
+    "# Product Owner\n\n### Description\n\nSome company blurb.\n\n"
+    "### Requirements\n\n"
+    "  * 5+ years of experience.\n"
+    "  * **English at Advanced (C1) level or higher, both written and spoken.**\n\n"
+    "### Responsibilities\n\n"
+    "  * Own the backlog.\n"
+)
+
+
+def test_english_level_body_flags_explicit_code_in_requirements_section():
+    reason = _check_english_level_body(_JD_DOU_STYLE_C1)
+    assert reason is not None
+    assert reason.startswith("english:")
+    assert "C1" in reason
+
+
+def test_english_level_body_no_flag_without_requirements_heading():
+    jd = "# Product Owner\n\nWe need English at C1 level, no headings here at all.\n"
+    assert _check_english_level_body(jd) is None
+
+
+def test_english_level_body_ignores_mention_in_responsibilities_section():
+    jd = (
+        "# Product Owner\n\n### Requirements\n\n  * 5+ years of experience.\n\n"
+        "### Responsibilities\n\n  * Communicate with English (C1) speaking stakeholders daily.\n"
+    )
+    assert _check_english_level_body(jd) is None
+
+
+def test_english_level_body_ignores_soft_requirement_phrasing():
+    jd = (
+        "# Product Owner\n\n### Requirements\n\n"
+        "  * Fluent English (C1) would be a plus, not required.\n"
+    )
+    assert _check_english_level_body(jd) is None
+
+
+def test_english_level_body_ignores_working_proficiency_below_candidate():
+    """Regression for a live false positive (#658, #1287, found 2026-09-04
+    before backfill): 'proficiency' alone doesn't mean C2 — 'working
+    proficiency'/'proficiency at Intermediate level' are well below it."""
+    jd = (
+        "# Senior Product Manager\n\n### Requirements\n\n"
+        "  * Working proficiency in English for written communication and meetings.\n"
+    )
+    assert _check_english_level_body(jd) is None
+    jd2 = (
+        "# Technical Project Manager\n\n### Requirements\n\n"
+        "  * English proficiency at Intermediate level or higher.\n"
+    )
+    assert _check_english_level_body(jd2) is None
+
+
+def test_english_level_body_flags_fluent_as_c2():
+    jd = "# Project Manager\n\n### Requirements\n\n  * Fluent English, both written and spoken.\n"
+    reason = _check_english_level_body(jd)
+    assert reason is not None
+    assert "C2" in reason
+
+
+def test_english_level_body_ukrainian_heading_recognized():
+    jd = (
+        "# Продакт менеджер\n\n### Вимоги\n\n"
+        "  * Англійська на рівні C1 або вище.\n\n"
+        "### Обов'язки\n\n  * Щось інше.\n"
+    )
+    reason = _check_english_level_body(jd)
+    assert reason is not None
+    assert "C1" in reason
 
 
 # ── apply_title_stage (auto-trigger helper, 2026-07-23) ────────────────────────

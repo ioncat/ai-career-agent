@@ -465,6 +465,35 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                   onPressed: () => _showActivityLog(context),
                 ),
               ),
+              // Skip moved leftmost of this button cluster (2026-09-04, user
+              // request) — it's the heaviest-used action on this pre-analysis
+              // phase and Applied? sitting first was in the way.
+              if (widget.restoreMode) ...[
+                OutlinedButton.icon(
+                  onPressed: _loadingRestore ? null : _restore,
+                  icon: _loadingRestore
+                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.inbox_outlined, size: 16),
+                  label: const Text('Restore to Inbox'),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: cs.primary.withValues(alpha: 0.5)),
+                    foregroundColor: cs.primary,
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ] else ...[
+                OutlinedButton(
+                  onPressed: _loadingDecline ? null : _decline,
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: cs.error),
+                    foregroundColor: cs.error,
+                  ),
+                  child: _loadingDecline
+                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Text('Skip'),
+                ),
+                const SizedBox(width: 8),
+              ],
               // Applied toggle — same affordance the tabbed post-analysis view
               // has always had, now also reachable pre-analysis (2026-09-02):
               // applying happens outside this pipeline sometimes (LinkedIn Easy
@@ -498,30 +527,7 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                       ),
               ),
               const SizedBox(width: 8),
-              if (widget.restoreMode) ...[
-                OutlinedButton.icon(
-                  onPressed: _loadingRestore ? null : _restore,
-                  icon: _loadingRestore
-                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Icon(Icons.inbox_outlined, size: 16),
-                  label: const Text('Restore to Inbox'),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: cs.primary.withValues(alpha: 0.5)),
-                    foregroundColor: cs.primary,
-                  ),
-                ),
-              ] else ...[
-                OutlinedButton(
-                  onPressed: _loadingDecline ? null : _decline,
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: cs.error),
-                    foregroundColor: cs.error,
-                  ),
-                  child: _loadingDecline
-                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Text('Skip'),
-                ),
-                const SizedBox(width: 8),
+              if (!widget.restoreMode) ...[
                 Tooltip(
                   message: 'Run the critical-blocker pre-filter manually (EPIC-27) — not auto-triggered yet',
                   child: OutlinedButton.icon(

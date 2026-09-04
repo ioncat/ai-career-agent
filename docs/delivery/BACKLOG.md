@@ -1,6 +1,6 @@
 # career-agent — Backlog
 
-> Last updated: 2026-08-27
+> Last updated: 2026-09-04
 > Rules: [documentation-conventions.md](documentation-conventions.md) · History: [CHANGELOG.md](CHANGELOG.md) · Specs: [Epics/](Epics/)
 
 **Priority legend:**
@@ -19,8 +19,11 @@
 ### 🧊 Icebox — Background Activity Indicator (discovery only, 2026-09-01)
 **What:** second, more detailed indicator (icon + text list) showing what non-user-triggered background processes are currently doing — fetch/tag/screen a vacancy, republish refresh, company-website lookup, (rarely) auto-analyze in full_auto mode. Distinct from the existing `PollingProgressBar`, which is just Flutter's own list-refresh cadence and has zero actual backend-activity awareness (a misconception that started this discussion). Full write-up incl. concrete label/icon table and sketched backend architecture: [background-activity-indicator.md](../discovery/background-activity-indicator.md). Not designed in enough detail to implement yet — needs a design pass (see doc's Open Questions).
 
-### 🧊 Icebox — deterministic Stage 1 checks for years/remote/countries (fast follow to the Djinni requirements-sidebar delivery, 2026-08-12)
-**What:** the requirements sidebar (years experience, remote-only, countries) now flows into `JD.md` (delivered 2026-08-12 — see CHANGELOG), but only the English-level line got a dedicated deterministic Stage 1 check so far. Phase 1+2 already sees the rest as normal JD context, so this isn't urgent — worth a fast follow only if it proves valuable in practice (same `apply_title_stage`/`apply_language_stage` pattern in `tools/cv_prefilter.py`).
+### ✅ Delivered (2026-09-04) — Stage 1 English-level check extended to JD body (DOU/non-Djinni sources)
+`_check_english_level_body()` in `tools/cv_prefilter.py` — the Djinni-sidebar-only check missed vacancy #1461 ("English at Advanced (C1) level or higher" sat only in DOU's plain JD body, no sidebar; Stage 2/LLM had already run on it too and also missed it). New section-boundary parser scopes the match to a Requirements-shaped heading only — the same deterministic fix the 2026-07-23 Responsibilities-vs-Requirements LLM bug needed but never got — plus a soft-requirement exclusion ("plus"/"nice to have"/"ideally"). Caught and fixed a real false positive before backfill: bare "proficient"/"proficiency" doesn't reliably mean C2 (#658 "Working proficiency in English", #1287 "proficiency at Intermediate level" — both below the candidate's B2, would have wrongly blocked). Backfilled 7 vacancies (#338/451/561/988/1214/1274/1461). Pitfall discussion + why sidebar-only was the original scope: [prefilter-content-stage-regex-idea.md](../discovery/prefilter-content-stage-regex-idea.md).
+
+### 🟡 P2 — Same body-scan technique still missing for `mandatory_business_travel` and `seniority` Critical Blockers (found 2026-09-04, vacancies #1362/#1377 "відрядження"; #1376 "Senior Product Manager" title)
+**What:** neither has ANY Stage 1 or Stage 2 check today (`blocker_stage=NULL` on all three — never run at all, not a miss). `seniority` was already scoped "regex-safe" in the discovery doc above; `mandatory_business_travel` isn't discussed there yet, needs its own risk pass (recurring-trip phrasing varies more than a title-level check). `ab_testing` (explicit "Experience with A/B testing... required" on #1461, discovery-doc-scoped "keep on LLM") is lower priority but worth revisiting with the same section-boundary technique that just fixed `english`.
 
 ---
 
