@@ -533,6 +533,7 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
               // panel flows them to a further line instead of overflowing —
               // same pattern used for the inbox card's badge cluster.
               Wrap(
+                alignment: WrapAlignment.end,
                 spacing: 8,
                 runSpacing: 8,
                 children: [
