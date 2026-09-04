@@ -70,6 +70,7 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
   bool _loadingRestore = false;
   bool _loadingPrefilter = false;
   bool _refreshing = false;
+  bool _loadingRefetch = false;
   // Kept for the "View details" affordance on _PrefilterBanner — the modal
   // is no longer shown automatically (found unreliable/easy-to-miss in
   // practice, 2026-07-17) but raw_output/error are still worth a drill-down.
@@ -198,6 +199,46 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
       }
     } finally {
       if (mounted) setState(() => _loadingPrefilter = false);
+    }
+  }
+
+  /// Manual "Re-fetch from source" (2026-09-04) — re-pulls the JD directly
+  /// from its posting URL, bypassing both the cached JD.md and the RSS feed.
+  /// For a vacancy fetched before the job board finished moderating it
+  /// (found live, vacancy #1471: DOU still showed "Перевіряється" in the
+  /// title at fetch time) — lets the user force a fresh pull instead of
+  /// waiting for job-monitor to notice a republish on its own.
+  Future<void> _refetchFromSource() async {
+    setState(() => _loadingRefetch = true);
+    try {
+      final result = await _repo.refetchFromSource(widget.vacancyId);
+      if (mounted) {
+        ref.invalidate(vacancyDetailProvider(widget.vacancyId));
+        ref.invalidate(vacancyJdProvider(widget.vacancyId));
+        ref.read(vacancyListProvider.notifier).refresh();
+        final ok = result['ok'] as bool? ?? false;
+        final blocked = result['blocked'] as bool? ?? false;
+        final String msg;
+        if (!ok) {
+          msg = 'Re-fetch failed: ${result['error']}';
+        } else {
+          final changed = (result['changed_fields'] as List<dynamic>? ?? []).join(', ');
+          msg = blocked
+              ? 'Re-fetched — possible blocker found'
+              : (changed.isEmpty ? 'Re-fetched — content unchanged' : 'Re-fetched — updated: $changed');
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(msg), backgroundColor: ok ? null : Colors.red),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loadingRefetch = false);
     }
   }
 
@@ -456,6 +497,18 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                   onPressed: _refreshing ? null : _refresh,
                 ),
               ),
+              if (widget.url.isNotEmpty)
+                Tooltip(
+                  message: 'Re-fetch from source — re-pull the JD from the live posting page '
+                      '(not the cached copy, not the RSS feed). For a vacancy fetched too early, '
+                      'e.g. while the job board was still moderating it.',
+                  child: IconButton(
+                    icon: _loadingRefetch
+                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                        : Icon(Icons.cloud_download_outlined, size: 18, color: cs.onSurfaceVariant),
+                    onPressed: _loadingRefetch ? null : _refetchFromSource,
+                  ),
+                ),
               Tooltip(
                 message: 'Activity log — pipeline runs + LLM calls (incl. pre-filter checks). '
                     'Only reachable from this JD view before analysis — the tabbed Activity tab '

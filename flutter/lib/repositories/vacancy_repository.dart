@@ -317,6 +317,25 @@ class VacancyRepository {
     return jsonDecode(response.body) as Map<String, dynamic>;
   }
 
+  /// Manual "Re-fetch from source" (2026-09-04) — re-pulls the JD directly
+  /// from its posting URL (not the RSS feed, not the cached JD.md) and
+  /// re-runs Stage 1 against fresh content. For when a vacancy was fetched
+  /// before the job board finished moderating it (found live, vacancy
+  /// #1471: DOU still showed "Перевіряється" in the title) and the user
+  /// doesn't want to wait for job-monitor to notice a republish on its own.
+  /// A 404/422 is a real error (thrown); a fetch/parser failure comes back
+  /// as `ok: false` in the body (not an HTTP error) — same "reported result,
+  /// not exception" contract as [runPrefilter].
+  Future<Map<String, dynamic>> refetchFromSource(int vacancyId) async {
+    final uri = Uri.parse('$baseUrl/api/vacancies/$vacancyId/refetch');
+    final response = await http.post(uri).timeout(const Duration(seconds: 30));
+    if (response.statusCode != 200) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>?;
+      throw Exception(data?['detail'] as String? ?? 'Re-fetch failed: ${response.statusCode}');
+    }
+    return jsonDecode(response.body) as Map<String, dynamic>;
+  }
+
   // ── Per-phase LLM routing (EPIC-27) ─────────────────────────────────────────
 
   Future<Map<String, dynamic>> getConfigPhases() async {

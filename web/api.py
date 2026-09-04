@@ -755,39 +755,50 @@ def _sanitize_published_at(raw: str | None) -> str | None:
     return raw
 
 
-async def _refresh_republished_vacancy(vacancy_id: int, url: str) -> None:
-    """Fire-and-forget: re-fetch a republished vacancy's JD from the live page
-    and re-run Stage 1 (title/language/location) against FRESH content.
+async def _do_refetch_vacancy_from_source(vacancy_id: int, url: str) -> dict:
+    """Core re-fetch logic: pull a vacancy's JD fresh from its live posting
+    URL (not the RSS feed, not the cached JD.md) and re-run Stage 1
+    (title/language/location/domain) against the fresh content. Shared by
+    two callers:
 
-    on_vacancy_republished() only flips DB fields (status/published_at) — it
-    never re-fetches, so the synchronous tag/Stage-1 pass in api_new_vacancy
-    still reads whatever JD.md was saved at the ORIGINAL fetch, possibly
-    weeks stale. A republish usually means the employer edited the posting
-    (Djinni shows "Оновлено <date>" on the live page) — found live
-    2026-09-01, vacancy #1060: the live page now carries a "Країни ЄС"
-    (EU-only) sidebar field the stored JD.md never had, so the location
-    Stage-1 check (_check_country) had nothing to find no matter how many
-    times it re-ran against the cached file.
+    - `_refresh_republished_vacancy()` below — automatic, fire-and-forget,
+      triggered when job-monitor's feed shows a vacancy already in the DB
+      republished.
+    - `POST /api/vacancies/{id}/refetch` — manual "Re-fetch from source"
+      button (2026-09-04), for the case a vacancy was fetched before the
+      job board finished moderating it (found live, vacancy #1471: DOU
+      still showed "Перевіряється" in the title at fetch time) and the
+      user doesn't want to wait for job-monitor to notice a republish.
 
-    Runs in the background — never blocks the /api/new-vacancy response, same
-    precedent as _enrich_company_website in tools/cv_fetch_jd.py. Fail-open:
-    any error here is logged and swallowed, never surfaced to the caller.
+    Never raises — every failure mode (vacancy/file missing, parser
+    unreachable, empty fetch) is reported in the returned dict instead, so
+    both callers can decide how loud to be about it (the automatic path
+    logs and moves on; the manual button surfaces it to the user).
+
+    Returns:
+        {"ok": bool, "error": str | None, "changed_fields": list[str],
+         "blocked": bool, "blocked_reasons": list[str]}
     """
     from tools.cv_prefilter import apply_domain_stage, apply_language_stage, apply_location_stage, apply_title_stage
 
+    def _fail(error: str) -> dict:
+        return {"ok": False, "error": error, "changed_fields": [], "blocked": False, "blocked_reasons": []}
+
     try:
         vacancy = await database.get_vacancy_by_id(vacancy_id)
-        if vacancy is None or not vacancy["markdown_path"]:
-            return
+        if vacancy is None:
+            return _fail("Vacancy not found")
+        if not vacancy["markdown_path"]:
+            return _fail("Vacancy has no JD.md yet")
         md_path = vacancy["markdown_path"]
         jd_path = _PROJECT_ROOT / md_path if not Path(md_path).is_absolute() else Path(md_path)
         if not jd_path.exists():
-            return
+            return _fail(f"JD.md not found at {jd_path}")
 
         parser_url = os.getenv("PARSER_URL", "http://localhost:8001")
         doc = await ParserAdapter(base_url=parser_url).fetch_markdown(url)
         if doc.is_empty:
-            return
+            return _fail("Fetched page came back empty")
 
         jd_path.write_text(
             f"# {doc.title}\n\nSource: {doc.source_url}\n\n---\n\n{doc.markdown}",
@@ -824,19 +835,49 @@ async def _refresh_republished_vacancy(vacancy_id: int, url: str) -> None:
         if fields:
             await database.update_vacancy_fields(vacancy_id, **fields)
 
+        result = {"ok": True, "error": None, "changed_fields": sorted(fields), "blocked": False, "blocked_reasons": []}
+
         if not await database.get_auto_check_title(vacancy["user_id"]):
-            return
+            return result
         blocked = await apply_title_stage(vacancy_id, doc.title or vacancy["title"] or "")
         if not blocked:
             blocked = await apply_language_stage(vacancy_id, doc.markdown)
             if not blocked:
                 blocked = await apply_location_stage(vacancy_id, doc.markdown)
             if not blocked:
-                await apply_domain_stage(vacancy_id, doc.markdown)
+                blocked = await apply_domain_stage(vacancy_id, doc.markdown)
+        if blocked:
+            refreshed = await database.get_vacancy_by_id(vacancy_id)
+            result["blocked"] = True
+            result["blocked_reasons"] = json.loads(refreshed["blocker_reasons"] or "[]")
+        return result
     except ParserError as exc:
-        log.warning("refresh-on-republish: parser failed v#%d (non-fatal): %s", vacancy_id, exc)
+        return _fail(f"Parser error: {exc}")
     except Exception as exc:
-        log.warning("refresh-on-republish: failed v#%d (non-fatal): %s", vacancy_id, exc)
+        return _fail(str(exc))
+
+
+async def _refresh_republished_vacancy(vacancy_id: int, url: str) -> None:
+    """Fire-and-forget: re-fetch a republished vacancy's JD from the live page
+    and re-run Stage 1 (title/language/location) against FRESH content.
+
+    on_vacancy_republished() only flips DB fields (status/published_at) — it
+    never re-fetches, so the synchronous tag/Stage-1 pass in api_new_vacancy
+    still reads whatever JD.md was saved at the ORIGINAL fetch, possibly
+    weeks stale. A republish usually means the employer edited the posting
+    (Djinni shows "Оновлено <date>" on the live page) — found live
+    2026-09-01, vacancy #1060: the live page now carries a "Країни ЄС"
+    (EU-only) sidebar field the stored JD.md never had, so the location
+    Stage-1 check (_check_country) had nothing to find no matter how many
+    times it re-ran against the cached file.
+
+    Runs in the background — never blocks the /api/new-vacancy response, same
+    precedent as _enrich_company_website in tools/cv_fetch_jd.py. Fail-open:
+    any error here is logged and swallowed, never surfaced to the caller.
+    """
+    result = await _do_refetch_vacancy_from_source(vacancy_id, url)
+    if not result["ok"]:
+        log.warning("refresh-on-republish: failed v#%d (non-fatal): %s", vacancy_id, result["error"])
 
 
 @app.post("/api/new-vacancy", status_code=201)
@@ -1525,6 +1566,27 @@ async def api_vacancy_prefilter(vacancy_id: int):
         "error": result["error"],
         "provider_unavailable": result["provider_unavailable"],
     }
+
+
+@app.post("/api/vacancies/{vacancy_id}/refetch")
+async def api_vacancy_refetch(vacancy_id: int):
+    """Manual "Re-fetch from source" — re-pulls the JD directly from its
+    posting URL (not the RSS feed, not the cached JD.md) and re-runs Stage 1
+    against the fresh content. Same underlying logic as the automatic
+    republish-refresh path (`_do_refetch_vacancy_from_source`) — exposed as
+    a button (2026-09-04) for when a vacancy was fetched before the job
+    board finished moderating it (found live, vacancy #1471: DOU still
+    showed "Перевіряється" in the title at fetch time) and the user doesn't
+    want to wait for job-monitor to notice a republish on its own.
+    """
+    vacancy = await database.get_vacancy_by_id(vacancy_id)
+    if vacancy is None:
+        raise HTTPException(status_code=404, detail="Vacancy not found")
+    if not vacancy["url"]:
+        raise HTTPException(status_code=422, detail="Vacancy has no source URL")
+
+    result = await _do_refetch_vacancy_from_source(vacancy_id, vacancy["url"])
+    return {"vacancy_id": vacancy_id, **result}
 
 
 @app.post("/api/vacancies/{vacancy_id}/reset", status_code=200)

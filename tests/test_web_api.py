@@ -691,6 +691,102 @@ async def test_refresh_republished_vacancy_no_markdown_path_is_noop():
     await _refresh_republished_vacancy(vid, url)  # must not raise, no markdown_path to work with
 
 
+# ── POST /api/vacancies/{id}/refetch — manual "Re-fetch from source" (2026-09-04) ──
+
+@pytest.mark.asyncio
+async def test_refetch_endpoint_success_returns_changed_fields(client, tmp_path):
+    """Found live, vacancy #1471: fetched while DOU still showed
+    "Перевіряється" (moderation) in the title. Manual re-fetch lets the user
+    force a fresh pull from the live posting URL without waiting for
+    job-monitor to notice a republish on its own."""
+    uid = await database.insert_user(name="RefetchUser", telegram_chat_id=5020, skill_type="pm")
+    url = "https://djinni.co/jobs/846731-senior-product-manager"
+    jd_path = tmp_path / "JD.md"
+    jd_path.write_text("# Senior Product ManagerПеревіряється\n\nStale content.", encoding="utf-8")
+
+    vid = await database.insert_vacancy(
+        url=url, title="Senior Product ManagerПеревіряється", user_id=uid, published_at="2026-09-01T10:00:00",
+    )
+    await database.update_vacancy_fields(vid, markdown_path=str(jd_path))
+
+    fresh_doc = ParsedDocument(
+        title="Senior Product Manager",
+        markdown="Real, moderated JD content.",
+        source_url=url,
+        company="Real Company",
+    )
+    with patch("web.api.ParserAdapter") as mock_adapter_cls:
+        mock_adapter_cls.return_value.fetch_markdown = AsyncMock(return_value=fresh_doc)
+        resp = client.post(f"/api/vacancies/{vid}/refetch")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ok"] is True
+    assert data["error"] is None
+    assert "title" in data["changed_fields"]
+    assert "company" in data["changed_fields"]
+    assert jd_path.read_text(encoding="utf-8") == "# Senior Product Manager\n\nSource: " + url + "\n\n---\n\nReal, moderated JD content."
+
+    row = await database.get_vacancy_by_id(vid)
+    assert row["title"] == "Senior Product Manager"
+    assert row["company"] == "Real Company"
+
+
+@pytest.mark.asyncio
+async def test_refetch_endpoint_reports_new_blocker(client, tmp_path):
+    uid = await database.insert_user(name="RefetchBlockerUser", telegram_chat_id=5021, skill_type="pm")
+    url = "https://djinni.co/jobs/111111-igaming-product-manager"
+    jd_path = tmp_path / "JD.md"
+    jd_path.write_text("# Product Manager\n\nStale, no domain mentioned yet.", encoding="utf-8")
+
+    vid = await database.insert_vacancy(url=url, title="Product Manager", user_id=uid, published_at="2026-09-01T10:00:00")
+    await database.update_vacancy_fields(vid, markdown_path=str(jd_path))
+
+    fresh_doc = ParsedDocument(
+        title="Product Manager, Gambling",
+        markdown="iGaming platform, real-money gambling products.",
+        source_url=url,
+        company="BetCo",
+    )
+    with patch("web.api.ParserAdapter") as mock_adapter_cls:
+        mock_adapter_cls.return_value.fetch_markdown = AsyncMock(return_value=fresh_doc)
+        resp = client.post(f"/api/vacancies/{vid}/refetch")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ok"] is True
+    assert data["blocked"] is True
+    assert any("igaming" in r for r in data["blocked_reasons"])
+
+
+@pytest.mark.asyncio
+async def test_refetch_endpoint_404_for_unknown_vacancy(client):
+    resp = client.post("/api/vacancies/999999/refetch")
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_refetch_endpoint_parser_failure_returns_ok_false(client, tmp_path):
+    from adapters.parser_adapter import ParserError
+
+    uid = await database.insert_user(name="RefetchFailUser", telegram_chat_id=5022, skill_type="pm")
+    url = "https://djinni.co/jobs/222222-example"
+    jd_path = tmp_path / "JD.md"
+    jd_path.write_text("# Example", encoding="utf-8")
+
+    vid = await database.insert_vacancy(url=url, title="Example", user_id=uid, published_at="2026-09-01T10:00:00")
+    await database.update_vacancy_fields(vid, markdown_path=str(jd_path))
+
+    with patch("web.api.ParserAdapter") as mock_adapter_cls:
+        mock_adapter_cls.return_value.fetch_markdown = AsyncMock(side_effect=ParserError("down", url=url))
+        resp = client.post(f"/api/vacancies/{vid}/refetch")
+
+    assert resp.status_code == 200  # parser failure is a reported result, not an HTTP error
+    data = resp.json()
+    assert data["ok"] is False
+    assert "Parser error" in data["error"]
+
+
 @pytest.mark.asyncio
 async def test_new_vacancy_republish_same_date_returns_409(client):
     """POST /api/new-vacancy for a declined vacancy with same/older published_at → 409."""
