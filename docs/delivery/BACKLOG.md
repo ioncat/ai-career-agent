@@ -13,6 +13,15 @@
 
 ## 📌 Now
 
+### 🟠 P1 — Wire Djinni hidden-salary estimate into the live fetch pipeline + Flutter badge (backend delivered 2026-09-05, this is the follow-up)
+**What:** `services/parser/salary_probe.py` + `POST /djinni-salary-ceiling` (jd-parser) + `adapters/djinni_salary_adapter.py` can now estimate a Djinni vacancy's real, possibly-undisclosed salary via Djinni's own public `salary=N` search filter — user's own manual technique (raise the filter until the vacancy drops out; the last value it's still visible at is the real number, confirmed $500 granularity) turned into an exponential+binary search. Currently only reachable via `scripts/backfill_djinni_salary_estimate.py`, a one-off script. Full design/why: [CHANGELOG.md → 2026-09-05](CHANGELOG.md).
+**Remaining:**
+1. Wire into `tools/cv_fetch_jd.py` — call the probe when `site == 'djinni' and not doc.salary`, fire-and-forget off the critical path (same pattern as the company-website lookup), write via `set_vacancy_salary()` only if still empty by the time it resolves (don't clobber a manual edit made while the probe was running).
+2. Flutter: visually distinguish an estimate (`"~$4000+ (Djinni filter estimate)"`) from a real disclosed salary — a real number should never look estimated, and vice versa. Needs its own small design pass (badge vs. inline suffix vs. tooltip), not just reusing the plain `salary` text field as-is.
+3. DOU has no equivalent public filter (checked) — this stays Djinni-only.
+**Not in scope:** re-probing vacancies periodically (a real disclosed salary showing up later should just overwrite the estimate on next re-fetch/republish, same as today — no separate mechanism needed).
+**Caution for whoever picks this up:** during this session's manual debugging, the *same* search query repeated ~6 times in under an hour started returning `None` (probe undeterminable) even though a fresh, unrelated vacancy page and a fresh, unrelated search query both succeeded immediately alongside it — looks like Djinni soft-throttles a specific repeated pattern rather than the IP overall, but not conclusively proven. Don't add a retry-on-`None` loop without spacing retries well apart (minutes, not seconds) — a tight retry loop is exactly the pattern that seemed to trigger it.
+
 ### ✅ Delivered this session (2026-08-26) — Warnings UI fix
 `_WarningsBanner` — Phase 2 `warnings` (e.g. hybrid-format/office-city flags) moved out of `_QuickOverviewCard`'s buried row into a standalone, prominent amber block under Fit/Attraction+pre-filter (`vacancy_detail_screen.dart`). Found live on vacancy #1228 (Meest China) — warning was correct but invisible. Full write-up: [CHANGELOG.md → 2026-08-26](CHANGELOG.md). Follow-up audit (keyBarriers/hiddenRisks, same pattern) tracked below in P2.
 

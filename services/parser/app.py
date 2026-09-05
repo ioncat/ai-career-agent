@@ -19,6 +19,7 @@ from pydantic import BaseModel
 
 from config import SITES
 from crawler import fetch
+from salary_probe import find_salary_ceiling
 
 log = logging.getLogger(__name__)
 
@@ -33,6 +34,10 @@ class ParseRequest(BaseModel):
 
 class CompanyWebsiteRequest(BaseModel):
     url: str  # company profile page URL, not a vacancy URL
+
+
+class DjinniSalaryCeilingRequest(BaseModel):
+    url: str  # vacancy URL — Djinni only, caller's responsibility to check site
 
 
 class ParsedDocument(BaseModel):
@@ -241,3 +246,46 @@ def company_website(req: CompanyWebsiteRequest) -> dict:
     site_key = _match_site_key(req.url)
     soup = BeautifulSoup(resp.text, "lxml")
     return {"website": _extract_company_website(soup, site_key)}
+
+
+@app.post("/djinni-salary-ceiling")
+def djinni_salary_ceiling(req: DjinniSalaryCeilingRequest) -> dict:
+    """Estimate a Djinni vacancy's real (possibly undisclosed) salary by
+    probing Djinni's own public search filter (see salary_probe.py) —
+    NOT the personalized login-gated profile-match panel, which this
+    service never fetches.
+
+    Fetches the vacancy page once (never trusts a caller-supplied title,
+    which might be stale or garbled) before starting the probe, so an
+    already-expired listing is caught in a single request rather than after
+    a wasted salary-search sequence. Also extracts the company's own Djinni
+    page URL (`company_link_selector`) — salary_probe's primary
+    identification strategy, same technique the user does by hand: open the
+    vacancy, follow the link to the company's page, apply the salary filter
+    there. Falls back to a title-only search when that link isn't present
+    (e.g. some recruiting-agency postings).
+
+    Returns {"ceiling": int | None}. None means undetermined — expired
+    listing, non-Djinni URL, or both identification strategies too broad to
+    resolve reliably — never a guess. Slow by design (multiple polite,
+    rate-limited requests inside salary_probe's exponential+binary search) —
+    call off the critical path.
+    """
+    resp = fetch(req.url)
+    if resp is None:
+        return {"ceiling": None}
+
+    m = re.search(r"/jobs/(\d+)-", req.url)
+    if not m:
+        return {"ceiling": None}
+
+    soup = BeautifulSoup(resp.text, "lxml")
+    h1 = soup.find("h1")
+    title = h1.get_text(strip=True) if h1 else None
+    if not title:
+        return {"ceiling": None}
+
+    site_key = _match_site_key(req.url)
+    company_profile_url = _extract_company_profile_url(req.url, soup, site_key)
+
+    return {"ceiling": find_salary_ceiling(req.url, title, company_profile_url)}
