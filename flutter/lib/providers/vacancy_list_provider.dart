@@ -194,9 +194,12 @@ final duplicatedByProvider = Provider<Map<int, List<int>>>((ref) {
 // Folders where "freshest" means our own last action on the vacancy
 // (analysis finished / CV+cover generated), not how recently the JD itself
 // was posted — sorted by updated_at instead of the backend's default
-// published_at order. Inbox/Archive keep published_at: Inbox is about JD
-// freshness on the market, Archive is a terminal state where "which JD is
-// newest" beats "when we acted on it" for browsing.
+// published_at order. Inbox keeps published_at — it's about JD freshness on
+// the market. Applied/Archive each get their own dedicated timestamp
+// (appliedAt/declinedAt) below, not updated_at, for the same reason: that
+// column is bumped by ~10 unrelated write paths (starred/salary/tags edits,
+// duplicate linking), so "last touched" silently drifts from "when the user
+// actually applied/declined it".
 const kUpdatedAtSortedFolders = {'analyzed', 'processed'};
 
 int _compareByNullableIso(String? aIso, String? bIso) {
@@ -223,6 +226,11 @@ final folderVacanciesProvider =
     // second, not first. Supersedes the 2026-07-26 published_at decision —
     // that one didn't have an applied_at field to sort by yet.
     filtered.sort((a, b) => _compareByNullableIso(a.appliedAt, b.appliedAt));
+  } else if (folder == 'archive') {
+    // declined_at (2026-09-05) — when the vacancy was actually declined, not
+    // publishedAt (JD posting date) or updatedAt. User request: the vacancy
+    // just skipped should show up first, regardless of how old its JD is.
+    filtered.sort((a, b) => _compareByNullableIso(a.declinedAt, b.declinedAt));
   }
   return filtered;
 });

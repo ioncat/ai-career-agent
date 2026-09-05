@@ -37,6 +37,11 @@ class VacancyListItem {
   // When applied was actually toggled on — Applied folder sorts by this,
   // not publishedAt/updatedAt (2026-08-13). Null when never applied.
   final String? appliedAt;
+  // When the vacancy was declined — Archive folder sorts by this, not
+  // publishedAt/updatedAt (2026-09-05, same reasoning as appliedAt). Null
+  // when never declined, or for pre-existing Archive rows from before this
+  // field existed (those fall back to arrival order — never backfilled).
+  final String? declinedAt;
   final String? salary;
   final List<String> tags;
   final List<String> roleTags;
@@ -76,6 +81,7 @@ class VacancyListItem {
     this.starred = false,
     this.applied = false,
     this.appliedAt,
+    this.declinedAt,
     this.salary,
     this.tags = const [],
     this.roleTags = const [],
@@ -111,6 +117,7 @@ class VacancyListItem {
       starred: json['starred'] as bool? ?? false,
       applied: json['applied'] as bool? ?? false,
       appliedAt: json['applied_at'] as String?,
+      declinedAt: json['declined_at'] as String?,
       salary: json['salary'] as String?,
       tags: _parseTags(json['tags']),
       roleTags: _parseStringList(json['role_tags']),
@@ -145,6 +152,7 @@ class VacancyListItem {
         'starred': starred,
         'applied': applied,
         'applied_at': appliedAt,
+        'declined_at': declinedAt,
         'salary': salary,
         'tags': tags.join(','),
         'role_tags': roleTags,

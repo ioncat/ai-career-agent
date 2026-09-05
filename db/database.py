@@ -226,6 +226,14 @@ async def init_db() -> None:
             # stored). Used to flag batches of similar vacancies (e.g. a MilTech
             # source) for tracking/filtering. 2026-08-27.
             "ALTER TABLE vacancies ADD COLUMN tags TEXT",
+            # When the vacancy was declined (Skip / auto give-up) — Archive
+            # sorts by this, not published_at (JD posting date, unrelated to
+            # when the user acted) or updated_at (bumped by ~10 unrelated
+            # write paths — starred/salary/tags edits, duplicate linking —
+            # same reliability gap already fixed for applied_at 2026-08-13).
+            # User request 2026-09-05: most-recently-declined first. NULL =
+            # never declined, or restored back out of Archive.
+            "ALTER TABLE vacancies ADD COLUMN declined_at TEXT",
         ]:
             try:
                 await db.execute(migration)
@@ -590,13 +598,21 @@ async def update_vacancy_warnings(vacancy_id: int, warnings: str) -> None:
 
 
 async def update_vacancy_status(vacancy_id: int, status: str) -> None:
-    """Update vacancy status and bump updated_at."""
+    """Update vacancy status and bump updated_at.
+
+    Also stamps declined_at when transitioning to 'declined' (Archive's sort
+    key, 2026-09-05) and clears it for any other status — covers both the
+    Skip button (status='declined') and Restore (status='analyzed'/'fetched')
+    through this one shared setter, same dedicated-timestamp pattern as
+    applied_at.
+    """
     log.info("DB: vacancy #%d status -> %s", vacancy_id, status)
+    declined_at_expr = "datetime('now')" if status == "declined" else "NULL"
     async with get_db() as db:
         await db.execute(
-            """
+            f"""
             UPDATE vacancies
-            SET status = ?, updated_at = datetime('now')
+            SET status = ?, updated_at = datetime('now'), declined_at = {declined_at_expr}
             WHERE id = ?
             """,
             (status, vacancy_id),
@@ -664,11 +680,13 @@ async def give_up_fetch(vacancy_id: int, error: str | None) -> None:
     Sets status='declined' (out of Inbox, matches "Inbox Zero" — an
     unparseable page isn't worth indefinite retries) and records the last
     error in analysis_error so the reason is visible, not just silently
-    archived.
+    archived. Also stamps declined_at (Archive's sort key) — bypasses
+    update_vacancy_status so it needs its own, same as that function.
     """
     async with get_db() as db:
         await db.execute(
-            "UPDATE vacancies SET status = 'declined', analysis_error = ?, updated_at = datetime('now') WHERE id = ?",
+            "UPDATE vacancies SET status = 'declined', analysis_error = ?, "
+            "updated_at = datetime('now'), declined_at = datetime('now') WHERE id = ?",
             (error, vacancy_id),
         )
         await db.commit()
@@ -680,11 +698,13 @@ async def requeue_fetch(vacancy_id: int) -> None:
     Sets status='queued' (picked up by RSSWatcher._poll_once), resets
     fetch_attempts to 0 (otherwise the next single failure would immediately
     hit MAX_FETCH_ATTEMPTS again and re-decline it) and clears analysis_error.
+    Also clears declined_at — this is a restore path, bypasses
+    update_vacancy_status so it needs its own.
     """
     async with get_db() as db:
         await db.execute(
             "UPDATE vacancies SET status = 'queued', fetch_attempts = 0, "
-            "analysis_error = NULL, updated_at = datetime('now') WHERE id = ?",
+            "analysis_error = NULL, updated_at = datetime('now'), declined_at = NULL WHERE id = ?",
             (vacancy_id,),
         )
         await db.commit()
@@ -792,7 +812,9 @@ async def on_vacancy_republished(vacancy_id: int, new_published_at: str) -> None
     """Handle a declined/skipped vacancy reappearing in RSS.
 
     Updates published_at, sets republished_at = now(), transitions status → fetched.
-    Called only when prior status was declined/skipped.
+    Called only when prior status was declined/skipped. Also clears
+    declined_at — this reopens the vacancy out of Archive, bypasses
+    update_vacancy_status so it needs its own.
     """
     async with get_db() as db:
         await db.execute(
@@ -802,7 +824,8 @@ async def on_vacancy_republished(vacancy_id: int, new_published_at: str) -> None
                 republished_at  = datetime('now'),
                 status          = 'fetched',
                 analysis_error  = NULL,
-                updated_at      = datetime('now')
+                updated_at      = datetime('now'),
+                declined_at     = NULL
             WHERE id = ?
             """,
             (new_published_at, vacancy_id),

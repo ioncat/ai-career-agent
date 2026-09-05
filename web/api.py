@@ -54,7 +54,7 @@ _CANDIDATE_NAME = os.getenv("CANDIDATE_NAME", "Candidate")
 # time (UTC+3) — the offset matched exactly. Normalize every known date
 # field to carry an explicit 'Z' at the API response boundary (DB storage
 # stays naive/unchanged) so no consumer has to guess again.
-_DATE_FIELDS = {"published_at", "created_at", "updated_at", "republished_at", "started_at", "finished_at"}
+_DATE_FIELDS = {"published_at", "created_at", "updated_at", "republished_at", "started_at", "finished_at", "declined_at"}
 
 
 def _utc_z(value):

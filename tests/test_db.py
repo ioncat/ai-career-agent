@@ -72,6 +72,66 @@ async def test_update_vacancy_status():
     assert row["status"] == "analyzing"
 
 
+# ── declined_at (2026-09-05) — Archive folder's sort key ────────────────────
+
+@pytest.mark.asyncio
+async def test_update_vacancy_status_declined_sets_declined_at():
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/da1/")
+    await database.update_vacancy_status(vid, "declined")
+    row = await database.get_vacancy_by_id(vid)
+    assert row["status"] == "declined"
+    assert row["declined_at"] is not None
+
+
+@pytest.mark.asyncio
+async def test_update_vacancy_status_non_declined_leaves_declined_at_null():
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/da2/")
+    await database.update_vacancy_status(vid, "analyzed")
+    row = await database.get_vacancy_by_id(vid)
+    assert row["declined_at"] is None
+
+
+@pytest.mark.asyncio
+async def test_update_vacancy_status_restore_clears_declined_at():
+    """Skip then Restore (both via update_vacancy_status, same as the
+    /decline and /restore API endpoints) — declined_at must not survive
+    the restore, or a re-declined vacancy later would sort by a stale
+    timestamp instead of its real new decline time."""
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/da3/")
+    await database.update_vacancy_status(vid, "declined")
+    await database.update_vacancy_status(vid, "analyzed")  # restore path
+    row = await database.get_vacancy_by_id(vid)
+    assert row["declined_at"] is None
+
+
+@pytest.mark.asyncio
+async def test_give_up_fetch_sets_declined_at():
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/da4/", status="fetching")
+    await database.give_up_fetch(vid, "Fetch failed 5x — giving up: 503")
+    row = await database.get_vacancy_by_id(vid)
+    assert row["declined_at"] is not None
+
+
+@pytest.mark.asyncio
+async def test_requeue_fetch_clears_declined_at():
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/da5/", status="fetching")
+    await database.give_up_fetch(vid, "Fetch failed 5x — giving up: 503")
+    await database.requeue_fetch(vid)
+    row = await database.get_vacancy_by_id(vid)
+    assert row["status"] == "queued"
+    assert row["declined_at"] is None
+
+
+@pytest.mark.asyncio
+async def test_on_vacancy_republished_clears_declined_at():
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/da6/")
+    await database.update_vacancy_status(vid, "declined")
+    await database.on_vacancy_republished(vid, "2026-09-05 12:00:00")
+    row = await database.get_vacancy_by_id(vid)
+    assert row["status"] == "fetched"
+    assert row["declined_at"] is None
+
+
 # ── company_website (2026-08-12) ────────────────────────────────────────────
 
 @pytest.mark.asyncio
