@@ -550,6 +550,9 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(color: cs.primary.withValues(alpha: 0.5)),
                         foregroundColor: cs.primary,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        minimumSize: const Size(0, 36),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
                     )
                   else
@@ -558,6 +561,9 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(color: cs.error),
                         foregroundColor: cs.error,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        minimumSize: const Size(0, 36),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
                       child: _loadingDecline
                           ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
@@ -608,6 +614,9 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                         style: OutlinedButton.styleFrom(
                           side: BorderSide(color: cs.outlineVariant),
                           foregroundColor: cs.onSurfaceVariant,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          minimumSize: const Size(0, 36),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
                       ),
                     ),
@@ -619,6 +628,11 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                             ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                             : const Icon(Icons.analytics_outlined, size: 16),
                         label: const Text('Analyze'),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          minimumSize: const Size(0, 36),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
                       ),
                     ),
                   ],
