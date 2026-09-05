@@ -484,6 +484,50 @@ _MOBILE_EXPERIENCE_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Bold-text pseudo-headings ("**Bonus points:**") are just as common as real
+# ATX (`#`) headings in fetched JDs, but _REQUIREMENTS_HEADING_RE above only
+# recognizes the latter. Found live 2026-09-05, vacancy #1441 (the exact
+# vacancy that originally motivated _MOBILE_EXPERIENCE_RE): "Hands-on
+# experience with mobile apps for iOS and/or Android" sits under
+# "**Bonus points:**", two sections below "**Requirements for a
+# Candidate:**" — a real optional nice-to-have the deterministic check
+# blocked on anyway, since it never looked at section context at all. The
+# matched line itself carries no soft-requirement word (unlike the English
+# check's same-line _SOFT_REQUIREMENT_RE scan) — only the heading two lines
+# above marks it optional — so this needs an actual nearest-heading lookup.
+_ANY_HEADING_RE = re.compile(r"(?im)^(?:#{1,6}\s*(.+?)|\*\*([^*\n]+?)\*\*\s*:?)\s*$")
+_BONUS_SECTION_HEADING_RE = re.compile(
+    r"bonus|nice.to.have|would be an?\s+(?:advantage|plus)|good to have|optional|"
+    r"перевагою|буде\s*плюсом|бажано|додатков\w*|необов.язков\w*|"
+    r"будет плюсом|приветствуется|желательно",
+    re.IGNORECASE,
+)
+
+
+def _in_bonus_section(text: str, pos: int) -> bool:
+    """Does the nearest heading-like line before *pos* (ATX or bold-text
+    pseudo-heading — real JDs mix both styles) read as optional/bonus rather
+    than a hard requirement? No heading at all before *pos* means don't
+    exclude — most of a JD's body sits above its first heading or between
+    unrelated ones, and false-negative risk (missing a real requirement)
+    matters more here than the reverse.
+    """
+    heading = None
+    for m in _ANY_HEADING_RE.finditer(text, 0, pos):
+        heading = m.group(1) or m.group(2)
+    return heading is not None and bool(_BONUS_SECTION_HEADING_RE.search(heading))
+
+
+def _mobile_requirement_match(jd_text: str) -> re.Match | None:
+    """_MOBILE_EXPERIENCE_RE match, excluding one that falls under a
+    Bonus/Nice-to-have-shaped section — same "check the actual section, not
+    just nearby words" principle _check_english_level_body already applies.
+    """
+    m = _MOBILE_EXPERIENCE_RE.search(jd_text)
+    if m and _in_bonus_section(jd_text, m.start()):
+        return None
+    return m
+
 
 async def apply_domain_stage(vacancy_id: int, jd_text: str) -> bool:
     """Run the deterministic mobile-domain check (Stage 1 — no LLM) and write
@@ -513,6 +557,12 @@ async def apply_domain_stage(vacancy_id: int, jd_text: str) -> bool:
     Ukrainian/Russian "досвід"/"опыт" equivalents) — present in both real
     misses, absent from #844.
 
+    2026-09-05: `_mobile_requirement_match()` additionally excludes a match
+    sitting under a Bonus/Nice-to-have-shaped section — found live on #1441
+    itself (the vacancy that motivated this whole check): its mobile mention
+    turned out to sit under "**Bonus points:**", not the Requirements
+    section, a real optional nice-to-have that had been wrongly blocking it.
+
     Called automatically on vacancy ingestion (RSSWatcher) alongside
     apply_title_stage/apply_language_stage/apply_location_stage, only when
     none of those already flagged it.
@@ -520,7 +570,7 @@ async def apply_domain_stage(vacancy_id: int, jd_text: str) -> bool:
     if "mobile" not in classify_tags(jd_text):
         return False
     text = jd_text.replace("’", "'")
-    if not _MOBILE_EXPERIENCE_RE.search(text):
+    if not _mobile_requirement_match(text):
         return False
     reason = "mobile: JD requires mobile app product experience (candidate has none)"
     log.info("apply_domain_stage: v#%d flagged at ingestion (no LLM call): %s", vacancy_id, reason)
@@ -581,7 +631,7 @@ async def cv_prefilter(ctx: RunContext[AgentDeps], vacancy_id: int) -> dict:
     if (
         deterministic_reason is None
         and "mobile" in classify_tags(jd_text)
-        and _MOBILE_EXPERIENCE_RE.search(jd_text.replace("’", "'"))
+        and _mobile_requirement_match(jd_text.replace("’", "'"))
     ):
         deterministic_reason = "mobile: JD requires mobile app product experience (candidate has none)"
         check_kind = "domain"

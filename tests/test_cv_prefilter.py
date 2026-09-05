@@ -585,6 +585,48 @@ async def test_apply_domain_stage_company_description_mention_does_not_block():
 
 
 @pytest.mark.asyncio
+async def test_apply_domain_stage_bonus_section_mention_does_not_block():
+    # Regression 2026-09-05, vacancy #1441 — the exact vacancy that
+    # motivated this whole check in the first place. Its mobile mention
+    # ("Hands-on experience with mobile apps for iOS and/or Android")
+    # actually sits under "**Bonus points:**", two sections below
+    # "**Requirements for a Candidate:**" — a real optional nice-to-have,
+    # not a hard requirement. The line itself carries no soft-requirement
+    # word (unlike the English check's same-line scan) — only the section
+    # heading marks it optional.
+    mock_db = _mock_db()
+    jd = (
+        "**Requirements for a Candidate:**\n\n"
+        "  * 4+ years of product management experience.\n\n"
+        "**Bonus points:**\n\n"
+        "  * Hands-on experience with mobile apps for iOS and/or Android, including release cycles.\n"
+    )
+    with patch("tools.cv_prefilter.database", mock_db):
+        result = await apply_domain_stage(1, jd)
+
+    assert result is False
+    mock_db.set_vacancy_blocker.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_apply_domain_stage_requirements_section_mention_still_blocks():
+    # Same shape as the bonus-section test above, but under a real
+    # Requirements heading — must still block. Guards against an overly
+    # broad fix that stops matching mobile mentions altogether.
+    mock_db = _mock_db()
+    jd = (
+        "**Requirements for a Candidate:**\n\n"
+        "  * Hands-on experience with mobile apps for iOS and/or Android.\n\n"
+        "**Bonus points:**\n\n"
+        "  * Experience with BPMN or other process modeling tools.\n"
+    )
+    with patch("tools.cv_prefilter.database", mock_db):
+        result = await apply_domain_stage(1, jd)
+
+    assert result is True
+
+
+@pytest.mark.asyncio
 async def test_apply_domain_stage_no_write_when_no_mobile_signal():
     mock_db = _mock_db()
     with patch("tools.cv_prefilter.database", mock_db):
