@@ -433,56 +433,66 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Row 1 — title + secondary icon actions. Split out from the
-              // primary action buttons below (2026-09-04, user feedback: the
-              // single combined row truncated the title hard — "Senior
-              // Product M..." — once the detail panel narrowed even a
-              // little). Title now gets the full row width to itself.
-              Row(
-                children: [
-                  if (role.isNotEmpty)
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+              // Row 1 — title only, full row width to itself (2026-09-04,
+              // user feedback: a combined title+icons row truncated the
+              // title hard — "Senior Product M..." — once the detail panel
+              // narrowed even a little).
+              if (role.isNotEmpty)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(role,
+                        style: Theme.of(context).textTheme.titleSmall,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis),
+                    if (company.isNotEmpty)
+                      Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(role,
-                              style: Theme.of(context).textTheme.titleSmall,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis),
-                          if (company.isNotEmpty)
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Flexible(
-                                  child: Text(company,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall
-                                          ?.copyWith(color: cs.onSurfaceVariant),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis),
+                          Flexible(
+                            child: Text(company,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(color: cs.onSurfaceVariant),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis),
+                          ),
+                          if (companyWebsite != null && companyWebsite.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 4),
+                              child: Tooltip(
+                                message: companyWebsite,
+                                child: InkWell(
+                                  onTap: () => launchUrl(Uri.parse(companyWebsite),
+                                      mode: LaunchMode.externalApplication),
+                                  child: Icon(Icons.language,
+                                      size: 14, color: cs.primary),
                                 ),
-                                if (companyWebsite != null && companyWebsite.isNotEmpty)
-                                  Padding(
-                                    padding: const EdgeInsets.only(left: 4),
-                                    child: Tooltip(
-                                      message: companyWebsite,
-                                      child: InkWell(
-                                        onTap: () => launchUrl(Uri.parse(companyWebsite),
-                                            mode: LaunchMode.externalApplication),
-                                        child: Icon(Icons.language,
-                                            size: 14, color: cs.primary),
-                                      ),
-                                    ),
-                                  ),
-                              ],
+                              ),
                             ),
                         ],
                       ),
-                    )
-                  else
-                    const Spacer(),
+                    const SizedBox(height: 4),
+                  ],
+                ),
+              // Row 2 — secondary icon actions, left-aligned (2026-09-05).
+              // Two earlier attempts at "align to Skip" both broke: (1) a
+              // plain left-aligned Row only happened to line up with Skip on
+              // a narrow panel, where the button Wrap below — WrapAlignment
+              // .end — nearly fills the width; on a wider panel the Wrap
+              // leaves slack before Skip and the rows drifted apart; (2)
+              // wrapping both rows in IntrinsicWidth to force a shared width
+              // broke Wrap's own line-wrapping — Wrap doesn't compute
+              // intrinsic width the way IntrinsicWidth needs, so Analyze got
+              // shoved onto its own line even when the panel had room.
+              // Simplest fix, per user request: stop right-packing the
+              // button row at all — WrapAlignment.start below — so both rows
+              // anchor to the panel's actual left edge, the one fixed point
+              // that doesn't depend on either row's content width.
+              Row(
+                children: [
                   if (widget.url.isNotEmpty)
                     IconButton(
                       icon: Icon(Icons.open_in_new, size: 18, color: cs.onSurfaceVariant),
@@ -529,11 +539,17 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                 ],
               ),
               const SizedBox(height: 8),
-              // Row 2 — primary action buttons. Wrap (not Row) so a narrow
+              // Row 3 — primary action buttons. Wrap (not Row) so a narrow
               // panel flows them to a further line instead of overflowing —
               // same pattern used for the inbox card's badge cluster.
+              // WrapAlignment.start (2026-09-05, was .end) — see comment
+              // above the icon row. A thin vertical divider after Skip
+              // separates it from Applied?/Check blockers/Analyze — same
+              // user request, marking Skip as the odd-one-out (destructive)
+              // action now that it's no longer set apart by position alone.
               Wrap(
-                alignment: WrapAlignment.end,
+                alignment: WrapAlignment.start,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 spacing: 8,
                 runSpacing: 8,
                 children: [
@@ -569,6 +585,9 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                           ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
                           : const Text('Skip'),
                     ),
+                  // Thin separator marking Skip (destructive) as set apart
+                  // from the rest of the cluster (2026-09-05, user request).
+                  Container(width: 1, height: 24, color: cs.outlineVariant),
                   // Applied toggle — same affordance the tabbed post-analysis
                   // view has always had, now also reachable pre-analysis
                   // (2026-09-02): applying happens outside this pipeline
