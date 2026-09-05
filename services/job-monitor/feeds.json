@@ -7,7 +7,8 @@
   {
     "name": "DOU | Project Manager",
     "url": "https://jobs.dou.ua/vacancies/feeds/?remote&category=Project%20Manager",
-    "user_ids": ["CAREER_AGENT_USER_1"]
+    "user_ids": ["CAREER_AGENT_USER_1"],
+    "enabled": false
   },
   {
     "name": "Djinni | Product Manager / Owner",
@@ -22,7 +23,8 @@
   {
     "name": "DOU | DefTech Project Manager",
     "url": "https://jobs.dou.ua/vacancies/feeds/?search=deftech&category=Project%20Manager",
-    "user_ids": ["CAREER_AGENT_USER_1"]
+    "user_ids": ["CAREER_AGENT_USER_1"],
+    "enabled": false
   },
   {
     "name": "Djinni | DefTech Product Manager / Owner",

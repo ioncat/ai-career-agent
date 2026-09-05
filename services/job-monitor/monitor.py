@@ -228,6 +228,13 @@ def load_feeds() -> list[dict]:
         if not isinstance(entry, dict):
             log.error("%s entry %d must be a JSON object", FEEDS_FILE.name, i)
             sys.exit(1)
+        # "enabled": false — reversible on/off switch for a feed without
+        # deleting it or needing real JSON comments (JSON has none). Default
+        # true when the key is absent, so every pre-existing feeds.json stays
+        # unaffected.
+        if entry.get("enabled", True) is False:
+            log.info("%s entry %r: disabled, skipping", FEEDS_FILE.name, entry.get("name", i))
+            continue
         for field in ("name", "url", "user_ids"):
             if field not in entry:
                 log.error("%s entry %d missing required field '%s'",
