@@ -334,6 +334,12 @@ vacancies/
 **[user_id]** — read from `skill/active_user`. Plain integer string: `1`, `2`, etc.
 **[Role — Company]** — extracted from JD during analysis. Format: `Product Manager — Acme Corp`. Em dash ( — ).
 **Folder name format:** `{vacancy_id} — {Role — Company}` — e.g. `405 — Product Manager — MWDN`. ID from DB (upsert first, then mkdir).
+**Strip `#` and `,` from every vacancy folder name, no exceptions — not just N-iX.** These two characters break the chat client's markdown-link decoding for ANY file path that contains them (confirmed 2026-09-04, vacancy #1460: `%23`/`%2C` were left un-decoded while everything else — spaces, em-dash, en-dash — decoded fine, making every `SendUserFile`-adjacent markdown link to that folder 404). This is a recurring problem (multiple vacancies over the prior ~1.5 weeks), not a one-off — treat it as a hard folder-naming rule, checked on every vacancy, every session, regardless of source site:
+- Job-board IDs in the title (`(#5749)`, `#1234`, etc.) — drop entirely, the URL already has this.
+- Commas inside the title (e.g. `(Product, UX)`) — drop the comma (join with a space, or use `;` if a separator is really needed).
+- Any other punctuation beyond letters/digits/spaces/hyphens/en-dash/em-dash/parentheses that shows up in a scraped title — treat as suspect and strip before using it in a folder name.
+- The DB `title` field may keep the original text if useful for display; only the **folder name** (and any path derived from it) must be stripped.
+- If an existing vacancy folder is later found to contain `#` or `,`, rename it and update `markdown_path` in the DB the same way as vacancy #1460 — don't leave old ones broken.
 **With a tag** (see below): `{vacancy_id} — [TAG] — {Role — Company}` — e.g. `1303 — [DEFTECH] — AI Product Manager — Everstar`. Tag in brackets, uppercase, right after the ID so it's the first thing visible in a sorted folder listing.
 **DB title** — stores `Role — Company` only (without ID prefix).
 
