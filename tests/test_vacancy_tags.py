@@ -42,6 +42,22 @@ class TestClassify:
     def test_studio_keyword(self):
         assert classify("Join our game studio building the next hit") == ["studio"]
 
+    def test_healthtech_keyword(self):
+        assert classify("We're a fast-growing telehealth product for the US market") == ["healthtech"]
+
+    def test_healthtech_hipaa_keyword(self):
+        assert "healthtech" in classify("Built in a strict, HIPAA-conscious environment")
+
+    def test_healthtech_does_not_match_insurance_benefit_boilerplate(self):
+        # Regression 2026-09-05, vacancy #1441 — bare "health"/"insurance"
+        # deliberately excluded from the keyword list. "медичне страхування"
+        # (health insurance) as an employee benefit is near-universal in
+        # Ukrainian job postings regardless of the company's actual
+        # business — same class of boilerplate that already forced
+        # deftech's strong/weak split.
+        text = "We offer medical insurance and paid vacation. Медичне страхування для співробітників."
+        assert classify(text) == []
+
     def test_multiple_tags_can_match(self):
         text = "We are a B2B SaaS fintech platform serving mobile app users"
         tags = classify(text)

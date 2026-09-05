@@ -2,14 +2,19 @@
 core/vacancy_tags — keyword-based domain/segment classification for vacancies.
 
 Classifies a JD's full text into zero or more market-segment tags (igaming,
-deftech, mobile, outsourcing, b2b_saas, studio, fintech). Purely lexical —
-no LLM call, cheap enough to run on every fetch.
+deftech, mobile, outsourcing, b2b_saas, studio, fintech, healthtech). Purely
+lexical — no LLM call, cheap enough to run on every fetch.
 
 Taxonomy locked 2026-08-28 after a retroactive analytics pass over the full
 vacancy history (see session — "iGaming share" question). AI/ML product was
 evaluated and deliberately excluded: too many companies bolt "AI-powered" on
 as a trend buzzword, so a keyword match doesn't reliably mean the product
 itself is AI. Revisit only with a tighter signal than plain text matching.
+
+`healthtech` added 2026-09-05 — found live on vacancy #1441 (a telehealth
+platform), which had no domain tag at all under the original 7 categories.
+Full-history backfill deliberately deferred to a later session — this
+addition only affects vacancies classified from here on.
 
 Tags here are ADDITIVE to the free-form `tags` column (schema.sql) — never
 overwrite a manually-set tag (e.g. a user-assigned one-off label).
@@ -74,6 +79,18 @@ _TAXONOMY: dict[str, list[str]] = {
     "fintech": [
         "fintech", "neobank", "crypto exchange", "payment processing",
         "psp integrat", "banking product",
+    ],
+    # Strong/product-describing terms only (2026-09-05) — bare "health" or
+    # "insurance" would collide hard with "медичне страхування" (health
+    # insurance), the single most common employee-benefit line in Ukrainian
+    # job postings regardless of the company's actual business — the exact
+    # same class of near-universal boilerplate that already forced deftech's
+    # strong/weak split (_DEFTECH_CSR_BOILERPLATE). Every term here describes
+    # the PRODUCT being healthcare-related, not a benefit line.
+    "healthtech": [
+        "telehealth", "telemedicine", "digital health", "medtech",
+        "health tech", "healthtech", "hipaa", r"\behr\b", r"\bemr\b",
+        "clinical trial", "patient portal", "e-prescri",
     ],
 }
 
@@ -185,7 +202,7 @@ _MOBILE_FALSE_CONTEXT = re.compile(
 # business it's in), with `outsourcing` last as a business-model fallback
 # (only becomes primary when no domain vertical matched at all).
 PRIORITY: list[str] = [
-    "deftech", "igaming", "fintech", "studio", "mobile", "b2b_saas", "outsourcing",
+    "deftech", "igaming", "fintech", "healthtech", "studio", "mobile", "b2b_saas", "outsourcing",
 ]
 
 
