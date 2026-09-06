@@ -13,11 +13,6 @@
 
 ## 📌 Now
 
-### 🟡 P2 — Full-history backfill for the new `healthtech` tag (added 2026-09-05, backfill deliberately deferred)
-**What:** `core/vacancy_tags.py` gained an 8th taxonomy category, `healthtech` (telehealth/telemedicine/HIPAA/EHR/EMR/medtech/clinical trial/patient portal — deliberately excludes bare "health"/"insurance", which collide with the near-universal "медичне страхування" employee-benefit boilerplate). Found live on vacancy #1441 (a telehealth platform that had no domain tag at all under the original 7 categories, and was wrongly tagged `mobile` instead off one incidental Bonus-points mention — see [CHANGELOG.md → 2026-09-05](CHANGELOG.md)). User explicitly asked to add the category now but defer the backfill to a later session.
-**Remaining:** audit the full vacancy history the same way every prior tag addition/fix got (deftech 2026-08-30/31, outsourcing 2026-08-30, mobile 2026-09-02) — run `classify()` against every existing JD.md, spot-check a sample for false positives/negatives before backfilling `tags` in bulk, DB backup first.
-**Also worth revisiting while there:** whether `mobile` should be stripped from any OTHER vacancy that also gains `healthtech` — #1441 itself was corrected by hand (`mobile` replaced with `healthtech`) since its one mobile mention was both a Bonus-points item and unrelated to what the product actually is, but that's a case-by-case call, not a rule change to `classify()` — the `mobile` keyword logic itself wasn't touched this session.
-
 ### 🟠 P1 — Wire Djinni hidden-salary estimate into the live fetch pipeline + Flutter badge (backend delivered 2026-09-05, this is the follow-up)
 **What:** `services/parser/salary_probe.py` + `POST /djinni-salary-ceiling` (jd-parser) + `adapters/djinni_salary_adapter.py` can now estimate a Djinni vacancy's real, possibly-undisclosed salary via Djinni's own public `salary=N` search filter — user's own manual technique (raise the filter until the vacancy drops out; the last value it's still visible at is the real number, confirmed $500 granularity) turned into an exponential+binary search. Currently only reachable via `scripts/backfill_djinni_salary_estimate.py`, a one-off script. Full design/why: [CHANGELOG.md → 2026-09-05](CHANGELOG.md).
 **Remaining:**
@@ -347,6 +342,11 @@ No dual-availability state — the button's visibility is a direct, deterministi
 **Scope:** Flutter detail screen — new section/tab rendering the stored `analysis_json` (or raw markdown) content; decide whether to show structured (parsed p1/p2 fields) or raw markdown.
 
 ## 🟡 P2
+
+### Flutter detail view — radar/spider chart for role-balance archetype breakdown (added 2026-09-06)
+**What:** visualize `analysis_json.p1.role_balance` (discovery / execution / stakeholder-coordination / strategy / operational, plus a possible new "growth" axis) as a radar (spider/web) chart in the vacancy detail screen, so the discovery-vs-delivery-vs-growth tension in a JD is visible at a glance instead of buried in a percentage list.
+**Why:** user request during vacancy #1441 (Balto) review — noticed the role wanted several archetypes at once (discovery + delivery + growth-style analytics rigor) and wants that tension shown visually, not just read off the text.
+**Scope (undecided, needs a design pass before implementing):** exact axis set isn't settled yet — current `role_balance` dims may need trimming/renaming or a "growth" axis added; also decide whether `fit_dimensions` (domain/execution/strategy/systems/stakeholder fit) gets its own separate radar or shares one view. Deliberately deferred — do this after current vacancy work, not now.
 
 ### Backlog structure simplification — BACKLOG.md itself (added 2026-09-01)
 **What:** BACKLOG.md violates its own documented contract (documentation-conventions.md) — mass 10-line-limit breaches, Now-section mixing, no stable entry IDs, done-markers inside open entries, duplicate content.

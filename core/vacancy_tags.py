@@ -87,10 +87,11 @@ _TAXONOMY: dict[str, list[str]] = {
     # same class of near-universal boilerplate that already forced deftech's
     # strong/weak split (_DEFTECH_CSR_BOILERPLATE). Every term here describes
     # the PRODUCT being healthcare-related, not a benefit line.
+    # "healthtech"/"health tech"/"hipaa"/"clinical trial" moved to
+    # _HEALTHTECH_WEAK below (2026-09-06) — see that comment for why.
     "healthtech": [
         "telehealth", "telemedicine", "digital health", "medtech",
-        "health tech", "healthtech", "hipaa", r"\behr\b", r"\bemr\b",
-        "clinical trial", "patient portal", "e-prescri",
+        r"\behr\b", r"\bemr\b", "patient portal", "e-prescri",
     ],
 }
 
@@ -191,6 +192,50 @@ _MOBILE_FALSE_CONTEXT = re.compile(
     r"бути\s+мобільним|міськ\w*\s+мобільність",
 )
 
+# healthtech-only: "healthtech"/"health tech"/"clinical trial" collide with
+# two unrelated contexts, neither describing THIS vacancy's own product —
+# found live 2026-09-06, full-history backfill audit (20 initial candidates,
+# ~40% were one of these two patterns):
+# 1. An agency/PM company listing many unrelated domains it has served as
+#    clients, or would accept from a candidate's past background — same
+#    shape as deftech/outsourcing/mobile's agency false positives, e.g.
+#    "fintech, healthtech, edtech, or other domain-heavy experience" (nice-
+#    to-have candidate background) — doesn't say the company's OWN product
+#    is healthcare-related.
+# 2. A generic document/transaction-management product listing "clinical
+#    trials" as just one of several unrelated transaction types it handles
+#    (#713, Ideals VDR: "due diligence, fundraising, ..., licensing,
+#    clinical trials, and other complex transactions" — a virtual data room
+#    for ANY deal type, not a health-industry product).
+# A genuine healthtech product still counts via the _TAXONOMY strong list
+# above, or via one of these weak terms used elsewhere in the JD outside
+# both contexts (e.g. #508: "clinical trial transparency frameworks: EMA
+# Policy 0070, EU CTR" — specific pharma-regulatory content, no adjacent
+# buzzword-domain list).
+#
+# "hipaa" deliberately excluded entirely (not even weak) — same audit found
+# it noisy in a THIRD, harder-to-bound way: a generic enterprise
+# compliance-framework laundry list ("ISO 27001 / SOC 2 / GDPR / HIPAA")
+# that any regulated-industry-adjacent B2B SaaS lists regardless of whether
+# its own product is healthcare-related (#1034), and a "Nice to Have:
+# experience with X, Y, or Z" candidate-background list naming HIPAA
+# alongside unrelated standards (#1224, "FHIR, HL7, NHS, HIPAA, or
+# similar"). Not needed for recall either — every genuine healthtech
+# vacancy found in the audit (including #1441, the vacancy that originally
+# prompted this category) also has "telehealth" or another strong keyword.
+_HEALTHTECH_WEAK = ["healthtech", "health tech", "clinical trial"]
+_HEALTHTECH_WEAK_COMPILED = [re.compile(p) for p in _HEALTHTECH_WEAK]
+_HEALTHTECH_FALSE_CONTEXT = re.compile(
+    r"(?:fintech|edtech|martech|proptech|agritech|insurtech|adtech|e-?commerce|logistics|gaming)"
+    r"[\w\s()]{0,3}[,/][\w\s,/()]{0,60}(?:healthtech|health tech)"
+    r"|"
+    r"(?:healthtech|health tech)[\w\s,/()]{0,60}[,/][\w\s()]{0,3}"
+    r"(?:fintech|edtech|martech|proptech|agritech|insurtech|adtech|e-?commerce|logistics|gaming)"
+    r"|"
+    r"due diligence[^.]{0,80}clinical trials?[^.]{0,40}complex transactions?",
+    re.IGNORECASE,
+)
+
 # Tags are non-exclusive by design (a vacancy can genuinely be both igaming
 # and studio, or deftech and outsourcing) — see the analytics discussion this
 # taxonomy came out of. For a single-owner view (a chart that needs to sum to
@@ -252,6 +297,13 @@ def classify(jd_text: str) -> list[str]:
         stripped = _MOBILE_FALSE_CONTEXT.sub(" ", text)
         if any(p.search(stripped) for p in _MOBILE_WEAK_COMPILED):
             tags.append("mobile")
+    if "healthtech" not in tags:
+        # Strong healthtech keywords (_TAXONOMY) found nothing — check the
+        # weak list, but only against text with the known agency-domain-list
+        # and VDR-transaction-list contexts stripped out.
+        stripped = _HEALTHTECH_FALSE_CONTEXT.sub(" ", text)
+        if any(p.search(stripped) for p in _HEALTHTECH_WEAK_COMPILED):
+            tags.append("healthtech")
     return tags
 
 

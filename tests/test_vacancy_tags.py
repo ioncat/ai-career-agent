@@ -45,8 +45,47 @@ class TestClassify:
     def test_healthtech_keyword(self):
         assert classify("We're a fast-growing telehealth product for the US market") == ["healthtech"]
 
-    def test_healthtech_hipaa_keyword(self):
-        assert "healthtech" in classify("Built in a strict, HIPAA-conscious environment")
+    def test_healthtech_ehr_keyword(self):
+        assert "healthtech" in classify("Experience integrating with EHR systems is a plus")
+
+    def test_healthtech_hipaa_alone_does_not_match(self):
+        # "hipaa" deliberately excluded entirely (2026-09-06) — too noisy on
+        # its own: a generic enterprise compliance-framework laundry list
+        # ("ISO 27001 / SOC 2 / GDPR / HIPAA") says nothing about whether
+        # the product itself is healthcare-related. Genuine healthtech
+        # vacancies also carry a real strong keyword (telehealth, EHR, ...).
+        assert classify("Built in a strict, HIPAA-conscious environment") == []
+
+    def test_healthtech_does_not_match_generic_compliance_framework_list(self):
+        # Regression 2026-09-06, vacancy #1034 — "ISO 27001 / SOC 2 / GDPR /
+        # HIPAA" as a generic security-compliance list, not evidence the
+        # product is healthcare-specific.
+        assert classify("We are SOC 2, GDPR, and HIPAA compliant.") == []
+
+    def test_healthtech_does_not_match_candidate_background_list(self):
+        # Regression 2026-09-06, vacancy #1034 — a "nice to have" delivery-
+        # exposure list naming healthcare as one of several unrelated
+        # sectors, not the company's own product domain.
+        text = "Nice to have: delivery exposure to healthcare (HIPAA), fintech, or e-commerce."
+        assert "healthtech" not in classify(text)
+
+    def test_healthtech_does_not_match_vdr_transaction_type_list(self):
+        # Regression 2026-09-06, vacancy #713 (Ideals VDR) — "clinical
+        # trials" as one of several unrelated transaction types a generic
+        # document-management product handles, not a health-industry
+        # product itself.
+        text = (
+            "Secure document sharing for due diligence, fundraising, corporate "
+            "reporting, licensing, clinical trials, and other complex transactions."
+        )
+        assert classify(text) == []
+
+    def test_healthtech_clinical_trial_matches_outside_vdr_context(self):
+        # A genuine pharma/clinical-trial-transparency product still counts
+        # — the exclusion above is scoped to the specific VDR phrasing, not
+        # "clinical trial" generally.
+        text = "Working knowledge of clinical trial transparency frameworks: EMA Policy 0070, EU CTR."
+        assert "healthtech" in classify(text)
 
     def test_healthtech_does_not_match_insurance_benefit_boilerplate(self):
         # Regression 2026-09-05, vacancy #1441 — bare "health"/"insurance"
