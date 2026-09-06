@@ -138,21 +138,33 @@ Determine what kind of PM they are actually hiring:
 
 ### 1.4 Role Balance
 
+**Six-axis taxonomy (empirically derived 2026-09-06 — keyword frequency + TF-IDF clustering + LLM open-coding, triangulated across 628 real PM/PO job descriptions; full methodology: `docs/discovery/role-balance-taxonomy-discovery-2026-09-06.md`).** These are the canonical field names, used verbatim in `analysis_json.p1.role_balance`:
+
+- **Strategy** (`strategy`) — deciding WHAT to build and why: vision, roadmap ownership, prioritization, OKRs, positioning
+- **Discovery** (`discovery`) — customer/user research, market/competitive research, hypothesis validation, problem framing
+- **Delivery** (`delivery`) — turning a decision into a shipped thing: backlog management, requirements/specs/user stories/acceptance criteria, sprint execution, release/launch coordination
+- **Growth** (`growth`) — improving something ALREADY shipped through data: experiments, A/B testing, cohort/funnel/retention/conversion analysis, LTV/CAC, activation/monetization work
+- **Stakeholder** (`stakeholder`) — cross-functional alignment and communication: engineering, design, business, leadership, external partners
+- **Operational** (`operational`) — process design, automation, efficiency, risk/compliance, day-to-day operational ownership
+
+**Definitional note (avoid the old "execution" ambiguity):** "Strategy" decides what and why. "Delivery" ships it. "Growth" improves it afterward using data — do not fold Growth into Delivery just because both involve "doing" something; a JD asking for experiments/cohorts/A-B-testing/retention work is Growth, not generic Delivery. If a JD's language genuinely spans two axes, split the percentage across them rather than forcing one pick.
+
 Estimate percentage split (must sum to 100%):
 - Strategy: __%
 - Discovery: __%
-- Execution/delivery: __%
-- Stakeholder coordination: __%
-- Operational/process work: __%
+- Delivery: __%
+- Growth: __%
+- Stakeholder: __%
+- Operational: __%
 
 **Primary archetype:** `[dominant label]`
 
 Use one of (can combine two):
-`Discovery-heavy` · `Strategy-heavy` · `Execution-heavy` · `Delivery-coordinator`
+`Discovery-heavy` · `Strategy-heavy` · `Delivery-heavy` · `Growth-heavy` · `Delivery-coordinator`
 `Platform/Systems PM` · `Feature PM` · `Founder proxy` · `Operations/BizOps`
 `Technical PM` · `Growth PM`
 
-Example: `Execution-heavy Platform/Systems PM`
+Example: `Delivery-heavy Platform/Systems PM`
 
 ---
 

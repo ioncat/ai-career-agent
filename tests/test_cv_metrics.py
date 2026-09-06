@@ -3,6 +3,7 @@
 import pytest
 
 from core.cv_metrics import (
+    detect_phrase_repetition,
     detect_repetition,
     format_freq_table,
     format_tools_table,
@@ -182,6 +183,83 @@ class TestDetectRepetition:
         result = detect_repetition(text, threshold=3)
         # roadmap should come before stakeholder
         assert result.index("roadmap") < result.index("stakeholder")
+
+
+# ── detect_phrase_repetition ─────────────────────────────────────────────────
+
+
+class TestDetectPhraseRepetition:
+    def test_returns_list(self):
+        result = detect_phrase_repetition("some text here")
+        assert isinstance(result, list)
+
+    def test_finds_repeated_phrase_missed_by_word_level_check(self):
+        # "as part of the team" reused verbatim across unrelated sentences —
+        # each individual word is common/stopword, so detect_repetition can't
+        # see this at all. Found live 2026-09-06, vacancy #1441.
+        text = (
+            "Worked embedded with engineering as part of the team on delivery. "
+            "Coordinated design and engineering as part of the team on execution. "
+            "Stayed close to QA as part of the team throughout the release."
+        )
+        result = detect_phrase_repetition(text)
+        phrases = [p for p, _ in result]
+        assert "as part of the team" in phrases
+
+    def test_default_threshold_is_two(self):
+        # Unlike detect_repetition (default threshold 3), a phrase repeated
+        # just twice is already worth flagging.
+        text = "delivered a production ready release last quarter and a production ready release this quarter"
+        result = detect_phrase_repetition(text)
+        phrases = [p for p, _ in result]
+        assert "a production ready release" in phrases
+
+    def test_single_occurrence_not_flagged(self):
+        text = "shipped a production ready release once and nothing else repeats here at all"
+        result = detect_phrase_repetition(text)
+        phrases = [p for p, _ in result]
+        assert "a production ready release" not in phrases
+
+    def test_all_stopword_phrase_excluded(self):
+        # A phrase made entirely of stopwords is grammatical noise, not a real echo
+        text = "this is not about that and it is not about this either and it is not about that"
+        result = detect_phrase_repetition(text, min_n=3, max_n=3, threshold=2)
+        phrases = [p for p, _ in result]
+        assert "is not about" not in phrases
+
+    def test_no_phrase_shorter_than_min_n(self):
+        text = "roadmap roadmap roadmap planning planning planning"
+        result = detect_phrase_repetition(text, min_n=3, max_n=5)
+        for phrase, _ in result:
+            assert len(phrase.split()) >= 3
+
+    def test_sorted_longest_phrase_first(self):
+        text = (
+            "owned the full product roadmap end to end for the team. "
+            "owned the full product roadmap end to end for another team."
+        )
+        result = detect_phrase_repetition(text, min_n=3, max_n=6, threshold=2)
+        lengths = [len(p.split()) for p, _ in result]
+        assert lengths == sorted(lengths, reverse=True)
+
+    def test_empty_text_returns_empty(self):
+        assert detect_phrase_repetition("") == []
+
+    def test_case_insensitive(self):
+        text = "Owned the Full Product Roadmap end to end. owned the full product roadmap end to end."
+        result = detect_phrase_repetition(text, threshold=2)
+        phrases = [p for p, _ in result]
+        assert "owned the full product roadmap" in phrases
+
+    def test_markdown_links_stripped(self):
+        text = (
+            "Personal projects: [ioncat.github.io](https://ioncat.github.io/) built hands on. "
+            "Personal projects: [ioncat.github.io](https://ioncat.github.io/) built hands on."
+        )
+        result = detect_phrase_repetition(text, threshold=2)
+        phrases = [p for p, _ in result]
+        assert not any("https" in p or "github" in p for p in phrases)
+        assert "personal projects built hands" in phrases
 
 
 # ── format_freq_table ─────────────────────────────────────────────────────────

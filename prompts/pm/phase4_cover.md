@@ -109,6 +109,14 @@ The CV already contains all evidence. The cover must NOT repeat or reference spe
 
 ✅ Right: `"Я — Product Owner, який працює з..."` / `"Я Product Manager з досвідом..."` / `"Займаюсь B2B-платформами, де..."` — told from the narrator's (candidate's) perspective.
 
+**English confirmed opener pattern (2026-09-06, vacancy #1441) — always self-intro first, name + role, before any pain/category elaboration, regardless of greeting formality:**
+```
+Dear Hiring Team,
+
+I'm Alex, a Product Manager who [category signal + strongest conceptual credential for this JD]...
+```
+Same pattern under an informal greeting: `Hi!\n\nI'm Alex, a Product Manager who...`. Standing override of the pain-first branch below — see [[feedback_cover_open_with_self_intro]].
+
 Narrative = a small story. Even 2–3 sentences (or Variant C's single sentence) must feel like the candidate speaking, not a description of a CV entry.
 
 ---
@@ -126,11 +134,11 @@ Two short paragraphs, no bullets, no header rhetoric. Paragraph 1: one sentence 
 ```
 [Greeting per company type]
 
-[1 sentence, first person: category signal + strongest conceptual credential/claim relevant to this JD — no company names, no metrics. E.g. "Я Product Manager з досвідом..." not "Product Manager з досвідом...".]
+[1 sentence, first person: category signal + strongest conceptual credential/claim relevant to this JD — no company names, no metrics. E.g. "Я Product Manager з досвідом..." not "Product Manager з досвідом...". English: "I'm [Name], a Product Manager who..." — confirmed opener, see [[feedback_cover_open_with_self_intro]].]
 
 [Standard broad-invitation closing — see Rules above.]
 
-[Candidate name]
+[Candidate name — full name if greeting was "Dear Hiring Team,", first name only if greeting was "Hi!", see [[feedback_cover_signoff_matches_greeting_formality]].]
 ```
 
 Use Variant A (narrative) or B (bullets) instead of C only when:

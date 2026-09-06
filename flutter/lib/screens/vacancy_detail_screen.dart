@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -493,46 +494,95 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
               // that doesn't depend on either row's content width.
               Row(
                 children: [
+                  // Vacancy id — canonical top-left location (2026-09-06,
+                  // same spot as the post-analysis _ActionBar), replacing the
+                  // right-aligned one that used to sit in the salary/tags row
+                  // below. Only this row gets a Spacer — the button Wrap
+                  // further down keeps its own WrapAlignment.start untouched
+                  // (that alignment broke 3 times before, 2026-09-05).
+                  Text(
+                    '#${widget.vacancyId}',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  const Spacer(),
                   if (widget.url.isNotEmpty)
                     IconButton(
-                      icon: Icon(Icons.open_in_new, size: 18, color: cs.onSurfaceVariant),
+                      icon: Icon(
+                        Icons.open_in_new,
+                        size: 18,
+                        color: cs.onSurfaceVariant,
+                      ),
                       tooltip: 'Open JD',
-                      onPressed: () => launchUrl(Uri.parse(widget.url),
-                          mode: LaunchMode.externalApplication),
+                      onPressed: () => launchUrl(
+                        Uri.parse(widget.url),
+                        mode: LaunchMode.externalApplication,
+                      ),
                     ),
                   if (widget.vacancy?.folderPath != null)
                     IconButton(
-                      icon: Icon(Icons.folder_open_outlined, size: 18, color: cs.onSurfaceVariant),
+                      icon: Icon(
+                        Icons.folder_open_outlined,
+                        size: 18,
+                        color: cs.onSurfaceVariant,
+                      ),
                       tooltip: 'Open folder',
-                      onPressed: () => Process.run('explorer.exe', [widget.vacancy!.folderPath!]),
+                      onPressed: () => Process.run('explorer.exe', [
+                        widget.vacancy!.folderPath!,
+                      ]),
                     ),
                   Tooltip(
                     message: 'Refresh vacancy data',
                     child: IconButton(
                       icon: _refreshing
-                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                          : Icon(Icons.sync_rounded, size: 18, color: cs.onSurfaceVariant),
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(
+                              Icons.sync_rounded,
+                              size: 18,
+                              color: cs.onSurfaceVariant,
+                            ),
                       onPressed: _refreshing ? null : _refresh,
                     ),
                   ),
                   if (widget.url.isNotEmpty)
                     Tooltip(
-                      message: 'Re-fetch from source — re-pull the JD from the live posting page '
+                      message:
+                          'Re-fetch from source — re-pull the JD from the live posting page '
                           '(not the cached copy, not the RSS feed). For a vacancy fetched too early, '
                           'e.g. while the job board was still moderating it.',
                       child: IconButton(
                         icon: _loadingRefetch
-                            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                            : Icon(Icons.cloud_download_outlined, size: 18, color: cs.onSurfaceVariant),
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Icon(
+                                Icons.cloud_download_outlined,
+                                size: 18,
+                                color: cs.onSurfaceVariant,
+                              ),
                         onPressed: _loadingRefetch ? null : _refetchFromSource,
                       ),
                     ),
                   Tooltip(
-                    message: 'Activity log — pipeline runs + LLM calls (incl. pre-filter checks). '
+                    message:
+                        'Activity log — pipeline runs + LLM calls (incl. pre-filter checks). '
                         'Only reachable from this JD view before analysis — the tabbed Activity tab '
                         'only appears once Phase 1+2 analysis exists.',
                     child: IconButton(
-                      icon: Icon(Icons.history_rounded, size: 18, color: cs.onSurfaceVariant),
+                      icon: Icon(
+                        Icons.history_rounded,
+                        size: 18,
+                        color: cs.onSurfaceVariant,
+                      ),
                       onPressed: () => _showActivityLog(context),
                     ),
                   ),
@@ -690,14 +740,6 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                   ref.read(vacancyListProvider.notifier).refresh();
                 },
               ),
-              const Spacer(),
-              Text('#${widget.vacancyId}',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(color: cs.onSurfaceVariant.withValues(alpha: 0.6)),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis),
             ],
           ),
         ),
@@ -1162,23 +1204,21 @@ class _VacancyDetailScreenState extends ConsumerState<VacancyDetailScreen>
                         if (p2.fitDimensions != null)
                           _CollapsibleSection(
                             title: 'Fit Dimensions',
-                            tooltip: 'Fit scored across 5 axes (0–10 each):\ndomain, execution, strategy, systems, stakeholder',
+                            tooltip:
+                                'Fit scored across 5 axes (0–10 each):\ndomain, execution, strategy, systems, stakeholder',
                             child: _FitDimsTable(dims: p2.fitDimensions!),
                           ),
                         if (p1 != null) ...[
                           const SizedBox(height: 16),
                           _CollapsibleSection(
                             title: 'Attraction Breakdown',
-                            tooltip: 'How attractive this vacancy is for you\nacross 8 factors: company tier, seniority,\nscope, compensation and more',
+                            tooltip:
+                                'How attractive this vacancy is for you\nacross 8 factors: company tier, seniority,\nscope, compensation and more',
                             child: _VacScoreTable(dims: p1.vacscoreDims),
                           ),
-                          const SizedBox(height: 16),
-                          if (p1.roleBalance.isNotEmpty)
-                            _CollapsibleSection(
-                              title: 'Role Balance',
-                              tooltip: 'Estimated split of responsibilities\nin this role (%)',
-                              child: _RoleBalanceBar(balance: p1.roleBalance),
-                            ),
+                          // Role Balance moved into _VacancyHero as a radar
+                          // chart (2026-09-06) — replaces this bar-list
+                          // rendering, not duplicated alongside it.
                         ],
                         const SizedBox(height: 16),
                         _JdSection(vacancyId: widget.vacancyId),
@@ -1299,48 +1339,52 @@ class _RelatedChip extends StatelessWidget {
       child: MouseRegion(
         cursor: onTap != null ? SystemMouseCursors.click : MouseCursor.defer,
         child: GestureDetector(
-        onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: cs.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: onTap != null
-                ? cs.primary.withValues(alpha: 0.35)
-                : cs.outlineVariant,
-            width: 1,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 13, color: onTap != null ? cs.primary : cs.onSurfaceVariant),
-            const SizedBox(width: 6),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: onTap != null
+                    ? cs.primary.withValues(alpha: 0.35)
+                    : cs.outlineVariant,
+                width: 1,
+              ),
+            ),
+            child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  '$label  #$id',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                Icon(
+                  icon,
+                  size: 13,
+                  color: onTap != null ? cs.primary : cs.onSurfaceVariant,
+                ),
+                const SizedBox(width: 6),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '$label  #$id',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
                         color: onTap != null ? cs.primary : cs.onSurface,
                         fontWeight: FontWeight.w600,
                       ),
-                ),
-                if (sublabel != null)
-                  Text(
-                    sublabel!,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    ),
+                    if (sublabel != null)
+                      Text(
+                        sublabel!,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
                           color: cs.onSurfaceVariant,
                           fontSize: 10,
                         ),
-                  ),
+                      ),
+                  ],
+                ),
               ],
             ),
-          ],
-        ),
-      ),
+          ),
         ),
       ),
     );
@@ -2040,6 +2084,18 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
       ),
       child: Row(
         children: [
+          // Vacancy id — moved here (2026-09-06, user request) as the single
+          // canonical top-left location, replacing the two previous spots
+          // (next to the title in _VacancyHero, and right-aligned in the
+          // salary/tags row of _JdModeView) so it's consistent across both
+          // pre- and post-analysis states.
+          Text(
+            '#${widget.vacancyId}',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: cs.onSurfaceVariant.withValues(alpha: 0.5),
+            ),
+          ),
+          const Spacer(),
           // Star toggle
           Tooltip(
             message: _starred ? 'Remove from favourites' : 'Add to favourites',
@@ -2081,11 +2137,14 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
                     ),
                   ),
           ),
-          const Spacer(),
           // Open JD
           if (widget.url.isNotEmpty)
             IconButton(
-              icon: Icon(Icons.open_in_new, size: 18, color: cs.onSurfaceVariant),
+              icon: Icon(
+                Icons.open_in_new,
+                size: 18,
+                color: cs.onSurfaceVariant,
+              ),
               tooltip: 'Open JD',
               onPressed: () => launchUrl(
                 Uri.parse(widget.url),
@@ -2163,114 +2222,128 @@ class _VacancyHero extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 24),
-        // Icon + Title + Subtitle
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: cs.surfaceContainer,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 4,
-                    offset: const Offset(0, 1),
-                  ),
-                ],
-              ),
-              child: Icon(Icons.code, color: cs.primary, size: 26),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // User tag badges (e.g. "DEFTECH") — shown above the title
-                  // itself, the most prominent spot on the screen, so a batch
-                  // of similarly-tagged vacancies stays identifiable at a
-                  // glance (2026-08-27).
-                  if ((vacancy?.tags ?? const []).isNotEmpty) ...[
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      children: [
-                        for (final tag in vacancy!.tags) _HeroTagBadge(tag: tag),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                  ],
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          role,
-                          style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                                fontSize: 28,
-                                fontWeight: FontWeight.w700,
-                                color: cs.onSurface,
-                                height: 1.2,
-                              ),
-                        ),
+        // Title + Subtitle
+        // IntrinsicHeight — required for VerticalDivider to render inside a
+        // Row; without it, the divider has no bounded height to fill and
+        // either collapses to zero or throws a layout error.
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // User tag badges (e.g. "DEFTECH") — shown above the title
+                    // itself, the most prominent spot on the screen, so a batch
+                    // of similarly-tagged vacancies stays identifiable at a
+                    // glance (2026-08-27).
+                    if ((vacancy?.tags ?? const []).isNotEmpty) ...[
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: [
+                          for (final tag in vacancy!.tags)
+                            _HeroTagBadge(tag: tag),
+                        ],
                       ),
-                      const SizedBox(width: 12),
-                      Text(
-                        '#$vacancyId',
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: cs.onSurfaceVariant.withValues(alpha: 0.45),
-                            ),
-                      ),
+                      const SizedBox(height: 6),
                     ],
-                  ),
-                  if (company.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            company,
-                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                  color: cs.onSurfaceVariant,
-                                  fontWeight: FontWeight.w400,
+                    // Vacancy id moved out of here (2026-09-06, user request)
+                    // — now shown once, top-left, in the _ActionBar/_JdModeView
+                    // row above, not duplicated next to the title too.
+                    Text(
+                      role,
+                      style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w700,
+                        color: cs.onSurface,
+                        height: 1.2,
+                      ),
+                    ),
+                    if (company.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              company,
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(
+                                    color: cs.onSurfaceVariant,
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: 18,
+                                  ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (vacancy?.companyWebsite != null &&
+                              vacancy!.companyWebsite!.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 8),
+                              child: Tooltip(
+                                message: vacancy!.companyWebsite!,
+                                child: InkWell(
+                                  onTap: () =>
+                                      _openWebsite(vacancy!.companyWebsite!),
+                                  child: Icon(
+                                    Icons.language,
+                                    size: 22,
+                                    color: cs.primary,
+                                  ),
                                 ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        if (vacancy?.companyWebsite != null && vacancy!.companyWebsite!.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(left: 6),
-                            child: Tooltip(
-                              message: vacancy!.companyWebsite!,
-                              child: InkWell(
-                                onTap: () => _openWebsite(vacancy!.companyWebsite!),
-                                child: Icon(Icons.language, size: 18, color: cs.primary),
                               ),
                             ),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: 10),
+                    // Salary/tags — enlarged (2026-09-06, user request: "легче
+                    // кликалось, легче редактировалось, легче читалось") now
+                    // that removing the leading icon box and adding the radar's
+                    // own column freed up the bottom-left quarter of this
+                    // header entirely.
+                    Row(
+                      children: [
+                        if (onSalaryChanged != null)
+                          _SalaryInline(
+                            salary: salary,
+                            onSave: onSalaryChanged!,
+                            fontSize: 18,
                           ),
+                        if (onTagsChanged != null) ...[
+                          const SizedBox(width: 20),
+                          _TagsInline(
+                            tags: vacancy?.tags ?? const [],
+                            onSave: onTagsChanged!,
+                            fontSize: 18,
+                          ),
+                        ],
                       ],
                     ),
                   ],
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      if (onSalaryChanged != null)
-                        _SalaryInline(salary: salary, onSave: onSalaryChanged!),
-                      if (onTagsChanged != null) ...[
-                        const SizedBox(width: 16),
-                        _TagsInline(tags: vacancy?.tags ?? const [], onSave: onTagsChanged!),
-                      ],
-                    ],
-                  ),
-                ],
+                ),
               ),
-            ),
-          ],
+              // Vertical divider between the text block and the radar
+              // (2026-09-06, user request).
+              if (p1 != null && p1!.roleBalance.isNotEmpty) ...[
+                const SizedBox(width: 20),
+                VerticalDivider(
+                  width: 1,
+                  thickness: 1,
+                  color: cs.outlineVariant.withValues(alpha: 0.3),
+                ),
+                const SizedBox(width: 20),
+                // Role-balance radar — right-aligned in the space the text
+                // block doesn't need (2026-09-06, user request). Replaces the
+                // old "Role Balance" collapsible bar-list section further down
+                // the page, not duplicated alongside it.
+                _RoleBalanceRadar(balance: p1!.roleBalance),
+              ],
+            ],
+          ),
         ),
         const SizedBox(height: 20),
         // Recommendation card — primary go/no-go decision
@@ -3405,69 +3478,133 @@ class _ScoreBar extends StatelessWidget {
   }
 }
 
-// ── Role Balance ──────────────────────────────────────────────────────────────
+// ── Role Balance (radar chart, 2026-09-06) ──────────────────────────────────
+// Replaces the old _RoleBalanceBar (horizontal bar list) — see
+// docs/discovery/role-balance-taxonomy-discovery-2026-09-06.md for how the
+// 6-axis taxonomy itself was derived (keyword frequency + clustering + LLM
+// open-coding, triangulated across 628 real PM/PO job descriptions).
 
-class _RoleBalanceBar extends StatelessWidget {
+class _RoleBalanceRadar extends StatelessWidget {
   final Map<String, int> balance;
 
-  const _RoleBalanceBar({required this.balance});
+  const _RoleBalanceRadar({required this.balance});
 
-  Color _colorForKey(String key, ColorScheme cs) {
-    switch (key.toLowerCase()) {
-      case 'strategy':    return cs.primary;
-      case 'discovery':   return cs.tertiary;
-      case 'execution':   return const Color(0xFF388E3C);
-      case 'stakeholder': return cs.secondary;
-      default:            return cs.outline;
-    }
-  }
+  // Fixed canonical order — always rendered in this order so the chart's
+  // shape is visually comparable across vacancies, regardless of which keys
+  // happen to be present in a given analysis_json (contracts/pipeline.py's
+  // Phase1Data.role_balance normalizer already maps legacy names onto these).
+  static const _axisOrder = [
+    'strategy',
+    'discovery',
+    'delivery',
+    'growth',
+    'stakeholder',
+    'operational',
+  ];
+
+  static const _axisLabels = {
+    'strategy': 'Strategy',
+    'discovery': 'Discovery',
+    'delivery': 'Delivery',
+    'growth': 'Growth',
+    'stakeholder': 'Stakeholder',
+    'operational': 'Operational',
+  };
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    // Vacancies analyzed before 2026-09-06 have no "growth" value at all —
+    // rendered as 0 on the chart, but called out explicitly below so it
+    // doesn't silently read as "this role has no growth work" when the
+    // truth is "this analysis predates the axis."
+    final missingGrowth = !balance.containsKey('growth');
+
     return Column(
-      children: balance.entries.map((e) {
-        final color = _colorForKey(e.key, cs);
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 116,
-                child: Text(
-                  e.key,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: cs.onSurfaceVariant,
-                      ),
-                ),
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Title + hover tooltip (2026-09-06, user request) — without this,
+        // a viewer unfamiliar with the chart has no way to know what it
+        // represents. Reuses the same _TooltipTitle pattern as the other
+        // analysis sections (Attraction Breakdown, Fit Dimensions, ...).
+        _TooltipTitle(
+          context: context,
+          cs: cs,
+          title: 'Role Balance',
+          // Bold + dark + larger (2026-09-06, user request) — bold+dark
+          // alone still read as "вяло" (flat) at the original 12px; bumped
+          // to 16px, the point where the monospace font actually reads as
+          // a heading rather than a small label.
+          fontWeight: FontWeight.w700,
+          color: cs.onSurface,
+          fontSize: 16,
+          tooltip: 'Estimated split of this role\'s day-to-day work across '
+              '6 dimensions: Strategy (deciding what and why), Discovery '
+              '(research), Delivery (shipping), Growth (data-driven '
+              'iteration), Stakeholder (coordination), Operational '
+              '(process/admin). Derived from the JD by Phase 1 analysis.',
+        ),
+        // Enlarged (2026-09-06, user request) — the chart's own "Strategy"
+        // axis label sits right at the top of its box, so a small gap here
+        // read as though the title and chart were one merged block.
+        const SizedBox(height: 20),
+        SizedBox(
+          width: 240,
+          height: 210,
+          child: RadarChart(
+            RadarChartData(
+              radarShape: RadarShape.polygon,
+              tickCount: 4,
+              ticksTextStyle: const TextStyle(
+                fontSize: 0,
+                color: Colors.transparent,
               ),
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: e.value / 100,
-                    minHeight: 6,
-                    backgroundColor: cs.surfaceContainerHighest,
-                    valueColor: AlwaysStoppedAnimation<Color>(color),
-                  ),
-                ),
+              radarBorderData: BorderSide(
+                color: cs.outlineVariant.withValues(alpha: 0.4),
               ),
-              const SizedBox(width: 10),
-              SizedBox(
-                width: 36,
-                child: Text(
-                  '${e.value}%',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: cs.onSurface,
-                        fontWeight: FontWeight.w600,
-                      ),
-                  textAlign: TextAlign.end,
-                ),
+              gridBorderData: BorderSide(
+                color: cs.outlineVariant.withValues(alpha: 0.3),
               ),
-            ],
+              tickBorderData: BorderSide(
+                color: cs.outlineVariant.withValues(alpha: 0.15),
+              ),
+              radarBackgroundColor: Colors.transparent,
+              titlePositionPercentageOffset: 0.16,
+              titleTextStyle: textTheme.labelSmall?.copyWith(
+                color: cs.onSurfaceVariant,
+              ),
+              getTitle: (index, angle) => RadarChartTitle(
+                text: _axisLabels[_axisOrder[index]] ?? _axisOrder[index],
+              ),
+              dataSets: [
+                RadarDataSet(
+                  fillColor: cs.primary.withValues(alpha: 0.22),
+                  borderColor: cs.primary,
+                  borderWidth: 2,
+                  entryRadius: 3,
+                  dataEntries: [
+                    for (final key in _axisOrder)
+                      RadarEntry(value: (balance[key] ?? 0).toDouble()),
+                  ],
+                ),
+              ],
+            ),
           ),
-        );
-      }).toList(),
+        ),
+        if (missingGrowth)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(
+              'No growth-axis data (analyzed before 2026-09-06)',
+              style: textTheme.labelSmall?.copyWith(
+                color: cs.onSurfaceVariant.withValues(alpha: 0.55),
+                fontStyle: FontStyle.italic,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+      ],
     );
   }
 }
@@ -3479,24 +3616,38 @@ class _TooltipTitle extends StatelessWidget {
   final String? tooltip;
   final BuildContext context;
   final ColorScheme cs;
+  final FontWeight? fontWeight;
+  final Color? color;
+  final double? fontSize;
 
   const _TooltipTitle({
     required this.title,
     required this.tooltip,
     required this.context,
     required this.cs,
+    this.fontWeight,
+    this.color,
+    this.fontSize,
   });
 
   @override
   Widget build(BuildContext ctx) {
     final text = Text(
       title,
-      style: Theme.of(ctx).textTheme.labelMedium?.copyWith(color: cs.onSurfaceVariant),
+      style: Theme.of(ctx).textTheme.labelMedium?.copyWith(
+            color: color ?? cs.onSurfaceVariant,
+            fontWeight: fontWeight,
+            fontSize: fontSize,
+          ),
     );
     if (tooltip == null) return text;
     return Tooltip(
       message: tooltip!,
       preferBelow: true,
+      // Caps tooltip width so long descriptions wrap into a compact block
+      // instead of stretching into a single line across the whole screen
+      // (2026-09-06, user request — noticed on the Role Balance tooltip).
+      constraints: const BoxConstraints(maxWidth: 260),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [

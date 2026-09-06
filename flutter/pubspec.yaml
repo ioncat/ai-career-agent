@@ -35,6 +35,9 @@ dependencies:
   # File save dialog (PDF download)
   file_picker: ^8.1.7
 
+  # Radar chart — role-balance archetype breakdown (2026-09-06)
+  fl_chart: ^0.69.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

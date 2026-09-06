@@ -35,6 +35,7 @@ from pydantic_ai import RunContext
 
 from adapters.cv_adapter import CVAdapterError
 from core.cv_metrics import (
+    detect_phrase_repetition,
     detect_repetition,
     format_freq_table,
     format_tools_table,
@@ -208,6 +209,12 @@ async def cv_generate(
     _rep_str = (
         ", ".join(f"`{w}`" for w in _repetitions) if _repetitions else "_none detected_"
     )
+    _phrase_repeats = detect_phrase_repetition(phase3_draft)
+    _phrase_str = (
+        ", ".join(f"`{p}` (x{c})" for p, c in _phrase_repeats[:15])
+        if _phrase_repeats
+        else "_none detected_"
+    )
 
     phase35_user = (
         f"JD Text:\n\n{jd_text}\n\n"
@@ -222,7 +229,9 @@ async def cv_generate(
         f"### Tools & Technologies\n\n"
         f"```\n{_tools_table}\n```\n\n"
         f"### Repeated Terms (3+ occurrences across CV body)\n\n"
-        f"{_rep_str}"
+        f"{_rep_str}\n\n"
+        f"### Repeated Phrases (3-5 word phrases, 2+ occurrences)\n\n"
+        f"{_phrase_str}"
     )
 
     try:

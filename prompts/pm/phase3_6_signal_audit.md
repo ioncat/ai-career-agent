@@ -67,5 +67,18 @@ If no issues:
 ## After audit
 
 - **🗑️ found** → present to user, confirm, remove from CV, re-save CV.md + PDF
-- **⚠️ only** → present to user, let them decide — do not auto-remove
+- **⚠️ only** → before presenting anything, check PROFILE.md (the same company/role's main
+  entry plus any Additional Evidence sections) for unused, honest evidence that would map that
+  sentence's slot to a currently weak (⚠️) or under-covered signal from the Signal Coverage
+  Table. Verify each claim in a candidate rewrite word-for-word against PROFILE.md before
+  using it — do not extrapolate adjacent-sounding detail that isn't literally stated there.
+  Then check the candidate rewrite against the REST OF THE CV (same role paragraph first, then
+  the whole document) for a repeated 3+ word phrase or construction — a rewrite that closes one
+  signal by echoing wording already used elsewhere just trades one weak sentence for a
+  duplication problem (see `core.cv_metrics.detect_phrase_repetition`, threshold 2+; in the
+  Claude Code local pipeline, where this isn't auto-injected, run it directly via Bash against
+  the saved CV before finalizing). Present findings with three options per sentence: remove /
+  keep as-is / replace with [specific rewrite + which signal it closes]. If no real evidence
+  exists to fill the gap, offer only remove/keep — never fabricate evidence to manufacture a
+  rewrite option.
 - **Clean** → proceed directly to Phase 4

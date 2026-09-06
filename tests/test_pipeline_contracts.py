@@ -147,6 +147,45 @@ def test_phase1_role_balance_is_dict():
     assert p1.role_balance["strategy"] == 20
 
 
+# ── role_balance legacy-key normalization (2026-09-06 taxonomy) ────────────────
+# See docs/discovery/role-balance-taxonomy-discovery-2026-09-06.md — the model
+# split ~50/50 between old/new names for two of the five axes for months
+# despite the prompt specifying one, so this is a permanent safety net.
+
+
+def test_role_balance_normalizes_execution_to_delivery():
+    p1 = Phase1Data(**_p1(role_balance={"strategy": 20, "execution": 50, "operational": 30}))
+    assert p1.role_balance == {"strategy": 20, "delivery": 50, "operational": 30}
+    assert "execution" not in p1.role_balance
+
+
+def test_role_balance_normalizes_coordination_to_stakeholder():
+    p1 = Phase1Data(**_p1(role_balance={"strategy": 20, "coordination": 50, "operational": 30}))
+    assert p1.role_balance == {"strategy": 20, "stakeholder": 50, "operational": 30}
+    assert "coordination" not in p1.role_balance
+
+
+def test_role_balance_normalizes_ops_to_operational():
+    p1 = Phase1Data(**_p1(role_balance={"strategy": 20, "discovery": 50, "ops": 30}))
+    assert p1.role_balance == {"strategy": 20, "discovery": 50, "operational": 30}
+    assert "ops" not in p1.role_balance
+
+
+def test_role_balance_canonical_keys_pass_through_unchanged():
+    canonical = {
+        "strategy": 15, "discovery": 20, "delivery": 30,
+        "growth": 15, "stakeholder": 10, "operational": 10,
+    }
+    p1 = Phase1Data(**_p1(role_balance=canonical))
+    assert p1.role_balance == canonical
+
+
+def test_role_balance_alias_does_not_clobber_existing_canonical_key():
+    # If both the old and new key somehow appear together, canonical wins.
+    p1 = Phase1Data(**_p1(role_balance={"strategy": 20, "delivery": 40, "execution": 99}))
+    assert p1.role_balance["delivery"] == 40
+
+
 # ── FitDimensions ─────────────────────────────────────────────────────────────
 
 def test_fit_dimensions_valid():

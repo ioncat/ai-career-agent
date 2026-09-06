@@ -35,11 +35,12 @@ PHASE1_SAMPLE = """
 
 - Strategy: 20%
 - Discovery: 30%
-- Execution/delivery: 30%
-- Stakeholder coordination: 10%
-- Operational/process work: 10%
+- Delivery: 25%
+- Growth: 5%
+- Stakeholder: 10%
+- Operational: 10%
 
-**Primary archetype:** `Execution-heavy Platform/Systems PM`
+**Primary archetype:** `Delivery-heavy Platform/Systems PM`
 
 ### 1.6 Language Analysis
 
@@ -243,7 +244,7 @@ def test_parse_phase1_data_success():
     assert p1.role == "Product Manager"
     assert p1.company == "Stripe"
     assert "CRM" in p1.north_star
-    assert p1.primary_archetype == "Execution-heavy Platform/Systems PM"
+    assert p1.primary_archetype == "Delivery-heavy Platform/Systems PM"
     assert p1.company_type == "product"
     assert p1.vacscore_dims.company_tier == 4
 
@@ -261,6 +262,10 @@ def test_parse_phase1_data_role_balance():
     assert p1 is not None
     assert p1.role_balance.get("strategy") == 20
     assert p1.role_balance.get("discovery") == 30
+    assert p1.role_balance.get("delivery") == 25
+    assert p1.role_balance.get("growth") == 5
+    assert p1.role_balance.get("stakeholder") == 10
+    assert p1.role_balance.get("operational") == 10
 
 
 def test_parse_phase1_data_dominant_culture():

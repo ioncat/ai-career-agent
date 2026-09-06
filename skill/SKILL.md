@@ -96,6 +96,17 @@ Pre-flight (ask once, before Phase 3):
 
 Phase 3: CV Draft          [NOT shown to user — internal]
 Phase 3.5: Self-Review     [review tables + verdict shown to user; CV body NEVER pasted in chat — see rule below]
+  → Before writing the review: compute Repeated Terms + Repeated Phrases against the Phase 3
+    draft. Unlike the Python/API pipeline (`tools/cv_generate.py`), this local Claude Code mode
+    does not auto-inject these tables — run them yourself via Bash:
+    `python -c "import sys; sys.path.insert(0,'.'); from core.cv_metrics import detect_repetition, detect_phrase_repetition; d=open(r'[path to CV draft]', encoding='utf-8').read(); print(detect_repetition(d)); print(detect_phrase_repetition(d))"`
+    `detect_repetition` = single words, 3+ occurrences. `detect_phrase_repetition` = 3-5 word
+    phrases, 2+ occurrences — this is the one that actually catches a verbatim construction like
+    "as part of the team" reused across unrelated role paragraphs, which single-word frequency
+    can't see at all (found live 2026-09-06, vacancy #1441 — three phrase-level duplicates
+    slipped through an eyeball-only Phase 3.5 pass and only surfaced when the user asked for a
+    dedicated dedup check). Feed both lists into the Repetition Check below same as the
+    Python pipeline would.
   → Save [Name]_CV.md to existing folder (already created after Phase 1+2)
   → Generate PDF via http://localhost:8002/render → save PDF bytes
   → Present a markdown link to the saved CV.md (and PDF) — per Rule 8, never paste the CV body itself
@@ -459,7 +470,7 @@ python scripts/vacancy_track.py update-json --id $VACANCY_ID --phase p1 --data '
   "north_star": "[one-line North Star from 1.0.5]",
   "primary_archetype": "[Primary archetype label from 1.3]",
   "company_type": "product|hybrid|outsourcing",
-  "role_balance": {"strategy": N, "discovery": N, "execution": N, "coordination": N, "ops": N},
+  "role_balance": {"strategy": N, "discovery": N, "delivery": N, "growth": N, "stakeholder": N, "operational": N},
   "dominant_culture": "ownership|speed|alignment|process|innovation|predictability",
   "vacscore_dims": {
     "company_tier": N,
@@ -474,6 +485,8 @@ python scripts/vacancy_track.py update-json --id $VACANCY_ID --phase p1 --data '
   "vacancy_score": N.N
 }'
 ```
+
+> **`role_balance` — six-axis taxonomy, empirically derived 2026-09-06 (keyword frequency + TF-IDF clustering + LLM open-coding, triangulated across 628 real PM/PO JDs — see `docs/discovery/role-balance-taxonomy-discovery-2026-09-06.md`).** Canonical keys are `strategy`/`discovery`/`delivery`/`growth`/`stakeholder`/`operational` — always these exact names, not synonyms (`execution`, `coordination`, `ops` were the old, inconsistently-applied names; a DB audit found the model split roughly 50/50 between two different naming conventions for the same two dimensions before this fix). `growth` is a new axis — vacancies analyzed before 2026-09-06 do not have it.
 
 > **Every field above is REQUIRED — this must validate against `contracts/pipeline.py:Phase1Data`.**
 > `role`/`company` are the most consequential (see below), but any missing field

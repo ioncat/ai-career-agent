@@ -22,6 +22,15 @@ from pydantic import BaseModel, Field, field_validator
 # ── Phase 1 ───────────────────────────────────────────────────────────────────
 
 
+# Legacy role_balance key names, superseded 2026-09-06 — see
+# docs/discovery/role-balance-taxonomy-discovery-2026-09-06.md.
+_ROLE_BALANCE_ALIASES: dict[str, str] = {
+    "execution": "delivery",
+    "coordination": "stakeholder",
+    "ops": "operational",
+}
+
+
 class VacScoreDims(BaseModel):
     """Raw dimension scores from Phase 1 §1.7 Vacancy Score.
 
@@ -56,6 +65,26 @@ class Phase1Data(BaseModel):
     dominant_culture: str
     vacscore_dims: VacScoreDims
     vacancy_score: float = Field(ge=0.0, le=10.0)
+
+    # Permanent safety net, not a one-time migration shim — prompt-only
+    # enforcement of canonical role_balance keys already failed once (a DB
+    # audit found the model split ~50/50 between two names for the same two
+    # dimensions for months despite the prompt specifying one). Normalizing
+    # here also lets historical rows keep validating on read (web/api.py
+    # calls AnalysisJson.model_validate_json on every Flutter request)
+    # without depending on the separate DB backfill for correctness.
+    @field_validator("role_balance", mode="before")
+    @classmethod
+    def _normalize_role_balance_keys(cls, v: dict[str, int]) -> dict[str, int]:
+        if not isinstance(v, dict):
+            return v
+        normalized: dict[str, int] = {}
+        for key, val in v.items():
+            canonical = _ROLE_BALANCE_ALIASES.get(key, key)
+            if canonical in normalized:
+                continue  # canonical name already present (or a second alias for it) — first one wins
+            normalized[canonical] = val
+        return normalized
 
 
 # ── Phase 2 ───────────────────────────────────────────────────────────────────

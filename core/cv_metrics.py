@@ -150,6 +150,53 @@ def detect_repetition(text: str, threshold: int = 3) -> list[str]:
     return [word for word, count in counts.most_common() if count >= threshold]
 
 
+def detect_phrase_repetition(
+    text: str, min_n: int = 3, max_n: int = 5, threshold: int = 2
+) -> list[tuple[str, int]]:
+    """Return multi-word phrases (n-grams) repeated at or above threshold times.
+
+    Complements detect_repetition (single-word frequency), which cannot catch
+    verbatim phrase/construction echoes — e.g. "as part of the team" reused
+    across three different roles reads as obvious duplication to a human but
+    never trips a single-word count (each individual word is common, and
+    "team" is itself a stopword here). Found live 2026-09-06, vacancy #1441:
+    three 3+ word phrases were reused verbatim across unrelated CV sections
+    and only caught by a manual ad-hoc n-gram scan after the fact.
+
+    Args:
+        text:      Full CV draft text (markdown).
+        min_n:     Shortest phrase length to check, in words (default 3).
+        max_n:     Longest phrase length to check, in words (default 5).
+        threshold: Minimum occurrence count to report (default 2 — unlike
+                   single words, a verbatim 3+ word phrase repeated even once
+                   more is already worth a human look).
+
+    Returns:
+        List of (phrase, count) tuples, longest phrases first, then by count
+        descending. Phrases made entirely of stopwords (e.g. "in the of") are
+        skipped as grammatical noise, not a real echo. A short, uniform
+        prose-then-bullet restatement of the same fact (e.g. a sentence and
+        its own Key Results bullet) is a legitimate pattern, not a bug — the
+        review step interprets findings, this function only surfaces them.
+    """
+    body = re.sub(r"\[.*?\]\(.*?\)", " ", text)  # strip markdown links first
+    body = re.sub(r"[#*`]", " ", body)
+    words = re.findall(r"[a-zA-Z']+", body.lower())
+
+    results: list[tuple[str, int]] = []
+    for n in range(max_n, min_n - 1, -1):
+        grams = Counter(tuple(words[i : i + n]) for i in range(len(words) - n + 1))
+        for gram, count in grams.items():
+            if count < threshold:
+                continue
+            if all(w in _STOPWORDS for w in gram):
+                continue
+            results.append((" ".join(gram), count))
+
+    results.sort(key=lambda t: (-len(t[0].split()), -t[1]))
+    return results
+
+
 # ── Formatters ────────────────────────────────────────────────────────────────
 
 

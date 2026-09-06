@@ -345,11 +345,13 @@ _FIT_DIM_PATTERNS: dict[str, re.Pattern] = {
 _NORTH_STAR_RE     = re.compile(r"\*\*North Star:\*\*\s*(.+?)(?:\n|$)")
 _ARCHETYPE_RE      = re.compile(r"\*\*Primary archetype:\*\*\s*`?(.+?)`?(?:\n|$)", re.IGNORECASE)
 _ROLE_BALANCE_RE   = {
-    "strategy":    re.compile(r"Strategy[^:\n]*:\s*(\d+)%", re.IGNORECASE),
+    # Six-axis taxonomy (2026-09-06) — see docs/discovery/role-balance-taxonomy-discovery-2026-09-06.md
+    "strategy":    re.compile(r"^\s*[-–]?\s*Strategy[^:\n]*:\s*(\d+)%", re.IGNORECASE | re.MULTILINE),
     "discovery":   re.compile(r"^\s*[-–]?\s*Discovery[^:\n]*:\s*(\d+)%", re.IGNORECASE | re.MULTILINE),
-    "execution":   re.compile(r"Execution[^:\n]*:\s*(\d+)%", re.IGNORECASE),
-    "stakeholder": re.compile(r"Stakeholder[^:\n]*:\s*(\d+)%", re.IGNORECASE),
-    "operational": re.compile(r"Operational[^:\n]*:\s*(\d+)%", re.IGNORECASE),
+    "delivery":    re.compile(r"^\s*[-–]?\s*Delivery[^:\n]*:\s*(\d+)%", re.IGNORECASE | re.MULTILINE),
+    "growth":      re.compile(r"^\s*[-–]?\s*Growth[^:\n]*:\s*(\d+)%", re.IGNORECASE | re.MULTILINE),
+    "stakeholder": re.compile(r"^\s*[-–]?\s*Stakeholder[^:\n]*:\s*(\d+)%", re.IGNORECASE | re.MULTILINE),
+    "operational": re.compile(r"^\s*[-–]?\s*Operational[^:\n]*:\s*(\d+)%", re.IGNORECASE | re.MULTILINE),
 }
 _CULTURE_KEYWORDS  = {"speed", "ownership", "alignment", "process", "autonomy", "predictability", "innovation"}
 
@@ -405,13 +407,16 @@ def _parse_company_type(company_type_score: int) -> str:
 
 
 def _parse_role_balance(phase1: str) -> dict[str, int]:
-    """Extract role balance percentages from Phase 1 §1.4."""
+    """Extract role balance percentages from Phase 1 §1.4 (six-axis taxonomy, 2026-09-06)."""
     balance: dict[str, int] = {}
     for key, pat in _ROLE_BALANCE_RE.items():
         m = pat.search(phase1)
         if m:
             balance[key] = int(m.group(1))
-    return balance or {"strategy": 25, "discovery": 25, "execution": 25, "stakeholder": 15, "operational": 10}
+    return balance or {
+        "strategy": 20, "discovery": 20, "delivery": 25,
+        "growth": 15, "stakeholder": 12, "operational": 8,
+    }
 
 
 def _parse_dominant_culture(phase1: str) -> str:

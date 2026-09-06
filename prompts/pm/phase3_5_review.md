@@ -79,6 +79,8 @@ Then output the updated CV draft with all identified changes already applied.
 
 The repeated terms list is pre-computed and provided in the user message under `### Repeated Terms`. For each listed term → add to ⚠️ section with a suggested variation or removal.
 
+**Also check `### Repeated Phrases`** (pre-computed, same user message) — this is a SEPARATE signal from Repeated Terms above and catches a different failure mode: single-word frequency cannot see a verbatim 3+ word phrase or sentence construction reused across unrelated sections (e.g. "as part of the team" appearing in three different role paragraphs), because each individual word in it may be common or even a stopword. For each phrase listed at 2+ occurrences → add to ⚠️ with a suggested reword for all but one instance. Exception: a short prose sentence and its own Key Results bullet restating the same fact in the same role block is a legitimate pattern, not a violation — do not flag that specific case.
+
 Also check visually for structural patterns not captured by frequency count:
 - Same verb ("owned", "drove", "managed") starting multiple bullets in the same block
 - Structural echo: two consecutive sentences starting with the same subject or verb form

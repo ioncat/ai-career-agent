@@ -135,21 +135,33 @@ Determine what kind of role they are actually hiring for:
 
 ### 1.4 Role Balance
 
+**Six-axis taxonomy (empirically derived 2026-09-06 from 628 real PM/PO job descriptions — keyword frequency + TF-IDF clustering + LLM open-coding, triangulated; full methodology: `docs/discovery/role-balance-taxonomy-discovery-2026-09-06.md`).** Same canonical field names as `prompts/pm/phase1_analysis.md`, kept identical across skill_types so `analysis_json.p1.role_balance` is comparable regardless of role family — used verbatim:
+
+- **Strategy** (`strategy`) — deciding what to do and why: planning, prioritization, goal-setting
+- **Discovery** (`discovery`) — research/analysis: understanding a problem, gathering requirements, investigating root causes before acting
+- **Delivery** (`delivery`) — turning a decision into a finished output: execution, hands-on completion of defined work
+- **Growth** (`growth`) — improving an already-delivered result using data: metrics, experiments, iteration, optimization (present in most roles to some degree, not PM-exclusive)
+- **Stakeholder** (`stakeholder`) — coordination/communication across people: internal teams, clients, leadership
+- **Operational** (`operational`) — process/administrative work: process design, automation, compliance, day-to-day operational upkeep
+
+**Definitional note (avoid the old "execution" ambiguity):** "Strategy" decides what and why. "Delivery" produces the finished output. "Growth" improves that output afterward using data/feedback — do not fold Growth into Delivery just because both involve "doing" something. If a role's language genuinely spans two axes, split the percentage across them rather than forcing one pick.
+
 Estimate percentage split (must sum to 100%):
-- Strategy/planning: __%
-- Research/analysis: __%
-- Execution/delivery: __%
-- Coordination/communication: __%
-- Operational/process work: __%
+- Strategy: __%
+- Discovery: __%
+- Delivery: __%
+- Growth: __%
+- Stakeholder: __%
+- Operational: __%
 
 **Primary role type:** `[dominant label]`
 
 Use one of (can combine two):
-`Execution-heavy` · `Coordination-heavy` · `Strategy-planning` · `Operations/BizOps`
+`Delivery-heavy` · `Stakeholder-heavy` · `Strategy-planning` · `Growth-heavy` · `Operations/BizOps`
 `Specialist` · `Generalist` · `Support function` · `Ownership function`
 `Client-facing` · `Internal-facing`
 
-Example: `Execution-heavy Generalist` · `Coordination-heavy Client-facing`
+Example: `Delivery-heavy Generalist` · `Stakeholder-heavy Client-facing`
 
 ---
 

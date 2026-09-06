@@ -343,11 +343,6 @@ No dual-availability state — the button's visibility is a direct, deterministi
 
 ## 🟡 P2
 
-### Flutter detail view — radar/spider chart for role-balance archetype breakdown (added 2026-09-06)
-**What:** visualize `analysis_json.p1.role_balance` (discovery / execution / stakeholder-coordination / strategy / operational, plus a possible new "growth" axis) as a radar (spider/web) chart in the vacancy detail screen, so the discovery-vs-delivery-vs-growth tension in a JD is visible at a glance instead of buried in a percentage list.
-**Why:** user request during vacancy #1441 (Balto) review — noticed the role wanted several archetypes at once (discovery + delivery + growth-style analytics rigor) and wants that tension shown visually, not just read off the text.
-**Scope (undecided, needs a design pass before implementing):** exact axis set isn't settled yet — current `role_balance` dims may need trimming/renaming or a "growth" axis added; also decide whether `fit_dimensions` (domain/execution/strategy/systems/stakeholder fit) gets its own separate radar or shares one view. Deliberately deferred — do this after current vacancy work, not now.
-
 ### Backlog structure simplification — BACKLOG.md itself (added 2026-09-01)
 **What:** BACKLOG.md violates its own documented contract (documentation-conventions.md) — mass 10-line-limit breaches, Now-section mixing, no stable entry IDs, done-markers inside open entries, duplicate content.
 **Why:** hard to read/edit/maintain for both human and AI agent; audited a marketplace `product-manager` skill as a possible fix — verdict: not applicable (broken package, wrong data model — ticket-per-file vs our single flat file).
