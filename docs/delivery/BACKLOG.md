@@ -13,6 +13,13 @@
 
 ## 📌 Now
 
+### 🔴 P0 — Unify vacancy detail header/action-bar (scheduled for 2026-09-07)
+**What:** `_JdModeView` (pre-analysis) and `_ActionBar` (post-analysis) are two independently hand-maintained widget trees for what is logically one document's header across its phases. `_JdModeView`'s internal split into two separately-aligned rows (icons `Row` + buttons `Wrap`) has now broken 4 times (2026-09-05 ×3, 2026-09-06 ×1) — same class of bug every time, because nothing structurally ties the two rows' alignment together.
+**Why:** user's explicit framing — a vacancy is one document moving through phases; fixing something in one place should fix it everywhere, not require re-fixing the same alignment class of bug per state. Also exposed real feature-parity gaps between the two widgets (Star/favourite, Check blockers, Re-fetch — each exists in only one of the two states, never explicitly decided).
+**Plan:** full inventory of both widgets' current actions, root-cause analysis, proposed architecture (one shared `Wrap`-based action-bar component + a shared action catalogue, states just vary which actions are included), step-by-step migration plan with per-step `dart analyze`/`flutter test` gates and a per-state visual-review checklist (not just one screenshot). Full detail: [vacancy-detail-header-unification-2026-09-06.md](../discovery/vacancy-detail-header-unification-2026-09-06.md).
+**Explicit open questions to resolve before/during implementation:** Star pre-analysis? Check-blockers post-analysis? Re-fetch post-analysis? Unify title placement too, or keep the sticky-bar-vs-scrollable-hero split? (all in the design doc §6).
+**Not started yet** — deliberately deferred a full session so it can be planned properly rather than rushed at 78%+ of a usage window.
+
 ### 🟠 P1 — Wire Djinni hidden-salary estimate into the live fetch pipeline + Flutter badge (backend delivered 2026-09-05, this is the follow-up)
 **What:** `services/parser/salary_probe.py` + `POST /djinni-salary-ceiling` (jd-parser) + `adapters/djinni_salary_adapter.py` can now estimate a Djinni vacancy's real, possibly-undisclosed salary via Djinni's own public `salary=N` search filter — user's own manual technique (raise the filter until the vacancy drops out; the last value it's still visible at is the real number, confirmed $500 granularity) turned into an exponential+binary search. Currently only reachable via `scripts/backfill_djinni_salary_estimate.py`, a one-off script. Full design/why: [CHANGELOG.md → 2026-09-05](CHANGELOG.md).
 **Remaining:**

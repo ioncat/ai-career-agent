@@ -434,6 +434,23 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Vacancy id — own line, topmost (2026-09-06, canonical
+              // top-left location, same idea as the post-analysis
+              // _ActionBar). Deliberately NOT sharing a row with the icon
+              // row below — that row's left-alignment is paired with the
+              // button Wrap further down (WrapAlignment.start, fixed
+              // 2026-09-05 after 3 breaks) and adding a Spacer here to push
+              // the id right previously dragged the icons right with it,
+              // breaking that pairing again (caught live, same day).
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(
+                  '#${widget.vacancyId}',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.5),
+                      ),
+                ),
+              ),
               // Row 1 — title only, full row width to itself (2026-09-04,
               // user feedback: a combined title+icons row truncated the
               // title hard — "Senior Product M..." — once the detail panel
@@ -494,19 +511,6 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
               // that doesn't depend on either row's content width.
               Row(
                 children: [
-                  // Vacancy id — canonical top-left location (2026-09-06,
-                  // same spot as the post-analysis _ActionBar), replacing the
-                  // right-aligned one that used to sit in the salary/tags row
-                  // below. Only this row gets a Spacer — the button Wrap
-                  // further down keeps its own WrapAlignment.start untouched
-                  // (that alignment broke 3 times before, 2026-09-05).
-                  Text(
-                    '#${widget.vacancyId}',
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: cs.onSurfaceVariant.withValues(alpha: 0.5),
-                    ),
-                  ),
-                  const Spacer(),
                   if (widget.url.isNotEmpty)
                     IconButton(
                       icon: Icon(
