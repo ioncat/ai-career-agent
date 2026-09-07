@@ -587,6 +587,24 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                       splashRadius: 18,
                     ),
                   ),
+                  // Open JD — moved right after Star (2026-09-07, user
+                  // request: "Звездочка, открыть ссылку на вакансию,
+                  // вертикальный разделитель"). Was in the trailing utility
+                  // cluster before.
+                  if (widget.url.isNotEmpty)
+                    IconButton(
+                      icon: Icon(
+                        Icons.open_in_new,
+                        size: 18,
+                        color: cs.onSurfaceVariant,
+                      ),
+                      tooltip: 'Open JD',
+                      onPressed: () => launchUrl(
+                        Uri.parse(widget.url),
+                        mode: LaunchMode.externalApplication,
+                      ),
+                    ),
+                  Container(width: 1, height: 24, color: cs.outlineVariant),
                   // Skip moved leftmost of this button cluster (2026-09-04,
                   // user request) — it's the heaviest-used action on this
                   // pre-analysis phase and Applied? sitting first was in the way.
@@ -691,23 +709,10 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                   ],
                   // Utility/secondary actions — deliberately last in the Wrap
                   // (2026-09-07), lower visual priority than the workflow
-                  // buttons above, same relative ordering as before (icons
-                  // used to be their own row, above the buttons — now
-                  // trailing in the same single Wrap instead).
+                  // buttons above. Open JD moved out of this cluster to
+                  // right after Star (see above) — Folder/Refresh/Refetch/
+                  // Activity stay here.
                   Container(width: 1, height: 24, color: cs.outlineVariant),
-                  if (widget.url.isNotEmpty)
-                    IconButton(
-                      icon: Icon(
-                        Icons.open_in_new,
-                        size: 18,
-                        color: cs.onSurfaceVariant,
-                      ),
-                      tooltip: 'Open JD',
-                      onPressed: () => launchUrl(
-                        Uri.parse(widget.url),
-                        mode: LaunchMode.externalApplication,
-                      ),
-                    ),
                   if (widget.vacancy?.folderPath != null)
                     IconButton(
                       icon: Icon(
@@ -2057,8 +2062,8 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
               OutlinedButton(
                 onPressed: _loadingDecline ? null : _decline,
                 style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: cs.outlineVariant),
-                  foregroundColor: cs.onSurfaceVariant,
+                  side: BorderSide(color: cs.error),
+                  foregroundColor: cs.error,
                 ),
                 child: _loadingDecline
                     ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
@@ -2182,6 +2187,23 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
                   splashRadius: 18,
                 ),
               ),
+              // Open JD — moved right after Star (2026-09-07, user request:
+              // "Звездочка, открыть ссылку на вакансию, вертикальный
+              // разделитель").
+              if (widget.url.isNotEmpty)
+                IconButton(
+                  icon: Icon(
+                    Icons.open_in_new,
+                    size: 18,
+                    color: cs.onSurfaceVariant,
+                  ),
+                  tooltip: 'Open JD',
+                  onPressed: () => launchUrl(
+                    Uri.parse(widget.url),
+                    mode: LaunchMode.externalApplication,
+                  ),
+                ),
+              Container(width: 1, height: 24, color: cs.outlineVariant),
               // Applied toggle
               Tooltip(
                 message: _applied ? 'Mark as not applied' : 'Mark as applied',
@@ -2210,20 +2232,6 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
                         ),
                       ),
               ),
-              // Open JD
-              if (widget.url.isNotEmpty)
-                IconButton(
-                  icon: Icon(
-                    Icons.open_in_new,
-                    size: 18,
-                    color: cs.onSurfaceVariant,
-                  ),
-                  tooltip: 'Open JD',
-                  onPressed: () => launchUrl(
-                    Uri.parse(widget.url),
-                    mode: LaunchMode.externalApplication,
-                  ),
-                ),
               // Open vacancy folder in Explorer
               if (widget.vacancy?.folderPath != null)
                 IconButton(
