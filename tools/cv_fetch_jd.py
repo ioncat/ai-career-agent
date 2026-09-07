@@ -222,8 +222,9 @@ async def fetch_jd(deps: AgentDeps, url: str) -> int:
     tags = merge_tags(existing["tags"] if existing else None, auto_tags)
     # Only fill in salary if nothing already set it (job-monitor's DOU-title
     # extraction, or a user's manual edit) — never clobber a real value with
-    # a sidebar re-read.
-    already_had_salary = bool(existing and existing["salary"])
+    # a sidebar re-read. A prior probe give-up note doesn't count as "already
+    # set" (_is_real_salary) — a fresh fetch is another chance to find one.
+    already_had_salary = bool(existing and _is_real_salary(existing["salary"]))
     salary = None if already_had_salary else _extract_salary(doc.markdown)
     if existing and existing["status"] in ("queued", "fetching"):
         await database.update_vacancy_fields(
@@ -303,6 +304,29 @@ async def _enrich_company_website(
         log.warning("fetch_jd: company_website enrichment failed for v#%d (non-fatal): %s", vacancy_id, exc)
 
 
+# A give-up note (below) is written into the same free-text `salary` column
+# as a real value or a successful estimate — no new schema needed — but it
+# must never be mistaken for one. "(probe:" is a marker no real salary or
+# the success format ("~$4000+ (Djinni filter estimate)") ever starts with;
+# _is_real_salary() is the single place that distinction is checked, so
+# every retry-eligibility check (fetch, republish, manual refetch) agrees
+# on what counts as "still effectively empty".
+_PROBE_NOTE_PREFIX = "(probe:"
+_REASON_NOTES = {
+    "not_found": f"{_PROBE_NOTE_PREFIX} listing not found in search — may be inactive)",
+    "too_many_matches": f"{_PROBE_NOTE_PREFIX} too many matching listings to narrow down)",
+    "request_failed": f"{_PROBE_NOTE_PREFIX} network error — will retry)",
+}
+
+
+def _is_real_salary(value: str | None) -> bool:
+    """True for an actual disclosed figure or a successful Djinni estimate —
+    False for empty or a probe give-up note (both retry-eligible: a future
+    fetch/republish/manual refetch should try the probe again, not treat a
+    note as if it were a real answer already on file)."""
+    return bool(value) and not value.startswith(_PROBE_NOTE_PREFIX)
+
+
 async def _estimate_djinni_salary(adapter: DjinniSalaryAdapter, vacancy_id: int, url: str) -> None:
     """Background enrichment: estimate a Djinni vacancy's real, possibly-
     undisclosed salary via its public search filter (2026-09-07, see
@@ -317,22 +341,35 @@ async def _estimate_djinni_salary(adapter: DjinniSalaryAdapter, vacancy_id: int,
     Slow by design — several deliberately-throttled requests inside the
     probe, can take up to about a minute — always fire-and-forget, never
     awaited inline with whatever triggered it. Re-checks the vacancy's
-    salary is STILL empty right before writing, since a manual edit or
-    another source could fill it in during that delay — never clobbers.
+    salary is STILL not a real value right before writing (see
+    _is_real_salary) — a manual edit or another source could fill in a real
+    number during that delay, or a previous probe attempt could have left
+    its own give-up note; neither should be clobbered by a stale-by-then
+    write, though a fresh note is allowed to replace an older one.
 
-    Fail-open: never raises. `None` (undeterminable, expired listing, or
-    jd-parser unreachable) is a normal, silent no-op, same as the adapter's
-    own contract.
+    When undetermined, writes a short explanatory note (_REASON_NOTES)
+    instead of leaving `salary` silently empty — found live 2026-09-07,
+    user feedback: a silent empty field gives no signal that anything was
+    even attempted, and no way to tell "genuinely nothing to find" apart
+    from "the search itself couldn't resolve it, try checking by hand".
+
+    Fail-open: never raises. An adapter-level failure (jd-parser
+    unreachable, malformed response — reason=None) is a silent no-op, same
+    as before; the probe's own classified outcomes (reason set) get a note.
     """
     try:
-        ceiling = await adapter.find_salary_ceiling(url)
-        if ceiling is None:
-            return
+        ceiling, reason = await adapter.find_salary_ceiling(url)
         current = await database.get_vacancy_by_id(vacancy_id)
-        if current is None or current["salary"]:
+        if current is None or _is_real_salary(current["salary"]):
             return
-        await database.set_vacancy_salary(vacancy_id, f"~${ceiling}+ (Djinni filter estimate)")
-        log.info("djinni salary estimate: v#%d -> ~$%d+", vacancy_id, ceiling)
+        if ceiling is not None:
+            await database.set_vacancy_salary(vacancy_id, f"~${ceiling}+ (Djinni filter estimate)")
+            log.info("djinni salary estimate: v#%d -> ~$%d+", vacancy_id, ceiling)
+        elif reason is not None:
+            note = _REASON_NOTES.get(reason)
+            if note:
+                await database.set_vacancy_salary(vacancy_id, note)
+                log.info("djinni salary estimate: v#%d -> %s", vacancy_id, note)
     except Exception as exc:
         log.warning("djinni salary estimate failed for v#%d (non-fatal): %s", vacancy_id, exc)
 

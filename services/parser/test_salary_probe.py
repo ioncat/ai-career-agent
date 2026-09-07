@@ -40,30 +40,39 @@ def test_ceiling_found_at_exact_threshold(monkeypatch):
         return _resp(_cards([]))
 
     monkeypatch.setattr(salary_probe, "fetch", fake_fetch)
-    assert salary_probe.find_salary_ceiling(TARGET_URL, "GLIG — Product Development Manager") == threshold
+    assert salary_probe.find_salary_ceiling(TARGET_URL, "GLIG — Product Development Manager") == (threshold, None)
 
 
 def test_undeterminable_when_absent_at_baseline(monkeypatch):
     """Expired listing / title mismatch — never present, even at salary=0."""
     monkeypatch.setattr(salary_probe, "fetch", lambda url: _resp(_cards([])))
-    assert salary_probe.find_salary_ceiling(TARGET_URL, "Some Title") is None
+    assert salary_probe.find_salary_ceiling(TARGET_URL, "Some Title") == (None, salary_probe.REASON_NOT_FOUND)
 
 
 def test_undeterminable_when_network_fails_at_baseline(monkeypatch):
     monkeypatch.setattr(salary_probe, "fetch", lambda url: None)
-    assert salary_probe.find_salary_ceiling(TARGET_URL, "Some Title") is None
+    assert salary_probe.find_salary_ceiling(TARGET_URL, "Some Title") == (None, salary_probe.REASON_REQUEST_FAILED)
 
 
-def test_generic_title_exceeding_page_cap_returns_none(monkeypatch):
-    """Every page full of OTHER vacancies, target never appears, cap never
-    exhausted (no empty page) — too generic to track, must not guess."""
+def test_too_many_matches_when_never_narrows_down(monkeypatch):
+    """The target genuinely exists (present at baseline, mixed among many
+    other postings) but no page within the cap ever comes back empty to
+    confirm absence at a higher salary — too generic to pin an exact
+    threshold, distinct from "never existed at all"."""
     other_ids = [str(1000 + i) for i in range(15)]
 
     def fake_fetch(url: str):
-        return _resp(_cards(other_ids))
+        salary = int(url.split("salary=")[1].split("&")[0])
+        page = int(url.split("page=")[1])
+        if page > 1:
+            return _resp(_cards(other_ids))  # never empty past page 1 -> hits the page cap
+        ids = list(other_ids)
+        if salary == 0:
+            ids.append(TARGET_ID)
+        return _resp(_cards(ids))
 
     monkeypatch.setattr(salary_probe, "fetch", fake_fetch)
-    assert salary_probe.find_salary_ceiling(TARGET_URL, "Product Manager") is None
+    assert salary_probe.find_salary_ceiling(TARGET_URL, "Product Manager") == (None, salary_probe.REASON_TOO_MANY_MATCHES)
 
 
 def test_network_failure_during_exponential_phase_returns_none_not_partial(monkeypatch):
@@ -85,7 +94,9 @@ def test_network_failure_during_exponential_phase_returns_none_not_partial(monke
         return _resp(_cards([TARGET_ID] if salary <= threshold else []))
 
     monkeypatch.setattr(salary_probe, "fetch", fake_fetch)
-    assert salary_probe.find_salary_ceiling(TARGET_URL, "Product Manager (web)") is None
+    ceiling, reason = salary_probe.find_salary_ceiling(TARGET_URL, "Product Manager (web)")
+    assert ceiling is None
+    assert reason == salary_probe.REASON_REQUEST_FAILED
 
 
 def test_network_failure_during_binary_search_phase_returns_none_not_partial(monkeypatch):
@@ -105,7 +116,9 @@ def test_network_failure_during_binary_search_phase_returns_none_not_partial(mon
         return _resp(_cards([TARGET_ID] if salary <= threshold else []))
 
     monkeypatch.setattr(salary_probe, "fetch", fake_fetch)
-    assert salary_probe.find_salary_ceiling(TARGET_URL, "Product Manager (web)") is None
+    ceiling, reason = salary_probe.find_salary_ceiling(TARGET_URL, "Product Manager (web)")
+    assert ceiling is None
+    assert reason == salary_probe.REASON_REQUEST_FAILED
 
 
 def test_company_page_used_first_when_available(monkeypatch):
@@ -126,8 +139,7 @@ def test_company_page_used_first_when_available(monkeypatch):
         return _resp(_cards([TARGET_ID] if salary <= threshold else []))
 
     monkeypatch.setattr(salary_probe, "fetch", fake_fetch)
-    result = salary_probe.find_salary_ceiling(TARGET_URL, "Product Manager", company_url)
-    assert result == threshold
+    assert salary_probe.find_salary_ceiling(TARGET_URL, "Product Manager", company_url) == (threshold, None)
 
 
 def test_company_page_never_requests_a_second_page(monkeypatch):
@@ -154,8 +166,7 @@ def test_company_page_never_requests_a_second_page(monkeypatch):
         return _resp(_cards(ids))
 
     monkeypatch.setattr(salary_probe, "fetch", fake_fetch)
-    result = salary_probe.find_salary_ceiling(TARGET_URL, "Senior Product Manager", company_url)
-    assert result == threshold
+    assert salary_probe.find_salary_ceiling(TARGET_URL, "Senior Product Manager", company_url) == (threshold, None)
 
 
 def test_falls_back_to_title_only_when_company_page_inconclusive(monkeypatch):
@@ -176,14 +187,13 @@ def test_falls_back_to_title_only_when_company_page_inconclusive(monkeypatch):
         return _resp(_cards([TARGET_ID] if salary <= threshold else []))
 
     monkeypatch.setattr(salary_probe, "fetch", fake_fetch)
-    result = salary_probe.find_salary_ceiling(TARGET_URL, "GLIG — Product Development Manager", company_url)
-    assert result == threshold
+    assert salary_probe.find_salary_ceiling(TARGET_URL, "GLIG — Product Development Manager", company_url) == (threshold, None)
 
 
 def test_invalid_url_returns_none_without_any_fetch(monkeypatch):
     calls = []
     monkeypatch.setattr(salary_probe, "fetch", lambda url: calls.append(url) or _resp(_cards([TARGET_ID])))
-    assert salary_probe.find_salary_ceiling("https://djinni.co/not-a-job-url", "Title") is None
+    assert salary_probe.find_salary_ceiling("https://djinni.co/not-a-job-url", "Title") == (None, salary_probe.REASON_NOT_FOUND)
     assert calls == []
 
 
@@ -202,8 +212,60 @@ def test_high_ceiling_uses_exponential_search_before_binary_search(monkeypatch):
         return _resp(_cards([TARGET_ID] if salary <= threshold else []))
 
     monkeypatch.setattr(salary_probe, "fetch", fake_fetch)
-    result = salary_probe.find_salary_ceiling(TARGET_URL, "Some Rare Title")
-    assert result == threshold
+    assert salary_probe.find_salary_ceiling(TARGET_URL, "Some Rare Title") == (threshold, None)
     # Sanity bound on request volume — must stay far below a linear $500-step
     # walk to MAX_SALARY (40 requests), proving the exponential phase ran.
     assert calls["count"] < 15
+
+
+# ── Shared per-vacancy request budget (2026-09-07) ──────────────────────────
+# User feedback: a vacancy that's genuinely present but never narrows down
+# (a large employer, or a title landing in the ambiguous zone under both
+# strategies) could otherwise grind through dozens of throttled requests
+# with no upper bound on time spent — every present() check across BOTH
+# strategies must draw from one shared counter for a single vacancy.
+
+def test_budget_exhausted_mid_search_returns_too_many_matches(monkeypatch):
+    """A company page that resolves fine, followed by a title-only fallback
+    that would otherwise run forever — the shared budget must cut it off
+    with a reason, not hang. (Company page fails outright here so the
+    fallback actually runs.)"""
+    calls = {"count": 0}
+
+    def fake_fetch(url: str):
+        calls["count"] += 1
+        page = int(url.split("page=")[1])
+        if "company-" in url:
+            return _resp(_cards([]))  # baseline absent — falls back immediately
+        # title-only: always present, page 1 never empty, target never found
+        # past the cap — would need unbounded pages/salary steps without a budget.
+        return _resp(_cards([str(2000 + page)] * 15))
+
+    monkeypatch.setattr(salary_probe, "fetch", fake_fetch)
+    result = salary_probe.find_salary_ceiling(TARGET_URL, "Product Manager", "https://djinni.co/jobs/company-big-corp")
+    assert result == (None, salary_probe.REASON_TOO_MANY_MATCHES)
+    assert calls["count"] <= salary_probe.MAX_TOTAL_REQUESTS + 1  # +1 for the failed company-page baseline
+
+
+def test_budget_is_shared_across_both_strategies_not_doubled(monkeypatch):
+    """The budget must be ONE pool for the whole vacancy, not a fresh
+    allowance per strategy — otherwise a company-page attempt that burns
+    through the whole budget would still let title-only spend a full
+    budget of its own on top, defeating the point of capping total effort.
+    Company page here always reports the target present (an exponential
+    search that never terminates on its own) to force it to consume the
+    entire small budget; if title-only then got its own fresh allowance
+    instead of an already-empty shared one, it would make at least one more
+    real request."""
+    small_budget = 5
+    monkeypatch.setattr(salary_probe, "MAX_TOTAL_REQUESTS", small_budget)
+    calls = {"count": 0}
+
+    def fake_fetch(url: str):
+        calls["count"] += 1
+        return _resp(_cards([TARGET_ID]))  # always present, exponential search never stops on its own
+
+    monkeypatch.setattr(salary_probe, "fetch", fake_fetch)
+    result = salary_probe.find_salary_ceiling(TARGET_URL, "Product Manager", "https://djinni.co/jobs/company-big-corp")
+    assert result == (None, salary_probe.REASON_TOO_MANY_MATCHES)
+    assert calls["count"] == small_budget

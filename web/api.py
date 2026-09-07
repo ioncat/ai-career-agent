@@ -806,7 +806,7 @@ async def _do_refetch_vacancy_from_source(vacancy_id: int, url: str) -> dict:
             encoding="utf-8",
         )
 
-        from tools.cv_fetch_jd import _estimate_djinni_salary, _extract_salary
+        from tools.cv_fetch_jd import _estimate_djinni_salary, _extract_salary, _is_real_salary
 
         auto_tags = classify_tags(doc.markdown)
         new_tags = merge_tags(vacancy["tags"], auto_tags)
@@ -829,7 +829,11 @@ async def _do_refetch_vacancy_from_source(vacancy_id: int, url: str) -> dict:
             # republish's fresh re-fetch was ever going to get another shot
             # at it, and this function didn't touch company until now.
             fields["company"] = doc.company
-        salary_still_missing = not vacancy["salary"]
+        # A prior probe give-up note doesn't count as "already set"
+        # (_is_real_salary) — this refetch is itself the retry the user
+        # asked for, so it must try the probe again, not treat its own
+        # earlier note as a real answer already on file.
+        salary_still_missing = not _is_real_salary(vacancy["salary"])
         if salary_still_missing:
             salary = _extract_salary(doc.markdown)
             if salary:

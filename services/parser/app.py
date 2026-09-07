@@ -17,6 +17,7 @@ from bs4 import BeautifulSoup
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
+import salary_probe
 from config import SITES
 from crawler import fetch
 from salary_probe import find_salary_ceiling
@@ -265,27 +266,29 @@ def djinni_salary_ceiling(req: DjinniSalaryCeilingRequest) -> dict:
     there. Falls back to a title-only search when that link isn't present
     (e.g. some recruiting-agency postings).
 
-    Returns {"ceiling": int | None}. None means undetermined — expired
-    listing, non-Djinni URL, or both identification strategies too broad to
-    resolve reliably — never a guess. Slow by design (multiple polite,
-    rate-limited requests inside salary_probe's exponential+binary search) —
-    call off the critical path.
+    Returns {"ceiling": int | None, "reason": str | None}. reason is always
+    None when ceiling is found; otherwise one of salary_probe.REASON_* —
+    lets the caller leave a short explanatory note instead of silence.
+    Never a guess. Slow by design (multiple polite, rate-limited requests
+    inside salary_probe's exponential+binary search) — call off the
+    critical path.
     """
     resp = fetch(req.url)
     if resp is None:
-        return {"ceiling": None}
+        return {"ceiling": None, "reason": salary_probe.REASON_REQUEST_FAILED}
 
     m = re.search(r"/jobs/(\d+)-", req.url)
     if not m:
-        return {"ceiling": None}
+        return {"ceiling": None, "reason": salary_probe.REASON_NOT_FOUND}
 
     soup = BeautifulSoup(resp.text, "lxml")
     h1 = soup.find("h1")
     title = h1.get_text(strip=True) if h1 else None
     if not title:
-        return {"ceiling": None}
+        return {"ceiling": None, "reason": salary_probe.REASON_NOT_FOUND}
 
     site_key = _match_site_key(req.url)
     company_profile_url = _extract_company_profile_url(req.url, soup, site_key)
 
-    return {"ceiling": find_salary_ceiling(req.url, title, company_profile_url)}
+    ceiling, reason = find_salary_ceiling(req.url, title, company_profile_url)
+    return {"ceiling": ceiling, "reason": reason}
