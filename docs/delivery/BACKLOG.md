@@ -13,10 +13,6 @@
 
 ## 📌 Now
 
-### 🔴 P0 — Vacancy detail header unification: implemented, needs visual verification (2026-09-07)
-**What:** `_JdModeView`'s icon-`Row`+button-`Wrap` merged into one `Wrap` (removes the root cause of 4 repeated alignment breaks); Star added pre-analysis; shared `_VacancyIdLine`/`_VacancyCompactTitle` widgets keep id+title always visible in both states. Full detail: [vacancy-detail-header-unification-2026-09-06.md](../discovery/vacancy-detail-header-unification-2026-09-06.md), [CHANGELOG.md → 2026-09-07](CHANGELOG.md).
-**Remaining:** visual review across every state — Inbox-fresh, Inbox-declined-restore-mode, Analyzed (all 4 tabs), declined-with-analysis, analysis_failed-with-prior-data. `dart analyze`/`flutter test` are clean but not proof the on-screen layout looks right; this session cannot verify Flutter desktop visually.
-
 ### 🟠 P1 — Wire Djinni hidden-salary estimate into the live fetch pipeline + Flutter badge (backend delivered 2026-09-05, this is the follow-up)
 **What:** `services/parser/salary_probe.py` + `POST /djinni-salary-ceiling` (jd-parser) + `adapters/djinni_salary_adapter.py` can now estimate a Djinni vacancy's real, possibly-undisclosed salary via Djinni's own public `salary=N` search filter — user's own manual technique (raise the filter until the vacancy drops out; the last value it's still visible at is the real number, confirmed $500 granularity) turned into an exponential+binary search. Currently only reachable via `scripts/backfill_djinni_salary_estimate.py`, a one-off script. Full design/why: [CHANGELOG.md → 2026-09-05](CHANGELOG.md).
 **Remaining:**
