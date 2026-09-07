@@ -637,9 +637,10 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                           ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
                           : const Text('Skip'),
                     ),
-                  // Thin separator marking Skip (destructive) as set apart
-                  // from the rest of the cluster (2026-09-05, user request).
-                  Container(width: 1, height: 24, color: cs.outlineVariant),
+                  // Divider after Skip removed (2026-09-07, user request) —
+                  // the new divider after Star+Open JD already marks the
+                  // "identity/global" cluster apart from the workflow
+                  // buttons; a second one here was redundant.
                   // Applied toggle — same affordance the tabbed post-analysis
                   // view has always had, now also reachable pre-analysis
                   // (2026-09-02): applying happens outside this pipeline
@@ -2203,7 +2204,16 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
                     mode: LaunchMode.externalApplication,
                   ),
                 ),
-              Container(width: 1, height: 24, color: cs.outlineVariant),
+              // Row (unlike the Wrap in _JdModeView) has no automatic gap
+              // between children — explicit horizontal margin here so the
+              // divider doesn't sit flush against Applied (2026-09-07, user
+              // feedback: "разделитель слишком близко к кнопке Applied").
+              Container(
+                width: 1,
+                height: 24,
+                margin: const EdgeInsets.symmetric(horizontal: 8),
+                color: cs.outlineVariant,
+              ),
               // Applied toggle
               Tooltip(
                 message: _applied ? 'Mark as not applied' : 'Mark as applied',
