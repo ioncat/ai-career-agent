@@ -55,6 +55,7 @@ services/job-monitor/monitor.lock
 *.bak
 *.bak.*
 *.bak-*
+*.bak_*
 db/backups/
 
 # Internal dev guidelines and discovery docs (not for public repos)
