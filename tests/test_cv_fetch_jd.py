@@ -16,6 +16,7 @@ from tools.cv_fetch_jd import (
     FetchError,
     _detect_site,
     _enrich_company_website,
+    _estimate_djinni_salary,
     _extract_salary_from_labeled_text,
     _extract_salary_from_sidebar,
     _safe_folder_name,
@@ -27,21 +28,29 @@ from tools.cv_fetch_jd import (
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _make_deps(tmp_path: Path, parser_adapter=None, user_id: int = 1) -> MagicMock:
-    """Build a mock AgentDeps."""
+def _make_deps(tmp_path: Path, parser_adapter=None, user_id: int = 1, djinni_salary_adapter=None) -> MagicMock:
+    """Build a mock AgentDeps.
+
+    djinni_salary_adapter defaults to None (not auto-created by MagicMock) —
+    a bare MagicMock() attribute would be truthy and its find_salary_ceiling()
+    wouldn't be awaitable, firing a broken background task in every existing
+    fetch_jd test that doesn't care about this feature. Tests exercising the
+    estimate task pass an explicit AsyncMock.
+    """
     if parser_adapter is None:
         parser_adapter = AsyncMock()
     deps = MagicMock()
     deps.parser_adapter = parser_adapter
     deps.vacancies_path = tmp_path / "vacancies"
     deps.user_id = user_id
+    deps.djinni_salary_adapter = djinni_salary_adapter
     return deps
 
 
-def _make_ctx(tmp_path: Path, parser_adapter=None, user_id: int = 1) -> MagicMock:
+def _make_ctx(tmp_path: Path, parser_adapter=None, user_id: int = 1, djinni_salary_adapter=None) -> MagicMock:
     """Build a mock RunContext[AgentDeps]."""
     ctx = MagicMock()
-    ctx.deps = _make_deps(tmp_path, parser_adapter, user_id)
+    ctx.deps = _make_deps(tmp_path, parser_adapter, user_id, djinni_salary_adapter)
     return ctx
 
 
@@ -902,6 +911,170 @@ async def test_fetch_jd_no_task_when_company_missing(tmp_path):
         await fetch_jd(deps, "https://djinni.co/jobs/123/")
 
     mock_create_task.assert_not_called()
+
+
+# ── Djinni salary estimate — fire-and-forget scheduling (2026-09-07) ────────
+
+@pytest.mark.asyncio
+async def test_fetch_jd_schedules_djinni_salary_task_when_undisclosed(tmp_path):
+    """Djinni vacancy, no salary anywhere (sidebar, labeled text, existing) —
+    schedules the estimate task."""
+    doc = _make_doc(markdown="## Job\nNo salary mentioned anywhere.")
+    parser = AsyncMock()
+    parser.fetch_markdown = AsyncMock(return_value=doc)
+    deps = _make_deps(tmp_path, parser, djinni_salary_adapter=AsyncMock())
+
+    with patch("tools.cv_fetch_jd.database") as mock_db, \
+         patch("tools.cv_fetch_jd.asyncio.create_task") as mock_create_task:
+        mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
+        mock_db.insert_vacancy = AsyncMock(return_value=400)
+        mock_db.update_vacancy_fields = AsyncMock()
+        _mock_dedup(mock_db)
+
+        await fetch_jd(deps, "https://djinni.co/jobs/123/")
+
+    assert mock_create_task.called
+    scheduled_coro = mock_create_task.call_args.args[0]
+    scheduled_coro.close()
+
+
+@pytest.mark.asyncio
+async def test_fetch_jd_no_djinni_salary_task_when_adapter_unset(tmp_path):
+    """deps.djinni_salary_adapter defaults to None (workers/scripts that
+    don't need this) — must not schedule anything, not crash on a missing
+    attribute."""
+    doc = _make_doc(markdown="## Job\nNo salary mentioned anywhere.")
+    parser = AsyncMock()
+    parser.fetch_markdown = AsyncMock(return_value=doc)
+    deps = _make_deps(tmp_path, parser)  # djinni_salary_adapter=None
+
+    with patch("tools.cv_fetch_jd.database") as mock_db, \
+         patch("tools.cv_fetch_jd.asyncio.create_task") as mock_create_task:
+        mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
+        mock_db.insert_vacancy = AsyncMock(return_value=401)
+        mock_db.update_vacancy_fields = AsyncMock()
+        _mock_dedup(mock_db)
+
+        await fetch_jd(deps, "https://djinni.co/jobs/123/")
+
+    mock_create_task.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_fetch_jd_no_djinni_salary_task_when_salary_extracted(tmp_path):
+    """A real disclosed number was found (sidebar/labeled text) — no need to
+    guess at a hidden one."""
+    doc = _make_doc(markdown="## Vacancy Requirements\n\n**$2000-3000**\n")
+    parser = AsyncMock()
+    parser.fetch_markdown = AsyncMock(return_value=doc)
+    deps = _make_deps(tmp_path, parser, djinni_salary_adapter=AsyncMock())
+
+    with patch("tools.cv_fetch_jd.database") as mock_db, \
+         patch("tools.cv_fetch_jd.asyncio.create_task") as mock_create_task:
+        mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
+        mock_db.insert_vacancy = AsyncMock(return_value=402)
+        mock_db.update_vacancy_fields = AsyncMock()
+        _mock_dedup(mock_db)
+
+        await fetch_jd(deps, "https://djinni.co/jobs/123/")
+
+    mock_create_task.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_fetch_jd_no_djinni_salary_task_for_non_djinni_site(tmp_path):
+    """DOU/LinkedIn — Djinni's search filter doesn't apply, never schedule."""
+    doc = _make_doc(markdown="## Job\nNo salary mentioned anywhere.")
+    parser = AsyncMock()
+    parser.fetch_markdown = AsyncMock(return_value=doc)
+    deps = _make_deps(tmp_path, parser, djinni_salary_adapter=AsyncMock())
+
+    with patch("tools.cv_fetch_jd.database") as mock_db, \
+         patch("tools.cv_fetch_jd.asyncio.create_task") as mock_create_task:
+        mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
+        mock_db.insert_vacancy = AsyncMock(return_value=403)
+        mock_db.update_vacancy_fields = AsyncMock()
+        _mock_dedup(mock_db)
+
+        await fetch_jd(deps, "https://jobs.dou.ua/vacancies/123/")
+
+    mock_create_task.assert_not_called()
+
+
+# ── _estimate_djinni_salary (2026-09-07) ────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_estimate_djinni_salary_writes_when_determined():
+    adapter = AsyncMock()
+    adapter.find_salary_ceiling = AsyncMock(return_value=4000)
+
+    with patch("tools.cv_fetch_jd.database") as mock_db:
+        mock_db.get_vacancy_by_id = AsyncMock(return_value={"salary": None})
+        mock_db.set_vacancy_salary = AsyncMock()
+
+        await _estimate_djinni_salary(adapter, 42, "https://djinni.co/jobs/123-x")
+
+    mock_db.set_vacancy_salary.assert_awaited_once_with(42, "~$4000+ (Djinni filter estimate)")
+
+
+@pytest.mark.asyncio
+async def test_estimate_djinni_salary_undetermined_does_not_write():
+    adapter = AsyncMock()
+    adapter.find_salary_ceiling = AsyncMock(return_value=None)
+
+    with patch("tools.cv_fetch_jd.database") as mock_db:
+        mock_db.get_vacancy_by_id = AsyncMock()
+        mock_db.set_vacancy_salary = AsyncMock()
+
+        await _estimate_djinni_salary(adapter, 42, "https://djinni.co/jobs/123-x")
+
+    mock_db.get_vacancy_by_id.assert_not_called()
+    mock_db.set_vacancy_salary.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_estimate_djinni_salary_does_not_clobber_value_set_meanwhile():
+    """The probe can take up to a minute — a manual edit or another source
+    could fill salary in during that delay. Never overwrite it."""
+    adapter = AsyncMock()
+    adapter.find_salary_ceiling = AsyncMock(return_value=4000)
+
+    with patch("tools.cv_fetch_jd.database") as mock_db:
+        mock_db.get_vacancy_by_id = AsyncMock(return_value={"salary": "$5000 (manually entered)"})
+        mock_db.set_vacancy_salary = AsyncMock()
+
+        await _estimate_djinni_salary(adapter, 42, "https://djinni.co/jobs/123-x")
+
+    mock_db.set_vacancy_salary.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_estimate_djinni_salary_vacancy_deleted_meanwhile_does_not_write():
+    adapter = AsyncMock()
+    adapter.find_salary_ceiling = AsyncMock(return_value=4000)
+
+    with patch("tools.cv_fetch_jd.database") as mock_db:
+        mock_db.get_vacancy_by_id = AsyncMock(return_value=None)
+        mock_db.set_vacancy_salary = AsyncMock()
+
+        await _estimate_djinni_salary(adapter, 42, "https://djinni.co/jobs/123-x")
+
+    mock_db.set_vacancy_salary.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_estimate_djinni_salary_fails_open_on_error():
+    """A jd-parser/network error here must never propagate — this is a
+    nice-to-have background enrichment, not a pipeline dependency."""
+    adapter = AsyncMock()
+    adapter.find_salary_ceiling = AsyncMock(side_effect=RuntimeError("boom"))
+
+    with patch("tools.cv_fetch_jd.database") as mock_db:
+        mock_db.set_vacancy_salary = AsyncMock()
+
+        await _estimate_djinni_salary(adapter, 42, "https://djinni.co/jobs/123-x")  # must not raise
+
+    mock_db.set_vacancy_salary.assert_not_called()
 
 
 # ── _enrich_company_website (2026-08-12) ────────────────────────────────────

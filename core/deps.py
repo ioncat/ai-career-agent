@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from adapters.cv_adapter import CVAdapter
+from adapters.djinni_salary_adapter import DjinniSalaryAdapter
 from adapters.parser_adapter import ParserAdapter
 from contracts.profile import CandidateProfile
 from core.llm_client import ClaudeCodeProvider, ClaudeProvider, OllamaProvider
@@ -49,6 +50,11 @@ class AgentDeps:
         profile:        Structured candidate profile parsed from PROFILE.md.
                         Provides domain_interests + company_stage_prefs for Phase 1 injection.
                         None if PROFILE.md is absent (pipeline runs with degraded personalisation).
+        djinni_salary_adapter: Async client for jd-parser's Djinni hidden-salary
+                        estimator (2026-09-07). Optional/defaulted so existing
+                        AgentDeps(...) call sites that don't fetch JDs (workers,
+                        scripts) don't need to pass it — tools/cv_fetch_jd.py
+                        skips the estimate fire-and-forget entirely when unset.
     """
     parser_adapter: ParserAdapter
     get_llm: Callable[[str], Awaitable[ClaudeProvider | OllamaProvider | ClaudeCodeProvider]]
@@ -59,3 +65,4 @@ class AgentDeps:
     candidate_name_uk: str = "Олексій Бондаренко"
     skill_type: str = "pm"
     profile: CandidateProfile | None = None
+    djinni_salary_adapter: DjinniSalaryAdapter | None = None

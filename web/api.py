@@ -31,6 +31,7 @@ try:
 except ImportError:
     pass
 
+from adapters.djinni_salary_adapter import DjinniSalaryAdapter
 from adapters.parser_adapter import ParserAdapter, ParserError
 from contracts.pipeline import AnalysisJson
 from core import config_store
@@ -805,7 +806,7 @@ async def _do_refetch_vacancy_from_source(vacancy_id: int, url: str) -> dict:
             encoding="utf-8",
         )
 
-        from tools.cv_fetch_jd import _extract_salary
+        from tools.cv_fetch_jd import _estimate_djinni_salary, _extract_salary
 
         auto_tags = classify_tags(doc.markdown)
         new_tags = merge_tags(vacancy["tags"], auto_tags)
@@ -828,12 +829,25 @@ async def _do_refetch_vacancy_from_source(vacancy_id: int, url: str) -> dict:
             # republish's fresh re-fetch was ever going to get another shot
             # at it, and this function didn't touch company until now.
             fields["company"] = doc.company
-        if not vacancy["salary"]:
+        salary_still_missing = not vacancy["salary"]
+        if salary_still_missing:
             salary = _extract_salary(doc.markdown)
             if salary:
                 fields["salary"] = salary
+                salary_still_missing = False
         if fields:
             await database.update_vacancy_fields(vacancy_id, **fields)
+
+        # Djinni salary estimate — fire-and-forget, off the critical path
+        # (2026-09-07). Same gap RSSWatcher's fetch_jd() closes for brand-new
+        # vacancies, but a republish/manual refetch never goes through
+        # fetch_jd() at all — found live, vacancy #902: republished today,
+        # re-extraction above correctly found no disclosed number in the
+        # text, and nothing else was ever going to try the estimate.
+        if vacancy["site"] == "djinni" and salary_still_missing:
+            asyncio.create_task(
+                _estimate_djinni_salary(DjinniSalaryAdapter(base_url=parser_url), vacancy_id, url)
+            )
 
         result = {"ok": True, "error": None, "changed_fields": sorted(fields), "blocked": False, "blocked_reasons": []}
 

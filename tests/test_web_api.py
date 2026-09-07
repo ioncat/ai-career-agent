@@ -575,9 +575,12 @@ async def test_refresh_republished_vacancy_catches_blocker_missing_from_stale_fi
         source_url=url,
         company="Phoenixgame",
     )
-    with patch("web.api.ParserAdapter") as mock_adapter_cls:
+    with patch("web.api.ParserAdapter") as mock_adapter_cls, \
+         patch("web.api.asyncio.create_task") as mock_create_task:
         mock_adapter_cls.return_value.fetch_markdown = AsyncMock(return_value=fresh_doc)
         await _refresh_republished_vacancy(vid, url)
+    if mock_create_task.called:
+        mock_create_task.call_args.args[0].close()
 
     row = await database.get_vacancy_by_id(vid)
     assert row["blocker_flag"] == 1
@@ -616,9 +619,12 @@ async def test_refresh_republished_vacancy_corrects_garbled_company(tmp_path):
         source_url=url,
         company="Traffic Corsar",
     )
-    with patch("web.api.ParserAdapter") as mock_adapter_cls:
+    with patch("web.api.ParserAdapter") as mock_adapter_cls, \
+         patch("web.api.asyncio.create_task") as mock_create_task:
         mock_adapter_cls.return_value.fetch_markdown = AsyncMock(return_value=fresh_doc)
         await _refresh_republished_vacancy(vid, url)
+    if mock_create_task.called:
+        mock_create_task.call_args.args[0].close()
 
     row = await database.get_vacancy_by_id(vid)
     assert row["company"] == "Traffic Corsar"
@@ -715,7 +721,8 @@ async def test_refetch_endpoint_success_returns_changed_fields(client, tmp_path)
         source_url=url,
         company="Real Company",
     )
-    with patch("web.api.ParserAdapter") as mock_adapter_cls:
+    with patch("web.api.ParserAdapter") as mock_adapter_cls, \
+         patch("web.api.asyncio.create_task") as mock_create_task:
         mock_adapter_cls.return_value.fetch_markdown = AsyncMock(return_value=fresh_doc)
         resp = client.post(f"/api/vacancies/{vid}/refetch")
 
@@ -725,6 +732,11 @@ async def test_refetch_endpoint_success_returns_changed_fields(client, tmp_path)
     assert data["error"] is None
     assert "title" in data["changed_fields"]
     assert "company" in data["changed_fields"]
+    # No salary anywhere (fresh_doc has none either) — schedules the Djinni
+    # salary-estimate background task (2026-09-07); mocked here so the test
+    # doesn't make a real network call, see dedicated scheduling tests below.
+    assert mock_create_task.called
+    mock_create_task.call_args.args[0].close()
     assert jd_path.read_text(encoding="utf-8") == "# Senior Product Manager\n\nSource: " + url + "\n\n---\n\nReal, moderated JD content."
 
     row = await database.get_vacancy_by_id(vid)
@@ -748,7 +760,8 @@ async def test_refetch_endpoint_reports_new_blocker(client, tmp_path):
         source_url=url,
         company="BetCo",
     )
-    with patch("web.api.ParserAdapter") as mock_adapter_cls:
+    with patch("web.api.ParserAdapter") as mock_adapter_cls, \
+         patch("web.api.asyncio.create_task") as mock_create_task:
         mock_adapter_cls.return_value.fetch_markdown = AsyncMock(return_value=fresh_doc)
         resp = client.post(f"/api/vacancies/{vid}/refetch")
 
@@ -757,6 +770,8 @@ async def test_refetch_endpoint_reports_new_blocker(client, tmp_path):
     assert data["ok"] is True
     assert data["blocked"] is True
     assert any("igaming" in r for r in data["blocked_reasons"])
+    if mock_create_task.called:
+        mock_create_task.call_args.args[0].close()
 
 
 @pytest.mark.asyncio
@@ -785,6 +800,99 @@ async def test_refetch_endpoint_parser_failure_returns_ok_false(client, tmp_path
     data = resp.json()
     assert data["ok"] is False
     assert "Parser error" in data["error"]
+
+
+# ── refetch/republish → Djinni salary-estimate scheduling (2026-09-07) ─────
+# Found live, vacancy #902: republished, re-extraction correctly found no
+# disclosed number in the text, and nothing was ever going to try the
+# public-search-filter estimate — it simply wasn't wired into this path yet.
+
+@pytest.mark.asyncio
+async def test_refetch_schedules_djinni_salary_task_when_undisclosed(tmp_path):
+    from web.api import _do_refetch_vacancy_from_source
+
+    uid = await database.insert_user(name="RefetchSalaryUser", telegram_chat_id=5023, skill_type="pm")
+    url = "https://djinni.co/jobs/902000-web-to-web-product-manager"
+    jd_path = tmp_path / "JD.md"
+    jd_path.write_text("# Web-to-Web Product Manager\n\nNo salary here.", encoding="utf-8")
+    vid = await database.insert_vacancy(url=url, title="Web-to-Web Product Manager", user_id=uid, published_at="2026-09-01T10:00:00")
+    await database.update_vacancy_fields(vid, markdown_path=str(jd_path))
+
+    fresh_doc = ParsedDocument(
+        title="Web-to-Web Product Manager", markdown="Part-time, hourly pay, no figure disclosed.", source_url=url,
+    )
+    with patch("web.api.ParserAdapter") as mock_adapter_cls, \
+         patch("web.api.asyncio.create_task") as mock_create_task:
+        mock_adapter_cls.return_value.fetch_markdown = AsyncMock(return_value=fresh_doc)
+        result = await _do_refetch_vacancy_from_source(vid, url)
+
+    assert result["ok"] is True
+    assert mock_create_task.called
+    mock_create_task.call_args.args[0].close()
+
+
+@pytest.mark.asyncio
+async def test_refetch_no_djinni_salary_task_when_salary_extracted(tmp_path):
+    from web.api import _do_refetch_vacancy_from_source
+
+    uid = await database.insert_user(name="RefetchSalaryUser2", telegram_chat_id=5024, skill_type="pm")
+    url = "https://djinni.co/jobs/902001-product-manager"
+    jd_path = tmp_path / "JD.md"
+    jd_path.write_text("# Product Manager\n\nNo structured fields here.", encoding="utf-8")
+    vid = await database.insert_vacancy(url=url, title="Product Manager", user_id=uid, published_at="2026-09-01T10:00:00")
+    await database.update_vacancy_fields(vid, markdown_path=str(jd_path))
+
+    fresh_doc = ParsedDocument(
+        title="Product Manager",
+        markdown="## Vacancy Requirements\n\n  * **$2000-3000**\n",
+        source_url=url,
+    )
+    with patch("web.api.ParserAdapter") as mock_adapter_cls, \
+         patch("web.api.asyncio.create_task") as mock_create_task:
+        mock_adapter_cls.return_value.fetch_markdown = AsyncMock(return_value=fresh_doc)
+        await _do_refetch_vacancy_from_source(vid, url)
+
+    mock_create_task.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_refetch_no_djinni_salary_task_when_already_had_one(tmp_path):
+    from web.api import _do_refetch_vacancy_from_source
+
+    uid = await database.insert_user(name="RefetchSalaryUser3", telegram_chat_id=5025, skill_type="pm")
+    url = "https://djinni.co/jobs/902002-product-manager"
+    jd_path = tmp_path / "JD.md"
+    jd_path.write_text("# Product Manager\n\nNo structured fields here.", encoding="utf-8")
+    vid = await database.insert_vacancy(url=url, title="Product Manager", user_id=uid, published_at="2026-09-01T10:00:00")
+    await database.update_vacancy_fields(vid, markdown_path=str(jd_path), salary="$5000 (manually entered)")
+
+    fresh_doc = ParsedDocument(title="Product Manager", markdown="Still no figure in the body.", source_url=url)
+    with patch("web.api.ParserAdapter") as mock_adapter_cls, \
+         patch("web.api.asyncio.create_task") as mock_create_task:
+        mock_adapter_cls.return_value.fetch_markdown = AsyncMock(return_value=fresh_doc)
+        await _do_refetch_vacancy_from_source(vid, url)
+
+    mock_create_task.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_refetch_no_djinni_salary_task_for_non_djinni_site(tmp_path):
+    from web.api import _do_refetch_vacancy_from_source
+
+    uid = await database.insert_user(name="RefetchSalaryUser4", telegram_chat_id=5026, skill_type="pm")
+    url = "https://jobs.dou.ua/vacancies/902003/"
+    jd_path = tmp_path / "JD.md"
+    jd_path.write_text("# Product Manager\n\nNo structured fields here.", encoding="utf-8")
+    vid = await database.insert_vacancy(url=url, title="Product Manager", user_id=uid, published_at="2026-09-01T10:00:00")
+    await database.update_vacancy_fields(vid, markdown_path=str(jd_path))
+
+    fresh_doc = ParsedDocument(title="Product Manager", markdown="No salary here either.", source_url=url)
+    with patch("web.api.ParserAdapter") as mock_adapter_cls, \
+         patch("web.api.asyncio.create_task") as mock_create_task:
+        mock_adapter_cls.return_value.fetch_markdown = AsyncMock(return_value=fresh_doc)
+        await _do_refetch_vacancy_from_source(vid, url)
+
+    mock_create_task.assert_not_called()
 
 
 @pytest.mark.asyncio

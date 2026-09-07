@@ -25,6 +25,7 @@ from pathlib import Path
 import uvicorn
 
 from adapters.cv_adapter import CVAdapter
+from adapters.djinni_salary_adapter import DjinniSalaryAdapter
 from adapters.parser_adapter import ParserAdapter
 from core import config_store
 from core.deps import AgentDeps
@@ -136,6 +137,7 @@ async def main() -> None:
 
     parser_adapter = ParserAdapter(base_url=settings.parser_url)
     cv_adapter = CVAdapter(pdf_service_url=settings.pdf_service_url)
+    djinni_salary_adapter = DjinniSalaryAdapter(base_url=settings.parser_url)
     deps = AgentDeps(
         parser_adapter=parser_adapter,
         get_llm=_fresh_llm,
@@ -146,6 +148,7 @@ async def main() -> None:
         user_id=default_user_id,
         skill_type=default_skill_type,
         profile=profile,
+        djinni_salary_adapter=djinni_salary_adapter,
     )
 
     # ── 5. Telegram bot (push-only) ───────────────────────────────────────────

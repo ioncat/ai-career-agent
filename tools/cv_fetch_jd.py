@@ -24,6 +24,7 @@ from urllib.parse import urlparse
 
 from pydantic_ai import RunContext
 
+from adapters.djinni_salary_adapter import DjinniSalaryAdapter
 from adapters.parser_adapter import ParserError
 from core.deps import AgentDeps
 from core.vacancy_tags import classify as classify_tags
@@ -222,7 +223,8 @@ async def fetch_jd(deps: AgentDeps, url: str) -> int:
     # Only fill in salary if nothing already set it (job-monitor's DOU-title
     # extraction, or a user's manual edit) — never clobber a real value with
     # a sidebar re-read.
-    salary = None if (existing and existing["salary"]) else _extract_salary(doc.markdown)
+    already_had_salary = bool(existing and existing["salary"])
+    salary = None if already_had_salary else _extract_salary(doc.markdown)
     if existing and existing["status"] in ("queued", "fetching"):
         await database.update_vacancy_fields(
             vacancy_id, title=doc.title, site=site, markdown_path=markdown_path,
@@ -263,6 +265,16 @@ async def fetch_jd(deps: AgentDeps, url: str) -> int:
             _enrich_company_website(deps, vacancy_id, doc.company, doc.company_profile_url)
         )
 
+    # Djinni salary estimate — fire-and-forget, off the critical path (2026-
+    # 09-07), same pattern as company-website enrichment above. Only when
+    # nothing (sidebar, labeled text, existing value) already found a real
+    # number — a JD that discloses nothing gets Djinni's own hidden number
+    # instead, via its public search filter (services/parser/salary_probe.py).
+    if site == "djinni" and not already_had_salary and not salary and deps.djinni_salary_adapter:
+        asyncio.create_task(
+            _estimate_djinni_salary(deps.djinni_salary_adapter, vacancy_id, url)
+        )
+
     log.info("fetch_jd: done vacancy_id=%d title=%r", vacancy_id, doc.title)
     return vacancy_id
 
@@ -289,6 +301,40 @@ async def _enrich_company_website(
             log.info("fetch_jd: company_website fetched for v#%d: %s", vacancy_id, website)
     except Exception as exc:
         log.warning("fetch_jd: company_website enrichment failed for v#%d (non-fatal): %s", vacancy_id, exc)
+
+
+async def _estimate_djinni_salary(adapter: DjinniSalaryAdapter, vacancy_id: int, url: str) -> None:
+    """Background enrichment: estimate a Djinni vacancy's real, possibly-
+    undisclosed salary via its public search filter (2026-09-07, see
+    services/parser/salary_probe.py for the technique — the user's own
+    manual method turned into an exponential+binary search over Djinni's
+    `salary=N` filter). Shared with web/api.py's republish-refresh and
+    manual "Re-fetch from source" paths, which hit the exact same gap
+    (found live, vacancy #902: republished, re-extraction correctly found
+    no disclosed number in the text, and this estimate simply wasn't wired
+    in anywhere yet).
+
+    Slow by design — several deliberately-throttled requests inside the
+    probe, can take up to about a minute — always fire-and-forget, never
+    awaited inline with whatever triggered it. Re-checks the vacancy's
+    salary is STILL empty right before writing, since a manual edit or
+    another source could fill it in during that delay — never clobbers.
+
+    Fail-open: never raises. `None` (undeterminable, expired listing, or
+    jd-parser unreachable) is a normal, silent no-op, same as the adapter's
+    own contract.
+    """
+    try:
+        ceiling = await adapter.find_salary_ceiling(url)
+        if ceiling is None:
+            return
+        current = await database.get_vacancy_by_id(vacancy_id)
+        if current is None or current["salary"]:
+            return
+        await database.set_vacancy_salary(vacancy_id, f"~${ceiling}+ (Djinni filter estimate)")
+        log.info("djinni salary estimate: v#%d -> ~$%d+", vacancy_id, ceiling)
+    except Exception as exc:
+        log.warning("djinni salary estimate failed for v#%d (non-fatal): %s", vacancy_id, exc)
 
 
 async def cv_fetch_jd(ctx: RunContext[AgentDeps], url: str) -> str:
