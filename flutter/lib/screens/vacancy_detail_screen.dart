@@ -40,6 +40,98 @@ Widget _reasonLine(String reason, {TextStyle? style}) {
   );
 }
 
+// ── Shared header pieces (2026-09-07) ───────────────────────────────────────
+// Used by both _JdModeView (pre-analysis) and _ActionBar (post-analysis) so
+// the vacancy id and the compact title always look and behave identically in
+// both states — the whole point of the header-unification pass: fix once,
+// works everywhere. See docs/discovery/vacancy-detail-header-unification-
+// 2026-09-06.md for the full design rationale (gitignored, local only).
+
+/// Vacancy id — always its own dedicated line, never sharing a row with
+/// anything else, in both pre- and post-analysis states. User's own framing
+/// (2026-09-07): "это важная штука, должна быть на самом видном месте,
+/// всегда в одном и том же месте" — quick self-orientation ("what vacancy
+/// am I even looking at") shouldn't depend on which state you're in.
+class _VacancyIdLine extends StatelessWidget {
+  final int vacancyId;
+  const _VacancyIdLine({required this.vacancyId});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Text(
+        '#$vacancyId',
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: cs.onSurfaceVariant.withValues(alpha: 0.5),
+            ),
+      ),
+    );
+  }
+}
+
+/// Compact title (role + company + website icon) — Variant A from the
+/// header-unification design doc. Rendered in the sticky header in BOTH
+/// states so the title never scrolls out of view post-analysis the way it
+/// used to (it lived only in the scrollable _VacancyHero before). The rich
+/// hero treatment (tag badges, large 28px title, radar chart, inline-
+/// editable salary/tags) stays exactly where it is today — this compact
+/// line does not replace it, it just guarantees an always-visible anchor.
+class _VacancyCompactTitle extends StatelessWidget {
+  final String role;
+  final String company;
+  final String? companyWebsite;
+  const _VacancyCompactTitle({
+    required this.role,
+    required this.company,
+    this.companyWebsite,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    if (role.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(role,
+            style: Theme.of(context).textTheme.titleSmall,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis),
+        if (company.isNotEmpty)
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(company,
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: cs.onSurfaceVariant),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
+              ),
+              if (companyWebsite != null && companyWebsite!.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(left: 4),
+                  child: Tooltip(
+                    message: companyWebsite!,
+                    child: InkWell(
+                      onTap: () => launchUrl(Uri.parse(companyWebsite!),
+                          mode: LaunchMode.externalApplication),
+                      child: Icon(Icons.language, size: 14, color: cs.primary),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+      ],
+    );
+  }
+}
+
 // ── JD mode — shown for status='fetched' ──────────────────────────────────────
 
 class _JdModeView extends ConsumerStatefulWidget {
@@ -85,16 +177,40 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
   late bool _applied;
   bool _loadingApplied = false;
 
+  // Star toggle (2026-09-07, header unification) — same reasoning as Applied
+  // above: favouriting is a global function, shouldn't be gated on whether a
+  // vacancy has been analyzed yet. Mirrors _ActionBarState's implementation
+  // exactly (same repo call, same optimistic-update-then-revert-on-error
+  // pattern).
+  late bool _starred;
+  bool _loadingStar = false;
+
   @override
   void initState() {
     super.initState();
     _applied = widget.vacancy?.applied ?? false;
+    _starred = widget.vacancy?.starred ?? false;
   }
 
   @override
   void didUpdateWidget(_JdModeView old) {
     super.didUpdateWidget(old);
     if (old.vacancy?.applied != widget.vacancy?.applied) _applied = widget.vacancy?.applied ?? false;
+    if (old.vacancy?.starred != widget.vacancy?.starred) _starred = widget.vacancy?.starred ?? false;
+  }
+
+  Future<void> _toggleStar() async {
+    if (_loadingStar) return;
+    final next = !_starred;
+    setState(() { _starred = next; _loadingStar = true; });
+    try {
+      await _repo.setStarred(widget.vacancyId, next);
+      if (mounted) ref.read(vacancyListProvider.notifier).refresh();
+    } catch (_) {
+      if (mounted) setState(() => _starred = !next);
+    } finally {
+      if (mounted) setState(() => _loadingStar = false);
+    }
   }
 
   Future<void> _toggleApplied() async {
@@ -434,179 +550,43 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Vacancy id — own line, topmost (2026-09-06, canonical
-              // top-left location, same idea as the post-analysis
-              // _ActionBar). Deliberately NOT sharing a row with the icon
-              // row below — that row's left-alignment is paired with the
-              // button Wrap further down (WrapAlignment.start, fixed
-              // 2026-09-05 after 3 breaks) and adding a Spacer here to push
-              // the id right previously dragged the icons right with it,
-              // breaking that pairing again (caught live, same day).
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text(
-                  '#${widget.vacancyId}',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: cs.onSurfaceVariant.withValues(alpha: 0.5),
-                      ),
-                ),
-              ),
-              // Row 1 — title only, full row width to itself (2026-09-04,
-              // user feedback: a combined title+icons row truncated the
-              // title hard — "Senior Product M..." — once the detail panel
-              // narrowed even a little).
-              if (role.isNotEmpty)
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(role,
-                        style: Theme.of(context).textTheme.titleSmall,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis),
-                    if (company.isNotEmpty)
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Flexible(
-                            child: Text(company,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
-                                    ?.copyWith(color: cs.onSurfaceVariant),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis),
-                          ),
-                          if (companyWebsite != null && companyWebsite.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(left: 4),
-                              child: Tooltip(
-                                message: companyWebsite,
-                                child: InkWell(
-                                  onTap: () => launchUrl(Uri.parse(companyWebsite),
-                                      mode: LaunchMode.externalApplication),
-                                  child: Icon(Icons.language,
-                                      size: 14, color: cs.primary),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    const SizedBox(height: 4),
-                  ],
-                ),
-              // Row 2 — secondary icon actions, left-aligned (2026-09-05).
-              // Two earlier attempts at "align to Skip" both broke: (1) a
-              // plain left-aligned Row only happened to line up with Skip on
-              // a narrow panel, where the button Wrap below — WrapAlignment
-              // .end — nearly fills the width; on a wider panel the Wrap
-              // leaves slack before Skip and the rows drifted apart; (2)
-              // wrapping both rows in IntrinsicWidth to force a shared width
-              // broke Wrap's own line-wrapping — Wrap doesn't compute
-              // intrinsic width the way IntrinsicWidth needs, so Analyze got
-              // shoved onto its own line even when the panel had room.
-              // Simplest fix, per user request: stop right-packing the
-              // button row at all — WrapAlignment.start below — so both rows
-              // anchor to the panel's actual left edge, the one fixed point
-              // that doesn't depend on either row's content width.
-              Row(
-                children: [
-                  if (widget.url.isNotEmpty)
-                    IconButton(
-                      icon: Icon(
-                        Icons.open_in_new,
-                        size: 18,
-                        color: cs.onSurfaceVariant,
-                      ),
-                      tooltip: 'Open JD',
-                      onPressed: () => launchUrl(
-                        Uri.parse(widget.url),
-                        mode: LaunchMode.externalApplication,
-                      ),
-                    ),
-                  if (widget.vacancy?.folderPath != null)
-                    IconButton(
-                      icon: Icon(
-                        Icons.folder_open_outlined,
-                        size: 18,
-                        color: cs.onSurfaceVariant,
-                      ),
-                      tooltip: 'Open folder',
-                      onPressed: () => Process.run('explorer.exe', [
-                        widget.vacancy!.folderPath!,
-                      ]),
-                    ),
-                  Tooltip(
-                    message: 'Refresh vacancy data',
-                    child: IconButton(
-                      icon: _refreshing
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Icon(
-                              Icons.sync_rounded,
-                              size: 18,
-                              color: cs.onSurfaceVariant,
-                            ),
-                      onPressed: _refreshing ? null : _refresh,
-                    ),
-                  ),
-                  if (widget.url.isNotEmpty)
-                    Tooltip(
-                      message:
-                          'Re-fetch from source — re-pull the JD from the live posting page '
-                          '(not the cached copy, not the RSS feed). For a vacancy fetched too early, '
-                          'e.g. while the job board was still moderating it.',
-                      child: IconButton(
-                        icon: _loadingRefetch
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : Icon(
-                                Icons.cloud_download_outlined,
-                                size: 18,
-                                color: cs.onSurfaceVariant,
-                              ),
-                        onPressed: _loadingRefetch ? null : _refetchFromSource,
-                      ),
-                    ),
-                  Tooltip(
-                    message:
-                        'Activity log — pipeline runs + LLM calls (incl. pre-filter checks). '
-                        'Only reachable from this JD view before analysis — the tabbed Activity tab '
-                        'only appears once Phase 1+2 analysis exists.',
-                    child: IconButton(
-                      icon: Icon(
-                        Icons.history_rounded,
-                        size: 18,
-                        color: cs.onSurfaceVariant,
-                      ),
-                      onPressed: () => _showActivityLog(context),
-                    ),
-                  ),
-                ],
+              // Vacancy id + compact title — shared with _ActionBar
+              // (2026-09-07 header unification), always their own lines,
+              // never sharing a row with the action controls below.
+              _VacancyIdLine(vacancyId: widget.vacancyId),
+              _VacancyCompactTitle(
+                role: role,
+                company: company,
+                companyWebsite: companyWebsite,
               ),
               const SizedBox(height: 8),
-              // Row 3 — primary action buttons. Wrap (not Row) so a narrow
-              // panel flows them to a further line instead of overflowing —
-              // same pattern used for the inbox card's badge cluster.
-              // WrapAlignment.start (2026-09-05, was .end) — see comment
-              // above the icon row. A thin vertical divider after Skip
-              // separates it from Applied?/Check blockers/Analyze — same
-              // user request, marking Skip as the odd-one-out (destructive)
-              // action now that it's no longer set apart by position alone.
+              // Single Wrap for every action — icons and buttons together
+              // (2026-09-07, header unification). Previously an icon Row and
+              // a button Wrap were two separately-aligned widgets that had
+              // to be kept in sync by hand; that broke 4 times (2026-09-05
+              // x3, 2026-09-06 x1) because nothing structurally tied their
+              // alignment together. One Wrap removes the failure mode
+              // entirely — there is nothing left to desync.
               Wrap(
                 alignment: WrapAlignment.start,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 spacing: 8,
                 runSpacing: 8,
                 children: [
+                  // Star — global function, everywhere (2026-09-07, user
+                  // request), matching _ActionBar's convention of Star first.
+                  Tooltip(
+                    message: _starred ? 'Remove from favourites' : 'Add to favourites',
+                    child: IconButton(
+                      icon: Icon(
+                        _starred ? Icons.star_rounded : Icons.star_outline_rounded,
+                        size: 20,
+                        color: _starred ? const Color(0xFFFFB300) : cs.onSurfaceVariant,
+                      ),
+                      onPressed: _toggleStar,
+                      splashRadius: 18,
+                    ),
+                  ),
                   // Skip moved leftmost of this button cluster (2026-09-04,
                   // user request) — it's the heaviest-used action on this
                   // pre-analysis phase and Applied? sitting first was in the way.
@@ -709,6 +689,91 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                       ),
                     ),
                   ],
+                  // Utility/secondary actions — deliberately last in the Wrap
+                  // (2026-09-07), lower visual priority than the workflow
+                  // buttons above, same relative ordering as before (icons
+                  // used to be their own row, above the buttons — now
+                  // trailing in the same single Wrap instead).
+                  Container(width: 1, height: 24, color: cs.outlineVariant),
+                  if (widget.url.isNotEmpty)
+                    IconButton(
+                      icon: Icon(
+                        Icons.open_in_new,
+                        size: 18,
+                        color: cs.onSurfaceVariant,
+                      ),
+                      tooltip: 'Open JD',
+                      onPressed: () => launchUrl(
+                        Uri.parse(widget.url),
+                        mode: LaunchMode.externalApplication,
+                      ),
+                    ),
+                  if (widget.vacancy?.folderPath != null)
+                    IconButton(
+                      icon: Icon(
+                        Icons.folder_open_outlined,
+                        size: 18,
+                        color: cs.onSurfaceVariant,
+                      ),
+                      tooltip: 'Open folder',
+                      onPressed: () => Process.run('explorer.exe', [
+                        widget.vacancy!.folderPath!,
+                      ]),
+                    ),
+                  Tooltip(
+                    message: 'Refresh vacancy data',
+                    child: IconButton(
+                      icon: _refreshing
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(
+                              Icons.sync_rounded,
+                              size: 18,
+                              color: cs.onSurfaceVariant,
+                            ),
+                      onPressed: _refreshing ? null : _refresh,
+                    ),
+                  ),
+                  if (widget.url.isNotEmpty)
+                    Tooltip(
+                      message:
+                          'Re-fetch from source — re-pull the JD from the live posting page '
+                          '(not the cached copy, not the RSS feed). For a vacancy fetched too early, '
+                          'e.g. while the job board was still moderating it.',
+                      child: IconButton(
+                        icon: _loadingRefetch
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Icon(
+                                Icons.cloud_download_outlined,
+                                size: 18,
+                                color: cs.onSurfaceVariant,
+                              ),
+                        onPressed: _loadingRefetch ? null : _refetchFromSource,
+                      ),
+                    ),
+                  Tooltip(
+                    message:
+                        'Activity log — pipeline runs + LLM calls (incl. pre-filter checks). '
+                        'Only reachable from this JD view before analysis — the tabbed Activity tab '
+                        'only appears once Phase 1+2 analysis exists.',
+                    child: IconButton(
+                      icon: Icon(
+                        Icons.history_rounded,
+                        size: 18,
+                        color: cs.onSurfaceVariant,
+                      ),
+                      onPressed: () => _showActivityLog(context),
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -1141,6 +1206,9 @@ class _VacancyDetailScreenState extends ConsumerState<VacancyDetailScreen>
         final role = p1?.role.isNotEmpty == true
             ? p1!.role
             : widget.vacancy?.role ?? '';
+        final company = p1?.company.isNotEmpty == true
+            ? p1!.company
+            : widget.vacancy?.company ?? '';
 
         return Column(
           children: [
@@ -1152,7 +1220,7 @@ class _VacancyDetailScreenState extends ConsumerState<VacancyDetailScreen>
                 onDismiss: () => setState(() => _errorBannerDismissed = true),
               ),
             // Sticky action bar
-            _ActionBar(vacancyId: widget.vacancyId, url: widget.url, role: role, status: status, vacancy: widget.vacancy, tabController: _tabController, onApplied: widget.onApplied),
+            _ActionBar(vacancyId: widget.vacancyId, url: widget.url, role: role, company: company, status: status, vacancy: widget.vacancy, tabController: _tabController, onApplied: widget.onApplied),
             // Tab bar
             TabBar(
               controller: _tabController,
@@ -1694,6 +1762,7 @@ class _ActionBar extends ConsumerStatefulWidget {
   final int vacancyId;
   final String url;
   final String role;
+  final String company;
   final String status;
   final VacancyListItem? vacancy;
   final TabController tabController;
@@ -1704,6 +1773,7 @@ class _ActionBar extends ConsumerStatefulWidget {
     required this.url,
     required this.role,
     required this.tabController,
+    this.company = '',
     this.status = 'analyzed',
     this.vacancy,
     this.onApplied,
@@ -2086,100 +2156,101 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
           bottom: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.15)),
         ),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Vacancy id — moved here (2026-09-06, user request) as the single
-          // canonical top-left location, replacing the two previous spots
-          // (next to the title in _VacancyHero, and right-aligned in the
-          // salary/tags row of _JdModeView) so it's consistent across both
-          // pre- and post-analysis states.
-          Text(
-            '#${widget.vacancyId}',
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: cs.onSurfaceVariant.withValues(alpha: 0.5),
-            ),
-          ),
-          const Spacer(),
-          // Star toggle
-          Tooltip(
-            message: _starred ? 'Remove from favourites' : 'Add to favourites',
-            child: IconButton(
-              icon: Icon(
-                _starred ? Icons.star_rounded : Icons.star_outline_rounded,
-                size: 20,
-                color: _starred ? const Color(0xFFFFB300) : cs.onSurfaceVariant,
-              ),
-              onPressed: _toggleStar,
-              splashRadius: 18,
-            ),
-          ),
-          // Applied toggle
-          Tooltip(
-            message: _applied ? 'Mark as not applied' : 'Mark as applied',
-            child: _applied
-                ? FilledButton.icon(
-                    onPressed: _loadingApplied ? null : _toggleApplied,
-                    icon: const Icon(Icons.check_circle, size: 16),
-                    label: const Text('Applied'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF2E7D32),
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      minimumSize: const Size(0, 36),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                  )
-                : OutlinedButton.icon(
-                    onPressed: _loadingApplied ? null : _toggleApplied,
-                    icon: const Icon(Icons.check_circle_outline, size: 16),
-                    label: const Text('Applied?'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: cs.onSurfaceVariant,
-                      side: BorderSide(color: cs.outlineVariant),
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      minimumSize: const Size(0, 36),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
+          // Vacancy id + compact title — shared with _JdModeView (2026-09-07
+          // header unification), own lines, same treatment in both states.
+          // The compact title guarantees the role/company is always visible
+          // here — previously it lived only in _VacancyHero, which scrolls
+          // away with the rest of the Analysis tab's content.
+          _VacancyIdLine(vacancyId: widget.vacancyId),
+          _VacancyCompactTitle(role: widget.role, company: widget.company),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              // Star toggle
+              Tooltip(
+                message: _starred ? 'Remove from favourites' : 'Add to favourites',
+                child: IconButton(
+                  icon: Icon(
+                    _starred ? Icons.star_rounded : Icons.star_outline_rounded,
+                    size: 20,
+                    color: _starred ? const Color(0xFFFFB300) : cs.onSurfaceVariant,
                   ),
-          ),
-          // Open JD
-          if (widget.url.isNotEmpty)
-            IconButton(
-              icon: Icon(
-                Icons.open_in_new,
-                size: 18,
-                color: cs.onSurfaceVariant,
+                  onPressed: _toggleStar,
+                  splashRadius: 18,
+                ),
               ),
-              tooltip: 'Open JD',
-              onPressed: () => launchUrl(
-                Uri.parse(widget.url),
-                mode: LaunchMode.externalApplication,
+              // Applied toggle
+              Tooltip(
+                message: _applied ? 'Mark as not applied' : 'Mark as applied',
+                child: _applied
+                    ? FilledButton.icon(
+                        onPressed: _loadingApplied ? null : _toggleApplied,
+                        icon: const Icon(Icons.check_circle, size: 16),
+                        label: const Text('Applied'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF2E7D32),
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          minimumSize: const Size(0, 36),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      )
+                    : OutlinedButton.icon(
+                        onPressed: _loadingApplied ? null : _toggleApplied,
+                        icon: const Icon(Icons.check_circle_outline, size: 16),
+                        label: const Text('Applied?'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: cs.onSurfaceVariant,
+                          side: BorderSide(color: cs.outlineVariant),
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          minimumSize: const Size(0, 36),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      ),
               ),
-            ),
-          // Open vacancy folder in Explorer
-          if (widget.vacancy?.folderPath != null)
-            IconButton(
-              icon: Icon(Icons.folder_open_outlined, size: 18, color: cs.onSurfaceVariant),
-              tooltip: 'Open folder',
-              onPressed: () => Process.run('explorer.exe', [widget.vacancy!.folderPath!]),
-            ),
-          Tooltip(
-            message: 'Refresh vacancy data',
-            child: IconButton(
-              icon: _refreshing
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Icon(Icons.sync_rounded, size: 18, color: cs.onSurfaceVariant),
-              onPressed: _refreshing ? null : _refresh,
-            ),
-          ),
-          const SizedBox(width: 4),
-          // Context-sensitive CTA — changes per tab
-          AnimatedBuilder(
-            animation: widget.tabController,
-            builder: (context, _) => _buildCta(context, cs, cvAsync, workerAvailable: workerAvailable),
+              // Open JD
+              if (widget.url.isNotEmpty)
+                IconButton(
+                  icon: Icon(
+                    Icons.open_in_new,
+                    size: 18,
+                    color: cs.onSurfaceVariant,
+                  ),
+                  tooltip: 'Open JD',
+                  onPressed: () => launchUrl(
+                    Uri.parse(widget.url),
+                    mode: LaunchMode.externalApplication,
+                  ),
+                ),
+              // Open vacancy folder in Explorer
+              if (widget.vacancy?.folderPath != null)
+                IconButton(
+                  icon: Icon(Icons.folder_open_outlined, size: 18, color: cs.onSurfaceVariant),
+                  tooltip: 'Open folder',
+                  onPressed: () => Process.run('explorer.exe', [widget.vacancy!.folderPath!]),
+                ),
+              Tooltip(
+                message: 'Refresh vacancy data',
+                child: IconButton(
+                  icon: _refreshing
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Icon(Icons.sync_rounded, size: 18, color: cs.onSurfaceVariant),
+                  onPressed: _refreshing ? null : _refresh,
+                ),
+              ),
+              const SizedBox(width: 4),
+              // Context-sensitive CTA — changes per tab
+              AnimatedBuilder(
+                animation: widget.tabController,
+                builder: (context, _) => _buildCta(context, cs, cvAsync, workerAvailable: workerAvailable),
+              ),
+            ],
           ),
         ],
       ),
