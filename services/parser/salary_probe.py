@@ -62,6 +62,23 @@ MAX_SALARY = 20000
 # pages is too generic/broad to track reliably — every further page just
 # costs a request without moving us closer to a trustworthy answer.
 MAX_PAGES_PER_CHECK = 3
+# Company pages only ever get 1 page (not MAX_PAGES_PER_CHECK) — found live
+# 2026-09-07, vacancy #231 (Influence Pro Services, 4 total postings):
+# Djinni's own pagination doesn't return an EMPTY page once a company's real
+# results run out — page 2+ silently falls back to an unrelated "recommended
+# jobs" listing instead (confirmed: the exact same ~15 job ids appeared on
+# page 2 of this company's page AND on page 2 of an unrelated title-only
+# search, regardless of query or filter). `_present_at`'s "non-empty page ⇒
+# keep paginating" logic can't tell that fallback apart from genuine
+# results, so it burned through the whole page cap without ever seeing an
+# empty page, discarding an otherwise-correct answer (present at $4500, the
+# real ceiling). A company page realistically never has enough PM/PO
+# postings to need a second page in the first place, so the safe fix is
+# simply never asking Djinni for one. Title-only search shares the same
+# underlying site quirk in theory, but its result counts vary widely enough
+# that a blanket 1-page cap would cost real recall — flagged as a follow-up,
+# not fixed here (BACKLOG).
+_COMPANY_PAGE_MAX_PAGES = 1
 
 _SEARCH_URL = "https://djinni.co/jobs/"
 # Same category scope feeds.json already ingests on — narrows the company
@@ -75,15 +92,23 @@ def _job_ids_on_page(html: str) -> set[str]:
     return set(re.findall(r'/jobs/(\d+)-', html))
 
 
-def _present_at(url_for_page: Callable[[int], str], target_id: str) -> bool | None:
-    """Is *target_id* present, scanning pages via *url_for_page*(page)?
+def _present_at(
+    url_for_page: Callable[[int], str], target_id: str, max_pages: int, exhaustive: bool,
+) -> bool | None:
+    """Is *target_id* present, scanning up to *max_pages* pages via
+    *url_for_page*(page)?
 
-    True/False if determinable within MAX_PAGES_PER_CHECK pages, None if a
-    request failed or the result set never narrows down (too broad) — both
-    cases mean "don't trust this data point", handled identically by every
-    caller.
+    True/False if determinable within max_pages, None if a request failed.
+    What happens at the page cap depends on *exhaustive*: company pages
+    never have a genuine second page (Djinni falls back to an unrelated
+    "recommended jobs" listing past the real end instead of an empty page —
+    found live 2026-09-07, vacancy #231 — so max_pages=1 there IS the whole
+    result set) — a non-empty-but-absent last page is definitive False, not
+    "too broad to tell". Title-only search has no such guarantee (a
+    genuinely large match count can span real pages beyond the cap), so the
+    same situation there stays None — "don't trust this data point".
     """
-    for page in range(1, MAX_PAGES_PER_CHECK + 1):
+    for page in range(1, max_pages + 1):
         resp = fetch(url_for_page(page))
         if resp is None:
             return None
@@ -92,17 +117,19 @@ def _present_at(url_for_page: Callable[[int], str], target_id: str) -> bool | No
             return True
         if not ids:
             return False  # ran out of real pages before the cap
-    return None  # hit the page cap without exhausting results — too broad
+    return False if exhaustive else None
 
 
-def _find_ceiling(build_url: Callable[[int, int], str], target_id: str, vacancy_url: str) -> int | None:
+def _find_ceiling(
+    build_url: Callable[[int, int], str], target_id: str, vacancy_url: str, max_pages: int, exhaustive: bool,
+) -> int | None:
     """Exponential-then-binary search for the salary threshold at which
     *target_id* disappears, using *build_url*(salary, page) for one
     particular identification strategy — see find_salary_ceiling() for the
     two strategies this gets called with.
     """
     def present(salary: int) -> bool | None:
-        return _present_at(lambda page: build_url(salary, page), target_id)
+        return _present_at(lambda page: build_url(salary, page), target_id, max_pages, exhaustive)
 
     if present(0) is not True:
         return None
@@ -176,7 +203,7 @@ def find_salary_ceiling(
         base = company_profile_url.rstrip("/")
         result = _find_ceiling(
             lambda salary, page: f"{base}/?{_ROLE_FILTER}&salary={salary}&page={page}",
-            target_id, vacancy_url,
+            target_id, vacancy_url, max_pages=_COMPANY_PAGE_MAX_PAGES, exhaustive=True,
         )
         if result is not None:
             return result
@@ -186,7 +213,7 @@ def find_salary_ceiling(
         lambda salary, page: (
             f"{_SEARCH_URL}?search_type=title-only&all_keywords={quote(title)}&salary={salary}&page={page}"
         ),
-        target_id, vacancy_url,
+        target_id, vacancy_url, max_pages=MAX_PAGES_PER_CHECK, exhaustive=False,
     )
     if result is None and not company_profile_url:
         log.info("salary_probe: undeterminable for %s (title-only failed, no company page to try)", vacancy_url)

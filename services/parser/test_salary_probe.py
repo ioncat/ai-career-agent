@@ -130,6 +130,34 @@ def test_company_page_used_first_when_available(monkeypatch):
     assert result == threshold
 
 
+def test_company_page_never_requests_a_second_page(monkeypatch):
+    """Regression 2026-09-07, vacancy #231 (Influence Pro Services, 4 total
+    postings): Djinni's own pagination doesn't return an empty page once a
+    company's real results run out — page 2 silently falls back to an
+    unrelated "recommended jobs" listing instead (confirmed live: the same
+    ~15 ids appeared on page 2 of an unrelated company AND an unrelated
+    title-only search). A non-empty page 1 that doesn't contain the target
+    must be treated as definitive absence, not "too broad to tell" — and
+    page 2 must never even be requested for this strategy."""
+    threshold = 4500
+    company_url = "https://djinni.co/jobs/company-influence-pro-services"
+    other_company_vacancy_id = "846784"  # a real co-worker posting, always present
+
+    def fake_fetch(url: str):
+        page = int(url.split("page=")[1])
+        if page > 1:
+            raise AssertionError(f"company-page strategy must never request page 2+: {url}")
+        salary = int(url.split("salary=")[1].split("&")[0])
+        ids = [other_company_vacancy_id]
+        if salary <= threshold:
+            ids.append(TARGET_ID)
+        return _resp(_cards(ids))
+
+    monkeypatch.setattr(salary_probe, "fetch", fake_fetch)
+    result = salary_probe.find_salary_ceiling(TARGET_URL, "Senior Product Manager", company_url)
+    assert result == threshold
+
+
 def test_falls_back_to_title_only_when_company_page_inconclusive(monkeypatch):
     """Company page never resolves (e.g. an agency page listing dozens of
     unrelated postings) — must fall back to title-only rather than giving
