@@ -5,6 +5,7 @@ Mocks: ParserAdapter, database functions, filesystem (tmp_path).
 No real jd-parser service or DB needed.
 """
 
+import asyncio
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -1164,6 +1165,44 @@ async def test_estimate_djinni_salary_fails_open_on_error():
         await _estimate_djinni_salary(adapter, 42, "https://djinni.co/jobs/123-x")  # must not raise
 
     mock_db.set_vacancy_salary.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_estimate_djinni_salary_serializes_across_concurrent_vacancies():
+    """Regression 2026-09-07, user concern: a burst of new vacancies in one
+    RSSWatcher poll cycle (a real pattern — a fresh feed's catch-up scan
+    once pulled in 85 in a single day) each spawn their own fire-and-forget
+    probe task via asyncio.create_task(). RSS_CONCURRENCY only bounds the
+    fetch step itself, not these background tasks, which keep running well
+    after fetch_jd() has already returned and freed its own concurrency
+    slot — without a global limit, many probes could hit Djinni at once,
+    defeating the whole point of the internal per-request polite delay
+    (which only paces one vacancy's own requests against itself). The
+    module-level semaphore must cap real concurrent network-calling work at
+    1, regardless of how many vacancies are being probed at once."""
+    in_flight = {"count": 0, "max": 0}
+
+    async def fake_find_salary_ceiling(url: str):
+        in_flight["count"] += 1
+        in_flight["max"] = max(in_flight["max"], in_flight["count"])
+        await asyncio.sleep(0.01)
+        in_flight["count"] -= 1
+        return 4000, None
+
+    adapter = AsyncMock()
+    adapter.find_salary_ceiling = AsyncMock(side_effect=fake_find_salary_ceiling)
+
+    with patch("tools.cv_fetch_jd.database") as mock_db:
+        mock_db.get_vacancy_by_id = AsyncMock(return_value={"salary": None})
+        mock_db.set_vacancy_salary = AsyncMock()
+
+        await asyncio.gather(*[
+            _estimate_djinni_salary(adapter, vid, f"https://djinni.co/jobs/{vid}-x")
+            for vid in range(5)
+        ])
+
+    assert in_flight["max"] == 1
+    assert mock_db.set_vacancy_salary.await_count == 5
 
 
 # ── _enrich_company_website (2026-08-12) ────────────────────────────────────

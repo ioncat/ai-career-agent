@@ -304,6 +304,23 @@ async def _enrich_company_website(
         log.warning("fetch_jd: company_website enrichment failed for v#%d (non-fatal): %s", vacancy_id, exc)
 
 
+# Global concurrency limit for the salary probe itself (2026-09-07, user
+# request) — separate from RSS_CONCURRENCY (how many vacancies FETCH at
+# once). fetch_jd() releases its own concurrency slot as soon as it
+# returns, but the salary-probe background task it spawns keeps running for
+# up to ~2.5 minutes afterward (MAX_TOTAL_REQUESTS × the polite delay) — a
+# burst of many new vacancies discovered in one RSSWatcher poll cycle (a
+# real pattern already seen in this project: a fresh feed subscription's
+# catch-up scan once pulled in 85 vacancies in a single day) could spawn
+# that many concurrent probes, each independently hitting Djinni — a much
+# higher instantaneous request rate than any single probe's own internal
+# polite delay implies, since that delay only paces one vacancy's own
+# sequence of requests against itself, not against every other vacancy's
+# probe running at the same time. Serializes the actual network-calling
+# part to 1 at a time system-wide, so the per-request delay inside
+# crawler.fetch() actually reflects the total load Djinni sees.
+_DJINNI_SALARY_SEMAPHORE = asyncio.Semaphore(1)
+
 # A give-up note (below) is written into the same free-text `salary` column
 # as a real value or a successful estimate — no new schema needed — but it
 # must never be mistaken for one. "(probe:" is a marker no real salary or
@@ -340,7 +357,11 @@ async def _estimate_djinni_salary(adapter: DjinniSalaryAdapter, vacancy_id: int,
 
     Slow by design — several deliberately-throttled requests inside the
     probe, can take up to about a minute — always fire-and-forget, never
-    awaited inline with whatever triggered it. Re-checks the vacancy's
+    awaited inline with whatever triggered it. Serialized system-wide via
+    _DJINNI_SALARY_SEMAPHORE — the internal per-request delay only paces
+    one vacancy's own request sequence, not every OTHER vacancy's probe
+    running at the same time (a burst of new vacancies could otherwise fire
+    many concurrent probes at once). Re-checks the vacancy's
     salary is STILL not a real value right before writing (see
     _is_real_salary) — a manual edit or another source could fill in a real
     number during that delay, or a previous probe attempt could have left
@@ -358,7 +379,8 @@ async def _estimate_djinni_salary(adapter: DjinniSalaryAdapter, vacancy_id: int,
     as before; the probe's own classified outcomes (reason set) get a note.
     """
     try:
-        ceiling, reason = await adapter.find_salary_ceiling(url)
+        async with _DJINNI_SALARY_SEMAPHORE:
+            ceiling, reason = await adapter.find_salary_ceiling(url)
         current = await database.get_vacancy_by_id(vacancy_id)
         if current is None or _is_real_salary(current["salary"]):
             return
