@@ -1,6 +1,6 @@
 # career-agent — Backlog
 
-> Last updated: 2026-09-04
+> Last updated: 2026-09-07
 > Rules: [documentation-conventions.md](documentation-conventions.md) · History: [CHANGELOG.md](CHANGELOG.md) · Specs: [Epics/](Epics/)
 
 **Priority legend:**
@@ -12,6 +12,16 @@
 ---
 
 ## 📌 Now
+
+### 🟠 P1 — New Phase 3.8: ATS Keyword Coverage (confirmed 2026-09-07, not started)
+**What:** user-requested new pipeline step, confirmed but deferred until current CV work was done. Goal is the opposite of Phase 3.7's "JD-Echo Risk" check — 3.7 flags and *reduces* CV phrases that mirror the JD too closely (human-credibility risk); this new phase should instead *guarantee* the CV literally contains the JD's own load-bearing keywords/terms (ATS keyword-matching risk) wherever real supporting evidence already exists. Found the gap live on vacancies #1491/#1494 this session — the CV was missing literal JD terms (e.g. "process flows", "functional validation and testing", "non-deterministic", "Jira", "testable") despite having real evidence for all of them; this was done ad hoc via an unstructured chat request, not a repeatable phase.
+**Proposed placement:** run before Phase 3.7, not after — 3.7 should then only trim echo-risk findings that are NOT one of the ATS-coverage terms this new phase just deliberately inserted (so the two phases don't fight each other and undo one another's work).
+**Not started — implementation needs:** a new `prompts/pm/phase3_8_ats_coverage.md` (and `prompts/generic/` equivalent), a SKILL.md pipeline-flow entry between 3.6 and 3.7, and a decision on whether it's mandatory or opt-in like 3.7.
+
+### 🟠 P1 — `phase2_fit.md` can generate a headline Fit Score/Key Barriers that contradicts its own deeper analysis (found 2026-09-07, vacancy #1494)
+**What:** the four output sections (Quick Scan, Fit Breakdown, Signal Coverage/Adaptation, Internal Analysis) are generated in that fixed order. Internal Analysis's "Detailed Assessment" is where the model actually does its most careful evidence matching — but it's generated *last*, after Quick Scan's Fit Score/Key Barriers are already locked in, and is explicitly marked "for record-keeping... not sent to Telegram." Found live: vacancy #1494's own Phase 2 output said in "Transferable experience" that HostiServer's billing/invoice automation was a near-direct match to the JD's AP Automation KPIs, while "Weak spots" two bullets earlier and the headline Key Barriers said the opposite — the correct insight never fed back into the fields that actually drive the recommendation and Adaptation Plan. Full diagnosis: [CHANGELOG.md → 2026-09-07](CHANGELOG.md).
+**Proposed fix (not yet applied — needs a decision, then a `phase2_fit.md` edit):** (1) reorder the four sections so Internal Analysis is generated before Quick Scan, and have Quick Scan's Fit Score/Key Barriers be an explicit summary derived from Internal Analysis rather than an independent judgment; (2) in the Fit Breakdown table, when a JD requirement combines a domain + a method/technology (e.g. "AI implementation in finance/accounting"), score domain-fit and method-fit separately in the Evidence column instead of letting a missing method suppress a real domain match.
+**Not started.**
 
 ### 🟡 P2 — Role Balance: is the mechanism deterministic enough, or does it need a change? (added 2026-09-07, open discussion)
 **What:** after shipping the 6-axis role_balance taxonomy + radar chart (2026-09-06), manually verified vacancy #1488's saved percentages against its JD — result was well-reasoned, confirming the mechanism is an LLM judgment call (no formula, no rubric with point values), not fabrication. That check surfaced a bigger unanswered question the user wants to think through properly: is this judgment call *deterministic/reproducible* enough to trust the chart's implied precision, and — separately — the model's reasoning/argumentation is never persisted anywhere (only the final 6 numbers + archetype label land in `JD_analysis.md`/DB; no thinking text is saved, only a token count).

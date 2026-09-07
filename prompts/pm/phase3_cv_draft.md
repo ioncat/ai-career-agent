@@ -42,6 +42,7 @@ User will provide:
 18. **Add `---` separator between each job entry** for visual spacing in PDF output.
 19. **NEVER use plural forms for things built or owned: no "systems", "portals", "platforms".** Name individual items specifically (singular each), or use "product" / "product suite" as a collective. Exception: "products" is allowed only when referring to multiple distinct products in context.
 20. **CERTIFICATIONS: include only "Certified AI-Empowered SAFe® Product Owner/Product Manager" by default.** Add others only when directly relevant to the specific vacancy.
+20b. **Key results block is mandatory for EVERY role in EXPERIENCE, including the most recent/current one.** Do not skip it for roles that read as execution-only or too short/new to have metrics. Check PROFILE.md's main entry for that company AND every "Additional Evidence" section for that company before concluding there is genuinely no outcome evidence — that is the only valid reason to omit it for a given role. Found missing live on two roles in one CV (vacancy #1494, 2026-09-07): the current role and a 5-month execution role that had a KPI figure sitting directly in PROFILE.md's Experience section, unused.
 21. **NPS/CSAT — always include in Key Results by default when the evidence exists.** Product metrics are asked for in most JDs (explicitly or implicitly) — default to keeping NPS/CSAT alongside other Key Results; removing later is easy if a specific vacancy truly has no use for them.
 22. **Every sentence must earn its place.** After drafting each role paragraph, check every sentence against the Signal Coverage Table. Ask: does this deliver value in the context of this JD's requirements, or lead the recruiter in the wrong direction? If a sentence maps to no JD signal (high/medium/low) — cut it. Factual ≠ relevant. (Phase 3.6 will audit the saved CV — but the draft should already pass this check.) NPS/CSAT are valid product-metrics evidence regardless of role type (per rule 21, default = keep) — combine with error reduction %, automation %, delivery velocity rather than replacing them, especially when the JD explicitly asks for "experience with product metrics and analytics."
 23. **CV describes practice, NOT cases.** Role descriptions state what the candidate did as a pattern (approach, method, ongoing responsibility). Specific examples, named projects, and case-study evidence belong in the interview, not the CV. Wrong: "identified an off-hours revenue gap and built an automated flow". Right: "applied gap analysis to identify process discrepancies and defined requirements to close them." The CV proves breadth of practice; the interview proves depth with specifics.
@@ -128,18 +129,28 @@ Certified AI-Empowered SAFe® Product Owner/Product Manager
 - If the JD itself uses both terms interchangeably or is ambiguous → combined `Product Manager / Product Owner` is the fallback default.
 - Adjust only if role archetype strongly differs (e.g. `Technical Program Manager`)
 
+**Summary opening term — asymmetric, JD-driven (confirmed 2026-09-07, vacancy #1491) — does NOT apply to the headline above, only to the Summary's opening sentence:**
+- JD title = "Product Owner" → Summary opens with the combined `Product Owner / Product Manager` (e.g. "Product Owner / Product Manager with 6+ years..."). Most of the candidate's role titles default to "Product Manager" (rule 24b), so "Product Owner" alone in Summary can read as narrower/inconsistent to a reader cross-referencing LinkedIn or other applications.
+- JD title = "Product Manager" → Summary opens with `Product Manager` alone, no combined form — that's already the default term, nothing to hedge.
+
 **AI Tooling Paragraph — mandatory for all roles with any AI/product/digital signal:**
 
-1-component (most roles — daily practice only):
-> `AI tooling in daily practice (Claude, ChatGPT, Gemini) — requirements refinement, research synthesis, workflow validation, prototype creation. Personal portfolio at [ioncat.github.io](https://ioncat.github.io/).`
+**GOLDEN STANDARD (locked, confirmed 2026-09-07, vacancy #1494) — the "AI tooling across PM workflows" line is fixed text, used verbatim every time, never trimmed or reworded per vacancy:**
+> `AI tooling across PM workflows (Claude, ChatGPT, Gemini): research synthesis, user feedback analysis, requirements refinement, technical/API spec review, workflow validation, prototype creation.`
 
-**"Prototype creation" is a permanent, always-included item (confirmed 2026-08-28, vacancy #1332) — English and Ukrainian both. Unlike the rest of this list, it is not conditional on JD relevance.**
+1-component (most roles — daily practice only) — the golden line above, plus the portfolio link appended to it:
+> `AI tooling across PM workflows (Claude, ChatGPT, Gemini): research synthesis, user feedback analysis, requirements refinement, technical/API spec review, workflow validation, prototype creation. Personal projects: [ioncat.github.io](https://ioncat.github.io/).`
 
 2-component (AI/technical depth roles — explicit AI product ownership, LLM/technical PM, hands-on AI signal required):
-> `Built LLM pipelines hands-on — prompt architecture, context window management, response quality assessment — and applied that implementation depth to writing AI requirement specs complete enough for engineers to ship from. Active daily practice, not a side project. Personal portfolio at [ioncat.github.io](https://ioncat.github.io/).`
-> `AI tooling across PM workflows (Claude, ChatGPT, Gemini) — requirements refinement, research synthesis, workflow validation.`
+> `Built LLM pipelines hands-on in personal projects: prompt architecture, context window management, response quality assessment. That hands-on depth carries into writing AI-related requirements and specs detailed enough for an engineering team to build from. Personal projects: [ioncat.github.io](https://ioncat.github.io/).`
+> `AI tooling across PM workflows (Claude, ChatGPT, Gemini): research synthesis, user feedback analysis, requirements refinement, technical/API spec review, workflow validation, prototype creation.` *(the golden line, standalone — no portfolio link here, it already appeared in the paragraph above)*
 
-**⚠️ Portfolio link is MANDATORY in the AI paragraph — always include `[ioncat.github.io](https://ioncat.github.io/)` at end of last AI sentence.**
+**Banned wording — never use, even though it appears in older CVs:**
+- "...for engineers to ship from" (or equivalent literal handoff phrasing) about the personal projects — these are solo projects, no engineers were involved; a literal handoff claim is a logical contradiction. Use "that hands-on depth carries into writing AI-related requirements and specs detailed enough for an engineering team to build from" instead.
+- "Active daily practice, not a side project" (or equivalent) — implies commercial/professional context that doesn't exist; delete permanently.
+- "portfolio" for the GitHub examples — use "personal projects" instead.
+
+**⚠️ Portfolio link is MANDATORY in the AI paragraph — always include `[ioncat.github.io](https://ioncat.github.io/)` at the end, exactly once (1-component: appended to the golden line; 2-component: appended to the LLM-pipelines paragraph, not repeated on the golden line).**
 
 ---
 
