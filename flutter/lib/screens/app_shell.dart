@@ -16,6 +16,7 @@ import '../widgets/backend_status_dot.dart';
 import '../widgets/polling_progress_bar.dart';
 import '../widgets/processing_wrapper.dart' show SnakePainter;
 import '../widgets/status_line.dart';
+import '../utils/error_snackbar.dart';
 import 'vacancy_inbox_screen.dart';
 import 'analytics_screen.dart';
 import 'settings_screen.dart';
@@ -89,11 +90,7 @@ class _AppShellState extends ConsumerState<AppShell> {
       ));
     } catch (e) {
       if (!mounted) return;
-      messenger.showSnackBar(SnackBar(
-        content: Text('Import failed: $e'),
-        backgroundColor: Theme.of(context).colorScheme.error,
-        duration: const Duration(seconds: 4),
-      ));
+      showErrorSnackBar(context, 'Import failed: $e');
     }
   }
 
@@ -139,23 +136,24 @@ class _AppShellState extends ConsumerState<AppShell> {
         // OS-level desktop notification
         NotificationService.showPipelineEvent(n);
 
-        // In-app SnackBar (non-blocking)
+        // In-app SnackBar (non-blocking). Failures stay on screen until the
+        // user closes them (showErrorSnackBar) — a background pipeline
+        // failure is exactly the kind of thing a brief auto-dismiss hides.
         if (context.mounted) {
-          final color = n.isFailure
-              ? Theme.of(context).colorScheme.error
-              : Theme.of(context).colorScheme.primary;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                n.title.isNotEmpty ? n.title : n.event,
-                style: const TextStyle(fontSize: 13),
+          final label = n.title.isNotEmpty ? n.title : n.event;
+          if (n.isFailure) {
+            showErrorSnackBar(context, label);
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(label, style: const TextStyle(fontSize: 13)),
+                backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.9),
+                duration: const Duration(seconds: 4),
+                behavior: SnackBarBehavior.floating,
+                margin: const EdgeInsets.all(16),
               ),
-              backgroundColor: color.withValues(alpha: 0.9),
-              duration: const Duration(seconds: 4),
-              behavior: SnackBarBehavior.floating,
-              margin: const EdgeInsets.all(16),
-            ),
-          );
+            );
+          }
         }
       }
     });

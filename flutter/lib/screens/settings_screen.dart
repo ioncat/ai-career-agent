@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/config_provider.dart';
 import '../providers/settings_provider.dart';
 import '../widgets/phase_llm_config_tile.dart';
+import '../utils/error_snackbar.dart';
 // RemoteConfig used by _ModelDropdown
 
 /// Runs a config_provider patch (model/effort) and surfaces the result.
@@ -20,9 +21,7 @@ Future<void> _patchConfigAndReport(BuildContext context, Future<void> Function()
     }
   } catch (e) {
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update: $e'), backgroundColor: Colors.red),
-      );
+      showErrorSnackBar(context, 'Failed to update: $e');
     }
   }
 }
@@ -475,9 +474,7 @@ class _RefreshModelsButtonState extends ConsumerState<_RefreshModelsButton> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Refresh failed: $e'), backgroundColor: Colors.red),
-        );
+        showErrorSnackBar(context, 'Refresh failed: $e');
       }
     } finally {
       if (mounted) setState(() => _loading = false);

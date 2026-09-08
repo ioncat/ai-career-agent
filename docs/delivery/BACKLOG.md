@@ -1,6 +1,6 @@
 # career-agent — Backlog
 
-> Last updated: 2026-09-07
+> Last updated: 2026-09-08
 > Rules: [documentation-conventions.md](documentation-conventions.md) · History: [CHANGELOG.md](CHANGELOG.md) · Specs: [Epics/](Epics/)
 
 **Priority legend:**
@@ -37,6 +37,13 @@
 3. Apply Rule 5 (task ordering by blockers) and the existing global `INTERACTION_RULES.md` pointer pattern already used for Global Rules — sections that are themselves just "how to work" conventions might belong there instead of duplicated per-project.
 4. `CLAUDE.md` itself is gitignored (local-only) — no git history to preserve carefully, but don't delete real information, relocate it.
 **Not started.**
+
+### 🟢 P3/Icebox — Flutter Analytics: personal market-research trend view (groundwork laid 2026-09-08, not started)
+**What:** `/ai-vacancy-report` and `/pm-vacancy-report` (personal market research, `research/` — see [feature entry in CHANGELOG.md → 2026-09-08](CHANGELOG.md)) each now also write a dated, never-overwritten JSON snapshot (`research/{ai,pm}_vacancy_report_raw_YYYY-MM-DD.json`) alongside their working-copy output — pure insurance laid down deliberately so this is buildable later without re-deriving anything. **When asked to "extend analytics" with this data, start here, not from scratch:**
+1. `research/ai-product-vacancy-market-analysis-methodology.md` / `research/pm-vacancy-market-analysis-methodology.md` — the two pipelines' full design (categories, dictionaries, false-positive lessons already learned).
+2. `scripts/ai_vacancy_report.py` / `scripts/pm_vacancy_report.py` — the actual filters + term dictionaries, extendable in place.
+3. `flutter/lib/screens/analytics_screen.dart` — the existing in-app Analytics screen (currently: live vacancy-tag distribution from `core/vacancy_tags.py`'s taxonomy, `_TagChart`/`_BarRow` bar-chart widgets) — the natural home for a new section, not a separate screen.
+**Not started — needs a decision first:** once 3+ dated JSON snapshots exist, add a small `agent.db` table (`report_date`/`category`/`term`/`count`) populated by parsing those snapshots, and a new backend endpoint + Flutter section reading it — confirmed *not* worth a separate database, see discussion this same session.
 
 ### 🟡 P2 — Flutter: visually distinguish a Djinni salary estimate (and a probe give-up note) from a real disclosed salary (backend + pipeline wiring delivered 2026-09-05/07)
 **What:** `services/parser/salary_probe.py` + `POST /djinni-salary-ceiling` (jd-parser) + `adapters/djinni_salary_adapter.py` estimate a Djinni vacancy's real, possibly-undisclosed salary via Djinni's own public `salary=N` search filter (exponential+binary search, $500 granularity, shared 30-request budget across both identification strategies). Wired into the live pipeline: `tools/cv_fetch_jd.py`'s `fetch_jd()` (brand-new vacancies, RSSWatcher included) and `web/api.py`'s `_do_refetch_vacancy_from_source()` (republish + manual "Re-fetch from source", which also now retries the probe itself, not just the JD text) both fire it in the background whenever nothing else finds a number. When it can't determine one, a short note is written into the same field instead of silence: `"(probe: listing not found in search — may be inactive)"`, `"(probe: too many matching listings to narrow down)"`, `"(probe: network error — will retry)"`.

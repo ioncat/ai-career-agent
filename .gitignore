@@ -62,6 +62,15 @@ db/backups/
 CLAUDE.md
 docs/discovery/
 
+# Personal/operational research (candidate's own market research, not
+# product discovery — see /research vs docs/discovery/ distinction,
+# confirmed 2026-09-08). The English-language content (scripts' output,
+# methodology docs, EN reports) IS tracked — only revised 2026-09-08:
+# Russian-language reports/translations and raw data dumps stay local-only.
+research/*_RU.md
+research/*_raw.json
+research/*_raw_*.json
+
 # Skill pipeline — base files (SKILL.md, SKILL_TYPES.md, users.yaml) are tracked.
 # Personal data (user profiles, active_user state) is private.
 skill/users/

@@ -97,6 +97,15 @@ class TestClassify:
         text = "We offer medical insurance and paid vacation. Медичне страхування для співробітників."
         assert classify(text) == []
 
+    def test_b2c_keyword(self):
+        assert "b2c" in classify("We build B2C mobile subscription products")
+
+    def test_d2c_keyword(self):
+        assert "b2c" in classify("A fast-growing D2C skincare brand")
+
+    def test_direct_to_consumer_keyword(self):
+        assert "b2c" in classify("We are a direct-to-consumer wellness startup")
+
     def test_multiple_tags_can_match(self):
         text = "We are a B2B SaaS fintech platform serving mobile app users"
         tags = classify(text)
@@ -303,6 +312,37 @@ class TestMobileFalseContext:
         # context found for them in the audit, unlike bare "мобільн".
         assert "mobile" in classify("Experience shipping iOS apps required")
         assert "mobile" in classify("3+ years building Android products")
+
+
+class TestB2CFalseContext:
+    """Regression for 2026-09-08: a full-DB test of bare "b2c" (162 matches)
+    found 9 (5.6%) fell into a candidate-background list or a "B2C, B2B"
+    adjacency mention, neither confirming the vacancy's own product is B2C —
+    comparable in scale to mobile's 8.5% false-positive rate, same fix
+    shape."""
+
+    def test_candidate_background_list_does_not_tag_b2c(self):
+        text = "3+ years of experience in Product Marketing, Growth Marketing, or similar B2C roles."
+        assert "b2c" not in classify(text)
+
+    def test_b2c_b2b_adjacency_does_not_tag_b2c(self):
+        text = "We serve merchants across B2C and B2B verticals with our payment infrastructure."
+        assert "b2c" not in classify(text)
+
+    def test_b2b_b2c_adjacency_reverse_order_does_not_tag_b2c(self):
+        text = "Our platform supports both B2B and B2C payment flows."
+        assert "b2c" not in classify(text)
+
+    def test_real_b2c_product_still_matches(self):
+        text = "Ми шукаємо Payment Manager, який працюватиме з B2C online payments та підписками."
+        assert "b2c" in classify(text)
+
+    def test_d2c_direct_to_consumer_strong_keywords_unaffected_by_b2c_weak_list(self):
+        # d2c/direct-to-consumer stay in the always-on strong list — no
+        # comparable false-positive context found for these more deliberate
+        # phrasings, unlike bare "b2c".
+        assert "b2c" in classify("A fast-growing D2C skincare brand")
+        assert "b2c" in classify("We are a direct-to-consumer wellness startup")
 
 
 class TestMergeTags:

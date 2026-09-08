@@ -8,6 +8,7 @@ import '../providers/settings_provider.dart';
 import '../providers/vacancy_list_provider.dart';
 import '../repositories/vacancy_repository.dart';
 import '../utils/backend_time.dart';
+import '../utils/error_snackbar.dart';
 import '../widgets/processing_wrapper.dart';
 import '../widgets/vacancy_card.dart';
 import 'vacancy_detail_screen.dart';
@@ -247,9 +248,7 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
       _keyboardFocusNode.requestFocus();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-      );
+      showErrorSnackBar(context, 'Error: $e');
     }
   }
 

@@ -2,8 +2,8 @@
 core/vacancy_tags — keyword-based domain/segment classification for vacancies.
 
 Classifies a JD's full text into zero or more market-segment tags (igaming,
-deftech, mobile, outsourcing, b2b_saas, studio, fintech, healthtech). Purely
-lexical — no LLM call, cheap enough to run on every fetch.
+deftech, mobile, outsourcing, b2b_saas, studio, fintech, healthtech, b2c).
+Purely lexical — no LLM call, cheap enough to run on every fetch.
 
 Taxonomy locked 2026-08-28 after a retroactive analytics pass over the full
 vacancy history (see session — "iGaming share" question). AI/ML product was
@@ -15,6 +15,12 @@ itself is AI. Revisit only with a tighter signal than plain text matching.
 platform), which had no domain tag at all under the original 7 categories.
 Full-history backfill deliberately deferred to a later session — this
 addition only affects vacancies classified from here on.
+
+`b2c` added 2026-09-08 — flagged by a personal market-research report
+(research/pm-vacancy-market-analysis-2026-09-08.md) that found B2C was the
+5th-largest domain (12.3% of a 954-vacancy Product-track corpus) with no
+matching tag anywhere in this taxonomy. Full-history backfill done same
+session — see scripts/backfill_b2c_tag.py.
 
 Tags here are ADDITIVE to the free-form `tags` column (schema.sql) — never
 overwrite a manually-set tag (e.g. a user-assigned one-off label).
@@ -92,6 +98,13 @@ _TAXONOMY: dict[str, list[str]] = {
     "healthtech": [
         "telehealth", "telemedicine", "digital health", "medtech",
         r"\behr\b", r"\bemr\b", "patient portal", "e-prescri",
+    ],
+    # "b2c" excluded here — see _B2C_WEAK below, 2026-09-08. d2c/direct-to-
+    # consumer stay strong: unlike "b2c", nobody uses these as filler in a
+    # candidate-background list or a "we serve both B2C and B2B" adjacency
+    # mention — they're deliberate, specific phrasing when used at all.
+    "b2c": [
+        r"\bd2c\b", "direct-to-consumer", "direct to consumer",
     ],
 }
 
@@ -236,6 +249,32 @@ _HEALTHTECH_FALSE_CONTEXT = re.compile(
     re.IGNORECASE,
 )
 
+# b2c-only: bare "b2c" collides with two contexts that don't confirm the
+# vacancy's OWN product is B2C — found live 2026-09-08, added after a market-
+# research report (research/pm-vacancy-market-analysis-2026-09-08.md) flagged
+# B2C as a missing domain category. Full-DB test of the strong "b2c" match
+# (162 vacancies) found 9 (5.6%) fell into one of these two shapes —
+# comparable in scale to the mobile weak-list false-positive rate (8.5%) that
+# already justified the same treatment:
+# 1. A candidate-background "nice to have" list ("...B2C roles", "experience
+#    in X or similar B2C...") — describes what the CANDIDATE should have
+#    done, not what THIS company's product is (same shape as deftech's
+#    "the miltech domain" candidate-background exclusion).
+# 2. A "B2C, B2B" / "B2B, B2C" adjacency listing both business models in the
+#    same breath — usually a company describing itself as serving multiple
+#    customer types, or an agency naming both as client categories, not a
+#    confident single classification.
+# A genuine B2C product still counts via a "b2c" mention elsewhere in the
+# same text outside both contexts, or via the always-on d2c/direct-to-
+# consumer strong keywords above.
+_B2C_WEAK = ["b2c"]
+_B2C_WEAK_COMPILED = [re.compile(p) for p in _B2C_WEAK]
+_B2C_FALSE_CONTEXT = re.compile(
+    r"experience\w*[^.\n]{0,80}(?:or|and)\s+(?:similar\s+)?b2c|"
+    r"b2c\s*(?:,|/|and|or)\s*b2b|b2b\s*(?:,|/|and|or)\s*b2c",
+    re.IGNORECASE,
+)
+
 # Tags are non-exclusive by design (a vacancy can genuinely be both igaming
 # and studio, or deftech and outsourcing) — see the analytics discussion this
 # taxonomy came out of. For a single-owner view (a chart that needs to sum to
@@ -247,7 +286,7 @@ _HEALTHTECH_FALSE_CONTEXT = re.compile(
 # business it's in), with `outsourcing` last as a business-model fallback
 # (only becomes primary when no domain vertical matched at all).
 PRIORITY: list[str] = [
-    "deftech", "igaming", "fintech", "healthtech", "studio", "mobile", "b2b_saas", "outsourcing",
+    "deftech", "igaming", "fintech", "healthtech", "studio", "mobile", "b2c", "b2b_saas", "outsourcing",
 ]
 
 
@@ -304,6 +343,13 @@ def classify(jd_text: str) -> list[str]:
         stripped = _HEALTHTECH_FALSE_CONTEXT.sub(" ", text)
         if any(p.search(stripped) for p in _HEALTHTECH_WEAK_COMPILED):
             tags.append("healthtech")
+    if "b2c" not in tags:
+        # Strong b2c keywords (d2c/direct-to-consumer) found nothing — check
+        # bare "b2c", but only against text with the known candidate-
+        # background-list and B2C/B2B-adjacency contexts stripped out.
+        stripped = _B2C_FALSE_CONTEXT.sub(" ", text)
+        if any(p.search(stripped) for p in _B2C_WEAK_COMPILED):
+            tags.append("b2c")
     return tags
 
 

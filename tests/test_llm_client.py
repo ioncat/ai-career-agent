@@ -511,6 +511,19 @@ async def test_claudecode_nonzero_returncode():
 
 
 @pytest.mark.asyncio
+async def test_claudecode_nonzero_returncode_stdout_fallback():
+    """When the CLI writes its failure reason to stdout instead of stderr
+    (e.g. an expired OAuth session, found live 2026-09-08 on vacancy #1504),
+    the error message must still surface it — not go blank because stderr
+    was empty."""
+    provider = ClaudeCodeProvider(profile_md=FAKE_PROFILE)
+    proc = _make_proc(b"Failed to authenticate: OAuth session expired", returncode=1, stderr=b"")
+    with patch("asyncio.create_subprocess_exec", return_value=proc):
+        with pytest.raises(LLMError, match="OAuth session expired"):
+            await provider.complete("x")
+
+
+@pytest.mark.asyncio
 async def test_claudecode_last_call_usage_zero_cost():
     provider = ClaudeCodeProvider(profile_md=FAKE_PROFILE)
     proc = _make_proc(b"result\n")

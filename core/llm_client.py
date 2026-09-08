@@ -732,7 +732,17 @@ class ClaudeCodeProvider:
             _f.write(f"--- END (rc={proc.returncode}, {elapsed_sec:.1f}s) ---\n")
 
         if proc.returncode != 0:
-            err = "".join(stderr_lines)[:300]
+            # claude CLI doesn't consistently write its own error messages to
+            # stderr — an expired OAuth session writes to stdout instead
+            # (found live 2026-09-08, vacancy #1504's "Check blockers":
+            # stderr was empty, the real reason — "Failed to authenticate:
+            # OAuth session expired and could not be refreshed" — was only
+            # in stdout, so the surfaced error was a blank "rc=1: "). Prefer
+            # stderr (empty on a clean run), fall back to stdout, so the real
+            # reason always reaches the caller instead of going silent.
+            stderr_text = "".join(stderr_lines).strip()
+            stdout_text = "".join(output_lines).strip()
+            err = (stderr_text or stdout_text or "(no output on either stream)")[:300]
             raise LLMError(f"claude CLI error (rc={proc.returncode}): {err}")
 
         text = self._normalize_cli_output("".join(output_lines).strip())

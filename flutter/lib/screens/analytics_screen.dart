@@ -12,8 +12,14 @@ import '../repositories/vacancy_repository.dart';
 // Mirrors core/vacancy_tags.py PRIORITY — kept as plain Dart here since this
 // screen can't import the Python taxonomy module directly. Update alongside
 // any change to that list.
+//
+// Fixed 2026-09-08: this list had drifted out of sync with the Python
+// source — 'healthtech' (added there 2026-09-05) was missing here entirely,
+// silently falling through to the generic tags.first fallback in
+// _primaryTag() instead of following its intended priority position. Added
+// 'b2c' (new 2026-09-08 category) in the same fix.
 const _kPriority = [
-  'deftech', 'igaming', 'fintech', 'studio', 'mobile', 'b2b_saas', 'outsourcing',
+  'deftech', 'igaming', 'fintech', 'healthtech', 'studio', 'mobile', 'b2c', 'b2b_saas', 'outsourcing',
 ];
 
 String? _primaryTag(List<String> tags) {
@@ -184,10 +190,12 @@ class _TagChart extends StatelessWidget {
     this.emptyMessage = 'No vacancies loaded yet.',
   });
 
+  // 9 colors — one per _kPriority tag, so all bars stay visually distinct
+  // (was 8, one short since the healthtech/b2c additions, 2026-09-08).
   static const _palette = [
     Color(0xFF6750A4), Color(0xFF386A20), Color(0xFF8C4A2F),
     Color(0xFF006874), Color(0xFF984061), Color(0xFF7C5800),
-    Color(0xFF4A6363), Color(0xFF5C5D72),
+    Color(0xFF4A6363), Color(0xFF5C5D72), Color(0xFF8B5000),
   ];
 
   @override
@@ -250,6 +258,8 @@ const _kTagDescriptions = {
   'b2b_saas': 'B2B SaaS platform or product.',
   'studio': 'Game development studio building its own games.',
   'fintech': 'Financial technology: payments, banking, crypto.',
+  'healthtech': 'Healthcare-related product: telehealth, EHR/EMR, patient portal.',
+  'b2c': 'Consumer-facing product: B2C, D2C, direct-to-consumer.',
   'untagged': 'JD text didn\'t match any known category keyword.',
 };
 

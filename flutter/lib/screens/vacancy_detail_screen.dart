@@ -15,6 +15,7 @@ import '../providers/vacancy_list_provider.dart';
 import '../repositories/vacancy_repository.dart';
 import '../providers/vacancy_cv_provider.dart';
 import '../utils/backend_time.dart';
+import '../utils/error_snackbar.dart';
 
 /// Renders a pre-filter reason string ("category: explanation" — as produced by
 /// prompts/pm|generic/prefilter.md) with the category bolded + capitalized,
@@ -262,9 +263,7 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
+        showErrorSnackBar(context, 'Error: $e');
       }
     } finally {
       if (mounted) setState(() => _loadingAnalyze = false);
@@ -289,30 +288,24 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
         // the actual reason immediately, not a generic "something failed"
         // (gap found 2026-07-17: Ollama being down looked like any other error).
         final providerUnavailable = result['provider_unavailable'] as bool? ?? false;
-        final String msg;
-        Color? bg;
-        if (providerUnavailable) {
-          msg = 'LLM provider unavailable: ${result['error']}';
-          bg = Colors.orange.shade800;
-        } else if (!ok) {
-          msg = 'Check failed — see details below';
-          bg = Colors.red;
+        if (providerUnavailable || !ok) {
+          // Real failure — show the actual reason and keep it on screen
+          // until the user closes it (see showErrorSnackBar docstring).
+          final reason = result['error'] ?? 'unknown error';
+          showErrorSnackBar(
+            context,
+            providerUnavailable ? 'LLM provider unavailable: $reason' : 'Check failed: $reason',
+          );
         } else {
-          msg = blocked ? 'Possible blocker found — see below' : 'Checked — no blockers found';
+          final msg = blocked ? 'Possible blocker found — see below' : 'Checked — no blockers found';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(msg), duration: const Duration(seconds: 3)),
+          );
         }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(msg),
-            backgroundColor: bg,
-            duration: Duration(seconds: providerUnavailable ? 6 : 3),
-          ),
-        );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
+        showErrorSnackBar(context, 'Error: $e');
       }
     } finally {
       if (mounted) setState(() => _loadingPrefilter = false);
@@ -350,9 +343,7 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
+        showErrorSnackBar(context, 'Error: $e');
       }
     } finally {
       if (mounted) setState(() => _loadingRefetch = false);
@@ -498,9 +489,7 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
+        showErrorSnackBar(context, 'Error: $e');
         setState(() => _loadingDecline = false);
       }
     }
@@ -518,9 +507,7 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
+        showErrorSnackBar(context, 'Error: $e');
         setState(() => _loadingRestore = false);
       }
     }
@@ -920,9 +907,7 @@ class _AnalysisErrorViewState extends ConsumerState<_AnalysisErrorView> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
+        showErrorSnackBar(context, 'Error: $e');
         setState(() => _retrying = false);
       }
     }
@@ -1012,9 +997,7 @@ class _AnalysisErrorBannerState extends ConsumerState<_AnalysisErrorBanner> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
+        showErrorSnackBar(context, 'Error: $e');
         setState(() => _retrying = false);
       }
     }
@@ -1879,9 +1862,7 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
+        showErrorSnackBar(context, 'Error: $e');
       }
     } finally {
       if (mounted) setState(() => _loadingCv = false);
@@ -1900,9 +1881,7 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
+        showErrorSnackBar(context, 'Error: $e');
       }
     } finally {
       if (mounted) setState(() => _loadingAnalyze = false);
@@ -1923,9 +1902,7 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
+        showErrorSnackBar(context, 'Error: $e');
       }
     } finally {
       if (mounted) setState(() => _loadingReset = false);
@@ -1944,9 +1921,7 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
+        showErrorSnackBar(context, 'Error: $e');
       }
     } finally {
       if (mounted) setState(() => _loadingCv = false);
@@ -1984,12 +1959,7 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
     } catch (e) {
       messenger.hideCurrentSnackBar();
       if (mounted) {
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text('PDF error: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
+        showErrorSnackBar(context, 'PDF error: $e');
       }
     }
   }
@@ -2003,9 +1973,7 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
+        showErrorSnackBar(context, 'Error: $e');
         setState(() => _loadingDecline = false);
       }
     }
@@ -2023,9 +1991,7 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
+        showErrorSnackBar(context, 'Error: $e');
         setState(() => _loadingRestore = false);
       }
     }
