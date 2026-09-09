@@ -6,6 +6,11 @@
 
 ---
 
+## 2026-09-09
+
+- **CV-drafting rule — banned bare capability framing ("Able to X", "Can X") in favor of demonstrated-experience phrasing.** Found live on vacancy #1511 (ITExpert): a Summary sentence read "Able to translate business needs into engineering-ready language..." — user pushback: this asserts raw capability, not proven track record ("не то что я способен, а то что у меня есть опыт"). Fixed to "Experienced in translating..." (also caught that a bare "Experienced translating" without the preposition is ungrammatical). New rule 9c (`prompts/pm/phase3_cv_draft.md`) / 12b (`prompts/generic/phase3_cv_draft.md`): prefer a past-tense action verb, a headline-style noun phrase ("Experience translating..."), or "Experienced in X-ing" — never bare "able to"/"can".
+- **CV #1511 Summary rewrite** — fixed a real conflation bug (the Summary listed billing/CRM/CMS/compliance and "internal permission structures" as one flat list, reading like features of a single business, when they actually describe two separate employers/platforms); simplified to plain B2 English per project language policy; dropped a redundant second "multi-module" mention once the opening clause already covered it.
+
 ## 2026-09-08
 
 - **Bug fix — a `claude` CLI failure (e.g. expired OAuth session) could surface as a blank error with no reason.** Found live on vacancy #1504: the manual "Check blockers" button failed twice with `claude CLI error (rc=1): ` — nothing after the colon. Root cause: `ClaudeCodeProvider.complete()` (`core/llm_client.py`) only read `stderr` into the error message on a non-zero exit, but this specific failure ("Failed to authenticate: OAuth session expired and could not be refreshed") was written to `stdout`, not `stderr` — visible only in `logs/cli_debug.log`, which streams stdout for debugging but isn't what the error message itself is built from. Fixed: prefer `stderr`, fall back to `stdout`, so the real reason always reaches the caller. 1 new test (`test_claudecode_nonzero_returncode_stdout_fallback`) covering the stdout-only failure case. 29/29 `test_llm_client.py` passing.
