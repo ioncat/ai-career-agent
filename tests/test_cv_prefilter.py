@@ -443,6 +443,13 @@ _JD_WORLDWIDE = (
 
 _JD_HYBRID_FORMAT = (
     "# Product Manager\n\n## Vacancy Requirements\n\n"
+    "  * **Офіс, Гібридний формат роботи**\n"
+    "  * ** Україна **\n\n"
+    "Країни, де розглядаємо кандидатів\n\n"
+)
+
+_JD_REMOTE_AMONG_OPTIONS = (
+    "# Product Manager\n\n## Vacancy Requirements\n\n"
     "  * **Офіс, Віддалена робота, Гібридний формат роботи**\n"
     "  * ** Україна **\n\n"
     "Країни, де розглядаємо кандидатів\n\n"
@@ -484,6 +491,13 @@ def test_check_remote_format_flags_hybrid_office_listing():
     assert "Гібридний" in reason
 
 
+def test_check_remote_format_no_flag_when_remote_among_multiple_options():
+    # Comma-separated list = selectable options, not an AND-combined
+    # requirement — "Віддалена робота" present alongside Office/Hybrid means
+    # remote IS one of the choices, not excluded. Vacancy #1565 (2026-09-11).
+    assert _check_remote_format(_JD_REMOTE_AMONG_OPTIONS) is None
+
+
 def test_check_remote_format_no_requirements_section_returns_none():
     assert _check_remote_format("# Product Manager\n\nJust a JD body.") is None
 
@@ -509,7 +523,7 @@ async def test_apply_location_stage_writes_blocker_on_country_mismatch():
 async def test_apply_location_stage_writes_both_reasons_when_both_fail():
     jd = (
         "# Product Manager\n\n## Vacancy Requirements\n\n"
-        "  * **Офіс, Віддалена робота, Гібридний формат роботи**\n"
+        "  * **Офіс, Гібридний формат роботи**\n"
         "  * ** Країни ЄС **\n\n"
         "Країни, де розглядаємо кандидатів\n\n"
     )

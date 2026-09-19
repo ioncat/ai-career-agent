@@ -311,15 +311,28 @@ _REMOTE_FORMAT_RE = re.compile(
     r"(?:Країни, де розглядаємо кандидатів|Countries where we consider candidates)",
     re.IGNORECASE,
 )
-_REMOTE_ONLY_WORDS = ("тільки віддалено", "full remote", "remote only", "fully remote")
+# The field is a comma-separated LIST OF OPTIONS Djinni lets the poster
+# multi-select, not an AND-combined single format — "Офіс, Віддалена робота,
+# Гібридний формат роботи" means all three are accepted, remote included, not
+# "the role is office+hybrid with no remote choice". The old version of this
+# check only cleared a listing that matched the *exact* remote-only phrasing
+# ("Тільки віддалено"), so it flagged EVERY multi-option listing that also
+# offered remote as if remote weren't on the table at all — caught live
+# 2026-09-11 (vacancy #1565, CashBee): "Віддалена робота, Гібридний формат
+# роботи" was flagged as "not remote-only" even though remote is explicitly
+# one of the two listed options. Corrected rule: flag only when NO remote
+# indicator appears anywhere in the list (e.g. "Офіс" alone, or "Офіс,
+# Гібридний формат роботи" with no "Віддалена"/"remote" word at all).
+_REMOTE_WORD_RE = re.compile(r"віддален\w*|remote", re.IGNORECASE)
 
 
 def _check_remote_format(jd_text: str) -> str | None:
     """Deterministic pre-check: does Djinni's structured requirements sidebar
-    list anything other than remote-only (Office, Hybrid)? Returns None if
-    clean, absent, or unparseable (fail-open), or a reason string to flag —
-    advisory only, same as the other structured-sidebar checks, not a hard
-    decline.
+    list a format field with NO remote option at all (e.g. "Офіс" alone, or
+    "Офіс, Гібридний формат роботи" with no remote choice)? Returns None if
+    clean (remote is one of the listed options, or field absent/unparseable —
+    fail-open), or a reason string to flag — advisory only, same as the other
+    structured-sidebar checks, not a hard decline.
     """
     m = _REQUIREMENTS_SECTION_RE.search(jd_text)
     if not m:
@@ -329,10 +342,9 @@ def _check_remote_format(jd_text: str) -> str | None:
     if not fmt_match:
         return None
     fmt = fmt_match.group(1).strip()
-    low = fmt.lower()
-    if any(phrase in low for phrase in _REMOTE_ONLY_WORDS):
+    if _REMOTE_WORD_RE.search(fmt):
         return None
-    return f"remote_format: JD lists {fmt!r} (not remote-only)"
+    return f"remote_format: JD lists {fmt!r} (no remote option)"
 
 
 def _check_country(jd_text: str) -> str | None:
