@@ -195,6 +195,8 @@ from the profile to guide which experience to surface.
 
 For each `high` signal where `in_profile = ⚠️` — give explicit framing instruction: how to present partial evidence honestly without overclaiming.
 
+**Before reaching for a generic phase3_cv_draft.md template (e.g. the AI Tooling Paragraph's 1-/2-component forms) — check PROFILE.md's `Additional Evidence` sections for a more specific block that answers the JD's exact wording.** A generic template match ("this JD has an AI/technical signal → use the standard template") is a fallback, not the first move — PROFILE.md often already has a dedicated, more precise evidence block for a specific tool/scenario (e.g. a "Claude Code / AI-agent-tooling practice" block for a JD naming Claude Code specifically, vs. the generic "LLM pipelines" template, which answers a different claim — building AI systems, not using one as a daily tool). If a specific block exists and matches better, cite it by name in the reframing action instead of just saying "use the 2-component form." Found live 2026-09-09 (vacancy #1515): the generic template was applied because an AI signal was present, without checking whether a more specific evidence block existed for the JD's actual wording.
+
 Format each action as:
 - **[Action label]:** [Specific instruction — what to change, what to emphasize, exact framing]
 

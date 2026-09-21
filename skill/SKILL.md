@@ -107,6 +107,17 @@ Phase 3.5: Self-Review     [review tables + verdict shown to user; CV body NEVER
     slipped through an eyeball-only Phase 3.5 pass and only surfaced when the user asked for a
     dedicated dedup check). Feed both lists into the Repetition Check below same as the
     Python pipeline would.
+  → Also run a grammar/sentence-construction pass before presenting the review: unnecessary
+    commas (esp. before "and" joining only two items, or between an adjective and the noun
+    phrase it modifies, e.g. "a shipped, production system" should be "a shipped production
+    system"), dangling/misattributed participial phrases (e.g. "X starts with discovery,
+    identifying the client's problems" attributes "identifying" to the wrong subject — rewrite
+    as an infinitive purpose clause: "X starts with discovery to identify..."), and awkward
+    verb-object pairings (e.g. "led an automated flow" — you lead delivery/a team, not a flow;
+    "led the delivery of an automated flow" is correct). This is a real, separate check from
+    the repetition/tone passes above — found missing live 2026-09-09 (vacancy #1515): several
+    rounds of small phrase edits went out with no one checking the resulting sentence was still
+    grammatically clean, until the user asked directly "почему не проверяешь грамматику?"
   → Save [Name]_CV.md to existing folder (already created after Phase 1+2)
   → Generate PDF via http://localhost:8002/render → save PDF bytes
   → Present a markdown link to the saved CV.md (and PDF) — per Rule 8, never paste the CV body itself

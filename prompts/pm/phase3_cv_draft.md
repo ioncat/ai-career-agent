@@ -136,6 +136,8 @@ Certified AI-Empowered SAFe® Product Owner/Product Manager
 
 **AI Tooling Paragraph — mandatory for all roles with any AI/product/digital signal:**
 
+**Before defaulting to the 1-/2-component templates below — check PROFILE.md's `Additional Evidence` sections for a more specific block matching the JD's exact wording (named tool, specific use case).** The templates are a fallback for a generic AI signal, not the first move. Do not pattern-match "AI signal present → use 2-component form" without checking whether PROFILE.md already has a more precise evidence block for that specific signal — using the generic template when a specific one exists produces a claim the JD didn't ask for and skips the evidence the JD actually asked for. Example: a JD naming Claude Code by name is answered by the "Claude Code / AI-agent-tooling practice" evidence block, not by the generic "LLM pipelines" 2-component paragraph (that one answers a different claim — building AI systems, not using one as a daily tool). Found live 2026-09-09, vacancy #1515.
+
 **GOLDEN STANDARD (locked, confirmed 2026-09-07, vacancy #1494) — the "AI tooling across PM workflows" line is fixed text, used verbatim every time, never trimmed or reworded per vacancy:**
 > `AI tooling across PM workflows (Claude, ChatGPT, Gemini): research synthesis, user feedback analysis, requirements refinement, technical/API spec review, workflow validation, prototype creation.`
 
