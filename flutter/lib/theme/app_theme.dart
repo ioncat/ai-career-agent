@@ -7,7 +7,10 @@ class AppColors {
   static const sourceDjinni  = Color(0xFF007BFF);
   static const sourceDou     = Color(0xFF4CAF50);
   static const sourceLinkedIn = Color(0xFF004182);
-  static const sourceOther   = Color(0xFF7A7582);  // == outline
+  static const sourceWork    = Color(0xFFFF6D00);  // work.ua brand orange
+  static const sourceRabota  = Color(0xFF00897B);  // rabota.ua
+  static const sourceRobota  = Color(0xFF6A1B9A);  // robota.ua (distinct site from rabota.ua)
+  static const sourceOther   = Color(0xFF7A7582);  // == outline — unrecognized/manual-paste fallback
 }
 
 // ── Full M3 ColorScheme (Fluid Desktop Workspace palette) ─────────────────────
@@ -153,6 +156,9 @@ class SourceColors {
       case 'djinni':   return AppColors.sourceDjinni;
       case 'dou':      return AppColors.sourceDou;
       case 'linkedin': return AppColors.sourceLinkedIn;
+      case 'work':     return AppColors.sourceWork;
+      case 'rabota':   return AppColors.sourceRabota;
+      case 'robota':   return AppColors.sourceRobota;
       default:         return AppColors.sourceOther;
     }
   }
@@ -162,6 +168,9 @@ class SourceColors {
       case 'djinni':   return 'Djinni';
       case 'dou':      return 'DOU.ua';
       case 'linkedin': return 'LinkedIn';
+      case 'work':     return 'work.ua';
+      case 'rabota':   return 'rabota.ua';
+      case 'robota':   return 'robota.ua';
       default:         return site.isEmpty ? 'Other' : site;
     }
   }

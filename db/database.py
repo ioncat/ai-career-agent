@@ -234,6 +234,11 @@ async def init_db() -> None:
             # User request 2026-09-05: most-recently-declined first. NULL =
             # never declined, or restored back out of Archive.
             "ALTER TABLE vacancies ADD COLUMN declined_at TEXT",
+            # Manual paste/import (via /api/vacancies/import-jd) vs. automatic
+            # RSS ingest — url no longer reliably signals this once real
+            # posting URLs (parsed from the pasted content's "Source:" line)
+            # replaced the synthetic "import://{hash}" scheme. 2026-09-19.
+            "ALTER TABLE vacancies ADD COLUMN manual_import INTEGER NOT NULL DEFAULT 0",
         ]:
             try:
                 await db.execute(migration)
@@ -427,6 +432,7 @@ async def insert_vacancy(
     status: str | None = None,
     published_at: str | None = None,
     company: str | None = None,
+    manual_import: bool = False,
 ) -> int:
     """Insert new vacancy. Returns new row id.
 
@@ -436,6 +442,8 @@ async def insert_vacancy(
     status: if provided, sets initial status (e.g. 'queued' for webhook-created vacancies).
     published_at: ISO 8601 UTC string from RSS pubDate (nullable).
     company: company name extracted from RSS feed before full JD parse (nullable).
+    manual_import: True when this row came from a pasted/manual import (see
+        db/schema.sql comment) rather than automatic RSS ingest.
     Raises sqlite3.IntegrityError if normalised URL already exists — caller should handle.
     """
     canonical_url = normalize_url(url)
@@ -444,18 +452,18 @@ async def insert_vacancy(
         if status is not None:
             cursor = await db.execute(
                 """
-                INSERT INTO vacancies (url, title, site, markdown_path, user_id, status, published_at, company)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO vacancies (url, title, site, markdown_path, user_id, status, published_at, company, manual_import)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (canonical_url, title, resolved_site, markdown_path, user_id, status, published_at, company),
+                (canonical_url, title, resolved_site, markdown_path, user_id, status, published_at, company, int(manual_import)),
             )
         else:
             cursor = await db.execute(
                 """
-                INSERT INTO vacancies (url, title, site, markdown_path, user_id, published_at, company)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO vacancies (url, title, site, markdown_path, user_id, published_at, company, manual_import)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (canonical_url, title, resolved_site, markdown_path, user_id, published_at, company),
+                (canonical_url, title, resolved_site, markdown_path, user_id, published_at, company, int(manual_import)),
             )
         await db.commit()
         return cursor.lastrowid  # type: ignore[return-value]

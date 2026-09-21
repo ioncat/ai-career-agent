@@ -60,6 +60,13 @@ CREATE TABLE IF NOT EXISTS vacancies (
     fetch_attempts INTEGER NOT NULL DEFAULT 0,
                                           -- count of failed RSSWatcher fetch attempts; capped
                                           -- retry gives up after MAX_FETCH_ATTEMPTS (rss_watcher.py)
+    -- Manual paste/import via /api/vacancies/import-jd (browser-extension JD
+    -- capture pasted into the local UI), vs. 0 = automatic RSS ingest via
+    -- RSSWatcher/_process(). Added 2026-09-19 after url briefly doubled as
+    -- this signal (synthetic "import://{hash}" scheme) — that broke once the
+    -- real posting URL (parsed from the pasted content's own "Source:" line)
+    -- started being stored in `url` instead, so this got its own column.
+    manual_import   INTEGER NOT NULL DEFAULT 0,
     -- EPIC-27: critical blocker pre-filter (advisory only, never auto-skips)
     blocker_flag    INTEGER NOT NULL DEFAULT 0,
                                           -- 1 = pre-filter found a conflict with ## Critical Blockers

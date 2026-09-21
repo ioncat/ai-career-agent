@@ -1032,14 +1032,20 @@ def _detect_site(content: str) -> str:
     return "manual"
 
 
+_TITLE_PREFIX_RE = r'^(?:Вакансія|Вакансия)\s*:?\s*'
+
+
 def _extract_title_and_company(content: str, site: str) -> tuple[str, str]:
     """Parse JD content → (clean_role_title, company). Both may be empty string."""
     h1_match = re.search(r'^#\s+(.+)$', content, re.MULTILINE)
     h1 = h1_match.group(1).strip() if h1_match else ""
 
     if site == "work":
-        # work.ua format: "Вакансія {role}, {location}, компанія {company}"
-        m = re.match(r'(?:Вакансія\s+)?(.+?),.*?компані[яї]\s+(.+)', h1, re.IGNORECASE)
+        # work.ua format: "Вакансія: {role}, {location}, компанія {company}"
+        # (real-world postings always carry the colon — bare "Вакансія {role}"
+        # was a guess that never matched live data, leaving the prefix stuck
+        # on every extracted title; found live on #1645/#1646/#1647 2026-09-19)
+        m = re.match(rf'{_TITLE_PREFIX_RE}(.+?),.*?компані[яї]\s+(.+)', h1, re.IGNORECASE)
         if m:
             return m.group(1).strip(), m.group(2).strip()
 
@@ -1049,13 +1055,27 @@ def _extract_title_and_company(content: str, site: str) -> tuple[str, str]:
         if m:
             company = m.group(1).strip()
             role = re.sub(r',?\s*компані[яї]\s+.+', '', h1, flags=re.IGNORECASE).strip()
-            role = re.sub(r'^(?:Вакансія|Вакансия)\s+', '', role, flags=re.IGNORECASE).strip()
+            role = re.sub(_TITLE_PREFIX_RE, '', role, flags=re.IGNORECASE).strip()
             return role, company
-        # No company in H1 — strip "Вакансія" prefix and return clean title
-        role = re.sub(r'^(?:Вакансія|Вакансия)\s+', '', h1, flags=re.IGNORECASE).strip()
+        # No company in H1 — strip "Вакансія[:]" prefix and return clean title
+        role = re.sub(_TITLE_PREFIX_RE, '', h1, flags=re.IGNORECASE).strip()
         return role, ""
 
     return "", ""
+
+
+def _extract_source_url(content: str) -> str | None:
+    """Pull the real posting URL out of a pasted JD's own "Source: <url>" line.
+
+    Browser-extension JD captures prepend this line (see the "Source:"/
+    "Extracted:" header visible in every manual-import JD.md) — without it,
+    manually-imported vacancies had no real URL at all: the synthetic
+    "import://{content_hash}" placeholder was stored in `url` and shown as
+    the "Open JD" link, which launchUrl() cannot open (no registered handler
+    for the "import" scheme). Found live 2026-09-19 on #1645/#1646/#1647.
+    """
+    m = re.search(r'^Source:\s*(https?://\S+)', content, re.MULTILINE | re.IGNORECASE)
+    return m.group(1).strip() if m else None
 
 
 class ImportJdRequest(BaseModel):
@@ -1097,7 +1117,10 @@ async def api_import_jd(req: ImportJdRequest):
     extracted_title, extracted_company = _extract_title_and_company(req.content, detected_site)
     title = extracted_title or fallback_title
 
-    url = f"import://{content_hash}"
+    # Prefer the real posting URL (lets "Open JD" work and gives dedup a real
+    # key); only synthesize the placeholder when the pasted content carries
+    # no "Source:" line at all (e.g. raw JD text with no header).
+    url = _extract_source_url(req.content) or f"import://{content_hash}"
     try:
         vacancy_id = await database.insert_vacancy(
             url=url,
@@ -1107,6 +1130,7 @@ async def api_import_jd(req: ImportJdRequest):
             status="fetched",
             published_at=datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             company=extracted_company or None,
+            manual_import=True,
         )
     except Exception as exc:
         if "UNIQUE" in str(exc).upper():
