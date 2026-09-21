@@ -76,10 +76,8 @@
 1. **Fact fabrication via JD-vocabulary bleed** — self-review has no PROFILE.md grounding check. See "Phase 3 CV draft fabricates experience..." ticket directly below (MAX PRIORITY, #844). Fresh evidence 2026-07-30: vacancy #934's HostiServer paragraph gained "Facilitated stakeholder workshops" — literally lifted from the JD's own responsibilities line, zero backing anywhere in PROFILE.md — caught only by the user's manual re-read, not by any pipeline step.
 2. **Sentence-granularity signal audit lets noise ride along on valid clauses** — see "Phase 3.6 Signal Audit operates at sentence granularity" ticket below (P0, #828). Fresh evidence 2026-07-30: the same "pre-sales, pilot negotiation... account management" enterprise-sales-jargon pattern first found on #828 reappeared in spirit on #934's HostiServer paragraph.
 3. **Cross-role lexical bleed within one generation** — see "Phase 3 CV draft: cross-role lexical bleed" ticket below (P0, #828).
-4. **NEW — mechanical NON-NEGOTIABLE rules (em-dash ban, banned-phrase list) are never re-verified downstream.** Not previously tracked — see new P0 ticket "Mechanical NON-NEGOTIABLE rule violations are never re-verified downstream" below.
-**Structural fix (covers 1 & 3):** "Per-archetype skeletal building-block constructs in PROFILE.md" (P1, below) — fixed, vetted phrasing blocks instead of free generation removes the fabrication/bleed *mechanism*, not just patches each individual leak as it's found.
-**Cheap fix (covers most of 4, and a slice of 1 & 2):** a deterministic, non-LLM lint pass right after Phase 3.5 saves the draft — regex-scan for em-dash characters and a maintained banned-phrase list — before the draft is ever shown to the user. Near-zero implementation cost, would have auto-caught a real chunk of today's manual fixes.
-**When to pick this up:** start with the cheap lint pass whenever there's a free slot — immediate ROI, no design work needed. The skeletal-blocks rewrite (1 & 3) is the bigger investment, save for later.
+4. **✅ Delivered 2026-09-21 — mechanical NON-NEGOTIABLE rules (em-dash ban, banned-phrase list) are never re-verified downstream.** `core/cv_metrics.py:detect_mechanical_violations()` — see CHANGELOG.
+**Structural fix (covers 1 & 3):** "Per-archetype skeletal building-block constructs in PROFILE.md" (P1, below) — fixed, vetted phrasing blocks instead of free generation removes the fabrication/bleed *mechanism*, not just patches each individual leak as it's found. Still open.
 
 ---
 
@@ -160,14 +158,6 @@ If the actual diagnostic text was printed to stdout instead (as it was here), `s
 **Why it matters (user's framing):** this is not the documented "CV contamination between vacancies" bug ([[feedback_cv_no_contamination]] — cross-vacancy) — it's a narrower, previously-uncaught class: cross-role bleed **within a single CV generation**, sourced from the same PROFILE.md but the wrong section. User reports this specific failure mode ("something generic and unverifiable creeping into a bullet") recurring across many past CV generations, repeatedly asked to be removed, and reappearing — likely this same root cause each time (free-form prose generation over the full profile context, no hard boundary between roles' source material).
 **Proposed structural fix:** see P1 ticket "Per-archetype skeletal building-block constructs in PROFILE.md" below — this bug is the concrete evidence motivating that ticket.
 **Found via:** user noticed the recurring phrase during CV review for #828; traced to HostiServer PM's canonical text via `grep -i "post-release" skill/users/1/PROFILE.md`.
-
----
-
-### Mechanical NON-NEGOTIABLE rule violations (em-dash, banned phrases) are never re-verified downstream (added 2026-07-30)
-**What:** `prompts/pm|generic/phase3_cv_draft.md` rule 25 ("NEVER use em-dashes — a chained em-dash pair is a well-known AI-writing tell") and house-rule banned phrases (e.g. "gap analysis" — [[feedback_no_gap_analysis]]) are stated once in the generation prompt and never mechanically re-checked afterward. Recurred repeatedly in a single session, 2026-07-30: em-dash found in vacancy #915 (a chained pair in the HostiServer paragraph — the exact AI-tell pattern the rule exists to stop), #922 (3 separate instances), #934 (2 instances); "gap analysis" recurred independently on #932 and #934, despite both rules already being explicit and dated (em-dash rule added 2026-07-27 per CHANGELOG).
-**Why:** the LLM doesn't reliably self-enforce every listed NON-NEGOTIABLE rule on every generation, and nothing downstream re-checks mechanically — Phase 3.5's self-review checklist (word-frequency, tools table, tone) doesn't include a literal scan for either.
-**Fix direction:** deterministic, non-LLM post-generation lint step, run right after Phase 3.5 saves the CV and before it's shown to the user — regex for em-dash characters plus a maintained banned-phrase list. Flag matches for a one-click fix rather than hard-blocking. Cheap, high-value, no prompt-design risk — good first pick when picking up the broader "self-review checks the wrong things" problem (see orienting note at top of this section).
-**Found via:** repeated manual catches across vacancies #915/#922/#932/#934 in a single session, 2026-07-30 — see session transcript / `CHANGELOG.md` 2026-07-30 entries.
 
 ---
 

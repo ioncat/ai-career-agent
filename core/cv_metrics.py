@@ -197,6 +197,62 @@ def detect_phrase_repetition(
     return results
 
 
+# ── Mechanical rule violations ─────────────────────────────────────────────────
+
+# Maintained banned-phrase list — each entry traces to a dated feedback rule
+# that recurred despite already being stated once in a prompt file. Literal
+# substrings only (case-insensitive) — advisory, not exhaustive; a phrase not
+# on this list can still be a real violation a human catches on read-through.
+_BANNED_PHRASES: tuple[str, ...] = (
+    "AI-Native", "AI-Driven mindset",  # phase3_cv_draft.md rule 7
+    "gap analysis",  # feedback_no_gap_analysis — JD-specific BA jargon, not universal
+    "on time", "on schedule",  # feedback_no_on_time_claim — table-stakes, not a claim
+    "вчасно", "без нагадувань", "без потреби нагадувати",  # same, UA
+    "portfolio",  # feedback_no_portfolio_word_pet_projects — these are pet projects
+    "active daily practice, not a side project",  # same memory, banned line
+    "account management",  # feedback_no_account_management_wording
+    "what's already working well", "what's going fine", "what's on track",  # feedback_no_whats_working_well
+    "чесно:", "важливо:", "honestly:",  # feedback_no_robotic_lead_in_phrases
+)
+
+
+def detect_mechanical_violations(text: str) -> dict[str, list[str]]:
+    """Deterministic, non-LLM scan for NON-NEGOTIABLE rules that free-form
+    generation doesn't reliably self-enforce on its own.
+
+    Covers phase3_cv_draft.md rule 25 (em-dash ban) and the maintained
+    banned-phrase list above. Both recurred multiple times across sessions
+    despite the prompt already stating the rule explicitly (em-dash on
+    #915/#922/#932/#934, "gap analysis" on #932/#934, same session,
+    2026-07-30) — see BACKLOG.md "Mechanical NON-NEGOTIABLE rule violations
+    are never re-verified downstream".
+
+    Args:
+        text: Full CV or cover draft text.
+
+    Returns:
+        {"em_dash": [...], "banned_phrases": [...]} — each a list of
+        one-line human-readable hits ("line 12: ..."), empty when clean.
+        Advisory only — flag for a one-click fix, don't hard-block; a hit
+        can be a legitimate false positive (e.g. "on time" inside an
+        unrelated phrase) that a human dismisses on review.
+    """
+    lines = text.splitlines()
+
+    em_dash_hits = [
+        f"line {i}: {line.strip()}" for i, line in enumerate(lines, start=1) if "—" in line
+    ]
+
+    banned_hits: list[str] = []
+    for i, line in enumerate(lines, start=1):
+        line_lower = line.lower()
+        for phrase in _BANNED_PHRASES:
+            if phrase.lower() in line_lower:
+                banned_hits.append(f'line {i}: "{phrase}" — {line.strip()}')
+
+    return {"em_dash": em_dash_hits, "banned_phrases": banned_hits}
+
+
 # ── Formatters ────────────────────────────────────────────────────────────────
 
 

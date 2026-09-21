@@ -35,6 +35,7 @@ from pydantic_ai import RunContext
 
 from adapters.cv_adapter import CVAdapterError
 from core.cv_metrics import (
+    detect_mechanical_violations,
     detect_phrase_repetition,
     detect_repetition,
     format_freq_table,
@@ -261,6 +262,17 @@ async def cv_generate(
     cv_md_path = _next_version_path(jd_path.parent / f"{safe_name}_CV.md")
     cv_md_path.write_text(final_cv, encoding="utf-8")
     log.info("cv_generate: saved CV.md → %s", cv_md_path)
+
+    # Deterministic mechanical lint (em-dash, banned-phrase list) — NON-NEGOTIABLE
+    # rules stated once in phase3_cv_draft.md but never re-checked downstream;
+    # recurred repeatedly across sessions (#915/#922/#932/#934, 2026-07-30).
+    # Advisory only — logged, not blocking; a human still decides what to do.
+    lint = detect_mechanical_violations(final_cv)
+    if lint["em_dash"] or lint["banned_phrases"]:
+        log.warning(
+            "cv_generate: mechanical rule violations in saved CV (vacancy_id=%d) — em_dash=%s banned_phrases=%s",
+            vacancy_id, lint["em_dash"], lint["banned_phrases"],
+        )
 
     await database.update_pipeline_run(
         run35_id, status="done", result_path=str(cv_md_path)

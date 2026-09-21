@@ -107,6 +107,13 @@ Phase 3.5: Self-Review     [review tables + verdict shown to user; CV body NEVER
     slipped through an eyeball-only Phase 3.5 pass and only surfaced when the user asked for a
     dedicated dedup check). Feed both lists into the Repetition Check below same as the
     Python pipeline would.
+  → Also run the mechanical-violation lint (em-dash + banned-phrase list — rule 25 and
+    several dated feedback rules recurred multiple times despite already being stated once
+    in the prompt, see BACKLOG.md "Mechanical NON-NEGOTIABLE rule violations..."):
+    `python -c "import sys; sys.path.insert(0,'.'); from core.cv_metrics import detect_mechanical_violations; d=open(r'[path to CV draft]', encoding='utf-8').read(); print(detect_mechanical_violations(d))"`
+    Any hit is a required fix before presenting the review — this is advisory to a human
+    reviewer in the Python pipeline (logged, not blocking), but here there is no separate
+    human review step downstream, so treat every hit as something to fix now.
   → Also run a grammar/sentence-construction pass before presenting the review: unnecessary
     commas (esp. before "and" joining only two items, or between an adjective and the noun
     phrase it modifies, e.g. "a shipped, production system" should be "a shipped production
@@ -145,6 +152,11 @@ Phase 3.7: Editorial Audit  [opt-in final polish — see below]
 
 Phase 4: Cover Message
   → Review/approval cycle (verdict/summary in chat, never the full cover text — Rule 8)
+  → Before approval: run the same mechanical-violation lint as Phase 3.5 (em-dash + banned-
+    phrase list, incl. cover-specific bans like "what's already working well" and robotic
+    lead-ins "Чесно:"/"Важливо:"):
+    `python -c "import sys; sys.path.insert(0,'.'); from core.cv_metrics import detect_mechanical_violations; d=open(r'[path to cover draft]', encoding='utf-8').read(); print(detect_mechanical_violations(d))"`
+    Any hit is a required fix before presenting for approval.
   → Save [Name]_Cover.md
   → Generate PDF via http://localhost:8002/render → save [Name]_Cover.pdf
   → Save p4 to DB analysis_json          [silent — see Analysis JSON section below]

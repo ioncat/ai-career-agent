@@ -23,6 +23,7 @@ from pathlib import Path
 
 from pydantic_ai import RunContext
 
+from core.cv_metrics import detect_mechanical_violations
 from core.deps import AgentDeps
 from core.llm_client import LLMError
 from db import database
@@ -135,6 +136,16 @@ async def cv_cover(ctx: RunContext[AgentDeps], vacancy_id: int) -> str:
     cover_md_path = _next_version_path(jd_path.parent / f"{safe_name}_Cover.md")
     cover_md_path.write_text(cover_text, encoding="utf-8")
     log.info("cv_cover: saved Cover.md → %s", cover_md_path)
+
+    # Deterministic mechanical lint (em-dash, banned-phrase list) — see
+    # core/cv_metrics.py:detect_mechanical_violations for rationale. Advisory
+    # only — logged, not blocking.
+    lint = detect_mechanical_violations(cover_text)
+    if lint["em_dash"] or lint["banned_phrases"]:
+        log.warning(
+            "cv_cover: mechanical rule violations in saved Cover (vacancy_id=%d) — em_dash=%s banned_phrases=%s",
+            vacancy_id, lint["em_dash"], lint["banned_phrases"],
+        )
 
     await database.update_pipeline_run(
         run_id, status="done", result_path=str(cover_md_path)

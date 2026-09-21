@@ -3,6 +3,7 @@
 import pytest
 
 from core.cv_metrics import (
+    detect_mechanical_violations,
     detect_phrase_repetition,
     detect_repetition,
     format_freq_table,
@@ -260,6 +261,57 @@ class TestDetectPhraseRepetition:
         phrases = [p for p, _ in result]
         assert not any("https" in p or "github" in p for p in phrases)
         assert "personal projects built hands" in phrases
+
+
+# ── detect_mechanical_violations ───────────────────────────────────────────────
+
+
+class TestDetectMechanicalViolations:
+    def test_clean_text_no_hits(self):
+        result = detect_mechanical_violations(
+            "Led delivery of a payment automation feature. Reduced manual work by 30%."
+        )
+        assert result == {"em_dash": [], "banned_phrases": []}
+
+    def test_em_dash_detected_with_line_number(self):
+        text = "Line one is clean.\nBuilt a flow — automated end to end."
+        result = detect_mechanical_violations(text)
+        assert len(result["em_dash"]) == 1
+        assert result["em_dash"][0].startswith("line 2:")
+
+    def test_multiple_em_dashes_on_different_lines(self):
+        text = "First — one.\nSecond line clean.\nThird — one."
+        result = detect_mechanical_violations(text)
+        assert len(result["em_dash"]) == 2
+
+    def test_banned_phrase_detected_case_insensitive(self):
+        text = "Applied Gap Analysis to identify process discrepancies."
+        result = detect_mechanical_violations(text)
+        assert len(result["banned_phrases"]) == 1
+        assert "gap analysis" in result["banned_phrases"][0].lower()
+
+    def test_banned_phrase_account_management(self):
+        text = "Owned ongoing account management for enterprise clients."
+        result = detect_mechanical_violations(text)
+        assert any("account management" in hit.lower() for hit in result["banned_phrases"])
+
+    def test_ukrainian_banned_phrase(self):
+        text = "Доставив функціонал вчасно, без нагадувань з боку команди."
+        result = detect_mechanical_violations(text)
+        assert len(result["banned_phrases"]) >= 2
+
+    def test_multiple_banned_phrases_same_line(self):
+        text = "Built a portfolio with account management skills."
+        result = detect_mechanical_violations(text)
+        assert len(result["banned_phrases"]) == 2
+
+    def test_empty_text(self):
+        assert detect_mechanical_violations("") == {"em_dash": [], "banned_phrases": []}
+
+    def test_both_violation_types_together(self):
+        text = "Handled gap analysis — identified discrepancies on time."
+        result = detect_mechanical_violations(text)
+        assert result["em_dash"] and result["banned_phrases"]
 
 
 # ── format_freq_table ─────────────────────────────────────────────────────────
