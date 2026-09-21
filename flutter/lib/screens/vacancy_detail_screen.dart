@@ -2685,9 +2685,9 @@ class _RecommendationCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
 
     final (bgColor, iconColor, icon) = switch (recommendation) {
-      'apply' => (cs.primaryContainer, cs.primary, Icons.check_circle_rounded),
-      'take_a_chance' => (cs.tertiaryContainer, cs.tertiary, Icons.bolt_rounded),
-      _ => (cs.errorContainer, cs.error, Icons.cancel_rounded),
+      'apply' => (cs.primaryContainer.withValues(alpha: 0.5), cs.primary, Icons.check_circle_rounded),
+      'take_a_chance' => (cs.tertiaryContainer.withValues(alpha: 0.5), cs.tertiary, Icons.bolt_rounded),
+      _ => (cs.errorContainer.withValues(alpha: 0.5), cs.error, Icons.cancel_rounded),
     };
 
     return Container(
@@ -2723,7 +2723,7 @@ class _RecommendationCard extends StatelessWidget {
                     child: SelectableText(
                       whoTheyWant,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: cs.onSurface.withValues(alpha: 0.65),
+                            color: cs.onSurface,
                           ),
                     ),
                   ),
@@ -3570,6 +3570,85 @@ class _RoleBalanceRadar extends StatelessWidget {
     'operational': 'Operational',
   };
 
+  // Deterministic role-shape classification (2026-09-21, revised twice
+  // same day). No LLM, pure arithmetic over the already-saved role_balance
+  // percentages. Three passes, in order:
+  //
+  // 1. Absolute >=30% threshold (validated against 88 applied vacancies:
+  //    74% resolved to exactly one axis >=30%). Replaced after a live check
+  //    on #1647 (delivery=25/strategy=20/stakeholder=20): an absolute
+  //    cutoff can't tell a real lead apart from a genuine 3-way tie sitting
+  //    at the same max value (several other applied vacancies split
+  //    25/25/25) — both landed in "Diffuse" even though #1647's radar
+  //    visually read as Delivery-led.
+  // 2. Margin between #1 and #2 axis, >=5 points: cleanly resolved 84% of
+  //    vacancies and correctly split #1647 (gap=5) from the 25/25/25 ties
+  //    (gap=0). Then re-checked #1647 against its own JD text — the JD
+  //    explicitly describes the role as combining three functions equally
+  //    ("продуктового мислення, операційного управління та бізнес-
+  //    аналітики"), and the user's own read of 25/20/20 was "genuinely
+  //    blended, slight lean toward Delivery" — not confidently Sharp. A
+  //    5-point margin was too lenient: it let a merely-25%-relative lead
+  //    (5 of the runner-up's 20) count as decisive.
+  // 3. Margin >=10: on the same 88-vacancy set, >=8 and >=10 produce the
+  //    *identical* result (58/90, 64%, resolve to a clear #1 either way —
+  //    no vacancy has a gap strictly between 8 and 10), so the two are
+  //    interchangeable on data seen so far; picked the more conservative
+  //    of the two deliberately — a false "Sharp" pushes Phase 3 to write a
+  //    narrowly-focused CV for a role that's actually a genuine blend
+  //    (the more costly error), while a false "Generalist" only costs a
+  //    softer, blended CV for a role that was actually sharp (cheaper).
+  //
+  // Full history: docs/discovery/role-balance-concentration-analysis-2026-09-21.md §6-7.
+  static const _margin = 10;
+
+  List<String> _sortedByValue() {
+    final order = [..._axisOrder];
+    order.sort((a, b) {
+      final cmp = (balance[b] ?? 0).compareTo(balance[a] ?? 0);
+      // Ties broken by the fixed canonical axis order so a repeat tie is
+      // deterministic rather than depending on sort-algorithm details.
+      if (cmp != 0) return cmp;
+      return _axisOrder.indexOf(a).compareTo(_axisOrder.indexOf(b));
+    });
+    return order;
+  }
+
+  ({String shape, List<String> axes}) _classifyShape() {
+    final byValue = _sortedByValue();
+    final v1 = balance[byValue[0]] ?? 0;
+    final v2 = balance[byValue[1]] ?? 0;
+    final v3 = balance[byValue[2]] ?? 0;
+    if (v1 - v2 >= _margin) return (shape: 'Sharp', axes: [byValue[0]]);
+    if (v2 - v3 >= _margin) return (shape: 'Dual', axes: byValue.take(2).toList());
+    return (shape: 'Diffuse', axes: byValue.take(2).toList());
+  }
+
+  String _shapeLabel() {
+    final s = _classifyShape();
+    switch (s.shape) {
+      case 'Sharp':
+        final ax = s.axes.first;
+        return 'Sharp — ${_axisLabels[ax]} (${balance[ax]}%)';
+      case 'Dual':
+        final pcts = s.axes.map((a) => '${_axisLabels[a]} ${balance[a]}%').join(' + ');
+        return 'Dual — $pcts';
+      default:
+        // "Diffuse" is correct here and stays — it names the *structural*
+        // concentration parameter (how spread the numbers are), a
+        // different layer from "Generalist" (a Phase-1-style *archetype*
+        // label, describing what kind of PM this is). Briefly conflated
+        // the two (2026-09-21) by displaying "Generalist" here directly —
+        // reverted same day once the user drew the distinction. See
+        // docs/discovery/role-balance-concentration-analysis-2026-09-21.md
+        // §8's correction note for the reasoning; "Generalist" as an
+        // archetype is a separate, not-yet-implemented candidate for
+        // `phase1_analysis.md` §1.4's archetype vocabulary.
+        final top2 = s.axes.map((a) => '${_axisLabels[a]} ${balance[a]}%').join(' / ');
+        return 'Diffuse — leaning $top2';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -3633,9 +3712,16 @@ class _RoleBalanceRadar extends StatelessWidget {
               titleTextStyle: textTheme.labelSmall?.copyWith(
                 color: cs.onSurfaceVariant,
               ),
-              getTitle: (index, angle) => RadarChartTitle(
-                text: _axisLabels[_axisOrder[index]] ?? _axisOrder[index],
-              ),
+              // Axis label + its own value together (2026-09-21, user
+              // request) — a bare label forced the viewer to cross-reference
+              // an unlabeled, auto-scaled grid to read off a number; showing
+              // the % right on the chart removes that guesswork entirely.
+              getTitle: (index, angle) {
+                final key = _axisOrder[index];
+                final label = _axisLabels[key] ?? key;
+                final value = balance[key] ?? 0;
+                return RadarChartTitle(text: '$label\n$value%');
+              },
               dataSets: [
                 RadarDataSet(
                   fillColor: cs.primary.withValues(alpha: 0.22),
@@ -3648,6 +3734,34 @@ class _RoleBalanceRadar extends StatelessWidget {
                   ],
                 ),
               ],
+            ),
+          ),
+        ),
+        Padding(
+          // Larger gap from the chart + a clear, saturated orange
+          // (2026-09-21, user request — the first pick, reused from
+          // _WarningsBanner's muted amber `fg`, read as swampy/olive
+          // rather than warm on the user's actual screen).
+          padding: const EdgeInsets.only(top: 32),
+          child: Tooltip(
+            message: 'How the pipeline classifies this role\'s shape from '
+                'the numbers above (by the gap between the #1 and #2 axis, '
+                'not their absolute size — a >=10-point lead counts). Sharp '
+                '= the top axis clearly leads, the CV should write to it '
+                'directly. Dual = the top 2 axes are close to each other '
+                'but both clearly ahead of the rest, the CV should carry '
+                'both together, not pick one. Diffuse = no gap that big '
+                'anywhere near the top — a genuine blend, not a clean '
+                'lead signal, shown as a lean toward the top 2 axes.',
+            preferBelow: true,
+            constraints: const BoxConstraints(maxWidth: 260),
+            child: Text(
+              _shapeLabel(),
+              style: textTheme.labelSmall?.copyWith(
+                color: const Color(0xFFE65100),
+                fontWeight: FontWeight.w700,
+              ),
+              textAlign: TextAlign.center,
             ),
           ),
         ),
