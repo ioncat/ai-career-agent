@@ -463,6 +463,23 @@ No dual-availability state — the button's visibility is a direct, deterministi
 
 ## 🐛 Bugs
 
+### Text selection on the vacancy detail screen still doesn't drag-select across paragraphs, despite a `SelectionArea` fix (found + attempted-fixed 2026-09-21, low priority — deprioritized by user)
+**What:** user reported being unable to select text with the mouse across more than one line/paragraph in the vacancy detail screen (JD view and every tab) — could select within one block, but dragging into the next selected nothing. Diagnosed as `flutter_markdown`'s own `selectable` mode and several standalone `SelectableText` widgets each managing isolated selection state with nothing coordinating them. Wrapped the JD `Markdown` widget and the whole `TabBarView` (Analysis/CV/Cover/Activity) each in `SelectionArea` — the standard Flutter mechanism for exactly this. `flutter analyze`/tests clean.
+**Still broken:** user tested live after the fix and selection still doesn't work properly. Root cause not re-diagnosed — the `SelectionArea` wrap may not be reaching the actual problem widgets, or there may be a second, unrelated cause.
+**Priority:** explicitly low — user's own call ("низкий приоритет, оставим на потом"). Not started.
+
+### `core.cv_metrics.top_n_words` (and the Top-15 Word Frequency check it feeds) is Latin-script-only — near-useless for a Cyrillic JD/CV pair (found 2026-09-21, regression test on vacancy #1656)
+**What:** the tokenizer only matches `[a-zA-Z]{4,}` — for a Ukrainian JD/CV, it returns almost nothing but English-embedded terms and contact-link boilerplate, giving `phase3_5_review.md`'s Top-15 Frequency Check essentially no real signal to work with. Found live during the post-audit regression test (isolated subagent run, vacancy #1656 — TEST COPY of #1646, Ukrainian JD): the subagent ran the check per instructions, got near-empty output, flagged it explicitly as low-value, and fell back to the Signal Coverage Table (manual reading) as the real check instead.
+**Why it matters:** this candidate applies to Ukrainian-language JDs regularly (see PROFILE.md language settings) — every one of those Phase 3.5 passes has been running this check essentially blind, silently, with nobody flagging it before now.
+**Fix direction:** extend the word-boundary regex (and the stopword list) to cover Cyrillic characters (`[а-яА-ЯіїєґІЇЄҐ]{4,}` or similar), or explicitly skip/replace the check with a language-aware alternative when `cv_language != 'en'`.
+**Not started.**
+
+### `SKILL.md`'s stated trigger conditions for Phase 4 (cover) vs. Phase 3.7 (editorial audit) are inconsistently documented (found 2026-09-21, regression test on vacancy #1656)
+**What:** `SKILL.md`'s Pipeline Flow diagram gates Phase 4 behind "[user explicitly requests cover]" as the literal comment, while a `recommendation=apply AND fit≥7` condition appears nearby and is written for Phase 3.7 specifically. During the isolated-subagent regression test, the task brief (written by the main session, not by SKILL.md itself) named the Phase 3.7 condition as if it were also Phase 4's trigger — the subagent flagged this explicitly as an inconsistency it had to resolve without a human to ask, rather than something SKILL.md itself states clearly.
+**Why it matters:** exactly the kind of "does what a rule says match where it's actually applied" gap the whole prompt audit was about — found immediately once a genuinely fresh, unbiased read tried to follow the file literally.
+**Fix direction:** re-read `SKILL.md`'s Pipeline Flow section and make each phase's trigger condition unambiguous and attached to the right phase — candidate for folding into the still-open "Prompt clarity/structure pass" BACKLOG item (`SKILL.md` itself, not just `prompts/pm/`, may need the same treatment).
+**Not started.**
+
 ### Stage 2 Critical Blocker prefilter can false-positive when JD's required level equals candidate's own (found 2026-08-15, vacancy #795)
 **What:** `prompts/pm|generic/prefilter.md` Stage 2 LLM check flagged #795 BLOCKED for "english: JD requires Upper-Intermediate, candidate is B2" — but Upper-Intermediate *is* B2 (candidate's own level), and the JD literally said "Upper-Intermediate або вище" (or higher), which the candidate meets, not fails. PROFILE.md's `## Critical Blockers` only wants a block for strictly-above-B2 (C1/C2) — the LLM reacted to an English-requirement mention without checking the specific level against the rule.
 **Why:** Stage 1's deterministic regex (`tools/cv_prefilter.py:_check_english_level`) only fires on a literal CEFR code merged from Djinni's structured sidebar — #795 predates that merge (no `## Vacancy Requirements` section in its JD.md), so it fell through to Stage 2 LLM judgment, which got it wrong.
