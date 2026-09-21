@@ -3181,8 +3181,10 @@ class _RecommendationCard extends StatelessWidget {
                   // Own pill so it doesn't blend into the surrounding prose
                   // (user: "искал, хотя он был у меня под носом") — mixes
                   // the neutral chip style already used by _AnalyzedChip
-                  // with a leading icon, plus more breathing room above/
-                  // below than a plain text line would get.
+                  // with more breathing room above/below than a plain text
+                  // line would get. No leading icon — every candidate tried
+                  // (category/label/badge/psychology/psychology_alt) read as
+                  // unclear or distracting at this size; text alone won.
                   const SizedBox(height: 10),
                   Tooltip(
                     message:
@@ -3190,8 +3192,10 @@ class _RecommendationCard extends StatelessWidget {
                         'from Phase 1 §1.4',
                     preferBelow: true,
                     child: Container(
-                      height: 28,
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: cs.surfaceContainer,
                         borderRadius: BorderRadius.circular(999),
@@ -3199,21 +3203,10 @@ class _RecommendationCard extends StatelessWidget {
                           color: cs.outlineVariant.withValues(alpha: 0.3),
                         ),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.category_outlined,
-                            size: 14,
-                            color: cs.onSurfaceVariant,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            archetype,
-                            style: Theme.of(context).textTheme.labelMedium
-                                ?.copyWith(color: cs.onSurfaceVariant),
-                          ),
-                        ],
+                      child: Text(
+                        archetype,
+                        style: Theme.of(context).textTheme.labelMedium
+                            ?.copyWith(color: cs.onSurfaceVariant),
                       ),
                     ),
                   ),
