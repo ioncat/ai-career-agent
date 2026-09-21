@@ -2409,6 +2409,7 @@ class _VacancyHero extends StatelessWidget {
         _RecommendationCard(
           recommendation: p2.recommendation,
           recommendationLabel: p2.recommendationLabel,
+          archetype: p1?.primaryArchetype ?? '',
           whoTheyWant: p2.whoTheyWant,
         ),
         const SizedBox(height: 12),
@@ -2672,11 +2673,13 @@ class _ScoreDotsRow extends StatelessWidget {
 class _RecommendationCard extends StatelessWidget {
   final String recommendation;
   final String recommendationLabel;
+  final String archetype;
   final String whoTheyWant;
 
   const _RecommendationCard({
     required this.recommendation,
     required this.recommendationLabel,
+    this.archetype = '',
     this.whoTheyWant = '',
   });
 
@@ -2715,6 +2718,21 @@ class _RecommendationCard extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                       ),
                 ),
+                if (archetype.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Tooltip(
+                    message: 'Primary archetype — balance-intensity + role-shape, '
+                        'from Phase 1 §1.4',
+                    preferBelow: true,
+                    child: Text(
+                      archetype,
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                            color: cs.onSurface.withValues(alpha: 0.75),
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                  ),
+                ],
                 if (whoTheyWant.isNotEmpty) ...[
                   const SizedBox(height: 6),
                   Tooltip(
