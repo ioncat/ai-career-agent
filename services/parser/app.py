@@ -8,6 +8,7 @@ Run:
     uvicorn app:app --host 0.0.0.0 --port 8001
 """
 
+import json
 import logging
 import re
 from urllib.parse import urljoin, urlparse
@@ -122,6 +123,31 @@ def _extract_company_profile_url(url: str, soup: BeautifulSoup, site_key: str | 
                 return urljoin(cfg.get("base_url", url), link["href"])
 
     return None
+
+
+def _extract_djinni_category(soup: BeautifulSoup) -> str | None:
+    """Djinni's own `primary_keyword` category for this specific vacancy
+    (e.g. "Product Manager", "Business Analyst") — read straight from its
+    schema.org JobPosting JSON-LD block (standard SEO markup, confirmed
+    present with a clean single-string `category` field on 15/15 vacancies
+    sampled live 2026-09-08), never inferred from the title. A hardcoded
+    guess here (an earlier version filtered every company page by
+    "Product Owner"/"Product Manager" only) silently broke the moment the
+    feed started ingesting any other role — this reads Djinni's actual
+    answer instead, so it stays correct for any category without a mapping
+    table to maintain. Returns None if the block is missing or malformed —
+    salary_probe then searches the company page unfiltered rather than
+    guessing.
+    """
+    script = soup.find("script", type="application/ld+json")
+    if not script or not script.string:
+        return None
+    try:
+        data = json.loads(script.string)
+    except (json.JSONDecodeError, TypeError):
+        return None
+    category = data.get("category") if isinstance(data, dict) else None
+    return category if isinstance(category, str) and category.strip() else None
 
 
 def _extract_company_website(soup: BeautifulSoup, site_key: str | None) -> str | None:
@@ -256,15 +282,20 @@ def djinni_salary_ceiling(req: DjinniSalaryCeilingRequest) -> dict:
     NOT the personalized login-gated profile-match panel, which this
     service never fetches.
 
-    Fetches the vacancy page once (never trusts a caller-supplied title,
-    which might be stale or garbled) before starting the probe, so an
+    Fetches the vacancy page once before starting the probe, so an
     already-expired listing is caught in a single request rather than after
-    a wasted salary-search sequence. Also extracts the company's own Djinni
-    page URL (`company_link_selector`) — salary_probe's primary
-    identification strategy, same technique the user does by hand: open the
-    vacancy, follow the link to the company's page, apply the salary filter
-    there. Falls back to a title-only search when that link isn't present
-    (e.g. some recruiting-agency postings).
+    a wasted salary-search sequence. Extracts the company's own Djinni page
+    URL (`company_link_selector`) — the only identification method
+    (2026-09-08, simplified from an earlier two-strategy design): every
+    vacancy belongs to some posting account's own page, same technique the
+    user does by hand — open the vacancy, follow the link to the company's
+    page, apply the salary filter there. No title-based fallback — the job
+    title plays no role in identification at all, only the internal job ID
+    matched against the company page's HTML. Also extracts Djinni's own
+    `category` for this vacancy (`_extract_djinni_category` — schema.org
+    JSON-LD, e.g. "Product Manager"/"Business Analyst") to narrow a busy
+    employer's page, when present — read from Djinni's own data, never
+    inferred from the title.
 
     Returns {"ceiling": int | None, "reason": str | None}. reason is always
     None when ceiling is found; otherwise one of salary_probe.REASON_* —
@@ -282,13 +313,14 @@ def djinni_salary_ceiling(req: DjinniSalaryCeilingRequest) -> dict:
         return {"ceiling": None, "reason": salary_probe.REASON_NOT_FOUND}
 
     soup = BeautifulSoup(resp.text, "lxml")
-    h1 = soup.find("h1")
-    title = h1.get_text(strip=True) if h1 else None
-    if not title:
+    if not soup.find("h1"):
+        # Doesn't look like a real vacancy page (e.g. an expired listing
+        # redirected elsewhere) — nothing to identify a company page from.
         return {"ceiling": None, "reason": salary_probe.REASON_NOT_FOUND}
 
     site_key = _match_site_key(req.url)
     company_profile_url = _extract_company_profile_url(req.url, soup, site_key)
+    category = _extract_djinni_category(soup) if site_key == "djinni.co" else None
 
-    ceiling, reason = find_salary_ceiling(req.url, title, company_profile_url)
+    ceiling, reason = find_salary_ceiling(req.url, company_profile_url, category)
     return {"ceiling": ceiling, "reason": reason}

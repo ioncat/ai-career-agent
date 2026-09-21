@@ -323,16 +323,22 @@ _DJINNI_SALARY_SEMAPHORE = asyncio.Semaphore(1)
 
 # A give-up note (below) is written into the same free-text `salary` column
 # as a real value or a successful estimate — no new schema needed — but it
-# must never be mistaken for one. "(probe:" is a marker no real salary or
-# the success format ("~$4000+ (Djinni filter estimate)") ever starts with;
-# _is_real_salary() is the single place that distinction is checked, so
-# every retry-eligibility check (fetch, republish, manual refetch) agrees
-# on what counts as "still effectively empty".
-_PROBE_NOTE_PREFIX = "(probe:"
+# must never be mistaken for one. A leading "(" is a marker no real salary
+# or the success format ("~$4000+ (Djinni filter estimate)") ever starts
+# with (that one only ever has "(" mid-string); _is_real_salary() is the
+# single place that distinction is checked, so every retry-eligibility
+# check (fetch, republish, manual refetch) agrees on what counts as "still
+# effectively empty". No literal "probe:"/source-name wording in the note
+# itself (user feedback, 2026-09-07/08) — the user already knows which
+# vacancy and site this is about; the note should just say what happened.
+_PROBE_NOTE_PREFIX = "("
 _REASON_NOTES = {
-    "not_found": f"{_PROBE_NOTE_PREFIX} listing not found in search — may be inactive)",
-    "too_many_matches": f"{_PROBE_NOTE_PREFIX} too many matching listings to narrow down)",
-    "request_failed": f"{_PROBE_NOTE_PREFIX} network error — will retry)",
+    "not_found": f"{_PROBE_NOTE_PREFIX}not a valid Djinni job link)",
+    "no_company_link": f"{_PROBE_NOTE_PREFIX}no company page found on this listing — unusual, worth a manual look)",
+    "not_on_company_page": f"{_PROBE_NOTE_PREFIX}company page doesn't list this vacancy — unusual, worth a manual look)",
+    "budget_exhausted": f"{_PROBE_NOTE_PREFIX}search ran out of steps before narrowing down — worth a manual look)",
+    "request_failed": f"{_PROBE_NOTE_PREFIX}network error — will retry)",
+    "high_salary": f"{_PROBE_NOTE_PREFIX}~$10,000+ or no salary listed at all)",
 }
 
 

@@ -1019,7 +1019,7 @@ class TestIsRealSalary:
         assert _is_real_salary("~$4000+ (Djinni filter estimate)") is True
 
     def test_probe_note_is_not_real(self):
-        assert _is_real_salary("(probe: listing not found in search — may be inactive)") is False
+        assert _is_real_salary("(not found in Djinni's search — may be closed)") is False
 
 
 # ── _estimate_djinni_salary (2026-09-07) ────────────────────────────────────
@@ -1069,14 +1069,19 @@ async def test_estimate_djinni_salary_writes_not_found_note():
 
     mock_db.set_vacancy_salary.assert_awaited_once()
     note = mock_db.set_vacancy_salary.call_args.args[1]
-    assert note.startswith("(probe:")
-    assert "not found" in note
+    assert note.startswith("(")
+    assert "not a valid" in note
 
 
 @pytest.mark.asyncio
-async def test_estimate_djinni_salary_writes_too_many_matches_note():
+async def test_estimate_djinni_salary_writes_no_company_link_note():
+    """Regression 2026-09-08: no company page found for this vacancy at
+    all — expected to be essentially impossible (every Djinni vacancy
+    belongs to some posting account's own page), so it gets its own
+    explicit, visible note rather than being silently absorbed into a
+    generic reason."""
     adapter = AsyncMock()
-    adapter.find_salary_ceiling = AsyncMock(return_value=(None, "too_many_matches"))
+    adapter.find_salary_ceiling = AsyncMock(return_value=(None, "no_company_link"))
 
     with patch("tools.cv_fetch_jd.database") as mock_db:
         mock_db.get_vacancy_by_id = AsyncMock(return_value={"salary": None})
@@ -1085,8 +1090,62 @@ async def test_estimate_djinni_salary_writes_too_many_matches_note():
         await _estimate_djinni_salary(adapter, 42, "https://djinni.co/jobs/123-x")
 
     note = mock_db.set_vacancy_salary.call_args.args[1]
-    assert note.startswith("(probe:")
-    assert "too many" in note.lower()
+    assert note.startswith("(")
+    assert "no company page" in note.lower()
+
+
+@pytest.mark.asyncio
+async def test_estimate_djinni_salary_writes_not_on_company_page_note():
+    """Regression 2026-09-08: company page found, but this vacancy isn't
+    listed on its own role-filtered page — user has seen this once before,
+    rare enough to just get an honest, visible note."""
+    adapter = AsyncMock()
+    adapter.find_salary_ceiling = AsyncMock(return_value=(None, "not_on_company_page"))
+
+    with patch("tools.cv_fetch_jd.database") as mock_db:
+        mock_db.get_vacancy_by_id = AsyncMock(return_value={"salary": None})
+        mock_db.set_vacancy_salary = AsyncMock()
+
+        await _estimate_djinni_salary(adapter, 42, "https://djinni.co/jobs/123-x")
+
+    note = mock_db.set_vacancy_salary.call_args.args[1]
+    assert note.startswith("(")
+    assert "company page" in note.lower()
+
+
+@pytest.mark.asyncio
+async def test_estimate_djinni_salary_writes_budget_exhausted_note():
+    adapter = AsyncMock()
+    adapter.find_salary_ceiling = AsyncMock(return_value=(None, "budget_exhausted"))
+
+    with patch("tools.cv_fetch_jd.database") as mock_db:
+        mock_db.get_vacancy_by_id = AsyncMock(return_value={"salary": None})
+        mock_db.set_vacancy_salary = AsyncMock()
+
+        await _estimate_djinni_salary(adapter, 42, "https://djinni.co/jobs/123-x")
+
+    note = mock_db.set_vacancy_salary.call_args.args[1]
+    assert note.startswith("(")
+    assert "ran out of steps" in note.lower()
+
+
+@pytest.mark.asyncio
+async def test_estimate_djinni_salary_writes_high_salary_note():
+    """Regression 2026-09-08, vacancy #1504: confirmed still present at
+    MAX_SALARY itself (a definite result) gets its own distinct, more
+    informative note — not the vaguer "too many matches" text."""
+    adapter = AsyncMock()
+    adapter.find_salary_ceiling = AsyncMock(return_value=(None, "high_salary"))
+
+    with patch("tools.cv_fetch_jd.database") as mock_db:
+        mock_db.get_vacancy_by_id = AsyncMock(return_value={"salary": None})
+        mock_db.set_vacancy_salary = AsyncMock()
+
+        await _estimate_djinni_salary(adapter, 42, "https://djinni.co/jobs/123-x")
+
+    note = mock_db.set_vacancy_salary.call_args.args[1]
+    assert note.startswith("(")
+    assert "10,000" in note
 
 
 @pytest.mark.asyncio
@@ -1101,7 +1160,7 @@ async def test_estimate_djinni_salary_writes_request_failed_note():
         await _estimate_djinni_salary(adapter, 42, "https://djinni.co/jobs/123-x")
 
     note = mock_db.set_vacancy_salary.call_args.args[1]
-    assert note.startswith("(probe:")
+    assert note.startswith("(")
 
 
 @pytest.mark.asyncio
@@ -1130,7 +1189,7 @@ async def test_estimate_djinni_salary_note_replaces_an_older_note():
     adapter.find_salary_ceiling = AsyncMock(return_value=(None, "not_found"))
 
     with patch("tools.cv_fetch_jd.database") as mock_db:
-        mock_db.get_vacancy_by_id = AsyncMock(return_value={"salary": "(probe: network error — will retry)"})
+        mock_db.get_vacancy_by_id = AsyncMock(return_value={"salary": "(network error — will retry)"})
         mock_db.set_vacancy_salary = AsyncMock()
 
         await _estimate_djinni_salary(adapter, 42, "https://djinni.co/jobs/123-x")
