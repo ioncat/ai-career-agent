@@ -28,13 +28,18 @@ Widget _reasonLine(String reason, {TextStyle? style}) {
   }
   final category = reason.substring(0, colonIdx).trim();
   final rest = reason.substring(colonIdx + 1).trim();
-  final capitalized = category.isEmpty ? category : category[0].toUpperCase() + category.substring(1);
+  final capitalized = category.isEmpty
+      ? category
+      : category[0].toUpperCase() + category.substring(1);
   return Text.rich(
     TextSpan(
       style: style,
       children: [
         const TextSpan(text: '•  '),
-        TextSpan(text: '$capitalized: ', style: const TextStyle(fontWeight: FontWeight.bold)),
+        TextSpan(
+          text: '$capitalized: ',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
         TextSpan(text: rest),
       ],
     ),
@@ -65,8 +70,8 @@ class _VacancyIdLine extends StatelessWidget {
       child: Text(
         '#$vacancyId',
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: cs.onSurfaceVariant.withValues(alpha: 0.5),
-            ),
+          color: cs.onSurfaceVariant.withValues(alpha: 0.5),
+        ),
       ),
     );
   }
@@ -97,22 +102,25 @@ class _VacancyCompactTitle extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(role,
-            style: Theme.of(context).textTheme.titleSmall,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis),
+        Text(
+          role,
+          style: Theme.of(context).textTheme.titleSmall,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
         if (company.isNotEmpty)
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Flexible(
-                child: Text(company,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(color: cs.onSurfaceVariant),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis),
+                child: Text(
+                  company,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
               if (companyWebsite != null && companyWebsite!.isNotEmpty)
                 Padding(
@@ -120,8 +128,10 @@ class _VacancyCompactTitle extends StatelessWidget {
                   child: Tooltip(
                     message: companyWebsite!,
                     child: InkWell(
-                      onTap: () => launchUrl(Uri.parse(companyWebsite!),
-                          mode: LaunchMode.externalApplication),
+                      onTap: () => launchUrl(
+                        Uri.parse(companyWebsite!),
+                        mode: LaunchMode.externalApplication,
+                      ),
                       child: Icon(Icons.language, size: 14, color: cs.primary),
                     ),
                   ),
@@ -139,6 +149,7 @@ class _JdModeView extends ConsumerStatefulWidget {
   final int vacancyId;
   final String url;
   final VacancyListItem? vacancy;
+
   /// When true: show "Restore to Inbox" instead of Analyze/Skip (used for declined-no-analysis).
   final bool restoreMode;
   final VoidCallback? onSkipped;
@@ -196,14 +207,19 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
   @override
   void didUpdateWidget(_JdModeView old) {
     super.didUpdateWidget(old);
-    if (old.vacancy?.applied != widget.vacancy?.applied) _applied = widget.vacancy?.applied ?? false;
-    if (old.vacancy?.starred != widget.vacancy?.starred) _starred = widget.vacancy?.starred ?? false;
+    if (old.vacancy?.applied != widget.vacancy?.applied)
+      _applied = widget.vacancy?.applied ?? false;
+    if (old.vacancy?.starred != widget.vacancy?.starred)
+      _starred = widget.vacancy?.starred ?? false;
   }
 
   Future<void> _toggleStar() async {
     if (_loadingStar) return;
     final next = !_starred;
-    setState(() { _starred = next; _loadingStar = true; });
+    setState(() {
+      _starred = next;
+      _loadingStar = true;
+    });
     try {
       await _repo.setStarred(widget.vacancyId, next);
       if (mounted) ref.read(vacancyListProvider.notifier).refresh();
@@ -217,7 +233,10 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
   Future<void> _toggleApplied() async {
     if (_loadingApplied) return;
     final next = !_applied;
-    setState(() { _applied = next; _loadingApplied = true; });
+    setState(() {
+      _applied = next;
+      _loadingApplied = true;
+    });
     try {
       await _repo.setApplied(widget.vacancyId, next);
       if (mounted) {
@@ -247,7 +266,9 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
   }
 
   VacancyRepository get _repo {
-    final apiUrl = ref.read(settingsProvider).valueOrNull?.apiUrl ?? 'http://localhost:8080';
+    final apiUrl =
+        ref.read(settingsProvider).valueOrNull?.apiUrl ??
+        'http://localhost:8080';
     return VacancyRepository(baseUrl: apiUrl);
   }
 
@@ -258,7 +279,10 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
       if (mounted) {
         ref.read(vacancyListProvider.notifier).refresh();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Analysis queued'), duration: Duration(seconds: 2)),
+          const SnackBar(
+            content: Text('Analysis queued'),
+            duration: Duration(seconds: 2),
+          ),
         );
       }
     } catch (e) {
@@ -287,17 +311,22 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
         // not running, Claude API down/rate-limited, claude CLI missing) — show
         // the actual reason immediately, not a generic "something failed"
         // (gap found 2026-07-17: Ollama being down looked like any other error).
-        final providerUnavailable = result['provider_unavailable'] as bool? ?? false;
+        final providerUnavailable =
+            result['provider_unavailable'] as bool? ?? false;
         if (providerUnavailable || !ok) {
           // Real failure — show the actual reason and keep it on screen
           // until the user closes it (see showErrorSnackBar docstring).
           final reason = result['error'] ?? 'unknown error';
           showErrorSnackBar(
             context,
-            providerUnavailable ? 'LLM provider unavailable: $reason' : 'Check failed: $reason',
+            providerUnavailable
+                ? 'LLM provider unavailable: $reason'
+                : 'Check failed: $reason',
           );
         } else {
-          final msg = blocked ? 'Possible blocker found — see below' : 'Checked — no blockers found';
+          final msg = blocked
+              ? 'Possible blocker found — see below'
+              : 'Checked — no blockers found';
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(msg), duration: const Duration(seconds: 3)),
           );
@@ -332,10 +361,13 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
         if (!ok) {
           msg = 'Re-fetch failed: ${result['error']}';
         } else {
-          final changed = (result['changed_fields'] as List<dynamic>? ?? []).join(', ');
+          final changed = (result['changed_fields'] as List<dynamic>? ?? [])
+              .join(', ');
           msg = blocked
               ? 'Re-fetched — possible blocker found'
-              : (changed.isEmpty ? 'Re-fetched — content unchanged' : 'Re-fetched — updated: $changed');
+              : (changed.isEmpty
+                    ? 'Re-fetched — content unchanged'
+                    : 'Re-fetched — updated: $changed');
         }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(msg), backgroundColor: ok ? null : Colors.red),
@@ -380,11 +412,14 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
     final reasons = (result['reasons'] as List<dynamic>? ?? []).cast<String>();
     final rawOutput = result['raw_output'] as String?;
     final error = result['error'] as String?;
-    final providerUnavailable = result['provider_unavailable'] as bool? ?? false;
+    final providerUnavailable =
+        result['provider_unavailable'] as bool? ?? false;
 
     final title = providerUnavailable
         ? '🔌 Provider unavailable'
-        : (!ok ? '❌ Check failed' : (blocked ? '⚠️ Possible blocker found' : '✅ No blockers'));
+        : (!ok
+              ? '❌ Check failed'
+              : (blocked ? '⚠️ Possible blocker found' : '✅ No blockers'));
 
     return showDialog(
       context: context,
@@ -398,7 +433,10 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (!ok) ...[
-                  Text(error ?? 'Unknown error', style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
+                  Text(
+                    error ?? 'Unknown error',
+                    style: TextStyle(color: Theme.of(ctx).colorScheme.error),
+                  ),
                   const SizedBox(height: 8),
                   if (providerUnavailable)
                     Text(
@@ -408,29 +446,46 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                       style: Theme.of(ctx).textTheme.bodySmall,
                     )
                   else
-                    Text('Full record (model, tokens, timing, or lack thereof) is in the Activity tab.',
-                        style: Theme.of(ctx).textTheme.bodySmall),
+                    Text(
+                      'Full record (model, tokens, timing, or lack thereof) is in the Activity tab.',
+                      style: Theme.of(ctx).textTheme.bodySmall,
+                    ),
                 ] else if (blocked)
-                  ...reasons.map((r) => Padding(
-                        padding: const EdgeInsets.only(bottom: 6),
-                        child: _reasonLine(r),
-                      ))
+                  ...reasons.map(
+                    (r) => Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: _reasonLine(r),
+                    ),
+                  )
                 else
-                  const Text('The pre-filter found no explicit conflict with your Critical Blockers.'),
+                  const Text(
+                    'The pre-filter found no explicit conflict with your Critical Blockers.',
+                  ),
                 if (rawOutput != null && rawOutput.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   ExpansionTile(
                     tilePadding: EdgeInsets.zero,
-                    title: Text('Raw model output', style: Theme.of(ctx).textTheme.labelMedium),
+                    title: Text(
+                      'Raw model output',
+                      style: Theme.of(ctx).textTheme.labelMedium,
+                    ),
                     children: [
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Theme.of(ctx).colorScheme.surfaceContainerHighest,
+                          color: Theme.of(
+                            ctx,
+                          ).colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(6),
                         ),
-                        child: SelectableText(rawOutput, style: const TextStyle(fontSize: 11.5, fontFamily: 'monospace')),
+                        child: SelectableText(
+                          rawOutput,
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -440,7 +495,10 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Close')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Close'),
+          ),
         ],
       ),
     );
@@ -465,9 +523,15 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                 padding: const EdgeInsets.fromLTRB(20, 16, 12, 0),
                 child: Row(
                   children: [
-                    Text('Activity — Vacancy #${widget.vacancyId}', style: Theme.of(ctx).textTheme.titleMedium),
+                    Text(
+                      'Activity — Vacancy #${widget.vacancyId}',
+                      style: Theme.of(ctx).textTheme.titleMedium,
+                    ),
                     const Spacer(),
-                    IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.of(ctx).pop()),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                    ),
                   ],
                 ),
               ),
@@ -502,7 +566,10 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
       if (mounted) {
         ref.read(vacancyListProvider.notifier).refresh();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Moved to inbox'), duration: Duration(seconds: 2)),
+          const SnackBar(
+            content: Text('Moved to inbox'),
+            duration: Duration(seconds: 2),
+          ),
         );
       }
     } catch (e) {
@@ -520,7 +587,8 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
     final role = widget.vacancy?.role ?? '';
     final company = widget.vacancy?.company ?? '';
     final companyWebsite = widget.vacancy?.companyWebsite;
-    final health = ref.watch(healthProvider).valueOrNull ?? HealthStatus.checking;
+    final health =
+        ref.watch(healthProvider).valueOrNull ?? HealthStatus.checking;
     final workerAvailable = health == HealthStatus.online;
 
     return Column(
@@ -531,7 +599,9 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
           decoration: BoxDecoration(
             color: cs.surfaceContainerLowest.withValues(alpha: 0.9),
             border: Border(
-              bottom: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.15)),
+              bottom: BorderSide(
+                color: cs.outlineVariant.withValues(alpha: 0.15),
+              ),
             ),
           ),
           child: Column(
@@ -563,12 +633,18 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                   // Star — global function, everywhere (2026-09-07, user
                   // request), matching _ActionBar's convention of Star first.
                   Tooltip(
-                    message: _starred ? 'Remove from favourites' : 'Add to favourites',
+                    message: _starred
+                        ? 'Remove from favourites'
+                        : 'Add to favourites',
                     child: IconButton(
                       icon: Icon(
-                        _starred ? Icons.star_rounded : Icons.star_outline_rounded,
+                        _starred
+                            ? Icons.star_rounded
+                            : Icons.star_outline_rounded,
                         size: 20,
-                        color: _starred ? const Color(0xFFFFB300) : cs.onSurfaceVariant,
+                        color: _starred
+                            ? const Color(0xFFFFB300)
+                            : cs.onSurfaceVariant,
                       ),
                       onPressed: _toggleStar,
                       splashRadius: 18,
@@ -599,11 +675,17 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                     OutlinedButton.icon(
                       onPressed: _loadingRestore ? null : _restore,
                       icon: _loadingRestore
-                          ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
                           : const Icon(Icons.inbox_outlined, size: 16),
                       label: const Text('Restore to Inbox'),
                       style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: cs.primary.withValues(alpha: 0.5)),
+                        side: BorderSide(
+                          color: cs.primary.withValues(alpha: 0.5),
+                        ),
                         foregroundColor: cs.primary,
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         minimumSize: const Size(0, 36),
@@ -621,7 +703,11 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
                       child: _loadingDecline
-                          ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
                           : const Text('Skip'),
                     ),
                   // Divider after Skip removed (2026-09-07, user request) —
@@ -635,7 +721,9 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                   // before triage), and there was previously no way to record
                   // that without leaving Inbox first.
                   Tooltip(
-                    message: _applied ? 'Mark as not applied' : 'Mark as applied',
+                    message: _applied
+                        ? 'Mark as not applied'
+                        : 'Mark as applied',
                     child: _applied
                         ? FilledButton.icon(
                             onPressed: _loadingApplied ? null : _toggleApplied,
@@ -643,19 +731,26 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                             label: const Text('Applied'),
                             style: FilledButton.styleFrom(
                               backgroundColor: const Color(0xFF2E7D32),
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                              ),
                               minimumSize: const Size(0, 36),
                               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             ),
                           )
                         : OutlinedButton.icon(
                             onPressed: _loadingApplied ? null : _toggleApplied,
-                            icon: const Icon(Icons.check_circle_outline, size: 16),
+                            icon: const Icon(
+                              Icons.check_circle_outline,
+                              size: 16,
+                            ),
                             label: const Text('Applied?'),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: cs.onSurfaceVariant,
                               side: BorderSide(color: cs.outlineVariant),
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                              ),
                               minimumSize: const Size(0, 36),
                               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             ),
@@ -663,11 +758,18 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                   ),
                   if (!widget.restoreMode) ...[
                     Tooltip(
-                      message: 'Run the critical-blocker pre-filter manually (EPIC-27) — not auto-triggered yet',
+                      message:
+                          'Run the critical-blocker pre-filter manually (EPIC-27) — not auto-triggered yet',
                       child: OutlinedButton.icon(
                         onPressed: _loadingPrefilter ? null : _checkBlockers,
                         icon: _loadingPrefilter
-                            ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
                             : const Icon(Icons.block_outlined, size: 16),
                         label: const Text('Check blockers'),
                         style: OutlinedButton.styleFrom(
@@ -680,11 +782,22 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                       ),
                     ),
                     Tooltip(
-                      message: workerAvailable ? '' : 'Analysis worker unavailable — start agent.py',
+                      message: workerAvailable
+                          ? ''
+                          : 'Analysis worker unavailable — start agent.py',
                       child: FilledButton.icon(
-                        onPressed: _loadingAnalyze || !workerAvailable ? null : _analyze,
+                        onPressed: _loadingAnalyze || !workerAvailable
+                            ? null
+                            : _analyze,
                         icon: _loadingAnalyze
-                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
                             : const Icon(Icons.analytics_outlined, size: 16),
                         label: const Text('Analyze'),
                         style: FilledButton.styleFrom(
@@ -780,7 +893,9 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
           decoration: BoxDecoration(
             color: cs.surfaceContainerLowest.withValues(alpha: 0.9),
             border: Border(
-              bottom: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.15)),
+              bottom: BorderSide(
+                color: cs.outlineVariant.withValues(alpha: 0.15),
+              ),
             ),
           ),
           child: Row(
@@ -809,24 +924,31 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
           blocked: widget.vacancy?.blockerFlag ?? false,
           checked: widget.vacancy?.blockerChecked ?? false,
           reasons: widget.vacancy?.blockerReasons ?? const [],
-          onTapDetails: (widget.vacancy?.blockerChecked ?? false) ? _showPrefilterDetails : null,
+          onTapDetails: (widget.vacancy?.blockerChecked ?? false)
+              ? _showPrefilterDetails
+              : null,
         ),
         // JD content
         Expanded(
           child: jdAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Center(
-              child: Text('Failed to load JD: $e',
-                  style: const TextStyle(color: Color(0xFFBA1A1A))),
+              child: Text(
+                'Failed to load JD: $e',
+                style: const TextStyle(color: Color(0xFFBA1A1A)),
+              ),
             ),
-            data: (jd) => Markdown(
-              data: jd,
-              selectable: true,
-              padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
-              styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
-                p: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: cs.onSurface,
-                      height: 1.6,
+            data: (jd) => SelectionArea(
+              child: Markdown(
+                data: jd,
+                selectable: true,
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+                styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context))
+                    .copyWith(
+                      p: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: cs.onSurface,
+                        height: 1.6,
+                      ),
                     ),
               ),
             ),
@@ -863,10 +985,9 @@ class _AnalyzingView extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             'Results will appear automatically',
-            style: Theme.of(context)
-                .textTheme
-                .bodySmall
-                ?.copyWith(color: cs.onSurfaceVariant),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
           ),
         ],
       ),
@@ -890,7 +1011,9 @@ class _AnalysisErrorViewState extends ConsumerState<_AnalysisErrorView> {
   bool _retrying = false;
 
   VacancyRepository get _repo {
-    final apiUrl = ref.read(settingsProvider).valueOrNull?.apiUrl ?? 'http://localhost:8080';
+    final apiUrl =
+        ref.read(settingsProvider).valueOrNull?.apiUrl ??
+        'http://localhost:8080';
     return VacancyRepository(baseUrl: apiUrl);
   }
 
@@ -902,7 +1025,10 @@ class _AnalysisErrorViewState extends ConsumerState<_AnalysisErrorView> {
       if (mounted) {
         ref.read(vacancyListProvider.notifier).refresh();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Reset & queued for analysis'), duration: Duration(seconds: 2)),
+          const SnackBar(
+            content: Text('Reset & queued for analysis'),
+            duration: Duration(seconds: 2),
+          ),
         );
       }
     } catch (e) {
@@ -924,8 +1050,12 @@ class _AnalysisErrorViewState extends ConsumerState<_AnalysisErrorView> {
           children: [
             Icon(Icons.error_outline_rounded, size: 48, color: cs.error),
             const SizedBox(height: 16),
-            Text('Analysis failed', style: Theme.of(context).textTheme.titleMedium),
-            if (widget.errorMessage != null && widget.errorMessage!.isNotEmpty) ...[
+            Text(
+              'Analysis failed',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            if (widget.errorMessage != null &&
+                widget.errorMessage!.isNotEmpty) ...[
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(12),
@@ -937,9 +1067,9 @@ class _AnalysisErrorViewState extends ConsumerState<_AnalysisErrorView> {
                 child: Text(
                   widget.errorMessage!,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: cs.onSurfaceVariant,
-                        fontFamily: 'monospace',
-                      ),
+                    color: cs.onSurfaceVariant,
+                    fontFamily: 'monospace',
+                  ),
                   maxLines: 6,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -952,7 +1082,10 @@ class _AnalysisErrorViewState extends ConsumerState<_AnalysisErrorView> {
                   ? const SizedBox(
                       width: 16,
                       height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
                     )
                   : const Icon(Icons.refresh_rounded),
               label: Text(_retrying ? 'Resetting...' : 'Reset & Retry'),
@@ -978,7 +1111,8 @@ class _AnalysisErrorBanner extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<_AnalysisErrorBanner> createState() => _AnalysisErrorBannerState();
+  ConsumerState<_AnalysisErrorBanner> createState() =>
+      _AnalysisErrorBannerState();
 }
 
 class _AnalysisErrorBannerState extends ConsumerState<_AnalysisErrorBanner> {
@@ -987,7 +1121,9 @@ class _AnalysisErrorBannerState extends ConsumerState<_AnalysisErrorBanner> {
   Future<void> _retry() async {
     setState(() => _retrying = true);
     try {
-      final apiUrl = ref.read(settingsProvider).valueOrNull?.apiUrl ?? 'http://localhost:8080';
+      final apiUrl =
+          ref.read(settingsProvider).valueOrNull?.apiUrl ??
+          'http://localhost:8080';
       final repo = VacancyRepository(baseUrl: apiUrl);
       await repo.reset(widget.vacancyId);
       await repo.analyze(widget.vacancyId);
@@ -1011,7 +1147,9 @@ class _AnalysisErrorBannerState extends ConsumerState<_AnalysisErrorBanner> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
         color: cs.errorContainer.withValues(alpha: 0.35),
-        border: Border(bottom: BorderSide(color: cs.error.withValues(alpha: 0.25))),
+        border: Border(
+          bottom: BorderSide(color: cs.error.withValues(alpha: 0.25)),
+        ),
       ),
       child: Row(
         children: [
@@ -1022,7 +1160,9 @@ class _AnalysisErrorBannerState extends ConsumerState<_AnalysisErrorBanner> {
               widget.errorMessage?.isNotEmpty == true
                   ? 'Analysis failed: ${widget.errorMessage}'
                   : 'Analysis failed — previous results shown',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
@@ -1036,7 +1176,11 @@ class _AnalysisErrorBannerState extends ConsumerState<_AnalysisErrorBanner> {
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
             child: _retrying
-                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
                 : const Text('Reset & Retry'),
           ),
           IconButton(
@@ -1076,18 +1220,20 @@ class VacancyDetailScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<VacancyDetailScreen> createState() => _VacancyDetailScreenState();
+  ConsumerState<VacancyDetailScreen> createState() =>
+      _VacancyDetailScreenState();
 }
 
 class _VacancyDetailScreenState extends ConsumerState<VacancyDetailScreen>
     with SingleTickerProviderStateMixin {
-
   late TabController _tabController;
   Timer? _cvPollingTimer;
   bool _errorBannerDismissed = false;
 
   static bool _needsPolling(String? status) =>
-      status == 'cv_queued' || status == 'cv_generating' || status == 'cover_generating';
+      status == 'cv_queued' ||
+      status == 'cv_generating' ||
+      status == 'cover_generating';
 
   void _startPollingIfNeeded(String? status) {
     if (_needsPolling(status)) {
@@ -1176,9 +1322,22 @@ class _VacancyDetailScreenState extends ConsumerState<VacancyDetailScreen>
       error: (e, _) {
         // API error → fall back to JD view with context-appropriate buttons
         if (status == 'declined') {
-          return _JdModeView(key: ValueKey(widget.vacancyId), vacancyId: widget.vacancyId, url: widget.url, vacancy: widget.vacancy, restoreMode: true);
+          return _JdModeView(
+            key: ValueKey(widget.vacancyId),
+            vacancyId: widget.vacancyId,
+            url: widget.url,
+            vacancy: widget.vacancy,
+            restoreMode: true,
+          );
         }
-        return _JdModeView(key: ValueKey(widget.vacancyId), vacancyId: widget.vacancyId, url: widget.url, vacancy: widget.vacancy, onSkipped: widget.onSkipped, onApplied: widget.onApplied);
+        return _JdModeView(
+          key: ValueKey(widget.vacancyId),
+          vacancyId: widget.vacancyId,
+          url: widget.url,
+          vacancy: widget.vacancy,
+          onSkipped: widget.onSkipped,
+          onApplied: widget.onApplied,
+        );
       },
       data: (analysis) {
         final p1 = analysis.p1;
@@ -1187,9 +1346,22 @@ class _VacancyDetailScreenState extends ConsumerState<VacancyDetailScreen>
         if (p2 == null) {
           // No analysis yet — show JD view with context-appropriate buttons
           if (status == 'declined') {
-            return _JdModeView(key: ValueKey(widget.vacancyId), vacancyId: widget.vacancyId, url: widget.url, vacancy: widget.vacancy, restoreMode: true);
+            return _JdModeView(
+              key: ValueKey(widget.vacancyId),
+              vacancyId: widget.vacancyId,
+              url: widget.url,
+              vacancy: widget.vacancy,
+              restoreMode: true,
+            );
           }
-          return _JdModeView(key: ValueKey(widget.vacancyId), vacancyId: widget.vacancyId, url: widget.url, vacancy: widget.vacancy, onSkipped: widget.onSkipped, onApplied: widget.onApplied);
+          return _JdModeView(
+            key: ValueKey(widget.vacancyId),
+            vacancyId: widget.vacancyId,
+            url: widget.url,
+            vacancy: widget.vacancy,
+            onSkipped: widget.onSkipped,
+            onApplied: widget.onApplied,
+          );
         }
 
         final role = p1?.role.isNotEmpty == true
@@ -1209,7 +1381,16 @@ class _VacancyDetailScreenState extends ConsumerState<VacancyDetailScreen>
                 onDismiss: () => setState(() => _errorBannerDismissed = true),
               ),
             // Sticky action bar
-            _ActionBar(vacancyId: widget.vacancyId, url: widget.url, role: role, company: company, status: status, vacancy: widget.vacancy, tabController: _tabController, onApplied: widget.onApplied),
+            _ActionBar(
+              vacancyId: widget.vacancyId,
+              url: widget.url,
+              role: role,
+              company: company,
+              status: status,
+              vacancy: widget.vacancy,
+              tabController: _tabController,
+              onApplied: widget.onApplied,
+            ),
             // Tab bar
             TabBar(
               controller: _tabController,
@@ -1225,75 +1406,96 @@ class _VacancyDetailScreenState extends ConsumerState<VacancyDetailScreen>
             ),
             // Tab content
             Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  // Tab 0: Analysis
-                  SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _VacancyHero(
-                          p1: p1,
-                          p2: p2,
-                          vacancyId: widget.vacancyId,
-                          vacancy: widget.vacancy,
-                          analyzedAt: analysis.analyzedAt,
-                          salary: widget.vacancy?.salary,
-                          onSalaryChanged: (v) async {
-                            final apiUrl = ref.read(settingsProvider).valueOrNull?.apiUrl ?? 'http://localhost:8080';
-                            await VacancyRepository(baseUrl: apiUrl).updateSalary(widget.vacancyId, v);
-                            ref.invalidate(vacancyListProvider);
-                          },
-                          onTagsChanged: (v) async {
-                            final apiUrl = ref.read(settingsProvider).valueOrNull?.apiUrl ?? 'http://localhost:8080';
-                            await VacancyRepository(baseUrl: apiUrl).updateTags(widget.vacancyId, v);
-                            ref.invalidate(vacancyListProvider);
-                          },
-                        ),
-                        if (widget.vacancy != null)
-                          _RelatedSection(
-                            vacancy: widget.vacancy!,
-                            onNavigateTo: widget.onNavigateTo,
+              // SelectionArea unifies text selection across every tab's
+              // content into one continuous drag-select, instead of each
+              // Markdown block/SelectableText being its own isolated
+              // island (found live 2026-09-21 — could select within one
+              // paragraph but dragging into the next selected nothing).
+              child: SelectionArea(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    // Tab 0: Analysis
+                    SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _VacancyHero(
+                            p1: p1,
+                            p2: p2,
+                            vacancyId: widget.vacancyId,
+                            vacancy: widget.vacancy,
+                            analyzedAt: analysis.analyzedAt,
+                            salary: widget.vacancy?.salary,
+                            onSalaryChanged: (v) async {
+                              final apiUrl =
+                                  ref
+                                      .read(settingsProvider)
+                                      .valueOrNull
+                                      ?.apiUrl ??
+                                  'http://localhost:8080';
+                              await VacancyRepository(
+                                baseUrl: apiUrl,
+                              ).updateSalary(widget.vacancyId, v);
+                              ref.invalidate(vacancyListProvider);
+                            },
+                            onTagsChanged: (v) async {
+                              final apiUrl =
+                                  ref
+                                      .read(settingsProvider)
+                                      .valueOrNull
+                                      ?.apiUrl ??
+                                  'http://localhost:8080';
+                              await VacancyRepository(
+                                baseUrl: apiUrl,
+                              ).updateTags(widget.vacancyId, v);
+                              ref.invalidate(vacancyListProvider);
+                            },
                           ),
-                        const SizedBox(height: 16),
-                        _WhyCard(p2: p2),
-                        const SizedBox(height: 16),
-                        _QuickOverviewCard(p2: p2),
-                        const SizedBox(height: 16),
-                        if (p2.fitDimensions != null)
-                          _CollapsibleSection(
-                            title: 'Fit Dimensions',
-                            tooltip:
-                                'Fit scored across 5 axes (0–10 each):\ndomain, execution, strategy, systems, stakeholder',
-                            child: _FitDimsTable(dims: p2.fitDimensions!),
-                          ),
-                        if (p1 != null) ...[
+                          if (widget.vacancy != null)
+                            _RelatedSection(
+                              vacancy: widget.vacancy!,
+                              onNavigateTo: widget.onNavigateTo,
+                            ),
                           const SizedBox(height: 16),
-                          _CollapsibleSection(
-                            title: 'Attraction Breakdown',
-                            tooltip:
-                                'How attractive this vacancy is for you\nacross 8 factors: company tier, seniority,\nscope, compensation and more',
-                            child: _VacScoreTable(dims: p1.vacscoreDims),
-                          ),
-                          // Role Balance moved into _VacancyHero as a radar
-                          // chart (2026-09-06) — replaces this bar-list
-                          // rendering, not duplicated alongside it.
+                          _WhyCard(p2: p2),
+                          const SizedBox(height: 16),
+                          _QuickOverviewCard(p2: p2),
+                          const SizedBox(height: 16),
+                          if (p2.fitDimensions != null)
+                            _CollapsibleSection(
+                              title: 'Fit Dimensions',
+                              tooltip:
+                                  'Fit scored across 5 axes (0–10 each):\ndomain, execution, strategy, systems, stakeholder',
+                              child: _FitDimsTable(dims: p2.fitDimensions!),
+                            ),
+                          if (p1 != null) ...[
+                            const SizedBox(height: 16),
+                            _CollapsibleSection(
+                              title: 'Attraction Breakdown',
+                              tooltip:
+                                  'How attractive this vacancy is for you\nacross 8 factors: company tier, seniority,\nscope, compensation and more',
+                              child: _VacScoreTable(dims: p1.vacscoreDims),
+                            ),
+                            // Role Balance moved into _VacancyHero as a radar
+                            // chart (2026-09-06) — replaces this bar-list
+                            // rendering, not duplicated alongside it.
+                          ],
+                          const SizedBox(height: 16),
+                          _JdSection(vacancyId: widget.vacancyId),
+                          const SizedBox(height: 80),
                         ],
-                        const SizedBox(height: 16),
-                        _JdSection(vacancyId: widget.vacancyId),
-                        const SizedBox(height: 80),
-                      ],
+                      ),
                     ),
-                  ),
-                  // Tab 1: CV
-                  _CvTab(vacancyId: widget.vacancyId, status: status),
-                  // Tab 2: Cover
-                  _CoverTab(vacancyId: widget.vacancyId, status: status),
-                  // Tab 3: Activity
-                  _ActivityLogView(vacancyId: widget.vacancyId),
-                ],
+                    // Tab 1: CV
+                    _CvTab(vacancyId: widget.vacancyId, status: status),
+                    // Tab 2: Cover
+                    _CoverTab(vacancyId: widget.vacancyId, status: status),
+                    // Tab 3: Activity
+                    _ActivityLogView(vacancyId: widget.vacancyId),
+                  ],
+                ),
               ),
             ),
           ],
@@ -1337,9 +1539,9 @@ class _RelatedSection extends ConsumerWidget {
               Text(
                 'Related',
                 style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: cs.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  color: cs.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ],
           ),
@@ -1350,21 +1552,31 @@ class _RelatedSection extends ConsumerWidget {
             children: [
               if (original != null)
                 _RelatedChip(
-                  label: 'Original · ${original.role.isNotEmpty ? original.role : '#${original.id}'}',
-                  sublabel: original.company.isNotEmpty ? original.company : null,
+                  label:
+                      'Original · ${original.role.isNotEmpty ? original.role : '#${original.id}'}',
+                  sublabel: original.company.isNotEmpty
+                      ? original.company
+                      : null,
                   id: original.id,
                   icon: Icons.arrow_upward_rounded,
-                  tooltip: 'This vacancy is a duplicate — the original posting is #${original.id}.\nTap to open the original.',
-                  onTap: onNavigateTo != null ? () => onNavigateTo!(original.id) : null,
+                  tooltip:
+                      'This vacancy is a duplicate — the original posting is #${original.id}.\nTap to open the original.',
+                  onTap: onNavigateTo != null
+                      ? () => onNavigateTo!(original.id)
+                      : null,
                 ),
               for (final dup in duplicates)
                 _RelatedChip(
-                  label: '${dup.site.isNotEmpty ? dup.site[0].toUpperCase() + dup.site.substring(1) : 'Dup'} · ${dup.role.isNotEmpty ? dup.role : '#${dup.id}'}',
+                  label:
+                      '${dup.site.isNotEmpty ? dup.site[0].toUpperCase() + dup.site.substring(1) : 'Dup'} · ${dup.role.isNotEmpty ? dup.role : '#${dup.id}'}',
                   sublabel: dup.company.isNotEmpty ? dup.company : null,
                   id: dup.id,
                   icon: Icons.copy_rounded,
-                  tooltip: 'The same job was also found on ${dup.site.isNotEmpty ? dup.site : 'another source'} (vacancy #${dup.id}).\nTap to open it.',
-                  onTap: onNavigateTo != null ? () => onNavigateTo!(dup.id) : null,
+                  tooltip:
+                      'The same job was also found on ${dup.site.isNotEmpty ? dup.site : 'another source'} (vacancy #${dup.id}).\nTap to open it.',
+                  onTap: onNavigateTo != null
+                      ? () => onNavigateTo!(dup.id)
+                      : null,
                 ),
             ],
           ),
@@ -1470,16 +1682,15 @@ class _JdSection extends ConsumerWidget {
       initiallyExpanded: true,
       child: jdAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Text('Failed to load JD: $e',
-            style: TextStyle(color: cs.error)),
+        error: (e, _) =>
+            Text('Failed to load JD: $e', style: TextStyle(color: cs.error)),
         data: (jd) => MarkdownBody(
           data: jd,
           selectable: true,
           styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
-            p: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: cs.onSurface,
-                  height: 1.6,
-                ),
+            p: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: cs.onSurface, height: 1.6),
           ),
         ),
       ),
@@ -1511,12 +1722,25 @@ class _ActivityLogViewState extends ConsumerState<_ActivityLogView> {
   }
 
   Future<void> _load() async {
-    final apiUrl = ref.read(settingsProvider).valueOrNull?.apiUrl ?? 'http://localhost:8080';
+    final apiUrl =
+        ref.read(settingsProvider).valueOrNull?.apiUrl ??
+        'http://localhost:8080';
     try {
-      final result = await VacancyRepository(baseUrl: apiUrl).getActivity(widget.vacancyId);
-      if (mounted) setState(() { _runs = result.runs; _entries = result.entries; _loading = false; });
+      final result = await VacancyRepository(
+        baseUrl: apiUrl,
+      ).getActivity(widget.vacancyId);
+      if (mounted)
+        setState(() {
+          _runs = result.runs;
+          _entries = result.entries;
+          _loading = false;
+        });
     } catch (e) {
-      if (mounted) setState(() { _error = '$e'; _loading = false; });
+      if (mounted)
+        setState(() {
+          _error = '$e';
+          _loading = false;
+        });
     }
   }
 
@@ -1526,11 +1750,11 @@ class _ActivityLogViewState extends ConsumerState<_ActivityLogView> {
   String _fmtTs(String? iso) {
     if (iso == null || iso.isEmpty) return '—';
     try {
-      final dt  = _asUtc(iso);
-      final dd  = dt.day.toString().padLeft(2, '0');
-      final mm  = dt.month.toString().padLeft(2, '0');
-      final yy  = dt.year.toString();
-      final hh  = dt.hour.toString().padLeft(2, '0');
+      final dt = _asUtc(iso);
+      final dd = dt.day.toString().padLeft(2, '0');
+      final mm = dt.month.toString().padLeft(2, '0');
+      final yy = dt.year.toString();
+      final hh = dt.hour.toString().padLeft(2, '0');
       final min = dt.minute.toString().padLeft(2, '0');
       return '$dd.$mm.$yy $hh:$min';
     } catch (_) {
@@ -1538,8 +1762,9 @@ class _ActivityLogViewState extends ConsumerState<_ActivityLogView> {
     }
   }
 
-  String _fmtMs(int ms) => ms >= 1000 ? '${(ms / 1000).toStringAsFixed(1)}s' : '${ms}ms';
-  String _k(int n)       => n >= 1000  ? '${(n  / 1000).toStringAsFixed(1)}k' : '$n';
+  String _fmtMs(int ms) =>
+      ms >= 1000 ? '${(ms / 1000).toStringAsFixed(1)}s' : '${ms}ms';
+  String _k(int n) => n >= 1000 ? '${(n / 1000).toStringAsFixed(1)}k' : '$n';
 
   // ── Shared container ──────────────────────────────────────────────────────────
 
@@ -1548,8 +1773,13 @@ class _ActivityLogViewState extends ConsumerState<_ActivityLogView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: Theme.of(context).textTheme.labelSmall
-            ?.copyWith(color: cs.onSurfaceVariant, letterSpacing: 0.8)),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: cs.onSurfaceVariant,
+            letterSpacing: 0.8,
+          ),
+        ),
         const SizedBox(height: 6),
         Container(
           width: double.infinity,
@@ -1569,55 +1799,90 @@ class _ActivityLogViewState extends ConsumerState<_ActivityLogView> {
 
   Widget _runsTable(BuildContext context, List<PipelineRun> runs) {
     final cs = Theme.of(context).colorScheme;
-    const hStyle = TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, letterSpacing: 0.4);
+    const hStyle = TextStyle(
+      fontSize: 10.5,
+      fontWeight: FontWeight.w600,
+      letterSpacing: 0.4,
+    );
     const dStyle = TextStyle(fontSize: 11.5, height: 1.6);
 
     Widget hcell(String t, {TextAlign a = TextAlign.left}) => Padding(
       padding: const EdgeInsets.fromLTRB(4, 2, 14, 5),
-      child: Text(t, style: hStyle.copyWith(color: cs.onSurfaceVariant), textAlign: a),
+      child: Text(
+        t,
+        style: hStyle.copyWith(color: cs.onSurfaceVariant),
+        textAlign: a,
+      ),
     );
-    Widget cell(String t, {TextAlign a = TextAlign.left, Color? color, bool bold = false}) => Padding(
+    Widget cell(
+      String t, {
+      TextAlign a = TextAlign.left,
+      Color? color,
+      bool bold = false,
+    }) => Padding(
       padding: const EdgeInsets.fromLTRB(4, 2, 14, 2),
-      child: Text(t,
-        style: dStyle.copyWith(color: color, fontWeight: bold ? FontWeight.w600 : null),
-        textAlign: a),
+      child: Text(
+        t,
+        style: dStyle.copyWith(
+          color: color,
+          fontWeight: bold ? FontWeight.w600 : null,
+        ),
+        textAlign: a,
+      ),
     );
 
     return Table(
       columnWidths: const {
-        0: IntrinsicColumnWidth(),  // time
-        1: IntrinsicColumnWidth(),  // phase
-        2: IntrinsicColumnWidth(),  // icon
-        3: IntrinsicColumnWidth(),  // status
-        4: IntrinsicColumnWidth(),  // duration
-        5: FlexColumnWidth(),       // error
+        0: IntrinsicColumnWidth(), // time
+        1: IntrinsicColumnWidth(), // phase
+        2: IntrinsicColumnWidth(), // icon
+        3: IntrinsicColumnWidth(), // status
+        4: IntrinsicColumnWidth(), // duration
+        5: FlexColumnWidth(), // error
       },
       defaultVerticalAlignment: TableCellVerticalAlignment.middle,
       children: [
         TableRow(
-          decoration: BoxDecoration(border: Border(
-            bottom: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
-          )),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                color: cs.outlineVariant.withValues(alpha: 0.5),
+              ),
+            ),
+          ),
           children: [
-            hcell('Time'), hcell('Phase'), hcell(''), hcell('Status'),
-            hcell('Duration', a: TextAlign.right), hcell('Error'),
+            hcell('Time'),
+            hcell('Phase'),
+            hcell(''),
+            hcell('Status'),
+            hcell('Duration', a: TextAlign.right),
+            hcell('Error'),
           ],
         ),
         ...runs.map((r) {
-          final ok      = r.status == 'done';
-          final isErr   = r.status == 'error';
-          final icon    = ok ? '✓' : (isErr ? '✗' : '·');
-          final icColor = ok ? cs.primary : (isErr ? cs.error : cs.onSurfaceVariant);
-          final err     = (!ok && r.errorMessage != null && r.errorMessage!.isNotEmpty)
-              ? r.errorMessage! : '';
-          return TableRow(children: [
-            cell(_fmtTs(r.startedAt), color: cs.onSurfaceVariant),
-            cell(r.phase, bold: true),
-            cell(icon, color: icColor),
-            cell(r.status),
-            cell(r.durationMs != null ? _fmtMs(r.durationMs!) : '—', a: TextAlign.right),
-            cell(err, color: err.isNotEmpty ? cs.error : null),
-          ]);
+          final ok = r.status == 'done';
+          final isErr = r.status == 'error';
+          final icon = ok ? '✓' : (isErr ? '✗' : '·');
+          final icColor = ok
+              ? cs.primary
+              : (isErr ? cs.error : cs.onSurfaceVariant);
+          final err =
+              (!ok && r.errorMessage != null && r.errorMessage!.isNotEmpty)
+              ? r.errorMessage!
+              : '';
+          return TableRow(
+            children: [
+              cell(_fmtTs(r.startedAt), color: cs.onSurfaceVariant),
+              cell(r.phase, bold: true),
+              cell(icon, color: icColor),
+              cell(r.status),
+              cell(
+                r.durationMs != null ? _fmtMs(r.durationMs!) : '—',
+                a: TextAlign.right,
+              ),
+              cell(err, color: err.isNotEmpty ? cs.error : null),
+            ],
+          );
         }),
       ],
     );
@@ -1627,66 +1892,96 @@ class _ActivityLogViewState extends ConsumerState<_ActivityLogView> {
 
   Widget _entriesTable(BuildContext context, List<ActivityEntry> entries) {
     final cs = Theme.of(context).colorScheme;
-    const hStyle = TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, letterSpacing: 0.4);
+    const hStyle = TextStyle(
+      fontSize: 10.5,
+      fontWeight: FontWeight.w600,
+      letterSpacing: 0.4,
+    );
     const dStyle = TextStyle(fontSize: 11.5, height: 1.6);
 
     Widget hcell(String t, {TextAlign a = TextAlign.left}) => Padding(
       padding: const EdgeInsets.fromLTRB(4, 2, 14, 5),
-      child: Text(t, style: hStyle.copyWith(color: cs.onSurfaceVariant), textAlign: a),
+      child: Text(
+        t,
+        style: hStyle.copyWith(color: cs.onSurfaceVariant),
+        textAlign: a,
+      ),
     );
-    Widget cell(String t, {TextAlign a = TextAlign.left, Color? color, bool bold = false}) => Padding(
+    Widget cell(
+      String t, {
+      TextAlign a = TextAlign.left,
+      Color? color,
+      bool bold = false,
+    }) => Padding(
       padding: const EdgeInsets.fromLTRB(4, 2, 14, 2),
-      child: Text(t,
-        style: dStyle.copyWith(color: color, fontWeight: bold ? FontWeight.w600 : null),
-        textAlign: a),
+      child: Text(
+        t,
+        style: dStyle.copyWith(
+          color: color,
+          fontWeight: bold ? FontWeight.w600 : null,
+        ),
+        textAlign: a,
+      ),
     );
 
     final totalCost = entries.fold(0.0, (s, e) => s + e.costUsd);
-    final totalMs   = entries.fold(0,   (s, e) => s + e.elapsedMs);
+    final totalMs = entries.fold(0, (s, e) => s + e.elapsedMs);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Table(
           columnWidths: const {
-            0: IntrinsicColumnWidth(),  // time
-            1: IntrinsicColumnWidth(),  // phase
-            2: IntrinsicColumnWidth(),  // provider
-            3: FlexColumnWidth(),       // model
-            4: IntrinsicColumnWidth(),  // elapsed
-            5: IntrinsicColumnWidth(),  // tokens
-            6: IntrinsicColumnWidth(),  // cost
+            0: IntrinsicColumnWidth(), // time
+            1: IntrinsicColumnWidth(), // phase
+            2: IntrinsicColumnWidth(), // provider
+            3: FlexColumnWidth(), // model
+            4: IntrinsicColumnWidth(), // elapsed
+            5: IntrinsicColumnWidth(), // tokens
+            6: IntrinsicColumnWidth(), // cost
           },
           defaultVerticalAlignment: TableCellVerticalAlignment.middle,
           children: [
             TableRow(
-              decoration: BoxDecoration(border: Border(
-                bottom: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
-              )),
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(
+                    color: cs.outlineVariant.withValues(alpha: 0.5),
+                  ),
+                ),
+              ),
               children: [
-                hcell('Time'), hcell('Phase'), hcell('Provider'), hcell('Model'),
+                hcell('Time'),
+                hcell('Phase'),
+                hcell('Provider'),
+                hcell('Model'),
                 hcell('Elapsed', a: TextAlign.right),
-                hcell('Tokens',  a: TextAlign.right),
-                hcell('Cost',    a: TextAlign.right),
+                hcell('Tokens', a: TextAlign.right),
+                hcell('Cost', a: TextAlign.right),
               ],
             ),
             ...entries.map((e) {
               final tok = e.provider == 'claude_cli'
                   ? '—'
                   : '${_k(e.inputTokens)}→${_k(e.outputTokens)}';
-              final cost      = e.costUsd > 0 ? '\$${e.costUsd.toStringAsFixed(4)}' : '—';
-              final modelText = e.thinkingEffort.isNotEmpty && e.thinkingEffort != 'off'
+              final cost = e.costUsd > 0
+                  ? '\$${e.costUsd.toStringAsFixed(4)}'
+                  : '—';
+              final modelText =
+                  e.thinkingEffort.isNotEmpty && e.thinkingEffort != 'off'
                   ? '${e.model}  [${e.thinkingEffort}]'
                   : e.model;
-              return TableRow(children: [
-                cell(_fmtTs(e.createdAt), color: cs.onSurfaceVariant),
-                cell(e.phase, bold: true),
-                cell(e.provider),
-                cell(modelText),
-                cell(_fmtMs(e.elapsedMs), a: TextAlign.right),
-                cell(tok,  a: TextAlign.right),
-                cell(cost, a: TextAlign.right),
-              ]);
+              return TableRow(
+                children: [
+                  cell(_fmtTs(e.createdAt), color: cs.onSurfaceVariant),
+                  cell(e.phase, bold: true),
+                  cell(e.provider),
+                  cell(modelText),
+                  cell(_fmtMs(e.elapsedMs), a: TextAlign.right),
+                  cell(tok, a: TextAlign.right),
+                  cell(cost, a: TextAlign.right),
+                ],
+              );
             }),
           ],
         ),
@@ -1708,10 +2003,12 @@ class _ActivityLogViewState extends ConsumerState<_ActivityLogView> {
 
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
-      return Center(child: Text('Error: $_error', style: TextStyle(color: cs.error)));
+      return Center(
+        child: Text('Error: $_error', style: TextStyle(color: cs.error)),
+      );
     }
 
-    final runs    = _runs    ?? [];
+    final runs = _runs ?? [];
     final entries = _entries ?? [];
 
     return SingleChildScrollView(
@@ -1722,8 +2019,9 @@ class _ActivityLogViewState extends ConsumerState<_ActivityLogView> {
           if (runs.isEmpty && entries.isEmpty)
             Text(
               'No activity recorded for this vacancy yet.',
-              style: Theme.of(context).textTheme.bodyMedium
-                  ?.copyWith(color: cs.onSurfaceVariant),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
             )
           else ...[
             if (runs.isNotEmpty) ...[
@@ -1735,7 +2033,13 @@ class _ActivityLogViewState extends ConsumerState<_ActivityLogView> {
           ],
           const SizedBox(height: 8),
           TextButton.icon(
-            onPressed: () { setState(() { _loading = true; _error = null; }); _load(); },
+            onPressed: () {
+              setState(() {
+                _loading = true;
+                _error = null;
+              });
+              _load();
+            },
             icon: const Icon(Icons.refresh, size: 16),
             label: const Text('Refresh'),
           ),
@@ -1794,12 +2098,16 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
   @override
   void didUpdateWidget(_ActionBar old) {
     super.didUpdateWidget(old);
-    if (old.vacancy?.starred != widget.vacancy?.starred) _starred = widget.vacancy?.starred ?? false;
-    if (old.vacancy?.applied != widget.vacancy?.applied) _applied = widget.vacancy?.applied ?? false;
+    if (old.vacancy?.starred != widget.vacancy?.starred)
+      _starred = widget.vacancy?.starred ?? false;
+    if (old.vacancy?.applied != widget.vacancy?.applied)
+      _applied = widget.vacancy?.applied ?? false;
   }
 
   VacancyRepository get _repo {
-    final apiUrl = ref.read(settingsProvider).valueOrNull?.apiUrl ?? 'http://localhost:8080';
+    final apiUrl =
+        ref.read(settingsProvider).valueOrNull?.apiUrl ??
+        'http://localhost:8080';
     return VacancyRepository(baseUrl: apiUrl);
   }
 
@@ -1818,7 +2126,10 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
   Future<void> _toggleStar() async {
     if (_loadingStar) return;
     final next = !_starred;
-    setState(() { _starred = next; _loadingStar = true; });
+    setState(() {
+      _starred = next;
+      _loadingStar = true;
+    });
     try {
       await _repo.setStarred(widget.vacancyId, next);
       if (mounted) ref.read(vacancyListProvider.notifier).refresh();
@@ -1832,7 +2143,10 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
   Future<void> _toggleApplied() async {
     if (_loadingApplied) return;
     final next = !_applied;
-    setState(() { _applied = next; _loadingApplied = true; });
+    setState(() {
+      _applied = next;
+      _loadingApplied = true;
+    });
     try {
       await _repo.setApplied(widget.vacancyId, next);
       if (mounted) {
@@ -1857,7 +2171,10 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
       if (mounted) {
         ref.read(vacancyListProvider.notifier).refresh();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('CV generation queued'), duration: Duration(seconds: 2)),
+          const SnackBar(
+            content: Text('CV generation queued'),
+            duration: Duration(seconds: 2),
+          ),
         );
       }
     } catch (e) {
@@ -1876,7 +2193,10 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
       if (mounted) {
         ref.read(vacancyListProvider.notifier).refresh();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Analysis queued'), duration: Duration(seconds: 2)),
+          const SnackBar(
+            content: Text('Analysis queued'),
+            duration: Duration(seconds: 2),
+          ),
         );
       }
     } catch (e) {
@@ -1897,7 +2217,10 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
         ref.read(vacancyListProvider.notifier).refresh();
         ref.invalidate(vacancyDetailProvider(widget.vacancyId));
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Reset & queued for analysis'), duration: Duration(seconds: 2)),
+          const SnackBar(
+            content: Text('Reset & queued for analysis'),
+            duration: Duration(seconds: 2),
+          ),
         );
       }
     } catch (e) {
@@ -1916,7 +2239,10 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
       if (mounted) {
         ref.read(vacancyListProvider.notifier).refresh();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cover generation queued'), duration: Duration(seconds: 2)),
+          const SnackBar(
+            content: Text('Cover generation queued'),
+            duration: Duration(seconds: 2),
+          ),
         );
       }
     } catch (e) {
@@ -1931,7 +2257,10 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
   Future<void> _downloadPdf(String type) async {
     final messenger = ScaffoldMessenger.of(context);
     messenger.showSnackBar(
-      const SnackBar(content: Text('Preparing PDF...'), duration: Duration(minutes: 1)),
+      const SnackBar(
+        content: Text('Preparing PDF...'),
+        duration: Duration(minutes: 1),
+      ),
     );
     try {
       final bytes = type == 'cv'
@@ -1940,7 +2269,8 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
       messenger.hideCurrentSnackBar();
       if (!mounted) return;
       final label = type == 'cv' ? 'CV' : 'Cover Letter';
-      final fileName = '${type == 'cv' ? 'CV' : 'Cover'}_${widget.vacancyId}.pdf';
+      final fileName =
+          '${type == 'cv' ? 'CV' : 'Cover'}_${widget.vacancyId}.pdf';
       final path = await FilePicker.platform.saveFile(
         dialogTitle: 'Save $label PDF',
         fileName: fileName,
@@ -1952,7 +2282,10 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
         await File(path).writeAsBytes(bytes, flush: true);
         if (mounted) {
           messenger.showSnackBar(
-            SnackBar(content: Text('Saved: $path'), duration: const Duration(seconds: 3)),
+            SnackBar(
+              content: Text('Saved: $path'),
+              duration: const Duration(seconds: 3),
+            ),
           );
         }
       }
@@ -1986,7 +2319,10 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
       if (mounted) {
         ref.read(vacancyListProvider.notifier).refresh();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Moved to inbox'), duration: Duration(seconds: 2)),
+          const SnackBar(
+            content: Text('Moved to inbox'),
+            duration: Duration(seconds: 2),
+          ),
         );
       }
     } catch (e) {
@@ -1997,17 +2333,27 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
     }
   }
 
-  Widget _buildCta(BuildContext context, ColorScheme cs, AsyncValue<VacancyCv> cvAsync, {required bool workerAvailable}) {
+  Widget _buildCta(
+    BuildContext context,
+    ColorScheme cs,
+    AsyncValue<VacancyCv> cvAsync, {
+    required bool workerAvailable,
+  }) {
     final tab = widget.tabController.index;
     final isDeclined = widget.status == 'declined';
-    final isCvInProgress = widget.status == 'cv_queued' || widget.status == 'cv_generating';
+    final isCvInProgress =
+        widget.status == 'cv_queued' || widget.status == 'cv_generating';
 
     if (isDeclined) {
       if (tab == 0) {
         return OutlinedButton.icon(
           onPressed: _loadingRestore ? null : _restore,
           icon: _loadingRestore
-              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+              ? const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
               : const Icon(Icons.inbox_outlined, size: 16),
           label: const Text('Restore to Inbox'),
           style: OutlinedButton.styleFrom(
@@ -2033,16 +2379,31 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
                   foregroundColor: cs.error,
                 ),
                 child: _loadingDecline
-                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
                     : const Text('Decline'),
               ),
               const SizedBox(width: 8),
               Tooltip(
-                message: workerAvailable ? '' : 'Analysis worker unavailable — start agent.py',
+                message: workerAvailable
+                    ? ''
+                    : 'Analysis worker unavailable — start agent.py',
                 child: FilledButton.icon(
-                  onPressed: _loadingAnalyze || !workerAvailable ? null : _analyze,
+                  onPressed: _loadingAnalyze || !workerAvailable
+                      ? null
+                      : _analyze,
                   icon: _loadingAnalyze
-                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
                       : const Icon(Icons.refresh_rounded, size: 16),
                   label: Text(_loadingAnalyze ? 'Queuing...' : 'Re-analyze'),
                 ),
@@ -2052,9 +2413,18 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
                 message: 'Reset stuck analysis and retry from scratch',
                 child: FilledButton.icon(
                   onPressed: _loadingReset ? null : _resetAndRetry,
-                  style: FilledButton.styleFrom(backgroundColor: Colors.orange.shade700),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.orange.shade700,
+                  ),
                   icon: _loadingReset
-                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
                       : const Icon(Icons.restart_alt_rounded, size: 16),
                   label: Text(_loadingReset ? 'Resetting...' : 'Reset & Retry'),
                 ),
@@ -2066,23 +2436,31 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
       case 1: // CV
         final hasCv = cvAsync.valueOrNull?.hasCv ?? false;
         return _SplitButton(
-          label: isCvInProgress ? 'Generating...' : (hasCv ? 'Regenerate CV' : 'Generate CV'),
+          label: isCvInProgress
+              ? 'Generating...'
+              : (hasCv ? 'Regenerate CV' : 'Generate CV'),
           icon: Icons.description_outlined,
           loading: _loadingCv || isCvInProgress,
           onPressed: (isCvInProgress || _loadingCv) ? null : _generateCv,
           menuItems: [
             MenuItemButton(
-              onPressed: (isCvInProgress || _loadingCv) ? null : () => _generateCv(language: 'en'),
+              onPressed: (isCvInProgress || _loadingCv)
+                  ? null
+                  : () => _generateCv(language: 'en'),
               leadingIcon: const Icon(Icons.translate, size: 16),
               child: const Text('Generate in English'),
             ),
             MenuItemButton(
-              onPressed: (isCvInProgress || _loadingCv) ? null : () => _generateCv(language: 'uk'),
+              onPressed: (isCvInProgress || _loadingCv)
+                  ? null
+                  : () => _generateCv(language: 'uk'),
               leadingIcon: const Icon(Icons.translate, size: 16),
               child: const Text('Generate in Ukrainian'),
             ),
             MenuItemButton(
-              onPressed: hasCv && !isCvInProgress ? () => _downloadPdf('cv') : null,
+              onPressed: hasCv && !isCvInProgress
+                  ? () => _downloadPdf('cv')
+                  : null,
               leadingIcon: const Icon(Icons.picture_as_pdf_outlined, size: 16),
               child: const Text('Download PDF'),
             ),
@@ -2093,7 +2471,9 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
         final hasCover = cvAsync.valueOrNull?.hasCover ?? false;
         final isCoverInProgress = widget.status == 'cover_generating';
         return _SplitButton(
-          label: isCoverInProgress ? 'Generating...' : (hasCover ? 'Regenerate Cover' : 'Generate Cover'),
+          label: isCoverInProgress
+              ? 'Generating...'
+              : (hasCover ? 'Regenerate Cover' : 'Generate Cover'),
           icon: Icons.mail_outline,
           loading: _loadingCv || isCoverInProgress,
           onPressed: (isCoverInProgress || _loadingCv) ? null : _generateCover,
@@ -2101,7 +2481,10 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
               ? [
                   MenuItemButton(
                     onPressed: () => _downloadPdf('cover'),
-                    leadingIcon: const Icon(Icons.picture_as_pdf_outlined, size: 16),
+                    leadingIcon: const Icon(
+                      Icons.picture_as_pdf_outlined,
+                      size: 16,
+                    ),
                     child: const Text('Download PDF'),
                   ),
                 ]
@@ -2117,7 +2500,8 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final cvAsync = ref.watch(vacancyCvProvider(widget.vacancyId));
-    final health = ref.watch(healthProvider).valueOrNull ?? HealthStatus.checking;
+    final health =
+        ref.watch(healthProvider).valueOrNull ?? HealthStatus.checking;
     final workerAvailable = health == HealthStatus.online;
 
     return Container(
@@ -2143,12 +2527,16 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
             children: [
               // Star toggle
               Tooltip(
-                message: _starred ? 'Remove from favourites' : 'Add to favourites',
+                message: _starred
+                    ? 'Remove from favourites'
+                    : 'Add to favourites',
                 child: IconButton(
                   icon: Icon(
                     _starred ? Icons.star_rounded : Icons.star_outline_rounded,
                     size: 20,
-                    color: _starred ? const Color(0xFFFFB300) : cs.onSurfaceVariant,
+                    color: _starred
+                        ? const Color(0xFFFFB300)
+                        : cs.onSurfaceVariant,
                   ),
                   onPressed: _toggleStar,
                   splashRadius: 18,
@@ -2211,9 +2599,15 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
               // Open vacancy folder in Explorer
               if (widget.vacancy?.folderPath != null)
                 IconButton(
-                  icon: Icon(Icons.folder_open_outlined, size: 18, color: cs.onSurfaceVariant),
+                  icon: Icon(
+                    Icons.folder_open_outlined,
+                    size: 18,
+                    color: cs.onSurfaceVariant,
+                  ),
                   tooltip: 'Open folder',
-                  onPressed: () => Process.run('explorer.exe', [widget.vacancy!.folderPath!]),
+                  onPressed: () => Process.run('explorer.exe', [
+                    widget.vacancy!.folderPath!,
+                  ]),
                 ),
               Tooltip(
                 message: 'Refresh vacancy data',
@@ -2224,7 +2618,11 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
                           height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : Icon(Icons.sync_rounded, size: 18, color: cs.onSurfaceVariant),
+                      : Icon(
+                          Icons.sync_rounded,
+                          size: 18,
+                          color: cs.onSurfaceVariant,
+                        ),
                   onPressed: _refreshing ? null : _refresh,
                 ),
               ),
@@ -2232,7 +2630,12 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
               // Context-sensitive CTA — changes per tab
               AnimatedBuilder(
                 animation: widget.tabController,
-                builder: (context, _) => _buildCta(context, cs, cvAsync, workerAvailable: workerAvailable),
+                builder: (context, _) => _buildCta(
+                  context,
+                  cs,
+                  cvAsync,
+                  workerAvailable: workerAvailable,
+                ),
               ),
             ],
           ),
@@ -2271,8 +2674,10 @@ class _VacancyHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final role    = p1?.role.isNotEmpty == true ? p1!.role : (vacancy?.role ?? '');
-    final company = p1?.company.isNotEmpty == true ? p1!.company : (vacancy?.company ?? '');
+    final role = p1?.role.isNotEmpty == true ? p1!.role : (vacancy?.role ?? '');
+    final company = p1?.company.isNotEmpty == true
+        ? p1!.company
+        : (vacancy?.company ?? '');
     final publishedAt = vacancy?.publishedAt;
     final appliedAt = vacancy?.appliedAt;
     // category moves to Quick Overview block, not used in hero
@@ -2422,20 +2827,32 @@ class _VacancyHero extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Tooltip(
-                    message: 'Candidate-to-role fit across domain, execution,\nstrategy, systems & stakeholder (0–10)',
-                    child: _ScoreDotsRow(label: 'Fit', score: p2.fitScore.toDouble(), max: 10),
+                    message:
+                        'Candidate-to-role fit across domain, execution,\nstrategy, systems & stakeholder (0–10)',
+                    child: _ScoreDotsRow(
+                      label: 'Fit',
+                      score: p2.fitScore.toDouble(),
+                      max: 10,
+                    ),
                   ),
                   if (p1 != null) ...[
                     const SizedBox(height: 5),
                     Tooltip(
-                      message: 'How attractive this role is for you —\nseniority, company tier, scope, compensation (0–10)',
-                      child: _ScoreDotsRow(label: 'Attraction', score: p1!.vacancyScore, max: 10),
+                      message:
+                          'How attractive this role is for you —\nseniority, company tier, scope, compensation (0–10)',
+                      child: _ScoreDotsRow(
+                        label: 'Attraction',
+                        score: p1!.vacancyScore,
+                        max: 10,
+                      ),
                     ),
                   ],
                 ],
               ),
             ),
-            if (publishedAt != null || analyzedAt != null || appliedAt != null) ...[
+            if (publishedAt != null ||
+                analyzedAt != null ||
+                appliedAt != null) ...[
               const SizedBox(width: 8),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
@@ -2508,18 +2925,24 @@ class _WarningsBanner extends StatelessWidget {
               SizedBox(width: 8),
               Text(
                 'Warnings',
-                style: TextStyle(fontWeight: FontWeight.w700, color: fg, fontSize: 15),
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: fg,
+                  fontSize: 15,
+                ),
               ),
             ],
           ),
           const SizedBox(height: 8),
-          ...warnings.map((w) => Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text(
-                  '•  $w',
-                  style: const TextStyle(color: fg, fontSize: 13.5, height: 1.35),
-                ),
-              )),
+          ...warnings.map(
+            (w) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(
+                '•  $w',
+                style: const TextStyle(color: fg, fontSize: 13.5, height: 1.35),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -2559,8 +2982,12 @@ class _PrefilterBanner extends StatelessWidget {
     final bg = blocked ? const Color(0xFFFFEBEE) : const Color(0xFFE8F5E9);
     final border = blocked ? const Color(0xFFE57373) : const Color(0xFF81C784);
     final fg = blocked ? const Color(0xFFC62828) : const Color(0xFF2E7D32);
-    final icon = blocked ? Icons.block_rounded : Icons.check_circle_outline_rounded;
-    final label = blocked ? 'Possible blocker — pre-filter check' : 'Pre-filter checked — no blockers';
+    final icon = blocked
+        ? Icons.block_rounded
+        : Icons.check_circle_outline_rounded;
+    final label = blocked
+        ? 'Possible blocker — pre-filter check'
+        : 'Pre-filter checked — no blockers';
 
     return Container(
       width: double.infinity,
@@ -2595,18 +3022,29 @@ class _PrefilterBanner extends StatelessWidget {
                 const Spacer(),
                 InkWell(
                   onTap: onTapDetails,
-                  child: Text('Details',
-                      style: TextStyle(fontSize: 11, color: cs.primary, decoration: TextDecoration.underline)),
+                  child: Text(
+                    'Details',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: cs.primary,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
                 ),
               ],
             ],
           ),
           if (blocked) ...[
             const SizedBox(height: 6),
-            ...reasons.map((r) => Padding(
-                  padding: const EdgeInsets.only(bottom: 3),
-                  child: _reasonLine(r, style: TextStyle(fontSize: compact ? 11.5 : 12.5)),
-                )),
+            ...reasons.map(
+              (r) => Padding(
+                padding: const EdgeInsets.only(bottom: 3),
+                child: _reasonLine(
+                  r,
+                  style: TextStyle(fontSize: compact ? 11.5 : 12.5),
+                ),
+              ),
+            ),
           ],
         ],
       ),
@@ -2619,7 +3057,11 @@ class _ScoreDotsRow extends StatelessWidget {
   final double score;
   final double max;
 
-  const _ScoreDotsRow({required this.label, required this.score, required this.max});
+  const _ScoreDotsRow({
+    required this.label,
+    required this.score,
+    required this.max,
+  });
 
   Color _filledColor() {
     final ratio = score / max;
@@ -2634,18 +3076,21 @@ class _ScoreDotsRow extends StatelessWidget {
     final filled = score.round().clamp(0, max.toInt());
     final filledColor = _filledColor();
     final emptyColor = cs.surfaceContainerHighest;
-    final scoreText = score % 1 == 0 ? '${score.toInt()}' : score.toStringAsFixed(1);
+    final scoreText = score % 1 == 0
+        ? '${score.toInt()}'
+        : score.toStringAsFixed(1);
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         SizedBox(
           width: 72,
-          child: Text(label,
-              style: Theme.of(context)
-                  .textTheme
-                  .labelSmall
-                  ?.copyWith(color: cs.onSurfaceVariant)),
+          child: Text(
+            label,
+            style: Theme.of(
+              context,
+            ).textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
         ),
         ...List.generate(
           max.toInt(),
@@ -2660,11 +3105,13 @@ class _ScoreDotsRow extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 6),
-        Text(scoreText,
-            style: Theme.of(context)
-                .textTheme
-                .labelSmall
-                ?.copyWith(color: cs.onSurface, fontWeight: FontWeight.w600)),
+        Text(
+          scoreText,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: cs.onSurface,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ],
     );
   }
@@ -2688,9 +3135,21 @@ class _RecommendationCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
 
     final (bgColor, iconColor, icon) = switch (recommendation) {
-      'apply' => (cs.primaryContainer.withValues(alpha: 0.5), cs.primary, Icons.check_circle_rounded),
-      'take_a_chance' => (cs.tertiaryContainer.withValues(alpha: 0.5), cs.tertiary, Icons.bolt_rounded),
-      _ => (cs.errorContainer.withValues(alpha: 0.5), cs.error, Icons.cancel_rounded),
+      'apply' => (
+        cs.primaryContainer.withValues(alpha: 0.5),
+        cs.primary,
+        Icons.check_circle_rounded,
+      ),
+      'take_a_chance' => (
+        cs.tertiaryContainer.withValues(alpha: 0.5),
+        cs.tertiary,
+        Icons.bolt_rounded,
+      ),
+      _ => (
+        cs.errorContainer.withValues(alpha: 0.5),
+        cs.error,
+        Icons.cancel_rounded,
+      ),
     };
 
     return Container(
@@ -2714,35 +3173,63 @@ class _RecommendationCard extends StatelessWidget {
                       ? recommendationLabel
                       : recommendation,
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: cs.onSurface,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    color: cs.onSurface,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 if (archetype.isNotEmpty) ...[
-                  const SizedBox(height: 4),
+                  // Own pill so it doesn't blend into the surrounding prose
+                  // (user: "искал, хотя он был у меня под носом") — mixes
+                  // the neutral chip style already used by _AnalyzedChip
+                  // with a leading icon, plus more breathing room above/
+                  // below than a plain text line would get.
+                  const SizedBox(height: 10),
                   Tooltip(
-                    message: 'Primary archetype — balance-intensity + role-shape, '
+                    message:
+                        'Primary archetype — balance-intensity + role-shape, '
                         'from Phase 1 §1.4',
                     preferBelow: true,
-                    child: Text(
-                      archetype,
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                            color: cs.onSurface.withValues(alpha: 0.75),
-                            fontWeight: FontWeight.w600,
+                    child: Container(
+                      height: 28,
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      decoration: BoxDecoration(
+                        color: cs.surfaceContainer,
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: cs.outlineVariant.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.category_outlined,
+                            size: 14,
+                            color: cs.onSurfaceVariant,
                           ),
+                          const SizedBox(width: 4),
+                          Text(
+                            archetype,
+                            style: Theme.of(context).textTheme.labelMedium
+                                ?.copyWith(color: cs.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
+                  const SizedBox(height: 4),
                 ],
                 if (whoTheyWant.isNotEmpty) ...[
                   const SizedBox(height: 6),
                   Tooltip(
-                    message: 'The ideal candidate archetype this vacancy targets',
+                    message:
+                        'The ideal candidate archetype this vacancy targets',
                     preferBelow: true,
                     child: SelectableText(
                       whoTheyWant,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: cs.onSurface,
-                          ),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodyMedium?.copyWith(color: cs.onSurface),
                     ),
                   ),
                 ],
@@ -2769,11 +3256,11 @@ class _AppliedChip extends StatelessWidget {
 
   String _fmtLocal() {
     try {
-      final dt  = _asUtc(appliedAt);
-      final dd  = dt.day.toString().padLeft(2, '0');
-      final mm  = dt.month.toString().padLeft(2, '0');
-      final yy  = dt.year.toString();
-      final hh  = dt.hour.toString().padLeft(2, '0');
+      final dt = _asUtc(appliedAt);
+      final dd = dt.day.toString().padLeft(2, '0');
+      final mm = dt.month.toString().padLeft(2, '0');
+      final yy = dt.year.toString();
+      final hh = dt.hour.toString().padLeft(2, '0');
       final min = dt.minute.toString().padLeft(2, '0');
       return '$dd.$mm.$yy $hh:$min';
     } catch (_) {
@@ -2798,9 +3285,9 @@ class _AppliedChip extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             'Applied ${_fmtLocal()}',
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: cs.onSurfaceVariant,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.labelMedium?.copyWith(color: cs.onSurfaceVariant),
           ),
         ],
       ),
@@ -2833,9 +3320,9 @@ class _PostedChip extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             'Posted ${_relativeTime()}',
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: cs.onSurfaceVariant,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.labelMedium?.copyWith(color: cs.onSurfaceVariant),
           ),
         ],
       ),
@@ -2857,11 +3344,11 @@ class _AnalyzedChip extends StatelessWidget {
 
   String _fmtLocal() {
     try {
-      final dt  = _asUtc(analyzedAt);
-      final dd  = dt.day.toString().padLeft(2, '0');
-      final mm  = dt.month.toString().padLeft(2, '0');
-      final yy  = dt.year.toString();
-      final hh  = dt.hour.toString().padLeft(2, '0');
+      final dt = _asUtc(analyzedAt);
+      final dd = dt.day.toString().padLeft(2, '0');
+      final mm = dt.month.toString().padLeft(2, '0');
+      final yy = dt.year.toString();
+      final hh = dt.hour.toString().padLeft(2, '0');
       final min = dt.minute.toString().padLeft(2, '0');
       return '$dd.$mm.$yy $hh:$min';
     } catch (_) {
@@ -2886,9 +3373,9 @@ class _AnalyzedChip extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             'Analyzed ${_fmtLocal()}',
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: cs.onSurfaceVariant,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.labelMedium?.copyWith(color: cs.onSurfaceVariant),
           ),
         ],
       ),
@@ -2914,11 +3401,11 @@ class _HeroTagBadge extends StatelessWidget {
       child: Text(
         tag.toUpperCase(),
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: const Color(0xFF5E35B1),
-              fontWeight: FontWeight.w700,
-              fontSize: 11,
-              letterSpacing: 0.3,
-            ),
+          color: const Color(0xFF5E35B1),
+          fontWeight: FontWeight.w700,
+          fontSize: 11,
+          letterSpacing: 0.3,
+        ),
       ),
     );
   }
@@ -2970,14 +3457,22 @@ class _SalaryInlineState extends State<_SalaryInline> {
     setState(() => _saving = true);
     try {
       await widget.onSave(value);
-      if (mounted) setState(() => _committedSalary = value.isEmpty ? null : value);
+      if (mounted)
+        setState(() => _committedSalary = value.isEmpty ? null : value);
     } finally {
-      if (mounted) setState(() { _saving = false; _editing = false; });
+      if (mounted)
+        setState(() {
+          _saving = false;
+          _editing = false;
+        });
     }
   }
 
   void _cancel() {
-    setState(() { _editing = false; _ctrl.text = _committedSalary ?? ''; });
+    setState(() {
+      _editing = false;
+      _ctrl.text = _committedSalary ?? '';
+    });
   }
 
   @override
@@ -2988,22 +3483,31 @@ class _SalaryInlineState extends State<_SalaryInline> {
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.attach_money, size: widget.fontSize + 2, color: cs.primary),
+          Icon(
+            Icons.attach_money,
+            size: widget.fontSize + 2,
+            color: cs.primary,
+          ),
           const SizedBox(width: 4),
           SizedBox(
             width: 220,
             child: TextField(
               controller: _ctrl,
               autofocus: true,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: cs.onSurface, fontSize: widget.fontSize),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: cs.onSurface,
+                fontSize: widget.fontSize,
+              ),
               decoration: InputDecoration(
                 isDense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 4,
+                ),
                 hintText: 'e.g. \$3k–5k USD/mo',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(6),
+                ),
               ),
               onSubmitted: (_) => _save(),
             ),
@@ -3011,7 +3515,8 @@ class _SalaryInlineState extends State<_SalaryInline> {
           const SizedBox(width: 4),
           if (_saving)
             const SizedBox(
-              width: 16, height: 16,
+              width: 16,
+              height: 16,
               child: CircularProgressIndicator(strokeWidth: 2),
             )
           else ...[
@@ -3040,32 +3545,38 @@ class _SalaryInlineState extends State<_SalaryInline> {
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
         child: GestureDetector(
-        onTap: () => setState(() => _editing = true),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.attach_money,
-              size: widget.fontSize + 2,
-              color: hasSalary ? cs.primary : cs.onSurfaceVariant.withValues(alpha: 0.45),
-            ),
-            const SizedBox(width: 3),
-            Text(
-              hasSalary ? _committedSalary! : 'Add salary…',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: hasSalary
-                        ? cs.onSurfaceVariant
-                        : cs.onSurfaceVariant.withValues(alpha: 0.45),
-                    fontStyle: hasSalary ? FontStyle.normal : FontStyle.italic,
-                    fontSize: widget.fontSize,
-                  ),
-            ),
-            if (hasSalary) ...[
-              const SizedBox(width: 4),
-              Icon(Icons.edit, size: widget.fontSize - 1, color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
+          onTap: () => setState(() => _editing = true),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.attach_money,
+                size: widget.fontSize + 2,
+                color: hasSalary
+                    ? cs.primary
+                    : cs.onSurfaceVariant.withValues(alpha: 0.45),
+              ),
+              const SizedBox(width: 3),
+              Text(
+                hasSalary ? _committedSalary! : 'Add salary…',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: hasSalary
+                      ? cs.onSurfaceVariant
+                      : cs.onSurfaceVariant.withValues(alpha: 0.45),
+                  fontStyle: hasSalary ? FontStyle.normal : FontStyle.italic,
+                  fontSize: widget.fontSize,
+                ),
+              ),
+              if (hasSalary) ...[
+                const SizedBox(width: 4),
+                Icon(
+                  Icons.edit,
+                  size: widget.fontSize - 1,
+                  color: cs.onSurfaceVariant.withValues(alpha: 0.4),
+                ),
+              ],
             ],
-          ],
-        ),
+          ),
         ),
       ),
     );
@@ -3082,7 +3593,11 @@ class _TagsInline extends StatefulWidget {
   final Future<void> Function(String) onSave;
   final double fontSize;
 
-  const _TagsInline({this.tags = const [], required this.onSave, this.fontSize = 12});
+  const _TagsInline({
+    this.tags = const [],
+    required this.onSave,
+    this.fontSize = 12,
+  });
 
   @override
   State<_TagsInline> createState() => _TagsInlineState();
@@ -3122,16 +3637,28 @@ class _TagsInlineState extends State<_TagsInline> {
     try {
       await widget.onSave(value);
       if (mounted) {
-        setState(() => _committedTags =
-            value.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList());
+        setState(
+          () => _committedTags = value
+              .split(',')
+              .map((t) => t.trim())
+              .where((t) => t.isNotEmpty)
+              .toList(),
+        );
       }
     } finally {
-      if (mounted) setState(() { _saving = false; _editing = false; });
+      if (mounted)
+        setState(() {
+          _saving = false;
+          _editing = false;
+        });
     }
   }
 
   void _cancel() {
-    setState(() { _editing = false; _ctrl.text = _committedTags.join(', '); });
+    setState(() {
+      _editing = false;
+      _ctrl.text = _committedTags.join(', ');
+    });
   }
 
   @override
@@ -3142,22 +3669,31 @@ class _TagsInlineState extends State<_TagsInline> {
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.label_outline, size: widget.fontSize + 2, color: cs.primary),
+          Icon(
+            Icons.label_outline,
+            size: widget.fontSize + 2,
+            color: cs.primary,
+          ),
           const SizedBox(width: 4),
           SizedBox(
             width: 220,
             child: TextField(
               controller: _ctrl,
               autofocus: true,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: cs.onSurface, fontSize: widget.fontSize),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: cs.onSurface,
+                fontSize: widget.fontSize,
+              ),
               decoration: InputDecoration(
                 isDense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 4,
+                ),
                 hintText: 'e.g. deftech, ai',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(6),
+                ),
               ),
               onSubmitted: (_) => _save(),
             ),
@@ -3165,7 +3701,8 @@ class _TagsInlineState extends State<_TagsInline> {
           const SizedBox(width: 4),
           if (_saving)
             const SizedBox(
-              width: 16, height: 16,
+              width: 16,
+              height: 16,
               child: CircularProgressIndicator(strokeWidth: 2),
             )
           else ...[
@@ -3201,22 +3738,28 @@ class _TagsInlineState extends State<_TagsInline> {
               Icon(
                 Icons.label_outline,
                 size: widget.fontSize + 2,
-                color: hasTags ? cs.primary : cs.onSurfaceVariant.withValues(alpha: 0.45),
+                color: hasTags
+                    ? cs.primary
+                    : cs.onSurfaceVariant.withValues(alpha: 0.45),
               ),
               const SizedBox(width: 3),
               Text(
                 hasTags ? _committedTags.join(', ') : 'Add tags…',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: hasTags
-                          ? cs.onSurfaceVariant
-                          : cs.onSurfaceVariant.withValues(alpha: 0.45),
-                      fontStyle: hasTags ? FontStyle.normal : FontStyle.italic,
-                      fontSize: widget.fontSize,
-                    ),
+                  color: hasTags
+                      ? cs.onSurfaceVariant
+                      : cs.onSurfaceVariant.withValues(alpha: 0.45),
+                  fontStyle: hasTags ? FontStyle.normal : FontStyle.italic,
+                  fontSize: widget.fontSize,
+                ),
               ),
               if (hasTags) ...[
                 const SizedBox(width: 4),
-                Icon(Icons.edit, size: widget.fontSize - 1, color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
+                Icon(
+                  Icons.edit,
+                  size: widget.fontSize - 1,
+                  color: cs.onSurfaceVariant.withValues(alpha: 0.4),
+                ),
               ],
             ],
           ),
@@ -3236,7 +3779,8 @@ class _QuickOverviewCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final hasContent = p2.category.isNotEmpty ||
+    final hasContent =
+        p2.category.isNotEmpty ||
         p2.keyBarriers.isNotEmpty ||
         p2.hiddenRisks.isNotEmpty;
 
@@ -3244,7 +3788,8 @@ class _QuickOverviewCard extends StatelessWidget {
 
     return _SectionCard(
       title: 'Quick Overview',
-      tooltip: 'Key signals extracted from the JD —\nwho they want, barriers, hidden risks',
+      tooltip:
+          'Key signals extracted from the JD —\nwho they want, barriers, hidden risks',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -3287,41 +3832,44 @@ class _WhyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (p2.whyApply.isEmpty && p2.whyNotApply.isEmpty) return const SizedBox.shrink();
+    if (p2.whyApply.isEmpty && p2.whyNotApply.isEmpty)
+      return const SizedBox.shrink();
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
 
     Widget bullets(List<String> items, Color dotColor) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: items
-              .map((item) => Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.only(top: 5),
-                          child: Container(
-                            width: 5,
-                            height: 5,
-                            decoration: BoxDecoration(
-                              color: dotColor,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: SelectableText(
-                            item,
-                            style: tt.bodySmall?.copyWith(color: cs.onSurface),
-                          ),
-                        ),
-                      ],
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: items
+          .map(
+            (item) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 5),
+                    child: Container(
+                      width: 5,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: dotColor,
+                        shape: BoxShape.circle,
+                      ),
                     ),
-                  ))
-              .toList(),
-        );
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: SelectableText(
+                      item,
+                      style: tt.bodySmall?.copyWith(color: cs.onSurface),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
+          .toList(),
+    );
 
     return Container(
       width: double.infinity,
@@ -3342,15 +3890,23 @@ class _WhyCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (p2.whyApply.isNotEmpty) ...[
-            Row(children: [
-              Icon(Icons.check_circle_outline_rounded, size: 14, color: const Color(0xFF2E7D32)),
-              const SizedBox(width: 6),
-              Text('Why apply',
+            Row(
+              children: [
+                Icon(
+                  Icons.check_circle_outline_rounded,
+                  size: 14,
+                  color: const Color(0xFF2E7D32),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Why apply',
                   style: tt.bodySmall?.copyWith(
                     color: const Color(0xFF2E7D32),
                     fontWeight: FontWeight.w700,
-                  )),
-            ]),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 8),
             bullets(p2.whyApply, const Color(0xFF2E7D32)),
           ],
@@ -3360,15 +3916,19 @@ class _WhyCard extends StatelessWidget {
               child: Divider(height: 1),
             ),
           if (p2.whyNotApply.isNotEmpty) ...[
-            Row(children: [
-              Icon(Icons.cancel_outlined, size: 14, color: cs.error),
-              const SizedBox(width: 6),
-              Text('Why not apply',
+            Row(
+              children: [
+                Icon(Icons.cancel_outlined, size: 14, color: cs.error),
+                const SizedBox(width: 6),
+                Text(
+                  'Why not apply',
                   style: tt.bodySmall?.copyWith(
                     color: cs.error,
                     fontWeight: FontWeight.w700,
-                  )),
-            ]),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 8),
             bullets(p2.whyNotApply, cs.error),
           ],
@@ -3444,20 +4004,20 @@ class _FitDimsTable extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final rows = [
-      ('Domain fit',      dims.domainFit),
-      ('Execution fit',   dims.executionFit),
-      ('Strategy fit',    dims.strategyFit),
-      ('Systems fit',     dims.systemsFit),
+      ('Domain fit', dims.domainFit),
+      ('Execution fit', dims.executionFit),
+      ('Strategy fit', dims.strategyFit),
+      ('Systems fit', dims.systemsFit),
       ('Stakeholder fit', dims.stakeholderFit),
-      ('Overall fit',     dims.overallFit),
+      ('Overall fit', dims.overallFit),
     ];
     return Column(
-      children: rows.map((r) => _ScoreBar(
-            label: r.$1,
-            value: r.$2,
-            max: 10,
-            color: cs.primary,
-          )).toList(),
+      children: rows
+          .map(
+            (r) =>
+                _ScoreBar(label: r.$1, value: r.$2, max: 10, color: cs.primary),
+          )
+          .toList(),
     );
   }
 }
@@ -3473,22 +4033,26 @@ class _VacScoreTable extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final rows = [
-      ('Company tier',  dims.companyTier,      4),
-      ('Seniority',     dims.seniority,        4),
-      ('Market scope',  dims.marketScope,      3),
-      ('Company type',  dims.companyType,      3),
-      ('Stage fit',     dims.companyStageFit,  3),
-      ('Domain score',  dims.domainScore,      5),
-      ('Remote policy', dims.remotePolicy,     3),
-      ('Compensation',  dims.compensation,     3),
+      ('Company tier', dims.companyTier, 4),
+      ('Seniority', dims.seniority, 4),
+      ('Market scope', dims.marketScope, 3),
+      ('Company type', dims.companyType, 3),
+      ('Stage fit', dims.companyStageFit, 3),
+      ('Domain score', dims.domainScore, 5),
+      ('Remote policy', dims.remotePolicy, 3),
+      ('Compensation', dims.compensation, 3),
     ];
     return Column(
-      children: rows.map((r) => _ScoreBar(
-            label: r.$1,
-            value: r.$2.toDouble(),
-            max: r.$3.toDouble(),
-            color: cs.secondary,
-          )).toList(),
+      children: rows
+          .map(
+            (r) => _ScoreBar(
+              label: r.$1,
+              value: r.$2.toDouble(),
+              max: r.$3.toDouble(),
+              color: cs.secondary,
+            ),
+          )
+          .toList(),
     );
   }
 }
@@ -3519,9 +4083,9 @@ class _ScoreBar extends StatelessWidget {
             width: 116,
             child: Text(
               label,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
             ),
           ),
           Expanded(
@@ -3540,12 +4104,12 @@ class _ScoreBar extends StatelessWidget {
             width: 36,
             child: Text(
               value % 1 == 0
-                  ? '${value.toInt()}/${ max.toInt()}'
+                  ? '${value.toInt()}/${max.toInt()}'
                   : '${value.toStringAsFixed(1)}/${max.toInt()}',
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: cs.onSurface,
-                    fontWeight: FontWeight.w600,
-                  ),
+                color: cs.onSurface,
+                fontWeight: FontWeight.w600,
+              ),
               textAlign: TextAlign.end,
             ),
           ),
@@ -3638,7 +4202,8 @@ class _RoleBalanceRadar extends StatelessWidget {
     final v2 = balance[byValue[1]] ?? 0;
     final v3 = balance[byValue[2]] ?? 0;
     if (v1 - v2 >= _margin) return (shape: 'Sharp', axes: [byValue[0]]);
-    if (v2 - v3 >= _margin) return (shape: 'Dual', axes: byValue.take(2).toList());
+    if (v2 - v3 >= _margin)
+      return (shape: 'Dual', axes: byValue.take(2).toList());
     return (shape: 'Diffuse', axes: byValue.take(2).toList());
   }
 
@@ -3649,7 +4214,9 @@ class _RoleBalanceRadar extends StatelessWidget {
         final ax = s.axes.first;
         return 'Sharp — ${_axisLabels[ax]} (${balance[ax]}%)';
       case 'Dual':
-        final pcts = s.axes.map((a) => '${_axisLabels[a]} ${balance[a]}%').join(' + ');
+        final pcts = s.axes
+            .map((a) => '${_axisLabels[a]} ${balance[a]}%')
+            .join(' + ');
         return 'Dual — $pcts';
       default:
         // "Diffuse" is correct here and stays — it names the *structural*
@@ -3662,7 +4229,9 @@ class _RoleBalanceRadar extends StatelessWidget {
         // §8's correction note for the reasoning; "Generalist" as an
         // archetype is a separate, not-yet-implemented candidate for
         // `phase1_analysis.md` §1.4's archetype vocabulary.
-        final top2 = s.axes.map((a) => '${_axisLabels[a]} ${balance[a]}%').join(' / ');
+        final top2 = s.axes
+            .map((a) => '${_axisLabels[a]} ${balance[a]}%')
+            .join(' / ');
         return 'Diffuse — leaning $top2';
     }
   }
@@ -3695,7 +4264,8 @@ class _RoleBalanceRadar extends StatelessWidget {
           fontWeight: FontWeight.w700,
           color: cs.onSurface,
           fontSize: 16,
-          tooltip: 'Estimated split of this role\'s day-to-day work across '
+          tooltip:
+              'Estimated split of this role\'s day-to-day work across '
               '6 dimensions: Strategy (deciding what and why), Discovery '
               '(research), Delivery (shipping), Growth (data-driven '
               'iteration), Stakeholder (coordination), Operational '
@@ -3762,7 +4332,8 @@ class _RoleBalanceRadar extends StatelessWidget {
           // rather than warm on the user's actual screen).
           padding: const EdgeInsets.only(top: 32),
           child: Tooltip(
-            message: 'How the pipeline classifies this role\'s shape from '
+            message:
+                'How the pipeline classifies this role\'s shape from '
                 'the numbers above (by the gap between the #1 and #2 axis, '
                 'not their absolute size — a >=10-point lead counts). Sharp '
                 '= the top axis clearly leads, the CV should write to it '
@@ -3826,10 +4397,10 @@ class _TooltipTitle extends StatelessWidget {
     final text = Text(
       title,
       style: Theme.of(ctx).textTheme.labelMedium?.copyWith(
-            color: color ?? cs.onSurfaceVariant,
-            fontWeight: fontWeight,
-            fontSize: fontSize,
-          ),
+        color: color ?? cs.onSurfaceVariant,
+        fontWeight: fontWeight,
+        fontSize: fontSize,
+      ),
     );
     if (tooltip == null) return text;
     return Tooltip(
@@ -3844,7 +4415,11 @@ class _TooltipTitle extends StatelessWidget {
         children: [
           text,
           const SizedBox(width: 4),
-          Icon(Icons.info_outline, size: 12, color: cs.onSurfaceVariant.withValues(alpha: 0.55)),
+          Icon(
+            Icons.info_outline,
+            size: 12,
+            color: cs.onSurfaceVariant.withValues(alpha: 0.55),
+          ),
         ],
       ),
     );
@@ -3881,7 +4456,12 @@ class _SectionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _TooltipTitle(title: title, tooltip: tooltip, context: context, cs: cs),
+          _TooltipTitle(
+            title: title,
+            tooltip: tooltip,
+            context: context,
+            cs: cs,
+          ),
           const SizedBox(height: 12),
           child,
         ],
@@ -3945,7 +4525,12 @@ class _CollapsibleSectionState extends State<_CollapsibleSection> {
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
               child: Row(
                 children: [
-                  _TooltipTitle(title: widget.title, tooltip: widget.tooltip, context: context, cs: cs),
+                  _TooltipTitle(
+                    title: widget.title,
+                    tooltip: widget.tooltip,
+                    context: context,
+                    cs: cs,
+                  ),
                   const Spacer(),
                   Icon(
                     _expanded ? Icons.expand_less : Icons.expand_more,
@@ -3964,10 +4549,7 @@ class _CollapsibleSectionState extends State<_CollapsibleSection> {
                   height: 1,
                   color: cs.outlineVariant.withValues(alpha: 0.3),
                 ),
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: widget.child,
-                ),
+                Padding(padding: const EdgeInsets.all(16), child: widget.child),
               ],
             ),
             crossFadeState: _expanded
@@ -4018,7 +4600,10 @@ class _SplitButton extends StatelessWidget {
           ? const SizedBox(
               width: 16,
               height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Colors.white,
+              ),
             )
           : Icon(icon, size: 16),
       label: Text(label),
@@ -4037,11 +4622,16 @@ class _SplitButton extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         mainBtn,
-        Container(width: 1, height: 36, color: Colors.white.withValues(alpha: 0.25)),
+        Container(
+          width: 1,
+          height: 36,
+          color: Colors.white.withValues(alpha: 0.25),
+        ),
         MenuAnchor(
           menuChildren: menuItems,
           builder: (context, controller, _) => FilledButton(
-            onPressed: () => controller.isOpen ? controller.close() : controller.open(),
+            onPressed: () =>
+                controller.isOpen ? controller.close() : controller.open(),
             style: FilledButton.styleFrom(
               shape: const RoundedRectangleBorder(borderRadius: rightRadius),
               minimumSize: const Size(34, 36),
@@ -4049,7 +4639,11 @@ class _SplitButton extends StatelessWidget {
               padding: EdgeInsets.zero,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
-            child: const Icon(Icons.arrow_drop_down, size: 18, color: Colors.white),
+            child: const Icon(
+              Icons.arrow_drop_down,
+              size: 18,
+              color: Colors.white,
+            ),
           ),
         ),
       ],
@@ -4070,7 +4664,9 @@ class _CvTab extends ConsumerWidget {
     final cs = Theme.of(context).colorScheme;
 
     if (status == 'cv_queued' || status == 'cv_generating') {
-      final label = status == 'cv_generating' ? 'Generating CV...' : 'CV in queue...';
+      final label = status == 'cv_generating'
+          ? 'Generating CV...'
+          : 'CV in queue...';
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -4081,7 +4677,9 @@ class _CvTab extends ConsumerWidget {
             const SizedBox(height: 8),
             Text(
               'Results will appear automatically',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
             ),
           ],
         ),
@@ -4098,7 +4696,8 @@ class _CvTab extends ConsumerWidget {
         if (!cv.hasCv) {
           return const _EmptyTabState(
             icon: Icons.description_outlined,
-            message: 'CV not generated yet.\nUse Generate CV from the action bar.',
+            message:
+                'CV not generated yet.\nUse Generate CV from the action bar.',
           );
         }
         return Markdown(
@@ -4106,10 +4705,9 @@ class _CvTab extends ConsumerWidget {
           selectable: true,
           padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
           styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
-            p: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: cs.onSurface,
-                  height: 1.6,
-                ),
+            p: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: cs.onSurface, height: 1.6),
           ),
         );
       },
@@ -4136,11 +4734,16 @@ class _CoverTab extends ConsumerWidget {
           children: [
             CircularProgressIndicator(color: cs.primary),
             const SizedBox(height: 20),
-            Text('CV in progress...', style: Theme.of(context).textTheme.bodyLarge),
+            Text(
+              'CV in progress...',
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
             const SizedBox(height: 8),
             Text(
               'Cover letter will be available after CV is generated',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
             ),
           ],
         ),
@@ -4151,7 +4754,10 @@ class _CoverTab extends ConsumerWidget {
     return cvAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(
-        child: Text('Failed to load cover: $e', style: TextStyle(color: cs.error)),
+        child: Text(
+          'Failed to load cover: $e',
+          style: TextStyle(color: cs.error),
+        ),
       ),
       data: (cv) {
         if (!cv.hasCover) {
@@ -4165,10 +4771,9 @@ class _CoverTab extends ConsumerWidget {
           selectable: true,
           padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
           styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
-            p: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: cs.onSurface,
-                  height: 1.6,
-                ),
+            p: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: cs.onSurface, height: 1.6),
           ),
         );
       },
@@ -4191,11 +4796,17 @@ class _EmptyTabState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 48, color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
+          Icon(
+            icon,
+            size: 48,
+            color: cs.onSurfaceVariant.withValues(alpha: 0.4),
+          ),
           const SizedBox(height: 12),
           Text(
             message,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
             textAlign: TextAlign.center,
           ),
         ],
