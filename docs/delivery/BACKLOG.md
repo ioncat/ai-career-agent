@@ -29,6 +29,12 @@
 **Write-ups:** [role-balance-determinism-2026-09-07.md](../discovery/role-balance-determinism-2026-09-07.md) (mechanism/reproducibility question, incl. a confirmed Growth-axis lexical-priming bug on #1494) · [role-balance-concentration-analysis-2026-09-21.md](../discovery/role-balance-concentration-analysis-2026-09-21.md) (88-vacancy analysis, threshold validation, next-step proposal).
 **Not started:** the actual Phase 3 enforcement mechanism (deterministic shape → forced Summary+Experience self-justification → Phase 3.5 check against the same number) — sketched in the 2026-09-21 doc §5, not drafted into any prompt yet. Also still open: the Growth lexical-priming fix, and whether to run a determinism probe (re-run a vacancy 3× and compare variance).
 
+### 🟠 P1 — EPIC-24 (`progressive_profile`) — keep investing, or deprecate? (elevated 2026-09-21, needs a dedicated decision session)
+**What:** `progressive_profile` (structured DB profile, separate from markdown `PROFILE.md`) shipped T1–T8, T7/T9 still open. Found live during the phase-by-phase prompt audit (2026-09-21): its write-back (`scripts/profile_merge.py`, called from every Phase 2.5) ran unconditionally regardless of session mode — but `PROFILE_SOURCE` (`.claude/commands/analyze.md`) defaults to `md`, and every real session traced so far ran in that mode, meaning `progressive_profile` has been written to on every resolved objection for months but never actually read back in practice. It also already hit one real reliability failure (`.claude/sessions/2026-08-10-...md`: a `claude` CLI subprocess crash during write-back, worked around at the time by editing `PROFILE.md` directly instead).
+**Gated 2026-09-21 (see CHANGELOG):** write-back now skipped when `PROFILE_SOURCE=md` (the default) — stops the silent, unread cost/risk without deciding the bigger question below.
+**The real open question — explicitly not resolved by the gate above, and explicitly NOT downgraded to icebox (user's framing, 2026-09-21):** is finishing this worth it (T7: trim `PROFILE.md` once DB evidence is trusted; T9: LLM-driven onboarding interview that would naturally populate structured data), or has months of exclusive `PROFILE.md`-markdown usage already settled the question in markdown's favor? Needs the same kind of deliberate, dedicated discussion as the Cover Variant B evidence-heavy debate (2026-09-21, `phase4_cover.md`) — not a quiet default either way.
+**Spec:** [Epics/EPIC-24-progressive-profile.md](Epics/EPIC-24-progressive-profile.md)
+
 ### 🟠 P1 — Full phase-by-phase prompt audit (added 2026-09-21, not started)
 **What:** user's recurring doubt, voiced explicitly during the #1646 role_balance discussion: the pipeline prompts (`phase1_analysis.md` through `phase4_cover.md`, both `pm`/`generic`) have grown reactively, one fix at a time, over many sessions — possible bloat, stale/redundant rules, and inconsistency between what a rule *says* and what actually gets applied in practice (the #1646 CV incident — a rule existed, wasn't followed — is direct evidence something in this space needs a fresh look, not just a one-off patch).
 **Scope (user's framing):** read each phase prompt fresh, one at a time, from scratch — not a diff against history. For each: what's outdated, what's dead weight, what's missing, what could be said more concisely/effectively given everything learned since it was first written. Candidate for deprecation/cleanup, not just addition.
@@ -169,7 +175,8 @@ If the actual diagnostic text was printed to stdout instead (as it was here), `s
 
 ---
 
-### Phase 1 "Company" extraction ignores the already-known job-board company, invents a placeholder when the JD body anonymizes the end-client — corrupts DB `title` and hides the real company in Flutter (found 2026-07-30, vacancy #934, N-iX; recurred 2026-08-01, vacancy #972, BBE Marketing)
+### ✅ Resolved 2026-09-21 — Phase 1 "Company" extraction ignores the already-known job-board company, invents a placeholder when the JD body anonymizes the end-client — corrupted DB `title` and hid the real company in Flutter (found 2026-07-30, vacancy #934, N-iX; recurred 2026-08-01, vacancy #972, BBE Marketing)
+**Resolution:** confirmed during the phase-by-phase prompt audit that `phase1_analysis.md`'s `**Known company:**` context line (wired in `tools/cv_analyze.py:98`) already implements the prompt-side fix direction below — verified by reading code, not a fresh live vacancy. Added the still-missing `web/api.py` guard the same day: `_looks_like_placeholder_company()` now stops a placeholder-shaped `analysis_json.p1.company` from overriding the correct `vacancies.company` (1 new test, `test_api_vacancies_falls_back_to_db_company_when_analysis_company_is_placeholder`). The `vacancies.title` corruption path (point 2 below) was never traced — not reproduced since, low residual priority.
 **What:** `prompts/pm|generic/phase1_analysis.md:42` — `**Company:** [company name as written in JD]` — extracts strictly from JD body text. Common for staffing/BPO/recruiting-agency postings (Djinni especially) to anonymize the end-client in the body ("Our Client provides...") while the actual hiring company is known and already correct in `vacancies.company` (fetched from the job-board page itself, not the body). On #934 this produced `analysis_json.p1.company = "[undisclosed — insurance claims/services BPO, client-facing role via staffing partner]"` even though `vacancies.company = "N-iX"` was sitting right there, correct, the whole time.
 **Two downstream breakages from the one bad value:**
 1. `web/api.py:349` (`api_vacancies`) explicitly prefers `analysis_json.p1.company` over the correct `vacancies.company` for the Flutter-facing `company` field ("prefer analysis company... over RSS company") — no guard against the analysis value being a placeholder/prose-descriptor rather than an actual name, so the correct "N-iX" gets hidden behind the useless placeholder in the UI (this is the exact card the user screenshotted).
@@ -316,9 +323,6 @@ No dual-availability state — the button's visibility is a direct, deterministi
 - [ ] `tools/cv_generate.py` — inject resolved/gap context before Phase 3
 - [ ] Flutter `BarrierResponseScreen` — needs UI design first (blocker)
 
-### EPIC-24 remainder: T7 + T9 (progressive profile)
-**What:** T7 — trim PROFILE.md (remove Experience + Additional Evidence) after real pipeline test with DB evidence; T9 — onboarding interview flow (LLM-driven).
-**Spec:** [Epics/EPIC-24-progressive-profile.md](Epics/EPIC-24-progressive-profile.md)
 
 ### Activity: surface claude_cli token estimates + parse real CLI usage (added 2026-07-14)
 **Story:** As a tester comparing providers, I want the Activity tab to show token/cost data for claude_cli runs (currently just "—"), so I can actually compare CLI vs API consumption.
@@ -524,7 +528,7 @@ No dual-availability state — the button's visibility is a direct, deterministi
 | [EPIC-21](Epics/EPIC-21-deterministic-vs-cognitive-pipeline.md) | Deterministic vs Cognitive split | ✅ Done 2026-07-12 (T5/T6 dropped) |
 | [EPIC-22](Epics/EPIC-22-flutter-platform.md) | Flutter Platform (Pivot 2) | 🚧 Phase C done; Phase D remainder: polish |
 | [EPIC-23](Epics/EPIC-23-claudecode-provider.md) | Claude Code CLI Provider | ✅ Done 2026-07-05 |
-| [EPIC-24](Epics/EPIC-24-progressive-profile.md) | Progressive Profile | 🚧 T1–T6, T8 done; T7, T9 open |
+| [EPIC-24](Epics/EPIC-24-progressive-profile.md) | Progressive Profile | 🚧 T1–T6, T8 done; T7, T9 open — **keep-or-deprecate decision needed, see BACKLOG Now section** |
 | [EPIC-25](Epics/EPIC-25-auth-billing.md) | Auth, User Management & Billing | 📋 Planned (design-first) |
 | [EPIC-26](Epics/EPIC-26-vacancy-dedup-republish.md) | Dedup & Re-publish Detection | ✅ Done 2026-07-09 |
 | [EPIC-27](Epics/EPIC-27-per-phase-llm-routing.md) | Per-Phase LLM Routing + Blocker Pre-filter | 🚧 Core done 2026-07-17; auto-trigger deferred |

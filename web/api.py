@@ -253,6 +253,22 @@ def _legacy_analysis_dict(raw: dict) -> dict:
     return result
 
 
+def _looks_like_placeholder_company(name: str) -> bool:
+    """True for a Phase 1 `company` value that reads as a bracketed/prose
+    non-answer rather than an actual company name — e.g. "[undisclosed —
+    insurance claims/services BPO...]" or "[not stated in JD]". Guards
+    against preferring this over the correct `vacancies.company` (found
+    live twice, vacancies #934/#972, 2026-07-30/2026-08-01 — the JD body
+    anonymized the end-client while the real hiring company was already
+    known from the job-board fetch). Not exhaustive by design — a false
+    negative here just means the old bug's symptom recurs, not a crash.
+    """
+    s = name.strip().lower()
+    if not s:
+        return False
+    return s.startswith("[") or "undisclosed" in s or "not stated" in s or "not disclosed" in s
+
+
 def _parse_analysis_summary(analysis_json_str: str | None) -> dict:
     """Extract list-card fields from analysis_json for GET /api/vacancies response.
 
@@ -349,9 +365,12 @@ async def api_vacancies(
             item["blocker_reasons"] = []
         db_company = item.get("company") or ""
         parsed = _parse_analysis_summary(item.pop("analysis_json", None))
-        # Prefer analysis company (post-JD parse) over RSS company, but keep RSS as fallback
-        if not parsed.get("company"):
-            parsed["company"] = db_company
+        # Prefer analysis company (post-JD parse) over RSS company, but keep RSS as fallback.
+        # Also fall back when the analysis value is a placeholder/prose non-answer rather
+        # than an actual name (db_company, fetched from the job-board page itself, is never
+        # a placeholder) — see _looks_like_placeholder_company.
+        if not parsed.get("company") or _looks_like_placeholder_company(parsed["company"]):
+            parsed["company"] = db_company or parsed.get("company", "")
         item.update(parsed)
         # Pass analysis_error through (None when no error)
         if 'analysis_error' not in item:

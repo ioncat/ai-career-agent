@@ -27,7 +27,7 @@ Do NOT soften gaps. Realistic critique produces better Phase 2 output.
 **Output rules:**
 - Language: English. All content values in English.
 - Tone: analytical and objective — state conclusions directly, avoid speculation and emotional language
-- All six sections required. Do not skip. Do not add extra sections.
+- All sections listed below (1.0 through 1.7) are required. Do not skip. Do not add extra sections.
 
 ## Output Format
 
@@ -157,12 +157,13 @@ Estimate percentage split (must sum to 100%):
 - Stakeholder: __%
 - Operational: __%
 
-**Primary archetype:** `[dominant label]`
+**Primary archetype:** `[balance-intensity] [role-shape]`
 
-Use one of (can combine two):
-`Discovery-heavy` · `Strategy-heavy` · `Delivery-heavy` · `Growth-heavy` · `Delivery-coordinator`
-`Platform/Systems PM` · `Feature PM` · `Founder proxy` · `Operations/BizOps`
-`Technical PM` · `Growth PM`
+**Two closed lists — exactly one term from each, nothing else** (tightened 2026-09-21 after a DB audit found 81 distinct, inconsistent free-text values across 131 vacancies — root cause: this field and §1.3's free discussion above bleed vocabulary into each other when generated in the same response):
+- **balance-intensity** = the single highest-% axis from the split just estimated above, canonical name + `-heavy` — nothing else: `Strategy-heavy` · `Discovery-heavy` · `Delivery-heavy` · `Growth-heavy` · `Stakeholder-heavy` · `Operational-heavy`
+- **role-shape** (from §1.3's judgment): `Platform/Systems PM` · `Feature PM` · `Founder proxy` · `Delivery-coordinator` · `Operations/BizOps` · `Technical PM` · `Growth PM`
+
+**Do NOT invent modifiers outside these two lists** (e.g. "Execution-heavy" is invalid — the canonical term for that meaning is "Delivery-heavy"). **Do NOT combine more than one term per list.**
 
 Example: `Delivery-heavy Platform/Systems PM`
 

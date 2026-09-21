@@ -220,7 +220,10 @@ raw occurrence count as you would for a full-page CV.
 
 ## After the audit
 
-- **Quick Win findings** → present to user, confirm → apply → re-save the
+- **Quick Win findings** → present to user, confirm → apply → **re-run
+  `core.cv_metrics.detect_mechanical_violations` (em-dash + banned-phrase list) and
+  `detect_phrase_repetition` against the edited text** (added 2026-09-21 — an editorial rewrite
+  can reintroduce either just as easily as any other edit) → re-save the
   audited document (CV.md + PDF, or Cover.md + PDF) — never overwrite silently.
 - **Medium Investment / Major Rewrite** → present, let the user decide — do not
   auto-apply.

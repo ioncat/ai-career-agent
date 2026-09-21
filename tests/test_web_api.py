@@ -1921,6 +1921,57 @@ async def test_api_vacancies_legacy_json_still_carries_role_and_company(client):
     assert target["company"] == "Go Offer"
 
 
+@pytest.mark.asyncio
+async def test_api_vacancies_falls_back_to_db_company_when_analysis_company_is_placeholder(client):
+    """GET /api/vacancies prefers the real DB company over an analysis-side placeholder.
+
+    Found live twice (vacancies #934/#972, 2026-07-30/2026-08-01): Phase 1's
+    `company` field can be a bracketed/prose non-answer ("[undisclosed —
+    insurance claims/services BPO...]", "[not stated in JD]") when the JD
+    body anonymizes the end-client — but the real hiring company is already
+    correct in `vacancies.company` (fetched from the job-board page itself).
+    The old unconditional "prefer analysis company" rule hid the correct
+    name behind the useless placeholder. Fixed via
+    `_looks_like_placeholder_company()`.
+    """
+    import json as _json
+    uid = await database.insert_user(name="Carol", telegram_chat_id=9903, skill_type="pm")
+    vid = await database.insert_vacancy(
+        url="manual:placeholder-company", user_id=uid, company="N-iX",
+    )
+
+    analysis_json = _json.dumps({
+        "p1": {
+            "role": "Senior Product Owner",
+            "company": "[undisclosed — insurance claims/services BPO, client-facing role via staffing partner]",
+            "company_type": "outsourcing",
+            "role_archetype": "Delivery-heavy Platform/Systems PM",
+            "primary_archetype": "Delivery-heavy Platform/Systems PM",
+            "role_balance": {},
+            "vacancy_score": 6.0,
+        },
+        "p2": {
+            "fit_score": 6,
+            "recommendation": "apply",
+            "category": "PM",
+            "key_barriers": [],
+        },
+    })
+    import aiosqlite
+    async with aiosqlite.connect(database._db_path) as db:
+        await db.execute(
+            "UPDATE vacancies SET analysis_json=?, status='analyzed' WHERE id=?",
+            (analysis_json, vid),
+        )
+        await db.commit()
+
+    resp = client.get("/api/vacancies")
+    assert resp.status_code == 200
+    target = next((v for v in resp.json() if v["id"] == vid), None)
+    assert target is not None
+    assert target["company"] == "N-iX"
+
+
 # ── POST /api/vacancies/import-jd ─────────────────────────────────────────────
 
 @pytest.mark.asyncio

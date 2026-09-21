@@ -148,7 +148,7 @@ Use Variant A (narrative) or B (bullets) instead of C only when:
 ---
 
 **ВАРІАНТ A — Narrative (short paragraphs)**
-Concise, direct. Leads with tenure + role scope. Second paragraph: most relevant domain evidence. No bullets, no metrics. Natural professional tone.
+Concise, direct. Leads with tenure + role scope. Second paragraph: domain relevance at a conceptual level (same no-evidence default as Rule #1 — no company names/metrics unless the user explicitly asks for them, see Variant B note below). No bullets, no metrics by default. Natural professional tone.
 
 **Ukrainian template:**
 ```
@@ -156,7 +156,7 @@ Concise, direct. Leads with tenure + role scope. Second paragraph: most relevant
 
 [1–2 sentences: years of experience + role scope relevant to this JD. Active verbs, no generic claims.]
 
-[1 sentence: specific domain relevance — the strongest bridge between candidate's experience and JD focus.]
+[1 sentence: domain relevance, conceptual — the strongest bridge between candidate's experience and JD focus, without naming companies/metrics.]
 
 Буду радий поспілкуватися детальніше.
 
@@ -169,7 +169,7 @@ Hi!
 
 [1–2 sentences: years of experience + role scope relevant to this JD.]
 
-[1 sentence: specific domain relevance.]
+[1 sentence: domain relevance, conceptual.]
 
 Happy to connect and learn more.
 
@@ -178,47 +178,52 @@ Happy to connect and learn more.
 
 ---
 
-**ВАРІАНТ B — Bullets with evidence**
-Evidence-heavy. Three specific bullets, each with a verifiable fact or metric. Best for roles where quantified impact matters.
+**ВАРІАНТ B — Bullets (conceptual by default; evidence is a valid opt-in strategy, not a default)**
 
-**Ukrainian template:**
+Default: three conceptual bullets, same content and same no-evidence rule as Bullet Selection Logic below (category / pain recognition / positioning close) — this is the strategy the candidate actually uses. Reach for this variant over C only when three separate points genuinely earn their own line, or the user asked for bullets specifically.
+
+**Evidence-heavy bullets (verifiable facts/metrics, one per bullet) are a legitimate alternate strategy — but only when the user explicitly asks for it for this cover.** Rewritten 2026-09-21: this variant's own template previously demanded "verifiable fact"/"metric"/"quantified impact" unconditionally, directly contradicting Rule #1 and the Bullet Selection Logic below (both correctly conceptual-only). The evidence-heavy approach itself isn't wrong — it's just opt-in, not the default, and the contradiction was in treating it as automatic. Do not switch to evidence-heavy bullets on your own judgment; ask, or wait to be asked.
+
+**Ukrainian template (default, conceptual):**
 ```
 Вітаю!
 
 [1 sentence direct opener — no setup preamble]
 
-- [Strongest match #1 — specific experience, active verbs, concrete fact]
-- [Strongest match #2 — delivery/stakeholder evidence, specific]
-- [Strongest match #3 — metric or methodology, verifiable]
+- [Bullet 1 — category claim, conceptual, see Bullet Selection Logic below]
+- [Bullet 2 — pain recognition, conceptual]
+- [Bullet 3 — positioning close, conceptual]
 
 [Specific closing referencing company/product — not generic "буду радий поспілкуватися"]
 
 [Candidate name]
 ```
 
-**English template:**
+**English template (default, conceptual):**
 ```
 Hi!
 
 I'm a [role] who [category signal — what kind of work at a conceptual level].
 
-- [Strongest match #1]
-- [Strongest match #2]
-- [Strongest match #3]
+- [Bullet 1 — category claim, conceptual]
+- [Bullet 2 — pain recognition, conceptual]
+- [Bullet 3 — positioning close, conceptual]
 
 [Specific closing referencing company/product]
 
 [Candidate name]
 ```
 
+*(If the user explicitly asked for evidence-heavy bullets: same structure, but each bullet cites one specific, verifiable fact or metric from the CV/PROFILE.md instead of a conceptual claim — never fabricate beyond what's already there.)*
+
 ---
 
 ## Bullet Selection Logic (Variant B only)
 
-Pick 3 conceptual signals based on Phase 1 + Phase 2 analysis. No company names, project names, or metrics from the CV.
+Default (conceptual — what the candidate actually uses): pick 3 conceptual signals based on Phase 1 + Phase 2 analysis. No company names, project names, or metrics from the CV.
 
 - Bullet 1: category claim — what kind of PM work this is at a conceptual level
 - Bullet 2: pain recognition — what specifically is broken in their context and how candidate's working style addresses it
 - Bullet 3: positioning close — confident assertion of fit, no proof (proof is in the CV)
 
-**No specific evidence. No metrics. No "at CompanyX I did Y". The CV has all of that.**
+**No specific evidence. No metrics. No "at CompanyX I did Y" — by default.** The CV has all of that. **Exception, opt-in only:** if the user explicitly asks for specific facts/metrics in this cover, bullets may cite concrete, verifiable evidence instead — still grounded in the CV/PROFILE.md, never fabricated. Do not apply this exception unless asked.

@@ -28,10 +28,11 @@ For each sentence in the EXPERIENCE section of the saved CV, assess whether it d
 
 1. Read the Signal Coverage Table — identify all JD signals (high / medium / low)
 2. Read EXPERIENCE section role by role
-3. For each sentence: map to a JD signal
-   - Maps to a signal → ✅ valuable
-   - No mapping found → ⚠️ weak (noise) or 🗑️ remove (misleads)
-4. Check coverage: are all high/medium ✅/⚠️ signals present in at least one role?
+3. **Decompose each sentence into clauses first** (split on em-dashes and comma-separated segments) before mapping — do not map at whole-sentence granularity. Example: "Managed enterprise customer relationships end-to-end — pre-sales, pilot negotiation, onboarding, and ongoing account management — translating direct client feedback into product priorities" splits into at least 3 clauses (the opening claim, the pre-sales/onboarding/account-management list, the client-feedback-to-priorities tail) — only the last one maps to a real signal here. Map EACH clause independently to a JD signal:
+   - Clause maps to a signal → ✅ valuable
+   - Clause has no mapping → ⚠️ weak (noise) or 🗑️ remove (misleads)
+4. **A sentence counts ✅ valuable only if ALL its clauses carry signal.** If even one clause has no mapping, the sentence is not clean — flag that specific clause (quote the clause, not the whole sentence) per the rules above, even when another clause in the same sentence is genuinely valuable. Added 2026-09-21 (originally found 2026-07-25, vacancy #828) — whole-sentence mapping previously let enterprise-sales-jargon noise ("pre-sales, pilot negotiation... account management") ride along unflagged inside an otherwise-valid sentence.
+5. Check coverage: are all high/medium ✅/⚠️ signals present in at least one role?
 
 ---
 
@@ -39,10 +40,10 @@ For each sentence in the EXPERIENCE section of the saved CV, assess whether it d
 
 ### Phase 3.6 — Signal Audit
 
-Per role — list only ⚠️ and 🗑️ findings. ✅ sentences not listed individually — counted in summary only.
+Per role — list only ⚠️ and 🗑️ findings. ✅ sentences (all clauses valuable) not listed individually — counted in summary only.
 
 **[Role — Company]**
-- "[sentence excerpt]..." → ⚠️/🗑️ [signal label or "no signal"] — [one-line reason]
+- "[sentence or clause excerpt]..." → ⚠️/🗑️ [signal label or "no signal"] — [one-line reason]. Quote just the offending clause, not the full sentence, when only part of a compound sentence lacks signal.
 
 ### Summary
 ✅ High/medium signals covered: N/N
@@ -66,7 +67,11 @@ If no issues:
 
 ## After audit
 
-- **🗑️ found** → present to user, confirm, remove from CV, re-save CV.md + PDF
+- **🗑️ found** → present to user, confirm, remove from CV, re-save CV.md + PDF, **then re-run
+  the mechanical lint** (`core.cv_metrics.detect_mechanical_violations` — em-dash + banned-phrase
+  list) **and the repetition check** (`detect_phrase_repetition`) against the re-saved text before
+  considering it final. Added 2026-09-21: a removal can leave an awkward join or duplicate
+  phrasing behind, and this file's own re-save step never re-checked for it.
 - **⚠️ only** → before presenting anything, check PROFILE.md (the same company/role's main
   entry plus any Additional Evidence sections) for unused, honest evidence that would map that
   sentence's slot to a currently weak (⚠️) or under-covered signal from the Signal Coverage
@@ -77,7 +82,9 @@ If no issues:
   signal by echoing wording already used elsewhere just trades one weak sentence for a
   duplication problem (see `core.cv_metrics.detect_phrase_repetition`, threshold 2+; in the
   Claude Code local pipeline, where this isn't auto-injected, run it directly via Bash against
-  the saved CV before finalizing). Present findings with three options per sentence: remove /
+  the saved CV before finalizing). **Also re-run `detect_mechanical_violations` against any
+  applied rewrite** (added 2026-09-21) — a rewrite can just as easily reintroduce an em-dash or
+  banned phrase as any other edit. Present findings with three options per sentence: remove /
   keep as-is / replace with [specific rewrite + which signal it closes]. If no real evidence
   exists to fill the gap, offer only remove/keep — never fabricate evidence to manufacture a
   rewrite option.

@@ -69,7 +69,7 @@ User will provide:
 
 ## Golden Rule — North Star Mirroring (SUMMARY, primary rule)
 
-Before writing SUMMARY, re-read the Phase 1 North Star sentence (§1.0.5 in JD_analysis.md). The SUMMARY must read as a direct, paraphrased answer to it, not a generic positioning statement and never JD-verbatim (see rule 25 / Phase 3.7 JD-Echo Risk) — the same image the employer has in mind, reflected back in the candidate's own words. This takes priority over the default Tailoring Logic below when the two would pull in different directions.
+Before writing SUMMARY, re-read the Phase 1 North Star sentence (§1.0.5 in JD_analysis.md). The SUMMARY must read as a direct, paraphrased answer to it, not a generic positioning statement and never JD-verbatim (see rule 25 / Phase 3.7 JD-Echo Risk) — the same image the employer has in mind, reflected back in the candidate's own words. This always wins over every other emphasis mechanism below — see Emphasis Precedence.
 
 ## CV Structure
 
@@ -157,6 +157,17 @@ Certified AI-Empowered SAFe® Product Owner/Product Manager
 
 ---
 
+## Emphasis Precedence
+
+Three separate mechanisms below all decide "what to lead with." Found live on vacancy #1646 (2026-09-21): with no stated order between them, the draft led with a business-feature list instead of the technical-complexity framing its own `role_balance` numbers implied. Resolve in this order when they'd pull in different directions:
+
+1. **Golden Rule (North Star Mirroring, above)** — always wins.
+2. **Archetype mismatch handling** (under Adaptation Plan Implementation, below) — only when Phase 2 explicitly flagged one.
+3. **Tailoring Logic (Role Balance Shape, below)** — the default emphasis driver when no mismatch was flagged.
+4. **Primary Asset vs. Supporting Roles** — decides which role carries the emphasis chosen above; it does not choose the emphasis itself.
+
+---
+
 ## Primary Asset vs. Supporting Roles
 
 Before drafting, identify which 1–2 roles are the **primary asset** for this vacancy — the roles most directly matching the core JD requirement (e.g., for a CRM PM role → HostiServer; for a marketplace discovery role → Marketplace).
@@ -174,11 +185,16 @@ Even a small, honest signal from a supporting role compounds the overall CV effe
 
 ## Tailoring Logic
 
-Based on role archetype from Phase 1:
-- Full PM (discovery + strategy + delivery) → lead with discovery + platform ownership
-- Pure execution/delivery coordinator → lead with delivery track record
-- Technical program management → lead with system complexity + cross-team coordination
-- Operations/BizOps → lead with automation, process ownership, operational metrics
+**Role Balance Shape — compute deterministically from Phase 1 §1.4's percentages (same margin-based logic Flutter uses under the radar chart — this is arithmetic on numbers already in front of you, not a separate judgment call):**
+1. Sort the 6 axes by percentage, descending (ties broken by axis order: strategy, discovery, delivery, growth, stakeholder, operational).
+2. If (#1 − #2) ≥ 10 points → **Sharp — [axis #1]**.
+3. Else if (#2 − #3) ≥ 10 points → **Dual — [axis #1 + axis #2]**.
+4. Else → **Diffuse — [axis #1 + axis #2]** (leaning, no clean single lead).
+
+**Lead with, based on the Shape just computed:**
+- **Sharp** → lead with the single strongest matching experience for that one axis: Strategy → vision/roadmap ownership; Discovery → research/validation; Delivery → shipped-thing track record; Growth → experiment/data-driven improvement; Stakeholder → cross-functional alignment; Operational → process/automation ownership.
+- **Dual** → weave both axes together explicitly in SUMMARY and at least one shared EXPERIENCE paragraph — do not pick one and drop the other.
+- **Diffuse** → lean on the top 2 axes without overclaiming a single sharp focus. Broader positioning is honest here, not a weakness to hide.
 
 Emphasis = adjust language and which Key Results to surface first. Not deleting entries.
 

@@ -25,12 +25,81 @@ User will provide:
 
 Output the following four sections in order. Use the exact `##` headers as shown.
 
+**Order changed 2026-09-21 (was Quick Scan → Fit Breakdown → Signal Coverage & Adaptation → Internal Analysis) — found live on vacancy #1494: the headline Quick Scan (Fit Score/Key Barriers/Recommendation) was generated first, before the deepest evidence matching (Internal Analysis) even happened, and nothing reconciled them afterward. That same output said in "Transferable experience" that HostiServer's billing/invoice automation was a near-direct match to the JD's AP Automation KPIs, while the headline Key Barriers said the opposite. Internal Analysis and Fit Breakdown (both deep, per-requirement evidence work) now generate first — Quick Scan is now an explicit summary derived from them, not an independent judgment reached before the deep analysis exists.**
+
 ---
 
-**[OUTPUT SECTION 1 — Quick Scan]**
+**[OUTPUT SECTION 1 — Internal Analysis]**
+
+*Generated first — this is where the real evidence matching happens. For record-keeping — not sent to Telegram. Kept in JD_analysis.md for deep reference, and used below to write Quick Scan.*
+
+## Internal Analysis
+
+### Fit Dimensions
+
+| Dimension | Score /10 | Comment |
+|-----------|-----------|---------|
+| Domain fit | | |
+| Execution fit | | |
+| Strategy fit | | |
+| Systems/platform fit | | |
+| Stakeholder fit | | |
+| **Overall fit** | | |
+
+### Detailed Assessment
+
+**Strong matches** — where candidate clearly hits the target:
+- [specific matches with evidence]
+
+**Weak spots** — gaps and missing experience:
+- [list of gaps]
+
+**Transferable experience** — real experience that can be reframed:
+- [list with specific examples]
+
+**Likely recruiter objections** — what will cause hesitation at screening:
+- [list of objections]
+
+**Best narrative for positioning:**
+[1–2 sentences: best positioning angle for this specific vacancy]
+
+### Summary
+
+- **Who the company is actually looking for:** [1 sentence]
+- **Why the candidate fits / does not fit:** [1 sentence]
+- **What the ideal CV for this vacancy should look like:** [2–3 sentences]
+
+---
+
+**[OUTPUT SECTION 2 — Fit Breakdown]**
+
+Mandatory table. Assess the 6–10 most significant JD requirements.
+
+## Fit Breakdown
+
+| JD Requirement | Status | Candidate Evidence |
+|----------------|--------|-------------------|
+| [requirement] | ✅ / ⚠️ / ❌ | [specific evidence from profile, or "no evidence"] |
+
+**Status rules — be strict:**
+- ✅ = direct commercial experience confirmed in profile
+- ⚠️ = partial: pet-projects only / shorter than required / adjacent/indirect experience
+- ❌ = missing — no evidence in profile
+
+**Pet-projects are NEVER ✅ if JD requires commercial experience. Always ⚠️ at best.**
+
+Skip boilerplate requirements (teamwork, communication, responsibility). Focus on substantive ones.
+
+**When a requirement combines a domain + a method/technology** (e.g. "AI implementation in finance/accounting") — score domain-fit and method-fit separately in the Evidence column instead of letting a missing method suppress credit for a real domain match, or vice versa. Added 2026-09-21 per the same #1494 diagnosis as the section-order note above.
+
+---
+
+**[OUTPUT SECTION 3 — Quick Scan]**
+
+*Write this section last, as an explicit summary of Internal Analysis (Section 1) and Fit Breakdown (Section 2) above — not an independent judgment. If Quick Scan's Fit score, Key Barriers, or Why-not-apply would say something Internal Analysis's Detailed Assessment or Fit Breakdown's evidence table doesn't support, that is a contradiction to resolve before output, not two independently-valid views.*
 
 Output this block exactly as shown, filling in the placeholders.
-**Output rule: Output ALL four sections in full (Quick Scan, Fit Breakdown, Adaptation Plan, Internal Analysis). Do NOT omit or abbreviate any section. The calling system handles display filtering and file storage — your job is to produce the complete structured output.**
+**Output rule: Output ALL four sections in full (Internal Analysis, Fit Breakdown, Quick Scan, Signal Coverage & Adaptation). Do NOT omit or abbreviate any section. The calling system handles display filtering and file storage — your job is to produce the complete structured output.**
 
 ## Quick Scan
 **Fit score:** X/10
@@ -56,15 +125,16 @@ Output this block exactly as shown, filling in the placeholders.
 
 | Fit | VScore | Recommendation (Quick Scan label) |
 |-----|--------|-----------------------------------|
-| ≥ 7 | ≥ 7.5 | `apply — strong match` |
-| ≥ 7 | 5–7.4 | `apply` |
-| ≥ 7 | < 5.5 | `apply — limited upside` |
-| 5–6 | ≥ 7.5 | `take a chance — premium opportunity` |
-| 5–6 | 5–7.4 | `take a chance` |
-| 5–6 | < 5.5 | `decline — not worth the effort` |
+| ≥ 7.0 | ≥ 7.5 | `apply — strong match` |
+| ≥ 7.0 | 5.5–7.4 | `apply` |
+| ≥ 7.0 | < 5.5 | `apply — limited upside` |
+| 5.0–6.9 | ≥ 7.5 | `take a chance — premium opportunity` |
+| 5.0–6.9 | 5.5–7.4 | `take a chance` |
+| 5.0–6.9 | < 5.5 | `decline — not worth the effort` |
 
 **VScore source:** Phase 1 section 1.7 → `vacancy_score` field.
 **DB value:** store base only (`apply` / `take a chance` / `decline`) — label is display-only, not persisted.
+**Note on fractional fit scores (clarified 2026-09-21):** the fit-score formula below can produce fractional values (e.g. 6.5) — the ranges above are written explicitly inclusive (`5.0–6.9`, `≥7.0`) precisely so a fractional score never falls in an ambiguous gap between rows. In the live pipeline, the stored recommendation is always re-derived from a rounded integer fit_score by `core/vacscore.py:compute_recommendation()` regardless of what you write here — but write the correct bucket anyway, since this text is also what a human reads directly in `JD_analysis.md`.
 
 **Fit score guidance — be critical, start from neutral:**
 - Baseline: 5.0
@@ -89,6 +159,7 @@ Output this block exactly as shown, filling in the placeholders.
 **Archetype mismatch** is both a Key Barrier AND an Adaptation Plan signal:
 - Barrier: flags the risk clearly ("JD targets a Founder Proxy, candidate's CV currently frames them as an Executor")
 - Adaptation: gives concrete reframing instructions using candidate's dual-archetype evidence
+- **Which Phase 1 field to read this from:** this Founder-Proxy/Executor binary is the candidate's own PROFILE.md-stated duality, not Phase 1 §1.4's structured `primary_archetype` (which has no "Executor" term and shouldn't — see §1.4's own closed vocabulary). Read Phase 1 §1.3's free discussion for this specific judgment call.
 
 **Hidden Risks** — role/company context signals (NOT candidate gaps):
 - Company maturity: early-stage, AI-pivot, no confirmed funding, agency structure
@@ -124,28 +195,7 @@ add: `**Track note:** role diverges from PM/PO — [1 sentence on the nature of 
 
 ---
 
-**[OUTPUT SECTION 2 — Fit Breakdown]**
-
-Mandatory table. Assess the 6–10 most significant JD requirements.
-
-## Fit Breakdown
-
-| JD Requirement | Status | Candidate Evidence |
-|----------------|--------|-------------------|
-| [requirement] | ✅ / ⚠️ / ❌ | [specific evidence from profile, or "no evidence"] |
-
-**Status rules — be strict:**
-- ✅ = direct commercial experience confirmed in profile
-- ⚠️ = partial: pet-projects only / shorter than required / adjacent/indirect experience
-- ❌ = missing — no evidence in profile
-
-**Pet-projects are NEVER ✅ if JD requires commercial experience. Always ⚠️ at best.**
-
-Skip boilerplate requirements (teamwork, communication, responsibility). Focus on substantive ones.
-
----
-
-**[OUTPUT SECTION 3 — Signal Coverage & Adaptation]**
+**[OUTPUT SECTION 4 — Signal Coverage & Adaptation]**
 
 ## Signal Coverage Table
 
@@ -199,45 +249,3 @@ For each `high` signal where `in_profile = ⚠️` — give explicit framing ins
 
 Format each action as:
 - **[Action label]:** [Specific instruction — what to change, what to emphasize, exact framing]
-
----
-
-**[OUTPUT SECTION 4 — Internal Analysis]**
-
-*For record-keeping — not sent to Telegram. Kept in JD_analysis.md for deep reference.*
-
-## Internal Analysis
-
-### Fit Dimensions
-
-| Dimension | Score /10 | Comment |
-|-----------|-----------|---------|
-| Domain fit | | |
-| Execution fit | | |
-| Strategy fit | | |
-| Systems/platform fit | | |
-| Stakeholder fit | | |
-| **Overall fit** | | |
-
-### Detailed Assessment
-
-**Strong matches** — where candidate clearly hits the target:
-- [specific matches with evidence]
-
-**Weak spots** — gaps and missing experience:
-- [list of gaps]
-
-**Transferable experience** — real experience that can be reframed:
-- [list with specific examples]
-
-**Likely recruiter objections** — what will cause hesitation at screening:
-- [list of objections]
-
-**Best narrative for positioning:**
-[1–2 sentences: best positioning angle for this specific vacancy]
-
-### Summary
-
-- **Who the company is actually looking for:** [1 sentence]
-- **Why the candidate fits / does not fit:** [1 sentence]
-- **What the ideal CV for this vacancy should look like:** [2–3 sentences]

@@ -120,9 +120,11 @@ Read the Phase 1 North Star sentence (§1.0.5). Read the drafted SUMMARY cold, a
 2. **Scan CV vocabulary** for tone mismatches against detected type:
    - Enterprise JD + startup language in CV ("founder-led", "scrappy", "0→1") → flag
    - Startup JD + heavy enterprise language ("governance", "compliance framework", "executive alignment") → flag
-3. **Verify positioning strategy** from Phase 2 Adaptation Plan still holds in the drafted CV:
-   - Does the overall framing match the role archetype identified in Phase 1?
-   - Is the candidate positioned as the right archetype for THIS company's context?
+3. **Verify Role Balance Shape alignment** — the same deterministic Shape `phase3_cv_draft.md`'s Tailoring Logic computed (sort Phase 1 §1.4's 6 axes descending, ties broken by axis order; Sharp if #1−#2 ≥10, else Dual if #2−#3 ≥10, else Diffuse). Added 2026-09-21 after vacancy #1646: the draft led with a business-feature list instead of the technical-complexity framing its own `role_balance.delivery=55%` implied, and nothing here would have caught it — this step existed only as a vague "does framing match role archetype?" question with no concrete comparison target.
+   - **Sharp** — does the CV actually lead with that one axis's strongest matching experience, or did it drift toward a different framing?
+   - **Dual** — are both axes woven together, or was one dropped?
+   - **Diffuse** — is the CV honestly broad across the top 2 axes, not artificially narrowed to one?
+   - **Archetype mismatch handling** (if Phase 2 flagged one, per `phase3_cv_draft.md`'s Emphasis Precedence) takes priority over Shape — verify it was actually applied, not silently skipped in favor of the Shape-driven default.
 4. Add tone/positioning issues to ❌ or 🔧 as appropriate
 
 ---

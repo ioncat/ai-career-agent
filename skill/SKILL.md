@@ -134,11 +134,14 @@ Phase 3.5: Self-Review     [review tables + verdict shown to user; CV body NEVER
 
 Phase 3.6: Signal Audit    [runs after save, verdict shown to user — CV body still never pasted]
   → Read saved CV (EXPERIENCE section) + Signal Coverage Table from JD_analysis.md
-  → For each sentence: assess value vs JD requirements (valuable / weak / remove)
+  → Decompose each sentence into clauses first (split on em-dashes/commas), then assess EACH
+    clause's value vs JD requirements (valuable / weak / remove) — a sentence is only "valuable"
+    if ALL its clauses are (see phase3_6_signal_audit.md's Algorithm, tightened 2026-09-21)
   → Check coverage: all high/medium signals present in at least one role?
   → Display audit report (findings only, not the CV text)
-  → If 🗑️ sentences found: confirm with user → remove → re-save CV.md + PDF → re-present link
-  → If ⚠️ only: present to user, they decide
+  → If 🗑️ sentences found: confirm with user → remove → re-save CV.md + PDF → re-run the
+    mechanical lint + repetition check against the re-saved text (2026-09-21) → re-present link
+  → If ⚠️ only: present to user, they decide → any applied rewrite also gets the same re-lint
   → If clean: proceed
 
   → Present link to saved CV.md/PDF (Rule 8 — never paste full CV text in chat)
@@ -244,14 +247,13 @@ Skip only when: `decline` (not worth it) OR clean `apply` with zero barriers.
 - **Per-vacancy → append an `## Phase 2.5: Objection Handling` block to `JD_analysis.md`** (resolved + genuine gaps + decision).
 - Pass resolved objections into Phase 3 context (CV must surface these counter-arguments).
 - Optional DB: store under `analysis_json` key `p2_5` (`{resolved:[...], gaps:[...]}`).
-- **DB Profile write-back (EPIC-24 T5)** — after summarizing resolved evidence, merge into `progressive_profile`:
+- **DB Profile write-back (EPIC-24 T5) — only when `PROFILE_SOURCE=db` for this session.** Gated 2026-09-21: this call was previously unconditional, but `PROFILE_SOURCE` defaults to `md` and every real session traced so far ran in `md` mode — meaning this write-back wrote into a store nothing downstream ever read back, while carrying a documented brittle `claude` CLI subprocess failure risk (`.claude/sessions/2026-08-10-...md`). Whether to keep investing in `progressive_profile` at all (finish EPIC-24 T7/T9) or deprecate it is an open strategic question — see `docs/delivery/BACKLOG.md` "EPIC-24 progressive_profile — keep investing or deprecate?" — not a decision this gate makes; the gate just stops paying the cost silently in the mode that never benefits from it.
   ```bash
   python scripts/profile_merge.py --user-id [id] --evidence "[resolved evidence text]"
   # Or write evidence to temp file first:
   # python scripts/profile_merge.py --user-id [id] --evidence-file /tmp/p25_evidence.txt
   ```
-  Only call when ≥1 resolved barriers with real evidence. Skip if all barriers are genuine gaps.
-  Use `--dry-run` to preview before saving.
+  Only call when `PROFILE_SOURCE=db` AND ≥1 resolved barriers with real evidence. Skip entirely (including the evidence-summarizing work) when `PROFILE_SOURCE=md` (the default). Use `--dry-run` to preview before saving.
 
 ### Nature (per EPIC-21)
 
