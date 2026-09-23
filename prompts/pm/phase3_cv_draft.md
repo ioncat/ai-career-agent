@@ -145,7 +145,9 @@ Certified AI-Empowered SAFe® Product Owner/Product Manager
 > `AI tooling across PM workflows (Claude, ChatGPT, Gemini): research synthesis, user feedback analysis, requirements refinement, technical/API spec review, workflow validation, prototype creation. Personal projects: [ioncat.github.io](https://ioncat.github.io/).`
 
 2-component (AI/technical depth roles — explicit AI product ownership, LLM/technical PM, hands-on AI signal required):
-> `Built LLM pipelines hands-on in personal projects: prompt architecture, context window management, response quality assessment. That hands-on depth carries into writing AI-related requirements and specs detailed enough for an engineering team to build from. Personal projects: [ioncat.github.io](https://ioncat.github.io/).`
+
+**Revised (locked, confirmed 2026-09-21, vacancy #1577) — includes the "human-in-the-loop" clause. Use the named term itself, not a paraphrase — it signals fluency with the concept, a paraphrase reads as guessing at it. This is the default 2-component first paragraph, not conditional on a JD naming a human-gate/AI-governance requirement explicitly.**
+> `Built LLM pipelines hands-on in personal projects: prompt architecture, context window management, response quality assessment, and human-in-the-loop review gates for AI output. That hands-on depth carries into writing AI-related requirements and specs detailed enough for an engineering team to build from. Personal projects: [ioncat.github.io](https://ioncat.github.io/).`
 > `AI tooling across PM workflows (Claude, ChatGPT, Gemini): research synthesis, user feedback analysis, requirements refinement, technical/API spec review, workflow validation, prototype creation.` *(the golden line, standalone — no portfolio link here, it already appeared in the paragraph above)*
 
 **Banned wording — never use, even though it appears in older CVs:**
