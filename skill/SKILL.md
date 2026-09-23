@@ -126,10 +126,12 @@ Phase 3.5: Self-Review     [review tables + verdict shown to user; CV body NEVER
     rounds of small phrase edits went out with no one checking the resulting sentence was still
     grammatically clean, until the user asked directly "почему не проверяешь грамматику?"
   → Save [Name]_CV.md to existing folder (already created after Phase 1+2)
-  → Generate PDF via http://localhost:8002/render → save PDF bytes
-  → Present a markdown link to the saved CV.md (and PDF) — per Rule 8, never paste the CV body itself
+  → Present a markdown link to the saved CV.md — per Rule 8, never paste the CV body itself.
+    ⛔ NO PDF YET — PDF is generated exactly once, at the end of the whole CV review arc (see
+    "PDF Generation — render once, at the end" below). Do not render/send a PDF here.
   → Ask: "Вносим правки или всё ок?"
-  → Apply approved changes → re-save CV.md + PDF → re-present the link (still no inline text)
+  → Apply approved changes → re-save CV.md only (no PDF) → re-present the link (still no inline text)
+  → Repeat the edit loop as many times as needed — every round touches CV.md only, never the PDF
   → Save p3 to DB analysis_json          [silent — see Analysis JSON section below]
 
 Phase 3.6: Signal Audit    [runs after save, verdict shown to user — CV body still never pasted]
@@ -139,12 +141,15 @@ Phase 3.6: Signal Audit    [runs after save, verdict shown to user — CV body s
     if ALL its clauses are (see phase3_6_signal_audit.md's Algorithm, tightened 2026-09-21)
   → Check coverage: all high/medium signals present in at least one role?
   → Display audit report (findings only, not the CV text)
-  → If 🗑️ sentences found: confirm with user → remove → re-save CV.md + PDF → re-run the
-    mechanical lint + repetition check against the re-saved text (2026-09-21) → re-present link
-  → If ⚠️ only: present to user, they decide → any applied rewrite also gets the same re-lint
+  → If 🗑️ sentences found: confirm with user → remove → re-save CV.md only (no PDF) → re-run the
+    mechanical lint + repetition check against the re-saved text (2026-09-21)
+  → If ⚠️ only: present to user, they decide → any applied rewrite also gets the same re-lint, .md only
   → If clean: proceed
 
-  → Present link to saved CV.md/PDF (Rule 8 — never paste full CV text in chat)
+  → Once the CV reaches a final, no-more-edits state (end of the whole Phase 3.5→3.6[→3.7] arc):
+    generate the PDF exactly once via http://localhost:8002/render → save PDF bytes → present the
+    CV.md + CV.pdf together (Rule 8 — never paste full CV text in chat). See "PDF Generation —
+    render once, at the end" below — do not render/send a PDF at any earlier point in this arc.
   → Ask: "Переходим к cover?"
 
   ↓ [OPT-IN, only if recommendation = apply AND fit_score ≥ 7, or user asks explicitly]
@@ -154,14 +159,17 @@ Phase 3.7: Editorial Audit  [opt-in final polish — see below]
   ↓ [user explicitly requests cover]
 
 Phase 4: Cover Message
-  → Review/approval cycle (verdict/summary in chat, never the full cover text — Rule 8)
+  → Review/approval cycle (verdict/summary in chat, never the full cover text — Rule 8). Every
+    edit round during this cycle saves Cover.md only — no PDF (see "PDF Generation — render
+    once, at the end" below).
   → Before approval: run the same mechanical-violation lint as Phase 3.5 (em-dash + banned-
     phrase list, incl. cover-specific bans like "what's already working well" and robotic
     lead-ins "Чесно:"/"Важливо:"):
     `python -c "import sys; sys.path.insert(0,'.'); from core.cv_metrics import detect_mechanical_violations; d=open(r'[path to cover draft]', encoding='utf-8').read(); print(detect_mechanical_violations(d))"`
     Any hit is a required fix before presenting for approval.
   → Save [Name]_Cover.md
-  → Generate PDF via http://localhost:8002/render → save [Name]_Cover.pdf
+  → Once the user confirms the cover is final (no more edits): generate the PDF exactly once via
+    http://localhost:8002/render → save [Name]_Cover.pdf
   → Save p4 to DB analysis_json          [silent — see Analysis JSON section below]
   → Present link to saved Cover.md/PDF (Rule 8 — never paste full cover text in chat)
 ```
@@ -289,7 +297,7 @@ Prompt file: `prompts/[skill_type]/phase3_7_editorial_audit.md` (full methodolog
 
 ### After the audit
 
-- **Quick Win findings** (includes JD-Echo Risk by default) → present to user → confirm → apply → re-save CV.md + PDF.
+- **Quick Win findings** (includes JD-Echo Risk by default) → present to user → confirm → apply → re-save CV.md only. Once all Quick Win fixes for this audit round are applied and confirmed: regenerate the PDF once from the final CV.md (do not render on each individual fix).
 - **Medium Investment / Major Rewrite** → present, let the user decide — do not auto-apply.
 - Append the full audit output to `JD_analysis.md` under `## Phase 3.7: Editorial Audit`.
 
@@ -423,7 +431,15 @@ Date: [date]
 
 ---
 
-## PDF Generation
+## PDF Generation — render once, at the end
+
+**NON-NEGOTIABLE (confirmed 2026-09-19/21, repeated live violation 2026-09-21 on vacancy #1577):
+never render or send a CV/cover PDF during an iterative edit/review loop.** Every edit-round save
+during Phase 3.5, 3.6, 3.7, or Phase 4's approval cycle touches the `.md` file only. Render the PDF
+exactly once — when the document reaches a final, no-more-edits state for that phase (user says
+"ок"/"всё ок"/no further changes, or the phase ends and hands off to the next one) — then present
+`.md` + `.pdf` together. A PDF render + `SendUserFile` round-trip on every small wording tweak is
+pure overhead: the user only needs to see and react to the text while iterating.
 
 Render via the **pdf-service** (`services/pdf/`, live). **NEVER** `../callback-cv/cv_to_pdf.py` — deprecated, external repo, has the old un-fixed renderer.
 
