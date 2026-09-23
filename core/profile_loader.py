@@ -39,8 +39,12 @@ def load_and_parse(path: Path) -> CandidateProfile:
 
 
 def _setting(text: str, key: str) -> str | None:
-    """Return first `key: value` from the ## Settings section, or None."""
-    m = re.search(r"^##\s+Settings\b(.+?)(?=\n##\s|\Z)", text, re.DOTALL | re.MULTILINE)
+    """Return first `key: value` from the Settings section, or None.
+
+    Matches both a plain `## Settings` heading and a lettered one like
+    `## A. Settings` (PROFILE.md's section-lettering scheme, added 2026-09-23).
+    """
+    m = re.search(r"^##\s+(?:[A-Za-z]\.\s+)?Settings\b(.+?)(?=\n##\s|\Z)", text, re.DOTALL | re.MULTILINE)
     if not m:
         return None
     for match in re.finditer(rf"^{re.escape(key)}:\s*(\S+)", m.group(1), re.MULTILINE):
@@ -49,8 +53,13 @@ def _setting(text: str, key: str) -> str | None:
 
 
 def _vacancy_prefs(text: str) -> dict:
-    """Return {domain_interests, company_stage_prefs} from ## Vacancy Preferences yaml block."""
-    m = re.search(r"^##\s+Vacancy Preferences\b(.+?)(?=\n##\s|\Z)", text, re.DOTALL | re.MULTILINE)
+    """Return {domain_interests, company_stage_prefs} from the Vacancy Preferences yaml block.
+
+    Matches `Vacancy Preferences` as either an H2 (plain, legacy layout) or an H3
+    nested under a lettered parent section (e.g. `## G. Pipeline Config` →
+    `### Vacancy Preferences`, PROFILE.md's section-lettering scheme, added 2026-09-23).
+    """
+    m = re.search(r"^#{2,3}\s+Vacancy Preferences\b(.+?)(?=\n#{2,3}\s|\Z)", text, re.DOTALL | re.MULTILINE)
     if not m:
         return {}
     yaml_m = re.search(r"```yaml\s*(.+?)```", m.group(1), re.DOTALL)
