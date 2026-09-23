@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:file_picker/file_picker.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -62,15 +63,34 @@ class _VacancyIdLine extends StatelessWidget {
   final int vacancyId;
   const _VacancyIdLine({required this.vacancyId});
 
+  void _copyId(BuildContext context) {
+    // Copied value deliberately excludes the leading "#" (2026-09-23, user
+    // request) — the id is pasted elsewhere as a bare number (search boxes,
+    // scripts, chat), where the "#" would just have to be stripped again.
+    Clipboard.setData(ClipboardData(text: '$vacancyId'));
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(content: Text('ID copied'), duration: Duration(seconds: 2)),
+      );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
-      child: Text(
-        '#$vacancyId',
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: cs.onSurfaceVariant.withValues(alpha: 0.5),
+      child: Tooltip(
+        message: 'Copy ID',
+        child: InkWell(
+          borderRadius: BorderRadius.circular(4),
+          onTap: () => _copyId(context),
+          child: Text(
+            '#$vacancyId',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+            ),
+          ),
         ),
       ),
     );
