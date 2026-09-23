@@ -3,6 +3,7 @@
 import pytest
 
 from core.cv_metrics import (
+    detect_jd_echo,
     detect_mechanical_violations,
     detect_phrase_repetition,
     detect_repetition,
@@ -261,6 +262,90 @@ class TestDetectPhraseRepetition:
         phrases = [p for p, _ in result]
         assert not any("https" in p or "github" in p for p in phrases)
         assert "personal projects built hands" in phrases
+
+
+class TestDetectJdEcho:
+    def test_returns_list(self):
+        result = detect_jd_echo("some cv text", "some jd text")
+        assert isinstance(result, list)
+
+    def test_finds_short_distinctive_phrase_missed_by_min_n_three(self):
+        # "running ceremonies" — the actual finding from vacancy #1658, a
+        # verbatim 2-word phrase lifted from the JD's own anti-pattern line.
+        # detect_phrase_repetition's default min_n=3 would miss this entirely.
+        jd = "We're not looking for someone whose main strength is running ceremonies."
+        cv = "Drives delivery to production rather than running ceremonies."
+        result = detect_jd_echo(cv, jd)
+        assert "running ceremonies" in result
+
+    def test_single_cooccurrence_is_enough_no_repetition_needed(self):
+        # Unlike detect_phrase_repetition (threshold=2, must repeat within
+        # one document), a single match between two DIFFERENT documents is
+        # already the whole problem — the phrase appears exactly once in
+        # each text below, and that alone must surface as a finding.
+        jd = "own the platform migration end to end for the business"
+        cv = "owned the platform migration end to end for the team"
+        result = detect_jd_echo(cv, jd)
+        assert any("migration end" in p for p in result)
+
+    def test_two_gram_with_stopword_is_filtered(self):
+        # "the platform" (stopword + content word) is noise, not an echoed
+        # distinctive phrase — only flag 2-grams where BOTH words carry content.
+        jd = "own the platform end to end"
+        cv = "led delivery on the platform for years"
+        result = detect_jd_echo(cv, jd)
+        assert "the platform" not in result
+
+    def test_role_title_combo_not_flagged(self):
+        # CV headline is required to track the JD's own title term — this
+        # overlap is expected by design, not an echo risk worth flagging.
+        jd = "We are hiring a Senior Product Manager to own this initiative."
+        cv = "Senior Product Manager with 6+ years of experience."
+        result = detect_jd_echo(cv, jd)
+        assert "product manager" not in result
+        assert "senior product" not in result
+
+    def test_known_tool_name_not_flagged(self):
+        # The CV SHOULD name a tool the JD asks for — that's ATS coverage,
+        # not JD-echo. (Both texts need >=2 tool-name words for a 2-gram
+        # match; use a two-word registry entry.)
+        jd = "Hands-on experience with Google Analytics is required."
+        cv = "Configured Google Analytics funnels for the marketing team."
+        result = detect_jd_echo(cv, jd)
+        assert "google analytics" not in result
+
+    def test_no_overlap_returns_empty(self):
+        jd = "responsible for warehouse logistics and inventory forecasting"
+        cv = "led design and delivery of a mobile banking application"
+        result = detect_jd_echo(cv, jd)
+        assert result == []
+
+    def test_sorted_longest_phrase_first(self):
+        jd = "turn ambiguous requirements into a clear execution plan with named owners"
+        cv = "turned ambiguous requirements into a clear execution plan with named owners"
+        result = detect_jd_echo(cv, jd, min_n=2, max_n=6)
+        lengths = [len(p.split()) for p in result]
+        assert lengths == sorted(lengths, reverse=True)
+
+    def test_nested_shorter_match_not_duplicated(self):
+        jd = "drive the platform all the way to production"
+        cv = "drove the platform all the way to production"
+        result = detect_jd_echo(cv, jd, min_n=2, max_n=6)
+        # the long match should be present; a shorter substring of it should not
+        # also be reported as a separate duplicate finding
+        longest = max(result, key=lambda p: len(p.split())) if result else ""
+        assert not any(p != longest and p in longest for p in result)
+
+    def test_empty_texts_return_empty(self):
+        assert detect_jd_echo("", "") == []
+        assert detect_jd_echo("some text", "") == []
+        assert detect_jd_echo("", "some text") == []
+
+    def test_case_insensitive(self):
+        jd = "Bring Structure To Ambiguity across the team"
+        cv = "bring structure to ambiguity across the team"
+        result = detect_jd_echo(cv, jd)
+        assert any("bring structure" in p for p in result)
 
 
 # ── detect_mechanical_violations ───────────────────────────────────────────────

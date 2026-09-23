@@ -197,6 +197,104 @@ def detect_phrase_repetition(
     return results
 
 
+# ── JD-echo (CV-vs-JD, not self-repetition) ────────────────────────────────────
+
+# Words that combine into a title/role phrase (e.g. "Product Manager", "Senior
+# Product Owner") and therefore legitimately overlap between CV and JD by
+# design — the CV headline is REQUIRED to track the JD's own title term
+# (phase3_cv_draft.md's headline rule). Local to detect_jd_echo only — do NOT
+# merge into _STOPWORDS, which other functions use for within-document
+# repetition where these words carry real signal.
+_ROLE_TITLE_WORDS: frozenset[str] = frozenset(
+    {"product", "manager", "owner", "project", "program", "senior", "junior",
+     "lead", "director", "specialist", "coordinator"}
+)
+
+
+def detect_jd_echo(cv_text: str, jd_text: str, min_n: int = 2, max_n: int = 6) -> list[str]:
+    """Return phrases that appear in both the CV and the JD text verbatim.
+
+    Different from detect_phrase_repetition (which checks a single document
+    against itself): this compares TWO documents, and a single co-occurrence
+    already counts — unlike self-repetition, echoing the employer's own
+    distinctive phrasing back at them is a problem the first time, not just
+    on a second occurrence. Found live 2026-09-21, vacancy #1658: an isolated
+    Phase 3.7 audit caught a CV Summary opening sentence built almost
+    entirely from paraphrased JD clauses, including one verbatim 2-word
+    phrase ("running ceremonies") lifted from the exact JD line describing
+    what the company does NOT want. min_n defaults to 2 (not 3, like
+    detect_phrase_repetition) specifically so a short but distinctive
+    phrase like that one isn't silently missed.
+
+    This is a cheap, advisory pre-filter, not a judgment call — it cannot
+    tell "echoed the JD's distinctive voice" apart from "used a shared,
+    expected term" as reliably as a human or an isolated Phase 3.7 read
+    can. It exists to catch the clear, literal cases cheaply in Phase 3.5,
+    before the more expensive Phase 3.7 audit ever runs — not to replace
+    3.7's own JD-Echo Risk check, which also catches paraphrased (non-
+    literal) echo this n-gram scan cannot see by construction.
+
+    Filtered out (to keep findings to genuine candidates, not routine
+    professional-vocabulary overlap):
+      - phrases made entirely of stopwords or role/title words (e.g. "the
+        product manager", "senior product owner" — expected to match, the
+        CV headline is required to track the JD's own title term)
+      - phrases that are a known tool/technology name (see _TOOL_REGISTRY)
+        — the CV SHOULD name a tool the JD asks for; that is ATS coverage,
+        the opposite problem from JD-echo
+      - a shorter phrase that is already a substring of a longer phrase
+        already found (report the longest match, not every nested overlap)
+
+    Args:
+        cv_text: Full CV or cover draft text (markdown).
+        jd_text: The vacancy's original JD text.
+        min_n:   Shortest phrase length to check, in words (default 2).
+        max_n:   Longest phrase length to check, in words (default 6).
+
+    Returns:
+        List of matched phrases, longest first. Empty when clean. Advisory
+        only — a hit can be a legitimate, defensible shared term a human
+        dismisses on review, same treatment as detect_mechanical_violations.
+    """
+
+    def _words(text: str) -> list[str]:
+        body = re.sub(r"\[.*?\]\(.*?\)", " ", text)
+        body = re.sub(r"[#*`]", " ", body)
+        return re.findall(r"[a-zA-Z']+", body.lower())
+
+    cv_words = _words(cv_text)
+    jd_words = _words(jd_text)
+
+    tool_phrases = {t.lower() for tools in _TOOL_REGISTRY.values() for t in tools}
+    skip_words = _STOPWORDS | _ROLE_TITLE_WORDS
+
+    results: list[str] = []
+    for n in range(max_n, min_n - 1, -1):
+        jd_grams = {tuple(jd_words[i : i + n]) for i in range(len(jd_words) - n + 1)}
+        cv_grams = {tuple(cv_words[i : i + n]) for i in range(len(cv_words) - n + 1)}
+        for gram in jd_grams & cv_grams:
+            phrase = " ".join(gram)
+            # 2-word grams: a single stopword/connector riding along a real
+            # word (e.g. "the platform", "blockers and") isn't a distinctive
+            # echoed phrase — require BOTH words to carry content. Longer
+            # grams may legitimately weave in one function word naturally
+            # ("bring structure to ambiguity") — the looser "not all
+            # skip words" check is enough there.
+            if n == 2:
+                if any(w in skip_words for w in gram):
+                    continue
+            elif all(w in skip_words for w in gram):
+                continue
+            if phrase in tool_phrases:
+                continue
+            if any(phrase in longer for longer in results):
+                continue
+            results.append(phrase)
+
+    results.sort(key=lambda p: -len(p.split()))
+    return results
+
+
 # ── Mechanical rule violations ─────────────────────────────────────────────────
 
 # Maintained banned-phrase list — each entry traces to a dated feedback rule

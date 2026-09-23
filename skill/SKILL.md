@@ -114,6 +114,18 @@ Phase 3.5: Self-Review     [review tables + verdict shown to user; CV body NEVER
     Any hit is a required fix before presenting the review — this is advisory to a human
     reviewer in the Python pipeline (logged, not blocking), but here there is no separate
     human review step downstream, so treat every hit as something to fix now.
+  → Also run the JD-echo scan (added 2026-09-23, see
+    `docs/discovery/north-star-signal-tree-discovery-2026-09-21.md` §4.1.1) — a cheap,
+    mechanical pre-filter for CV phrases that mirror the JD's own distinctive wording, run
+    BEFORE any Phase 3.7 isolated audit (which also catches paraphrased, non-literal echo this
+    n-gram scan can't see — the two are layered, not redundant):
+    `python -c "import sys; sys.path.insert(0,'.'); from core.cv_metrics import detect_jd_echo; cv=open(r'[path to CV draft]', encoding='utf-8').read(); jd=open(r'[path to JD.md]', encoding='utf-8').read(); print(detect_jd_echo(cv, jd))"`
+    Advisory, not auto-blocking — some findings are legitimate shared vocabulary (a required
+    tool name, a role title term) a human dismisses on read-through, but any hit that echoes
+    the JD's own distinctive editorial voice (not a tool/domain term) is a required fix before
+    presenting the review. Found live 2026-09-21 (vacancy #1658): a Summary opening sentence
+    used the JD's own "running ceremonies" phrase, lifted from the exact line describing what
+    the company does NOT want.
   → Also run a grammar/sentence-construction pass before presenting the review: unnecessary
     commas (esp. before "and" joining only two items, or between an adjective and the noun
     phrase it modifies, e.g. "a shipped, production system" should be "a shipped production

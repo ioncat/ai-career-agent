@@ -78,3 +78,28 @@ Not a file. Reasons: multi-user native, Flutter reads via API, Phase 2.5 write-b
 |-----------|--------|
 | LLM access (Claude CLI) | 🔴 BLOCKED — Tasks 7+ only |
 | EPIC-22 Phase C complete | Independent — can start now |
+
+---
+
+## Status update (2026-09-21) — see BACKLOG.md "Now" for the current, authoritative status
+
+This file is stale relative to the task table above (last updated 2026-07-05). As of 2026-09-21:
+`progressive_profile`'s Phase 2.5 write-back (T5) ran unconditionally regardless of session mode,
+but `PROFILE_SOURCE` defaults to `md` and every real session traced so far has run in that mode —
+meaning T5 wrote to a store nothing downstream ever read back, in production, for months. Write-back
+is now gated on `PROFILE_SOURCE=db` (stops the silent cost, doesn't resolve the question below).
+**Open, undecided, explicitly not downgraded to icebox:** is finishing T7/T9 worth it, or has
+months of exclusive PROFILE.md-markdown usage already settled this in markdown's favor? Needs a
+dedicated decision session — not yet scheduled as of 2026-09-23.
+
+**Future consideration, if EPIC-24 is picked back up (added 2026-09-23):** the North Star Signal
+Tree design (`docs/discovery/north-star-signal-tree-discovery-2026-09-21.md`) proposes a
+candidate-side "differentiation weight" that partly depends on PROFILE.md's own existing rarity
+language — freeform notes like *"rare, edge-case signal, default omit"* vs. *"universal, baseline
+evidence for ANY commercial PM/PO role"* — which the LLM currently has to notice by reading prose.
+If `progressive_profile`'s structured evidence format is ever built out, that rarity/universality
+marker could become an explicit structured field per evidence item instead of a phrase the model
+has to find in an 800-line markdown file — more mechanically reliable. **Not a current dependency**
+— the Signal Tree work proceeds against PROFILE.md prose (the only thing actually populated today)
+regardless of what happens with this epic; revisit only if prose-based rarity detection turns out
+to hit a real reliability ceiling.
