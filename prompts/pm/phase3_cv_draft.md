@@ -163,10 +163,10 @@ Certified AI-Empowered SAFe® Product Owner/Product Manager
 
 Three separate mechanisms below all decide "what to lead with." Found live on vacancy #1646 (2026-09-21): with no stated order between them, the draft led with a business-feature list instead of the technical-complexity framing its own `role_balance` numbers implied. Resolve in this order when they'd pull in different directions:
 
-1. **Golden Rule (North Star Mirroring, above)** — always wins.
+1. **Golden Rule (North Star Mirroring, above)** — always wins. **Operationalized by Phase 2's lead-signal rule (confirmed 2026-09-23 — see the Signal Coverage Table's "Lead-signal rule for Phase 3" in `JD_analysis.md`):** the branch that is both `central` to the North Star AND has `Distinctive = yes` evidence is what Golden Rule means by "mirror the North Star" — lead with that branch specifically, not just the North Star sentence in the abstract. **If Phase 2 explicitly found no qualifying branch** ("No strong differentiator identified for this JD's core ask"), Golden Rule falls back to a plain, honest answer to the North Star sentence itself (or, if Phase 1 found no North Star at all, there is nothing here to mirror — proceed straight to Tailoring Logic below).
 2. **Archetype mismatch handling** (under Adaptation Plan Implementation, below) — only when Phase 2 explicitly flagged one.
-3. **Tailoring Logic (Role Balance Shape, below)** — the default emphasis driver when no mismatch was flagged.
-4. **Primary Asset vs. Supporting Roles** — decides which role carries the emphasis chosen above; it does not choose the emphasis itself.
+3. **Tailoring Logic (Role Balance Shape, below)** — the default emphasis driver when no mismatch was flagged AND no branch qualified as the Golden Rule's lead in step 1.
+4. **Primary Asset vs. Supporting Roles** — decides which role carries the emphasis chosen above; it does not choose the emphasis itself. When step 1 found a qualifying lead branch, the primary asset is simply whichever role(s) hold that branch's distinctive evidence — no separate identification needed.
 
 ---
 

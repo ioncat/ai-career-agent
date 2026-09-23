@@ -199,11 +199,11 @@ add: `**Track note:** role diverges from PM/PO — [1 sentence on the nature of 
 
 ## Signal Coverage Table
 
-Extract all meaningful signals from the JD. For each signal, assess whether it is present in the candidate's profile and assign importance.
+**Built as branch-tagged rows under Phase 1's North Star tree (§1.0.5) — do NOT regenerate the signal list independently from scratch.** A branch naming several distinct JD asks must already have been decomposed in Phase 1; if you find a row here that still bundles more than one distinct ask, split it now rather than carrying the bundle forward (this bundling was the direct cause of a real false-positive bug — see the Weak-signal overfit check below).
 
-| Signal | In Profile | Importance |
-|--------|-----------|------------|
-| [signal] | ✅ / ⚠️ / ❌ | high / medium / low |
+| Signal | Branch | In Profile | Distinctive? | Importance |
+|--------|--------|-----------|---------------|------------|
+| [signal] | [branch label from §1.0.5] | ✅ / ⚠️ / ❌ | yes / no / n/a | high / medium / low |
 
 **Importance rules (apply in order, first match wins):**
 1. Signal appears in Requirements/Qualifications section AND maps to the role's North Star (section 1.0.5) → **high**
@@ -211,14 +211,22 @@ Extract all meaningful signals from the JD. For each signal, assess whether it i
 3. Signal mentioned 2+ times across the JD → **medium**
 4. Signal is "nice to have" / "preferably" / "is a plus" / mentioned once in description only → **low**
 
+This tier stays the fallback signal-strength measure for vacancies where Phase 1 found **no North Star** (§1.0.5) — with no core pain, there's nothing for a branch to be central or secondary to, so emphasis in Phase 3 runs on `importance` alone, same as before this section existed.
+
 **In Profile rules:**
 - ✅ = confirmed commercial experience in profile
 - ⚠️ = partial: pet-projects only / adjacent / indirect
 - ❌ = no evidence
 
+**Distinctive? — a direct judgment call, not a proxy (confirmed 2026-09-23, see `docs/discovery/north-star-signal-tree-discovery-2026-09-21.md` §3.3.1).** Ask directly: *would most competing candidates for this exact role also credibly claim this evidence, or is it distinctive — hard for a typical competitor to match?* `n/a` when `in_profile = ❌` (nothing to judge). Two supporting signals inform this judgment, but neither is the mechanism itself — the judgment must still be made when both are silent:
+- A fact that only got written into PROFILE.md as the direct result of a Phase 2.5 barrier resolution (not present before that dialogue) leans toward `yes` — it wasn't obvious or already documented.
+- PROFILE.md's own explicit rarity language for a piece of evidence (*"rare, edge-case signal, default omit"* vs. *"universal, baseline evidence for ANY commercial PM/PO role"*) is a direct, already-written hint for the same judgment — use it when present.
+
 **Coverage mandate for Phase 3:**
 Every signal where `importance = high|medium` AND `in_profile = ✅|⚠️` MUST appear explicitly in at least one role entry in the EXPERIENCE section of the CV.
 Signals where `in_profile = ❌` must NOT be fabricated — omit or address honestly.
+
+**Lead-signal rule for Phase 3 (this is what "lead with X" in the Adaptation Plan actually means):** a branch becomes the CV's LEAD only when BOTH hold: (1) its Phase 1 centrality is `central` (not `secondary` or `no North Star`), AND (2) at least one of its signals has `Distinctive = yes` with `in_profile = ✅|⚠️`. Other `central` branches without distinctive evidence still get full Coverage-mandate treatment — just not the lead. **If no branch qualifies on both axes, say so explicitly rather than forcing one:** `No strong differentiator identified for this JD's core ask — CV should compete on solid generic terms.` This is a legitimate, honest result (see §3.4 of the discovery doc), not a failure to find something — the alternative (word-matching until *something* looks like a fit) is exactly how a narrow, non-matching fact got forced into a CV as a false lead before this check existed.
 
 ---
 
@@ -245,7 +253,7 @@ from the profile to guide which experience to surface.
 
 For each `high` signal where `in_profile = ⚠️` — give explicit framing instruction: how to present partial evidence honestly without overclaiming.
 
-**Weak-signal overfit check (added 2026-09-21, vacancy #1577) — do this before pulling in ANY specific, narrow PROFILE.md evidence block for a reframing action.** Check the signal's own `importance` from the Signal Coverage Table above:
+**Weak-signal overfit check (added 2026-09-21, vacancy #1577; now a safety net — Phase 1 §1.0.5 decomposes bundled branches upfront as of 2026-09-23, so this should find less to catch, not nothing).** Do this before pulling in ANY specific, narrow PROFILE.md evidence block for a reframing action. Check the signal's own `importance` from the Signal Coverage Table above:
 - `importance = low` (a JD word appearing once, outside Requirements/Qualifications, "nice to have"/"is a plus") does NOT license pairing it with a specific, narrow, or rare PROFILE.md fact just because the words happen to match. A single incidental JD mention is not evidence the company actually needs that exact experience — pulling in a rare evidence block for it produces a CV line the candidate can't defend as a real match, and reads as forced when the recruiter reads past that one word.
 - Reserve specific/narrow evidence blocks (e.g. a one-off legal/compliance fact, a single-case interview story) for `high`/`medium`-importance signals — repeated, Requirements-section, or North-Star-linked JD asks — where the pairing is actually load-bearing, not incidental.
 - This is the same failure this rule exists to prevent: [[feedback_no_manufactured_parallels]] bans fabricated JD↔fact parallels; this check extends it to *real, non-fabricated* facts that are still the wrong match for a weak signal. Found live 2026-09-21 on vacancy #1577: the JD's single, non-repeated "compliance" mention (one word in a 5-item coordination list, not a Must-have) got paired with HostiServer's real but narrow ad-hoc ToS/contract-negotiation fact — technically true, not fabricated, but not what the JD's "compliance" mention was actually about, and the user rejected it live as a stretch.

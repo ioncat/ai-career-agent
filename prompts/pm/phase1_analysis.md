@@ -49,38 +49,43 @@ Do not skip. Do not add extra text. One line per field.
 
 ---
 
-### 1.0.5 North Star
+### 1.0.5 North Star & Branches
 
-**Before any other analysis — find the single outcome this company is paying for.**
+**Two-stage, judgment-based process (confirmed 2026-09-21/23 — see `docs/discovery/north-star-signal-tree-discovery-2026-09-21.md` for the full reasoning). Complete Stage 1 fully before starting Stage 2 — don't interleave "what's the core pain" with listing individual requirements in the same breath.**
 
-**Method:**
-1. Strip the JD of all tools, skills, qualifications, and requirements
-2. Ask: *"What result is this company actually buying?"*
-3. Express as ONE sentence: `[role] must [action] so that [business outcome]`
-4. Map every major JD requirement as an instrument/path toward this North Star
-5. Build a tree:
+#### Stage 1 — North Star search
 
-```
-[North Star]
-├── [sub-goal 1] — [which JD requirements serve this]
-├── [sub-goal 2] — [which JD requirements serve this]
-└── [sub-goal 3] — [which JD requirements serve this]
-```
+Read the whole JD once, holistically, before extracting individual requirements.
+
+1. Check whether the company states its core pain/problem/goal explicitly — an intro paragraph, a "why this role exists," a "what success looks like" section. Mature product companies often do this plainly; when they do, use it directly rather than re-deriving it.
+2. If no explicit statement exists: strip the JD of tools, skills, qualifications, and requirements, then ask *"What result is this company actually buying?"* — check whether the responsibilities cluster around one recognizable underlying problem even though it's never stated outright. If they do, synthesize the North Star from that cluster.
+3. **If they don't cluster around anything recognizable — conclude "not found" and stop.** This is a legitimate, expected outcome, not a search failure — common for outsourcing/staffing/agency-type postings where the work is process-shaped rather than pain-shaped. Do not force a synthetic North Star onto a JD that doesn't have one. Judge the actual text, not the company type alone — a product company usually has a real North Star, but not always, and an outsourcing/staffing posting doesn't always lack one either.
 
 **Output:**
 ```
-**North Star:** [one sentence]
-
-**Sub-goals:**
-├── [label] — [requirements that serve it]
-├── [label] — [requirements that serve it]
-└── [label] — [requirements that serve it]
+**North Star:** [role] must [action] so that [business outcome] — OR — not found: requirements only, no unifying pain identified
 ```
 
-This North Star drives everything downstream:
-- Phase 2: fit assessment maps candidate to each sub-goal branch
-- Phase 3: CV leads with the branch where candidate is strongest
-- Phase 4: cover opens by acknowledging the North Star outcome
+#### Stage 2 — Branches (only after Stage 1 has completed and produced its result)
+
+Map every major JD requirement onto a **branch** — a meaningful cluster, not one branch per bullet point. **A branch naming several distinct JD asks (e.g. "coordinate with dev, design, marketing, compliance, and support") should split into separate branches per distinct function, not stay bundled as one** — a single bundled branch can't represent that some of its parts have real candidate evidence and others don't; this was the direct cause of a real false-positive bug (a narrow, non-matching fact got pulled in to answer an entire bundled branch on the strength of one word). Decompose here, don't defer it to Phase 2.
+
+**If North Star found (Stage 1):** for EACH branch, make an explicit judgment call — not a text-position or frequency proxy — *is this branch part of the North Star's own core, unsolved responsibility, or a secondary/supporting requirement attached from elsewhere in the JD?* Mark it `central` or `secondary` directly.
+
+**If North Star not found (Stage 1):** still build the branch list (every JD still has requirements to map), but mark every branch `no North Star` instead of central/secondary — there is no core pain for a branch to be central or secondary to. Phase 2 falls back to flat importance tiers only (see `phase2_fit.md`).
+
+**Output:**
+```
+**Branches:**
+├── [label] — [central | secondary | no North Star] — [requirements that serve it]
+├── [label] — [central | secondary | no North Star] — [requirements that serve it]
+└── [label] — [central | secondary | no North Star] — [requirements that serve it]
+```
+
+This drives everything downstream:
+- Phase 2: the Signal Coverage Table is built as branch-tagged rows under this same tree, not regenerated independently — one row per distinct JD ask, tagged with its branch. Candidate-side distinctiveness is judged separately per branch there — a branch only becomes the CV's lead when it's BOTH central AND distinctive, not on centrality alone.
+- Phase 3: CV leads with the branch that wins both judgments; other central branches get covered for completeness, not led with.
+- Phase 4: cover opens by acknowledging the North Star outcome (or, when not found, the category-level ask instead).
 
 ---
 
