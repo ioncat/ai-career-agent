@@ -50,6 +50,22 @@ _FONT_CONFIG = FontConfiguration()
 
 _HR_RE = re.compile(r"<hr\s*/?>", re.IGNORECASE)
 
+# Header is always: "# Name\nHeadline\ncontacts line\n\n---". Without a blank
+# line between headline and contacts, python-markdown merges them into one
+# <p> (it only breaks paragraphs on blank lines, not single newlines), so the
+# contacts line collapses onto the headline instead of rendering on its own
+# line. Confirmed live 2026-09-24, vacancy #1704 — every CV/cover generated
+# from a header written without that blank line has this bug. Fixed here
+# defensively so it self-heals regardless of whether the source markdown
+# remembers the blank line.
+_HEADER_GAP_RE = re.compile(r"\A(# .+\n)([^\n]+)\n([^\n]+\n)")
+
+
+def _ensure_header_blank_line(markdown_text: str) -> str:
+    """Insert a blank line between the headline and contacts line under the
+    leading H1, if missing, so they render as separate paragraphs."""
+    return _HEADER_GAP_RE.sub(lambda m: f"{m.group(1)}{m.group(2)}\n\n{m.group(3)}", markdown_text, count=1)
+
 
 def _is_cover(markdown_text: str) -> bool:
     return "## " not in markdown_text
@@ -57,6 +73,7 @@ def _is_cover(markdown_text: str) -> bool:
 
 def render_to_bytes(markdown_text: str) -> bytes:
     """Render markdown CV/cover/analysis to PDF bytes. Used by FastAPI /render endpoint."""
+    markdown_text = _ensure_header_blank_line(markdown_text)
     content_html = md_lib.markdown(markdown_text, extensions=["tables", "extra"])
     font_dir_uri = FONT_DIR.as_uri()
 
