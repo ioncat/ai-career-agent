@@ -85,7 +85,7 @@ Output valid markdown exactly as shown below. Do NOT substitute `•` for `-`. D
 ## SUMMARY
 
 [2 paragraphs max. Full-arc positioning tailored to this vacancy.]
-[AI tooling paragraph — include when vacancy has AI/product/digital signal; omit if vacancy is for AI product owner]
+[AI tooling paragraph — include on every CV; omit if vacancy is for AI product owner]
 
 ---
 
@@ -134,7 +134,7 @@ Certified AI-Empowered SAFe® Product Owner/Product Manager
 - JD title = "Product Owner" → Summary opens with the combined `Product Owner / Product Manager` (e.g. "Product Owner / Product Manager with 6+ years..."). Most of the candidate's role titles default to "Product Manager" (rule 24b), so "Product Owner" alone in Summary can read as narrower/inconsistent to a reader cross-referencing LinkedIn or other applications.
 - JD title = "Product Manager" → Summary opens with `Product Manager` alone, no combined form — that's already the default term, nothing to hedge.
 
-**AI Tooling Paragraph — mandatory for all roles with any AI/product/digital signal:**
+**AI Tooling Paragraph — default on every CV, not conditional on an AI signal in the JD (a PM/PO vacancy always carries a product signal):**
 
 **Before defaulting to the 1-/2-component templates below — check PROFILE.md's `Additional Evidence` sections for a more specific block matching the JD's exact wording (named tool, specific use case).** The templates are a fallback for a generic AI signal, not the first move. Do not pattern-match "AI signal present → use 2-component form" without checking whether PROFILE.md already has a more precise evidence block for that specific signal — using the generic template when a specific one exists produces a claim the JD didn't ask for and skips the evidence the JD actually asked for. Example: a JD naming Claude Code by name is answered by the "Claude Code / AI-agent-tooling practice" evidence block, not by the generic "LLM pipelines" 2-component paragraph (that one answers a different claim — building AI systems, not using one as a daily tool). Found live 2026-09-09, vacancy #1515.
 
