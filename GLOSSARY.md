@@ -102,7 +102,7 @@
 | **Tailoring Logic** | Default emphasis driver when no branch qualified as lead: lead with the strongest experience for the axis (or two) the Role Balance Shape points to. |
 | **Elaboration-depth check** | An action named in the Adaptation Plan must get the same depth in the CV as comparable signals, not a one-line name drop. |
 | **Practice, not cases** | CV rule 23: roles describe a pattern of work, not specific case stories. Cases belong in the interview. |
-| **Voice rule** | CV rules 8 and 9: no first person, and no third-person present-tense verbs with an implied subject ("Owns", "Works"). Headline style or past tense. |
+| **Voice rule** | CV rules 8 and 9: no first person, and no third-person present-tense verbs with an implied subject ("Owns", "Works"). Headline style or past tense. A present-tense verb inside a relative clause with its own subject ("a tool that tracks X") is allowed. |
 | **Language-level rule** | CV rule 26: write at the candidate's actual English level, stated in the profile's Languages entry (for a non-native intermediate level such as B2: plain wording, no idiom the candidate could not defend in an interview). |
 | **Manufactured parallel** | An invented or forced link between a JD requirement and a profile fact, usually a shared word. A fabrication-class error; banned. |
 | **AI tooling paragraph** | The fixed one-line "AI tooling across PM workflows…" mention, a default on every CV. A two-component form with human-in-the-loop wording is for roles with real AI depth. The portfolio link appears exactly once. |
