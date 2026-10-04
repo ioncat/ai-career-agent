@@ -22,7 +22,7 @@ User will provide:
 1. **NEVER copy-paste JD phrases verbatim** — absorb meaning, rewrite in natural language
 2. **NEVER change actual job titles** — dishonest and verifiable
 3. **NEVER fabricate experience** — if it doesn't exist, don't claim it
-4. **NEVER remove a work experience entry** — every job in PROFILE.md stays in CV. Early career entries (before the cutoff year in PROFILE.md) omitted by default unless directly relevant. This includes the current/most recent role — never drop it even if it looks less relevant to the JD than an older role.
+4. **NEVER remove a work experience entry** — every job in PROFILE.md stays in CV. Early career entries (before the CV cutoff year set in the profile's Generation Rules; if none is set, roles that ended more than 10 years ago) are omitted by default unless directly relevant. This includes the current/most recent role — never drop it even if it looks less relevant to the JD than an older role.
 4b. **EXPERIENCE order is ALWAYS strict reverse-chronological — most recent role first.** Never reorder by relevance or "lead with the strongest match." If the Adaptation Plan says "lead with X," that means strengthen X's framing/word choice within its own chronological slot, not move it to the top of the list. Found live on vacancy #922: an older role was moved to the top over more recent ones, breaking the chronology candidates and recruiters both expect by default.
 5. **CV language = input language** — English input → English CV; Ukrainian input → Ukrainian CV
 6. **Do not self-apply "Senior"** unless officially held
@@ -78,13 +78,13 @@ Output valid markdown exactly as shown below. Do NOT substitute `•` for `-`. D
 ```markdown
 # [Selected Name]
 [Headline]  
-[contacts line — copy verbatim from PROFILE.md → ## Contacts]
+[contacts line — copy verbatim from the profile's Contacts line (Identity & Contact section)]
 
 ---
 
 ## SUMMARY
 
-[2 paragraphs max. Full-arc positioning tailored to this vacancy.]
+[2 paragraphs max of positioning text; the AI tooling paragraph below is in addition. Full-arc positioning tailored to this vacancy.]
 [AI tooling paragraph — include on every CV; omit if vacancy is for AI product owner]
 
 ---
@@ -105,7 +105,7 @@ Key results:
 
 ---
 
-[...repeat for all roles, reverse chronological, default cutoff 2017...]
+[...repeat for all roles, reverse chronological, applying the CV cutoff from rule 4...]
 
 ---
 
@@ -122,7 +122,7 @@ Key results:
 - `### Role Title` — H3 for each job role title
 - `Key results:` followed by **blank line**, then `- item` list (NOT `•`)
 - `---` between each job entry (rule 17)
-- Contacts: **copy verbatim** from PROFILE.md → `## Contacts` — markdown links, exact separators, all four items including portfolio. **NEVER use plain-text URLs. NEVER omit portfolio link.** Never add GitHub (rule 14).
+- Contacts: **copy verbatim** from the profile's Contacts line (Identity & Contact section) — markdown links, exact separators, all four items including portfolio. **NEVER use plain-text URLs. NEVER omit portfolio link.** Never add GitHub (rule 14).
 
 **Headline options:**
 - **Never append a narrow specialization qualifier like "(UX)" to the headline or Summary opening, even when the JD's own title uses it (confirmed 2026-08-30, vacancy #1333).** A narrow specialization is one part of product work, not a separate title or discipline the candidate claims. Headline stays plain "Product Manager" / "Product Owner"; UX signal goes into Summary/EXPERIENCE content, never into the title.

@@ -3,7 +3,7 @@
 Review the generated CV draft against the specific vacancy. Identify what doesn't fit, what's weak, and what's missing.
 The candidate's full profile is in your system context (PROFILE.md).
 
-**Output language: use the language from PROFILE.md → ## Settings → language. Default: Russian.**
+**Output language: English.** This review is appended to `JD_analysis.md`, which is written in English (project language policy). When you present it to the user in chat, summarize it in the language from the profile's Settings section (`language`).
 
 This review is shown to the user BEFORE saving the CV. It is the first time the user sees the CV output.
 

@@ -19,7 +19,7 @@ python scripts/inbox_scan.py --user-id [user_id] --json
 Read `skill/active_user` → ID → `skill/users.yaml` → name + slug. Then display **both blocks side by side — vertical split (columns), NOT a horizontal ━━━ divider**:
 
 ```
-👤 Alex Bondarenko (alex) · [режим ещё не выбран] · 📄 Markdown
+👤 Jane Doe (jane) · [режим ещё не выбран] · 📄 Markdown
 
   Профиль / Режим              │   📥 Inbox — N вакансий
   ─────────────────────────    │   ──────────────────────────────
@@ -89,8 +89,8 @@ Display:
 👥 Career Agent — пользователи
 
   ID    Name               Slug      Profile
-  1     Alex Bondarenko    alex      ✅        ← активный
-  2     Maria Beleshko     maria     ✅
+  1     Jane Doe           jane      ✅        ← активный
+  2     John Roe           john      ✅
 
 /analyze -u [id|slug]   — переключить и начать
 /analyze                — начать с активным
@@ -216,7 +216,7 @@ Answer 1–10 → routes to Block 1. Answer 11–20 → routes to Block 2. Never
 **Example output:**
 
 ```
-👤 Alex Bondarenko (alex) · Локально
+👤 Jane Doe (jane) · Локально
 
   [1] Сменить режим → API
   [2] Сменить профиль
@@ -231,7 +231,7 @@ https://djinni.co/jobs/829358-product-manager-srm
 
 Выполнено:
   ✅ Phase 1+2 — анализ (fit 7/10, rec: apply)
-  ✅ Phase 3+3.5 — CV (Alex Bondarenko, en, 0 правок)
+  ✅ Phase 3+3.5 — CV (Jane Doe, en, 0 правок)
   ✅ Phase 4 — cover (en)
 
 Что делаем?
@@ -300,7 +300,7 @@ Scan `vacancies/` directory. List folders that contain at least one eligible `.m
        JD_analysis.md  →  JD_analysis.pdf
   2. Stripe — Product Manager
        JD_analysis.md  →  JD_analysis.pdf
-       Alex_CV.md      →  Alex_CV.pdf
+       Jane_CV.md      →  Jane_CV.pdf
 
 Введи номер или часть названия.
 ```
@@ -331,8 +331,8 @@ Report result:
 📄 AlphaNova — Junior Publishing Manager
 
   ✅ JD_analysis.pdf
-  ✅ Alex_CV.pdf
-  ❌ Maria_CV.pdf — ошибка: [message]
+  ✅ Jane_CV.pdf
+  ❌ John_CV.pdf — ошибка: [message]
 ```
 
 Stop after report. Do not start pipeline.

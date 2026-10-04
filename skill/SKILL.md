@@ -33,10 +33,10 @@ Applies to both `pm` and `generic` skill_type prompt sets.
 
 ## Language Rules
 
-**Output language** (user communication + JD_analysis.md):
-1. Read `skill/users/[id]/PROFILE.md` → `## Settings` → `language` field
-2. Default if not set: `en`
-3. Apply to ALL output: user messages, analysis, internal sections — everything except CV/cover
+**Output language:**
+1. User communication in chat: the `language` field in the Settings section of `skill/users/[id]/PROFILE.md` (default `en` if not set).
+2. Analysis documents written to disk: **English**, always. That is `JD_analysis.md` and every phase block appended to it (Phase 1, 2, 2.5, 3.5, 3.6, 3.7). Project language policy: analysis output, the tracker and the Flutter UI are English-only. When a phase result is presented in chat, summarize it in the language from point 1.
+3. CV and cover follow the rules below, not this setting.
 
 - **CV language** — default = JD language (English JD → English CV, Ukrainian JD → Ukrainian CV). Final choice = user (pre-flight ask before Phase 3). User can override the default.
 - **Cover language** = same as the approved CV language.
@@ -92,7 +92,7 @@ Phase 1 + Phase 2  [run immediately on JD input, no confirmation needed]
 
 Pre-flight (ask once, before Phase 3):
   → CV language: ask only if JD ≠ English (English JD → English CV, obvious — skip)
-  → Name variant: ask only if PROFILE.md → ## Name variants has more than one entry; single variant → use automatically, no ask
+  → Name variant: ask only if the profile's Name variants section has more than one entry; single variant → use automatically, no ask
 
 Phase 3: CV Draft          [NOT shown to user — internal]
 Phase 3.5: Self-Review     [review tables + verdict shown to user; CV body NEVER pasted in chat — see rule below]
@@ -355,7 +355,7 @@ Store detected type as: `COMPANY_TYPE = enterprise | scaleup | startup | founder
 
 Load the prompt file, read it fully, then execute against the provided input.
 
-All prompt paths: `prompts/[skill_type]/phaseN.md` — read `skill_type` from active user PROFILE.md → `## Settings`.
+All prompt paths: `prompts/[skill_type]/phaseN.md` — read `skill_type` from the Settings section of the active user's PROFILE.md.
 ALL phases are skill_type-specific. No universal phase files remain in prompts/ root.
 
 | Phase | Prompt file | Input |
@@ -384,7 +384,7 @@ vacancies/
 │       └── [Role — Company]/
 │           ├── JD.md                    ← user drops here (or Claude saves from URL)
 │           ├── JD_analysis.md           ← Phase 1 + Phase 2 output (auto-save, no confirmation)
-│           ├── [Full Name]_CV.md        ← English CV — e.g. Alex Bondarenko_CV.md
+│           ├── [Full Name]_CV.md        ← English CV, named after the CV name variant, e.g. Jane Doe_CV.md
 │           ├── [Full Name]_CV_UA.md     ← Ukrainian CV (if generated)
 │           ├── [Full Name]_CV.pdf       ← generated PDF
 │           ├── [Full Name]_Cover.md     ← cover (English, no suffix)
@@ -409,7 +409,7 @@ When the user flags a vacancy (or a batch/session) as belonging to a category �
 
 **inbox_manual processed files** move to `vacancies/inbox/[user_id]/[Role — Company]/` — same standard.
 
-**JD_analysis.md — always starts with Quick Scan header:**
+**JD_analysis.md — always starts with Quick Scan header.** This is the Quick Scan block from Phase 2's output section 3, moved to the top of the file, not repeated inside the Phase 2 part. Phase 2's template also lists `Why apply` and `Why not apply`; those are stored in the DB (`p2.why_apply`, `p2.why_not_apply`) and may be left out of the file's block.
 
 ```markdown
 ## Quick Scan
@@ -477,7 +477,7 @@ Same service renders **CVs and covers** — `render_md` is cover-aware (CV heade
 
 ## Name Selection (before Phase 3)
 
-1. Read PROFILE.md → `## Name variants` section. Count entries.
+1. Read the profile's Name variants section. Count entries.
 2. **Single variant** → use automatically, no ask.
 3. **Multiple variants** → ask user to choose.
 
@@ -605,7 +605,7 @@ python scripts/vacancy_track.py update --id $VACANCY_ID --status analyzed
 
 ```bash
 python scripts/vacancy_track.py update-json --id $VACANCY_ID --phase p3 --data '{
-  "name_variant": "Alex Bondarenko",
+  "name_variant": "Jane Doe",
   "cv_language": "en|uk|ru",
   "changes_count": N
 }'
@@ -646,7 +646,7 @@ python scripts/inbox_scan.py --user-id [user_id] --json
 Read `skill/active_user` → name + slug. Display **both blocks side by side — vertical split (columns), NOT a horizontal ━━━ divider**:
 
 ```
-👤 Alex Bondarenko (alex) · [режим ещё не выбран]
+👤 Jane Doe (jane) · [режим ещё не выбран]
 
   Профиль / Режим              │   📥 Inbox — N вакансий
   ─────────────────────────    │   ──────────────────────────────
@@ -820,7 +820,7 @@ Answer 1–10 → Block 1 action. Answer 11–20 → Block 2 action. Never ambig
 ### Display format
 
 ```
-👤 Alex Bondarenko (alex) · Локально
+👤 Jane Doe (jane) · Локально
 
   [1] Сменить режим → API
   [2] Сменить профиль

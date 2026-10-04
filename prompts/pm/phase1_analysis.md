@@ -203,7 +203,7 @@ Example: `Delivery-heavy Platform/Systems PM`
 
 Compute **vacancy attractiveness** — how good this opportunity is, independent of candidate fit.
 
-**Step 1 — Read from active user PROFILE.md → `## Vacancy Preferences`:**
+**Step 1 — Read from the active user's PROFILE.md, Vacancy Preferences section:**
 - `domain_interests` list
 - `company_stage_prefs` list
 

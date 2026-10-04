@@ -65,7 +65,7 @@ The CV already contains all evidence. The cover must NOT repeat or reference spe
 
 - **Pain-first opening (founder-led / first PM roles)** — do NOT open with self-description ("I've been...", "I've spent...", "Most of my work..."). Open with THEIR situation — the transition they're navigating, the gap they need filled. The candidate appears as the answer to their pain, not as the headline. Self-lead = talking about yourself; pain-lead = talking about their problem and positioning yourself as the solution.
 
-- **Header (mandatory)** — every cover starts with the candidate header block (same as CV), then `---`, then greeting. Read from PROFILE.md → `## Contacts` section.
+- **Header (mandatory)** — every cover starts with the candidate header block (same as CV), then `---`, then greeting. Read from the profile's Contacts line (Identity & Contact section).
 ```
 # [Full Name]
 [Headline]
@@ -113,9 +113,9 @@ The CV already contains all evidence. The cover must NOT repeat or reference spe
 ```
 Dear Hiring Team,
 
-I'm Alex, a Product Manager who [category signal + strongest conceptual credential for this JD]...
+I'm [First name], a Product Manager who [category signal + strongest conceptual credential for this JD]...
 ```
-Same pattern under an informal greeting: `Hi!\n\nI'm Alex, a Product Manager who...`. Standing override of the pain-first branch below — see [[feedback_cover_open_with_self_intro]].
+Same pattern under an informal greeting: `Hi!\n\nI'm [First name], a Product Manager who...`. Standing override of the pain-first branch below.
 
 Narrative = a small story. Even 2–3 sentences (or Variant C's single sentence) must feel like the candidate speaking, not a description of a CV entry.
 
@@ -134,11 +134,11 @@ Two short paragraphs, no bullets, no header rhetoric. Paragraph 1: one sentence 
 ```
 [Greeting per company type]
 
-[1 sentence, first person: category signal + strongest conceptual credential/claim relevant to this JD — no company names, no metrics. E.g. "Я Product Manager з досвідом..." not "Product Manager з досвідом...". English: "I'm [Name], a Product Manager who..." — confirmed opener, see [[feedback_cover_open_with_self_intro]].]
+[1 sentence, first person: category signal + strongest conceptual credential/claim relevant to this JD — no company names, no metrics. E.g. "Я Product Manager з досвідом..." not "Product Manager з досвідом...". English: "I'm [Name], a Product Manager who..." — confirmed opener.]
 
 [Standard broad-invitation closing — see Rules above.]
 
-[Candidate name — full name if greeting was "Dear Hiring Team,", first name only if greeting was "Hi!", see [[feedback_cover_signoff_matches_greeting_formality]].]
+[Candidate name — full name if greeting was "Dear Hiring Team,", first name only if greeting was "Hi!".]
 ```
 
 Use Variant A (narrative) or B (bullets) instead of C only when:

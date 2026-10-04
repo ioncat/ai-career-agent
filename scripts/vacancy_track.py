@@ -215,8 +215,13 @@ def cmd_move_to_inbox(folder_name: str, user_id: int) -> None:
 
 # ── get ───────────────────────────────────────────────────────────────────────
 
-async def cmd_get(vacancy_id: int) -> None:
-    """Print vacancy record as JSON. Exits 1 with message on stderr if not found."""
+async def cmd_get(vacancy_id: int, field: str | None = None) -> None:
+    """Print vacancy record as JSON, or just one field when `field` is given.
+
+    `--field markdown_path` is for callers that need only the JD location and must not
+    see prior analysis (for example a blind validation run): the full record includes
+    the old analysis_json. Exits 1 with a message on stderr if the vacancy or field is missing.
+    """
     database.configure(_db_path())
     await database.init_db()
 
@@ -226,6 +231,13 @@ async def cmd_get(vacancy_id: int) -> None:
         sys.exit(1)
 
     data = dict(row)
+    if field is not None:
+        if field not in data:
+            print(f"ERROR: unknown field '{field}'", file=sys.stderr)
+            sys.exit(1)
+        print("" if data[field] is None else data[field])
+        return
+
     if data.get("analysis_json"):
         try:
             data["analysis_json"] = json.loads(data["analysis_json"])
@@ -313,6 +325,8 @@ def main() -> None:
     p_get = sub.add_parser("get", help="Print vacancy record as JSON by DB id")
     p_get.add_argument("--id", dest="vacancy_id", type=int, required=True,
                        help="Vacancy DB id")
+    p_get.add_argument("--field", default=None,
+                       help="Print only this column's raw value (e.g. markdown_path) instead of the full record")
 
     # delete-inbox
     p_del = sub.add_parser("delete-inbox", help="Delete raw inbox_manual folder after pipeline processing")
@@ -345,7 +359,7 @@ def main() -> None:
                 data_str=args.data,
             ))
         elif args.cmd == "get":
-            asyncio.run(cmd_get(vacancy_id=args.vacancy_id))
+            asyncio.run(cmd_get(vacancy_id=args.vacancy_id, field=args.field))
         elif args.cmd == "move-to-inbox":
             cmd_move_to_inbox(folder_name=args.folder, user_id=args.user_id)
         elif args.cmd == "delete-inbox":

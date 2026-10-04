@@ -1,4 +1,4 @@
-"""Leak lint: the engine prompts (`prompts/`) must not carry one candidate's personal data.
+"""Leak lint: the engine files (`prompts/`, `skill/SKILL.md`, `.claude/commands/`) must not carry one candidate's personal data.
 
 Facts, URLs, names and company names belong to the profile (`skill/users/*/PROFILE.md`),
 never to the working prompts. A second user would otherwise receive the first user's
@@ -33,7 +33,11 @@ _GENERIC_HEADINGS = {"independent", "personal", "cross-role", "freelance"}
 
 
 def _prompt_files() -> list[Path]:
-    return sorted(_PROMPTS.rglob("*.md"))
+    """Every file that steers the pipeline for ALL users: prompts, the skill file, slash commands."""
+    files = list(_PROMPTS.rglob("*.md"))
+    files.append(_ROOT / "skill" / "SKILL.md")
+    files.extend((_ROOT / ".claude" / "commands").glob("*.md"))
+    return sorted(f for f in files if f.exists())
 
 
 def extract_profile_entities(profile_text: str) -> dict[str, set[str]]:
@@ -49,6 +53,11 @@ def extract_profile_entities(profile_text: str) -> dict[str, set[str]]:
             nm = nm.strip()
             if 1 < len(nm.split()) <= 4:
                 entities["name"].add(nm)
+
+    for full in list(entities["name"]):
+        for part in full.split():
+            if len(part) >= 4:
+                entities["name"].add(part)
 
     exp = re.search(r"^## [A-Z]\. Experience\b.*?(?=^## |\Z)", profile_text, re.M | re.S)
     if exp:
@@ -78,7 +87,7 @@ def test_extractor_finds_name_employer_and_url():
         "[site](https://janedoe.github.io/) [mail](mailto:jane@example.com)\n"
     )
     ent = extract_profile_entities(sample)
-    assert ent["name"] == {"Jane Doe", "Janet Doe"}
+    assert ent["name"] == {"Jane Doe", "Janet Doe", "Jane", "Janet"}
     assert ent["employer"] == {"AcmeCorp", "Globex"}
     assert "janedoe.github.io" in ent["url"]
     assert "jane@example.com" in ent["url"]
