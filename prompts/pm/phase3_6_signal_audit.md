@@ -72,8 +72,8 @@ If no issues:
   list) **and the repetition check** (`detect_phrase_repetition`) against the re-saved text before
   considering it final. Added 2026-09-21: a removal can leave an awkward join or duplicate
   phrasing behind, and this file's own re-save step never re-checked for it.
-- **⚠️ only** → before presenting anything, check PROFILE.md (the same company/role's main
-  entry plus any Additional Evidence sections) for unused, honest evidence that would map that
+- **⚠️ only** → before presenting anything, check PROFILE.md (the same company/role's own
+  Experience block, including the notes under it) for unused, honest evidence that would map that
   sentence's slot to a currently weak (⚠️) or under-covered signal from the Signal Coverage
   Table. Verify each claim in a candidate rewrite word-for-word against PROFILE.md before
   using it — do not extrapolate adjacent-sounding detail that isn't literally stated there.

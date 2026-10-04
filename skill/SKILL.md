@@ -96,6 +96,11 @@ Pre-flight (ask once, before Phase 3):
 
 Phase 3: CV Draft          [NOT shown to user — internal]
 Phase 3.5: Self-Review     [review tables + verdict shown to user; CV body NEVER pasted in chat — see rule below]
+  → One command runs every mechanical check below at once (repeated terms, repeated phrases,
+    mechanical lint, JD echo, word-frequency and tools tables) with UTF-8 output, so it also works
+    on a Windows console:
+    `python scripts/cv_checks.py --cv "[path to CV draft]" --jd "[path to JD.md]"`
+    The individual calls that follow stay valid: use them to re-run a single check after an edit.
   → Before writing the review: compute Repeated Terms + Repeated Phrases against the Phase 3
     draft. Unlike the Python/API pipeline (`tools/cv_generate.py`), this local Claude Code mode
     does not auto-inject these tables — run them yourself via Bash:
@@ -263,7 +268,7 @@ Skip only when: `decline` (not worth it) OR clean `apply` with zero barriers.
 
 ### Output / persistence
 
-- **Resolved evidence → append to `skill/users/[id]/PROFILE.md`** (grows the profile; future vacancies benefit). Add under the relevant Experience/Skills entry or a `## Additional evidence` block. Factual only — never fabricated.
+- **Resolved evidence → append to `skill/users/[id]/PROFILE.md`** (grows the profile; future vacancies benefit). Add it to the Experience (or Skills) entry it belongs to: a fact about a company or role lives inside that role's own block, never in a standalone "additional evidence" section (the profile's own Maintenance Rule). Factual only — never fabricated.
 - **Per-vacancy → append an `## Phase 2.5: Objection Handling` block to `JD_analysis.md`** (resolved + genuine gaps + decision).
 - Pass resolved objections into Phase 3 context (CV must surface these counter-arguments).
 - Optional DB: store under `analysis_json` key `p2_5` (`{resolved:[...], gaps:[...]}`).

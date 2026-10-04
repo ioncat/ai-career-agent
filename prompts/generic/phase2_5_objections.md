@@ -87,7 +87,7 @@ Show a summary block after classification:
 [proceed / reconsidered — 1 sentence]
 ```
 
-**2. PROFILE.md** — append resolved evidence under `## Additional evidence` block (create if absent).
+**2. PROFILE.md** — add resolved evidence to the Experience block of the role it belongs to. A fact about a company or role lives inside that role's own block, never in a standalone "additional evidence" section elsewhere in the file.
 Factual only. Use candidate's exact wording, not a rewrite.
 
 **3. Phase 3 context** — pass resolved objections list so Phase 3 CV surfaces them explicitly as counter-arguments.
