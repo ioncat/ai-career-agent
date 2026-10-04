@@ -103,10 +103,10 @@
 | **Elaboration-depth check** | An action named in the Adaptation Plan must get the same depth in the CV as comparable signals, not a one-line name drop. |
 | **Practice, not cases** | CV rule 23: roles describe a pattern of work, not specific case stories. Cases belong in the interview. |
 | **Voice rule** | CV rules 8 and 9: no first person, and no third-person present-tense verbs with an implied subject ("Owns", "Works"). Headline style or past tense. |
-| **B2 language rule** | CV rule 26: plain English at the candidate's real B2 level, no idiom the candidate could not defend in an interview. |
+| **Language-level rule** | CV rule 26: write at the candidate's actual English level, stated in the profile's Languages entry (for a non-native intermediate level such as B2: plain wording, no idiom the candidate could not defend in an interview). |
 | **Manufactured parallel** | An invented or forced link between a JD requirement and a profile fact, usually a shared word. A fabrication-class error; banned. |
 | **AI tooling paragraph** | The fixed one-line "AI tooling across PM workflows…" mention, a default on every CV. A two-component form with human-in-the-loop wording is for roles with real AI depth. The portfolio link appears exactly once. |
-| **Mechanical lint** | `core/cv_metrics.py` checks run in Phase 3.5: `detect_mechanical_violations` (em-dash, banned phrases), `detect_repetition` and `detect_phrase_repetition`, and `detect_jd_echo`. |
+| **Mechanical lint** | `core/cv_metrics.py` checks run in Phase 3.5: `detect_mechanical_violations` (em-dash, banned phrases), `detect_repetition` and `detect_phrase_repetition`, and `detect_jd_echo`. `scripts/cv_checks.py` runs all of them (plus the frequency and tools tables) in one command. |
 | **Self-audit bias** | Measured effect: an auditor in the same conversation as the author scores the text higher than an isolated one. The reason Phase 3.7 runs in an isolated subagent. |
 
 ## 7. North Star Signal Tree

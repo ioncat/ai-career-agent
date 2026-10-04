@@ -4,6 +4,7 @@
 **Priority:** P1
 **Last updated:** 2026-07-05
 **Design doc:** `docs/discovery/progressive-profile.md` (gitignored — internal only)
+**Re-scope proposal (2026-10-04, draft, not applied):** `docs/discovery/profile-schema-v0-2026-10-04.md` (gitignored). One structured profile with atomic, rule-annotated facts would replace both `users.profile_json` and `users.progressive_profile`; tasks T-A to T-G are in its section 10. Decided so far (owner, 2026-10-04): one profile per person, JSON as the source of truth, Markdown only as a rendered view, work starts after the `prompt-audit-pm-2026-09-21` merge. The task table below stays as the record of what shipped until the proposal is approved.
 
 ---
 
