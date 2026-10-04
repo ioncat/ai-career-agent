@@ -166,7 +166,6 @@ async def run(
         parser_adapter=None,  # type: ignore[arg-type]  # cv_prefilter never touches this
         get_llm=_get_llm,
         vacancies_path=settings.vacancies_path,
-        candidate_name=settings.candidate_name,
         cv_adapter=None,  # type: ignore[arg-type]  # cv_prefilter never touches this
         user_id=user_id,
         skill_type=skill_type,

@@ -1,0 +1,10 @@
+# Registry only — routing and identification. Copy to users.yaml (gitignored) and fill in.
+# All user preferences and settings live in users/[id]/PROFILE.md.
+
+users:
+  - id: "1"
+    name: "John Doe"
+    slug: "john"
+  - id: "2"
+    name: "Jane Roe"
+    slug: "jane"

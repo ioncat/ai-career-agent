@@ -142,7 +142,6 @@ async def run_e2e(
     print(f"  AGENT_MODE  : {settings.agent_mode}")
     print(f"  PARSER_URL  : {settings.parser_url}")
     print(f"  DB_PATH     : {settings.db_path}")
-    print(f"  CANDIDATE   : {settings.candidate_name}")
     print()
 
     database.configure(settings.db_path)
@@ -205,7 +204,6 @@ async def run_e2e(
         parser_adapter=parser,
         get_llm=_fixed_llm,
         vacancies_path=settings.vacancies_path,
-        candidate_name=settings.candidate_name,
         cv_adapter=cv_adapter,
         user_id=user_id,
         skill_type=skill_type,

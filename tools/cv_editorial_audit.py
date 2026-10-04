@@ -26,7 +26,6 @@ from pydantic_ai import RunContext
 
 from core.deps import AgentDeps
 from core.llm_client import LLMError
-from core.translit import safe_filename_stem
 from db import database
 
 log = logging.getLogger(__name__)
@@ -115,7 +114,7 @@ async def cv_editorial_audit(
 
     for t in targets:
         label = _DOC_TYPES[t]
-        doc_path = _latest_doc_path(jd_path.parent, ctx.deps.candidate_name, label)
+        doc_path = _latest_doc_path(jd_path.parent, label)
         if doc_path is None:
             msg = f"⚠️ {label} не найден для вакансии #{vacancy_id} — пропускаю."
             log.warning("cv_editorial_audit: %s", msg)
@@ -182,23 +181,21 @@ def _parse_analysis_json(vacancy) -> dict:
         return {}
 
 
-def _latest_doc_path(vacancy_dir: Path, candidate_name: str, doc_type: str) -> Path | None:
-    """Find the highest-versioned {Name}_{doc_type}.md / _v2 / _v3... in the vacancy folder.
+def _latest_doc_path(vacancy_dir: Path, doc_type: str) -> Path | None:
+    """Find the highest-versioned *_{doc_type}.md / _v2 / _v3... in the vacancy folder.
 
-    doc_type: 'CV' or 'Cover'.
+    doc_type: 'CV' or 'Cover'. The name prefix is not needed: a vacancy folder holds
+    one candidate's documents, and the prefix differs by CV language (English vs Ukrainian).
     """
-    safe_name = safe_filename_stem(candidate_name)
-    base = vacancy_dir / f"{safe_name}_{doc_type}.md"
-    if not base.exists():
-        return None
-    latest = base
-    n = 2
-    while True:
-        candidate = vacancy_dir / f"{safe_name}_{doc_type}_v{n}.md"
-        if not candidate.exists():
-            return latest
-        latest = candidate
-        n += 1
+    best: tuple[int, Path] | None = None
+    for path in vacancy_dir.glob(f"*_{doc_type}*.md"):
+        m = re.fullmatch(rf".+_{doc_type}(?:_v(\d+))?\.md", path.name)
+        if not m:
+            continue
+        version = int(m.group(1) or 1)
+        if best is None or version > best[0]:
+            best = (version, path)
+    return best[1] if best else None
 
 
 def _extract_quick_scan(analysis_text: str) -> str:

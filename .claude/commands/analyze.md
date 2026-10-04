@@ -19,7 +19,7 @@ python scripts/inbox_scan.py --user-id [user_id] --json
 Read `skill/active_user` → ID → `skill/users.yaml` → name + slug. Then display **both blocks side by side — vertical split (columns), NOT a horizontal ━━━ divider**:
 
 ```
-👤 Jane Doe (jane) · [режим ещё не выбран] · 📄 Markdown
+👤 John Doe (john) · [режим ещё не выбран] · 📄 Markdown
 
   Профиль / Режим              │   📥 Inbox — N вакансий
   ─────────────────────────    │   ──────────────────────────────
@@ -89,8 +89,8 @@ Display:
 👥 Career Agent — пользователи
 
   ID    Name               Slug      Profile
-  1     Jane Doe           jane      ✅        ← активный
-  2     John Roe           john      ✅
+  1     John Doe           john      ✅        ← активный
+  2     Jane Roe           jane      ✅
 
 /analyze -u [id|slug]   — переключить и начать
 /analyze                — начать с активным
@@ -216,7 +216,7 @@ Answer 1–10 → routes to Block 1. Answer 11–20 → routes to Block 2. Never
 **Example output:**
 
 ```
-👤 Jane Doe (jane) · Локально
+👤 John Doe (john) · Локально
 
   [1] Сменить режим → API
   [2] Сменить профиль
@@ -231,7 +231,7 @@ https://djinni.co/jobs/829358-product-manager-srm
 
 Выполнено:
   ✅ Phase 1+2 — анализ (fit 7/10, rec: apply)
-  ✅ Phase 3+3.5 — CV (Jane Doe, en, 0 правок)
+  ✅ Phase 3+3.5 — CV (John Doe, en, 0 правок)
   ✅ Phase 4 — cover (en)
 
 Что делаем?
@@ -300,7 +300,7 @@ Scan `vacancies/` directory. List folders that contain at least one eligible `.m
        JD_analysis.md  →  JD_analysis.pdf
   2. Stripe — Product Manager
        JD_analysis.md  →  JD_analysis.pdf
-       Jane_CV.md      →  Jane_CV.pdf
+       John_CV.md      →  John_CV.pdf
 
 Введи номер или часть названия.
 ```
@@ -331,7 +331,7 @@ Report result:
 📄 AlphaNova — Junior Publishing Manager
 
   ✅ JD_analysis.pdf
-  ✅ Jane_CV.pdf
+  ✅ John_CV.pdf
   ❌ John_CV.pdf — ошибка: [message]
 ```
 
@@ -422,7 +422,7 @@ python scripts/inbox_scan.py --user-id [user_id] --json
 ## Adding a New User
 
 1. Create `skill/users/[id]/PROFILE.md` — fill with candidate profile.
-2. Add entry to `skill/users.yaml`:
+2. Add entry to `skill/users.yaml` (gitignored; on a fresh clone copy `skill/users.example.yaml` first):
    ```yaml
    - id: "003"
      name: "Full Name"

@@ -384,7 +384,7 @@ vacancies/
 │       └── [Role — Company]/
 │           ├── JD.md                    ← user drops here (or Claude saves from URL)
 │           ├── JD_analysis.md           ← Phase 1 + Phase 2 output (auto-save, no confirmation)
-│           ├── [Full Name]_CV.md        ← English CV, named after the CV name variant, e.g. Jane Doe_CV.md
+│           ├── [Full Name]_CV.md        ← English CV, named after the CV name variant, e.g. John Doe_CV.md
 │           ├── [Full Name]_CV_UA.md     ← Ukrainian CV (if generated)
 │           ├── [Full Name]_CV.pdf       ← generated PDF
 │           ├── [Full Name]_Cover.md     ← cover (English, no suffix)
@@ -605,7 +605,7 @@ python scripts/vacancy_track.py update --id $VACANCY_ID --status analyzed
 
 ```bash
 python scripts/vacancy_track.py update-json --id $VACANCY_ID --phase p3 --data '{
-  "name_variant": "Jane Doe",
+  "name_variant": "John Doe",
   "cv_language": "en|uk|ru",
   "changes_count": N
 }'
@@ -646,7 +646,7 @@ python scripts/inbox_scan.py --user-id [user_id] --json
 Read `skill/active_user` → name + slug. Display **both blocks side by side — vertical split (columns), NOT a horizontal ━━━ divider**:
 
 ```
-👤 Jane Doe (jane) · [режим ещё не выбран]
+👤 John Doe (john) · [режим ещё не выбран]
 
   Профиль / Режим              │   📥 Inbox — N вакансий
   ─────────────────────────    │   ──────────────────────────────
@@ -820,7 +820,7 @@ Answer 1–10 → Block 1 action. Answer 11–20 → Block 2 action. Never ambig
 ### Display format
 
 ```
-👤 Jane Doe (jane) · Локально
+👤 John Doe (john) · Локально
 
   [1] Сменить режим → API
   [2] Сменить профиль

@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from adapters.cv_adapter import CVAdapter, CVAdapterError
+from contracts.profile import CandidateProfile
 from core.llm_client import LLMError
 from tools.cv_generate import _next_version_path, _split_review_and_cv, cv_generate
 
@@ -57,8 +58,7 @@ def _make_ctx(tmp_path: Path, llm=None, cv_adapter=None) -> MagicMock:
     ctx = MagicMock()
     ctx.deps.get_llm = AsyncMock(return_value=llm or _make_llm())
     ctx.deps.cv_adapter = cv_adapter or _make_cv_adapter()
-    ctx.deps.candidate_name = "Oleksii_Bondarenko"
-    ctx.deps.candidate_name_uk = "Олексій_Бондаренко"
+    ctx.deps.profile = CandidateProfile(name_en="Oleksii_Bondarenko", name_uk="Олексій_Бондаренко")
     ctx.deps.vacancies_path = tmp_path / "vacancies"
     ctx.deps.skill_type = "pm"
     ctx.deps.user_id = 1
@@ -284,8 +284,7 @@ async def test_generate_english_uses_candidate_name(tmp_path):
     vacancy_row = _make_vacancy_row(jd_path)
     llm = _make_llm(side_effect=[_PHASE3_DRAFT, _PHASE35_SAMPLE])
     ctx = _make_ctx(tmp_path, llm)
-    ctx.deps.candidate_name = "Alex Bondarenko"
-    ctx.deps.candidate_name_uk = "Олексій Бондаренко"
+    ctx.deps.profile = CandidateProfile(name_en="Alex Bondarenko", name_uk="Олексій Бондаренко")
     mock_db = _mock_db(vacancy_row=vacancy_row)
 
     with patch("tools.cv_generate.database", mock_db):
@@ -302,8 +301,7 @@ async def test_generate_ukrainian_uses_candidate_name_uk(tmp_path):
     vacancy_row = _make_vacancy_row(jd_path)
     llm = _make_llm(side_effect=[_PHASE3_DRAFT, _PHASE35_SAMPLE])
     ctx = _make_ctx(tmp_path, llm)
-    ctx.deps.candidate_name = "Alex Bondarenko"
-    ctx.deps.candidate_name_uk = "Олексій Бондаренко"
+    ctx.deps.profile = CandidateProfile(name_en="Alex Bondarenko", name_uk="Олексій Бондаренко")
     mock_db = _mock_db(vacancy_row=vacancy_row)
 
     with patch("tools.cv_generate.database", mock_db):
@@ -326,8 +324,7 @@ async def test_generate_auto_detected_ukrainian_uses_candidate_name_uk(tmp_path)
     vacancy_row = _make_vacancy_row(jd_path)
     llm = _make_llm(side_effect=[_PHASE3_DRAFT, _PHASE35_SAMPLE])
     ctx = _make_ctx(tmp_path, llm)
-    ctx.deps.candidate_name = "Alex Bondarenko"
-    ctx.deps.candidate_name_uk = "Олексій Бондаренко"
+    ctx.deps.profile = CandidateProfile(name_en="Alex Bondarenko", name_uk="Олексій Бондаренко")
     mock_db = _mock_db(vacancy_row=vacancy_row)
 
     with patch("tools.cv_generate.database", mock_db):
@@ -358,8 +355,7 @@ async def test_generate_auto_detected_english_ignores_dou_cyrillic_metadata(tmp_
     vacancy_row = _make_vacancy_row(jd_path)
     llm = _make_llm(side_effect=[_PHASE3_DRAFT, _PHASE35_SAMPLE])
     ctx = _make_ctx(tmp_path, llm)
-    ctx.deps.candidate_name = "Alex Bondarenko"
-    ctx.deps.candidate_name_uk = "Олексій Бондаренко"
+    ctx.deps.profile = CandidateProfile(name_en="Alex Bondarenko", name_uk="Олексій Бондаренко")
     mock_db = _mock_db(vacancy_row=vacancy_row)
 
     with patch("tools.cv_generate.database", mock_db):

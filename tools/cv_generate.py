@@ -43,6 +43,7 @@ from core.cv_metrics import (
     scan_tools,
     top_n_words,
 )
+from core.candidate_name import resolve_candidate_name
 from core.deps import AgentDeps
 from core.llm_client import LLMError
 from core.translit import safe_filename_stem
@@ -133,14 +134,10 @@ async def cv_generate(
 
     # Candidate name follows CV language — PROFILE.md's own rule (English →
     # informal default, no asking; Ukrainian → Ukrainian-spelling variant).
-    # Previously a single static candidate_name was used unconditionally
-    # regardless of language, injected straight into the Phase 3 prompt as a
-    # hard instruction — the LLM never got a chance to apply the profile's
-    # own default-name rule. Found live 2026-07-27 (vacancy #844, English JD,
-    # wrong formal-variant name used).
-    candidate_display_name = (
-        ctx.deps.candidate_name_uk if language == "Ukrainian" else ctx.deps.candidate_name
-    )
+    # Read per user from the profile ("Name variants"), falling back to users.name;
+    # never from process-wide settings (found live 2026-07-27, vacancy #844: one
+    # static name was used regardless of language; the per-user move followed).
+    candidate_display_name = await resolve_candidate_name(ctx.deps, language)
 
     # ── Load progressive_profile evidence (EPIC-24 T6) ───────────────────────
     _pp_evidence: str | None = None

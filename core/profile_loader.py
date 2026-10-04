@@ -26,6 +26,7 @@ def parse_profile_md(text: str) -> CandidateProfile:
     return CandidateProfile(
         skill_type=_setting(text, "skill_type") or "pm",
         language=_setting(text, "language") or "ru",
+        **_name_variants(text),
         **_vacancy_prefs(text),
     )
 
@@ -50,6 +51,33 @@ def _setting(text: str, key: str) -> str | None:
     for match in re.finditer(rf"^{re.escape(key)}:\s*(\S+)", m.group(1), re.MULTILINE):
         return match.group(1)
     return None
+
+
+def _name_variants(text: str) -> dict:
+    """Return {name_en, name_uk} from the `### Name variants` section.
+
+    Expected layout: an `**English CV:**` bullet list (the one marked DEFAULT wins,
+    else the first) and a `**Ukrainian CV:**` list (first bullet). Bullet text is
+    `- **Name** — note`; only the bold name is taken. Missing parts stay empty.
+    """
+    m = re.search(r"^#{2,3}\s+Name variants\b(.+?)(?=\n#{2,3}\s|\n---|\Z)", text, re.DOTALL | re.MULTILINE)
+    if not m:
+        return {}
+    en_names, uk_names, target = [], [], None
+    for line in m.group(1).splitlines():
+        low = line.lower()
+        if low.startswith("**english cv"):
+            target = en_names
+        elif low.startswith("**ukrainian cv"):
+            target = uk_names
+        elif target is not None and (b := re.match(r"\s*-\s*\*\*(.+?)\*\*(.*)", line)):
+            target.append((b.group(1).strip(), "default" in b.group(2).lower()))
+    return {"name_en": _preferred(en_names), "name_uk": _preferred(uk_names)}
+
+
+def _preferred(names: list[tuple[str, bool]]) -> str:
+    """The name flagged DEFAULT, else the first listed, else ''."""
+    return next((n for n, is_default in names if is_default), names[0][0] if names else "")
 
 
 def _vacancy_prefs(text: str) -> dict:

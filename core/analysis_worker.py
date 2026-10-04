@@ -100,7 +100,6 @@ class AnalysisWorker:
                     parser_adapter=self._deps.parser_adapter,
                     get_llm=self._fresh_llm,  # type: ignore[arg-type]
                     vacancies_path=self._deps.vacancies_path,
-                    candidate_name=self._deps.candidate_name,
                     cv_adapter=self._deps.cv_adapter,
                     user_id=self._deps.user_id,
                     skill_type=self._deps.skill_type,

@@ -81,13 +81,13 @@ def extract_profile_entities(profile_text: str) -> dict[str, set[str]]:
 
 def test_extractor_finds_name_employer_and_url():
     sample = (
-        "# Jane Doe — Profile\n\n### Name variants\n\n**English CV:**\n- **Janet Doe** — informal\n\n"
+        "# John Doe — Profile\n\n### Name variants\n\n**English CV:**\n- **Johnny Doe** — informal\n\n"
         "## D. Experience\n\n### Independent / Project-based\ntext\n\n"
         "### AcmeCorp\ntext\n\n### Globex.com — Product Manager\ntext\n\n## E. Skills\n"
         "[site](https://janedoe.github.io/) [mail](mailto:jane@example.com)\n"
     )
     ent = extract_profile_entities(sample)
-    assert ent["name"] == {"Jane Doe", "Janet Doe", "Jane", "Janet"}
+    assert ent["name"] == {"John Doe", "Johnny Doe", "John", "Johnny"}
     assert ent["employer"] == {"AcmeCorp", "Globex"}
     assert "janedoe.github.io" in ent["url"]
     assert "jane@example.com" in ent["url"]
