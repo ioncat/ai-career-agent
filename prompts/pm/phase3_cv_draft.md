@@ -23,7 +23,7 @@ User will provide:
 2. **NEVER change actual job titles** — dishonest and verifiable
 3. **NEVER fabricate experience** — if it doesn't exist, don't claim it
 4. **NEVER remove a work experience entry** — every job in PROFILE.md stays in CV. Early career entries (before the cutoff year in PROFILE.md) omitted by default unless directly relevant. This includes the current/most recent role — never drop it even if it looks less relevant to the JD than an older role.
-4b. **EXPERIENCE order is ALWAYS strict reverse-chronological — most recent role first.** Never reorder by relevance or "lead with the strongest match." If the Adaptation Plan says "lead with X," that means strengthen X's framing/word choice within its own chronological slot, not move it to the top of the list. Found live on vacancy #922: HostiServer PO (2018–2021) was moved to the top over InsulaLabs/Marketplace (2022–2025), breaking chronology candidates and recruiters both expect by default.
+4b. **EXPERIENCE order is ALWAYS strict reverse-chronological — most recent role first.** Never reorder by relevance or "lead with the strongest match." If the Adaptation Plan says "lead with X," that means strengthen X's framing/word choice within its own chronological slot, not move it to the top of the list. Found live on vacancy #922: an older role was moved to the top over more recent ones, breaking the chronology candidates and recruiters both expect by default.
 5. **CV language = input language** — English input → English CV; Ukrainian input → Ukrainian CV
 6. **Do not self-apply "Senior"** unless officially held
 7. **Avoid AI clichés** — "AI-Native", "AI-Driven mindset" etc.
@@ -42,16 +42,16 @@ User will provide:
 17. **Domain context (e.g. iGaming, fintech, e-commerce) — include only if JD is from that domain.** Never volunteer domain in a generic or unrelated vacancy.
 18. **Add `---` separator between each job entry** for visual spacing in PDF output.
 19. **NEVER use plural forms for things built or owned: no "systems", "portals", "platforms".** Name individual items specifically (singular each), or use "product" / "product suite" as a collective. Exception: "products" is allowed only when referring to multiple distinct products in context.
-20. **CERTIFICATIONS: include only "Certified AI-Empowered SAFe® Product Owner/Product Manager" by default.** Add others only when directly relevant to the specific vacancy.
+20. **CERTIFICATIONS: include only the certification(s) the profile marks as the default on every CV (its Certifications section).** Add others only when directly relevant to the specific vacancy.
 20b. **Key results block is mandatory for EVERY role in EXPERIENCE, including the most recent/current one.** Do not skip it for roles that read as execution-only or too short/new to have metrics. Check PROFILE.md's whole entry for that company, including every note under it, before concluding there is genuinely no outcome evidence — that is the only valid reason to omit it for a given role. Found missing live on two roles in one CV (vacancy #1494, 2026-09-07): the current role and a 5-month execution role that had a KPI figure sitting directly in PROFILE.md's Experience section, unused.
 21. **NPS/CSAT — always include in Key Results by default when the evidence exists.** Product metrics are asked for in most JDs (explicitly or implicitly) — default to keeping NPS/CSAT alongside other Key Results; removing later is easy if a specific vacancy truly has no use for them.
 22. **Every sentence must earn its place.** After drafting each role paragraph, check every sentence against the Signal Coverage Table. Ask: does this deliver value in the context of this JD's requirements, or lead the recruiter in the wrong direction? If a sentence maps to no JD signal (high/medium/low) — cut it. Factual ≠ relevant. (Phase 3.6 will audit the saved CV — but the draft should already pass this check.) NPS/CSAT are valid product-metrics evidence regardless of role type (per rule 21, default = keep) — combine with error reduction %, automation %, delivery velocity rather than replacing them, especially when the JD explicitly asks for "experience with product metrics and analytics."
 23. **CV describes practice, NOT cases.** Role descriptions state what the candidate did as a pattern (approach, method, ongoing responsibility). Specific examples, named projects, and case-study evidence belong in the interview, not the CV. Wrong: "identified an off-hours revenue gap and built an automated flow". Right: "applied gap analysis to identify process discrepancies and defined requirements to close them." The CV proves breadth of practice; the interview proves depth with specifics.
-24. **Years of experience — count ONLY "Product Manager"/"Product Owner"-titled roles (both count equally, per 2026-08-13 decision — see profile note below rule 24b).** Default summary = "Product Manager with 6+ years…" (or "Product Owner", matched to whichever title this specific CV uses — see rule 24b). PM/PO-titled roles as of 2026-08: Independent/Project-based (Aug 2025–Present, ~11m) + InsulaLabs (5m) + Marketplace (14m) + HostiServer (46m) = ~76m ≈ 6+ years. "Project Manager" title (HostiServer 2015–2017) ≠ product years — never fold it in. Recompute only if a new PM/PO-titled role is added.
+24. **Years of experience — count ONLY roles titled "Product Manager" or "Product Owner" (both count equally).** Default summary = "Product Manager with N+ years…" (or "Product Owner", matched to whichever title this specific CV uses — see rule 24b), with N computed from the role dates in the profile (sum the months of those roles, "Present" counts up to today) and rounded down. A role with any other title (e.g. "Project Manager") is not product experience — never fold it in, unless the profile explicitly says otherwise. Recompute whenever the profile gains a role or time passes.
 
-24b. **Title choice (Product Manager vs Product Owner) is JD-driven, not fixed.** As of 2026-08-13, all profile role titles use "Product Manager" except InsulaLabs (stays "Product Owner" — literal title held there). Treat the two terms as interchangeable in principle: some companies/recruiters/ATS filters screen strictly on one term over the other. Default to whichever term the target JD's own role title uses (JD says "Product Manager" → CV role titles say "Product Manager"; JD says "Product Owner" → CV role titles say "Product Owner"), keeping InsulaLabs as "Product Owner" regardless (that one is fixed, not JD-driven). If the JD uses a different or ambiguous term, default to "Product Manager" (the current profile default). This does not change what work was actually done — only the title label applied to it.
+24b. **Title choice (Product Manager vs Product Owner) is JD-driven by default.** Treat the two terms as interchangeable in principle: some companies/recruiters/ATS filters screen strictly on one term over the other. Default to whichever term the target JD's own role title uses (JD says "Product Manager" → CV role titles say "Product Manager"; JD says "Product Owner" → CV role titles say "Product Owner"). **Exception: a role whose profile entry marks its title as fixed (the literal title held there) always keeps that title, regardless of the JD.** If the JD uses a different or ambiguous term, default to the profile's own default term. This does not change what work was actually done — only the title label applied to it.
 25. **NEVER use em-dashes (—).** Use a period, comma, colon, or parentheses instead. A chained em-dash pair inside one sentence (a mid-sentence parenthetical insert) is a strong, well-known AI-writing tell — rewrite as two sentences or a parenthetical instead of reaching for a dash.
-26. **Write at B2 English level — plain, direct vocabulary and sentence structure, no idiom.** Candidate's actual English level is B2 (per PROFILE.md → Settings). Avoid idiomatic/literary phrasing that signals native-level fluency — "safety net", "closing the loop", "ends up owning", "no stone unturned", chained metaphors, or any turn of phrase a B2 speaker wouldn't naturally produce or confidently defend if asked about it in an interview. Prefer short, direct sentences over subordinate-clause-heavy constructions. This is a per-sentence check, not a pass over only the "fancy-sounding" lines — the flagged phrasing is often introduced unconsciously mid-sentence (found recurring across multiple CVs/covers, e.g. vacancy #1169).
+26. **Write at the candidate's actual English level — plain, direct vocabulary and sentence structure, no idiom.** The level is stated in the profile's Languages entry. For a non-native intermediate level (B2 and similar), avoid idiomatic/literary phrasing that signals native-level fluency — "safety net", "closing the loop", "ends up owning", "no stone unturned", chained metaphors, or any turn of phrase the candidate wouldn't naturally produce or confidently defend if asked about it in an interview. Prefer short, direct sentences over subordinate-clause-heavy constructions. This is a per-sentence check, not a pass over only the "fancy-sounding" lines — the flagged phrasing is often introduced unconsciously mid-sentence (found recurring across multiple CVs/covers, e.g. vacancy #1169).
 
 ---
 
@@ -101,7 +101,7 @@ Key results:
 - [Metric/outcome]
 - [Metric/outcome]
 
-**Multi-role at same company (e.g. HostiServer PO + PM):** each role gets its own `### Role Title` + `Company | Dates` line independently. NEVER create a parent company block (e.g. `### HostiServer · 6 years`) above two roles — it breaks PDF layout. Both roles follow the same flat pattern.
+**Multi-role at same company (e.g. a PO role followed by a PM role):** each role gets its own `### Role Title` + `Company | Dates` line independently. NEVER create a parent company block (e.g. `### Company · 6 years`) above two roles — it breaks PDF layout. Both roles follow the same flat pattern.
 
 ---
 
@@ -111,7 +111,7 @@ Key results:
 
 ## CERTIFICATIONS
 
-Certified AI-Empowered SAFe® Product Owner/Product Manager
+[the profile's default certification(s)]
 [Add AI certs only if vacancy explicitly focuses on AI product ownership]
 ```
 
@@ -125,8 +125,8 @@ Certified AI-Empowered SAFe® Product Owner/Product Manager
 - Contacts: **copy verbatim** from PROFILE.md → `## Contacts` — markdown links, exact separators, all four items including portfolio. **NEVER use plain-text URLs. NEVER omit portfolio link.** Never add GitHub (rule 14).
 
 **Headline options:**
-- **Never append a narrow specialization qualifier like "(UX)" to the headline or Summary opening, even when the JD's own title uses it (confirmed 2026-08-30, vacancy #1333).** Candidate is explicit: he is not a UX specialist — UX is one part of Product work, not a separate title/discipline he claims. Headline stays plain "Product Manager" / "Product Owner"; UX signal goes into Summary/EXPERIENCE content, never into the title.
-- **Headline always tracks the JD's own term.** JD says "Product Manager" → headline is `Product Manager`. JD says "Product Owner" → headline is `Product Owner`. This applies regardless of what any individual role's title in EXPERIENCE says (e.g. InsulaLabs is contractually fixed as "Product Owner" per rule 24b — that does NOT pull the headline toward a combined "Product Manager / Product Owner"). Confirmed 2026-08-25 (vacancy #1235).
+- **Never append a narrow specialization qualifier like "(UX)" to the headline or Summary opening, even when the JD's own title uses it (confirmed 2026-08-30, vacancy #1333).** A narrow specialization is one part of product work, not a separate title or discipline the candidate claims. Headline stays plain "Product Manager" / "Product Owner"; UX signal goes into Summary/EXPERIENCE content, never into the title.
+- **Headline always tracks the JD's own term.** JD says "Product Manager" → headline is `Product Manager`. JD says "Product Owner" → headline is `Product Owner`. This applies regardless of what any individual role's title in EXPERIENCE says (e.g. a role whose title is fixed per rule 24b does NOT pull the headline toward a combined "Product Manager / Product Owner"). Confirmed 2026-08-25 (vacancy #1235).
 - If the JD itself uses both terms interchangeably or is ambiguous → combined `Product Manager / Product Owner` is the fallback default.
 - Adjust only if role archetype strongly differs (e.g. `Technical Program Manager`)
 
@@ -138,24 +138,14 @@ Certified AI-Empowered SAFe® Product Owner/Product Manager
 
 **Before defaulting to the 1-/2-component templates below — check the profile (role blocks under Experience, the notes under them, and any dedicated project or practice description) for a more specific block matching the JD's exact wording (named tool, specific use case).** The templates are a fallback for a generic AI signal, not the first move. Do not pattern-match "AI signal present → use 2-component form" without checking whether the profile already has a more precise evidence block for that specific signal — using the generic template when a specific one exists produces a claim the JD didn't ask for and skips the evidence the JD actually asked for. A JD that names a specific tool is answered by the profile's block about using that tool, not by the generic "building LLM pipelines" paragraph, which answers a different claim. Found live 2026-09-09, vacancy #1515.
 
-**GOLDEN STANDARD (locked, confirmed 2026-09-07, vacancy #1494) — the "AI tooling across PM workflows" line is fixed text, used verbatim every time, never trimmed or reworded per vacancy:**
-> `AI tooling across PM workflows (Claude, ChatGPT, Gemini): research synthesis, user feedback analysis, requirements refinement, technical/API spec review, workflow validation, prototype creation.`
+**The wording of this paragraph belongs to the profile, not to this file.** Use the profile's AI Tooling Paragraph section (Generation Rules) verbatim, in the matching form:
+- **1-component** (most roles, daily practice only): the profile's golden line, with the portfolio link appended to it.
+- **2-component** (AI/technical depth roles: explicit AI product ownership, LLM/technical PM, hands-on AI signal required): the profile's two-paragraph form, the pipeline-building paragraph first and the golden line standalone after it. Use the named term the profile uses (for example "human-in-the-loop"), not a paraphrase: a paraphrase reads as guessing at the concept.
+- **Development/Analysis split** and language-specific forms (for example Ukrainian): as defined in the profile, only under the conditions the profile states.
 
-1-component (most roles — daily practice only) — the golden line above, plus the portfolio link appended to it:
-> `AI tooling across PM workflows (Claude, ChatGPT, Gemini): research synthesis, user feedback analysis, requirements refinement, technical/API spec review, workflow validation, prototype creation. Personal projects: [ioncat.github.io](https://ioncat.github.io/).`
+The golden line is fixed text, used verbatim every time, never trimmed or reworded per vacancy. The portfolio link (taken from the profile's Contacts block) appears exactly once in the AI paragraph. **If the profile has no AI Tooling Paragraph section, omit the paragraph instead of inventing wording.**
 
-2-component (AI/technical depth roles — explicit AI product ownership, LLM/technical PM, hands-on AI signal required):
-
-**Revised (locked, confirmed 2026-09-21, vacancy #1577) — includes the "human-in-the-loop" clause. Use the named term itself, not a paraphrase — it signals fluency with the concept, a paraphrase reads as guessing at it. This is the default 2-component first paragraph, not conditional on a JD naming a human-gate/AI-governance requirement explicitly.**
-> `Built LLM pipelines hands-on in personal projects: prompt architecture, context window management, response quality assessment, and human-in-the-loop review gates for AI output. That hands-on depth carries into writing AI-related requirements and specs detailed enough for an engineering team to build from. Personal projects: [ioncat.github.io](https://ioncat.github.io/).`
-> `AI tooling across PM workflows (Claude, ChatGPT, Gemini): research synthesis, user feedback analysis, requirements refinement, technical/API spec review, workflow validation, prototype creation.` *(the golden line, standalone — no portfolio link here, it already appeared in the paragraph above)*
-
-**Banned wording — never use, even though it appears in older CVs:**
-- "...for engineers to ship from" (or equivalent literal handoff phrasing) about the personal projects — these are solo projects, no engineers were involved; a literal handoff claim is a logical contradiction. Use "that hands-on depth carries into writing AI-related requirements and specs detailed enough for an engineering team to build from" instead.
-- "Active daily practice, not a side project" (or equivalent) — implies commercial/professional context that doesn't exist; delete permanently.
-- "portfolio" for the GitHub examples — use "personal projects" instead.
-
-**⚠️ Portfolio link is MANDATORY in the AI paragraph — always include `[ioncat.github.io](https://ioncat.github.io/)` at the end, exactly once (1-component: appended to the golden line; 2-component: appended to the LLM-pipelines paragraph, not repeated on the golden line).**
+**Personal projects stay anchored as personal.** Never describe them in a way that implies commercial or professional context, never imply other engineers were involved in solo work, and never call the code examples a "portfolio" (use "personal projects"). The profile lists any additional banned wordings for this paragraph; they apply as written.
 
 ---
 
@@ -172,7 +162,7 @@ Three separate mechanisms below all decide "what to lead with." Found live on va
 
 ## Primary Asset vs. Supporting Roles
 
-Before drafting, identify which 1–2 roles are the **primary asset** for this vacancy — the roles most directly matching the core JD requirement (e.g., for a CRM PM role → HostiServer; for a marketplace discovery role → Marketplace).
+Before drafting, identify which 1–2 roles are the **primary asset** for this vacancy — the roles most directly matching the core JD requirement (e.g., for a CRM-focused role → the role where CRM experience was built; for a marketplace discovery role → the role that owned marketplace discovery).
 
 For the primary asset role(s): lead with the vocabulary, metrics, and framing that directly match the JD's main requirement.
 
@@ -206,7 +196,7 @@ Emphasis = adjust language and which Key Results to surface first. Not deleting 
 
 `JD_analysis.md` contains `## Adaptation Plan` from Phase 2. Implement ALL listed actions in this draft.
 
-**Elaboration-depth check (added 2026-09-21, vacancy #1577) — "implement the action" means giving it the same level of process detail as comparable signals elsewhere in the same CV, not a passing one-line mention.** If an Adaptation Plan action names a specific piece of evidence (a named system, a named process, a specific case) as the answer to a signal, and a comparable signal elsewhere in the same draft gets a full paragraph (what was owned, how it worked, what the candidate's role in it was) — the flagged evidence needs the same treatment, not a generic single clause tacked onto an unrelated sentence. A one-line mention that doesn't actually explain what the candidate did with that evidence does not satisfy "implement the action," even though it technically name-drops the right words. Found live 2026-09-21 on vacancy #1577: the Adaptation Plan named HostiServer's self-built-CMS/multilingual-content case as real evidence for the JD's localization signal, but the first Phase 3 draft reduced it to one generic clause while a directly comparable signal (Marketplace's own localization ownership) got a full, detailed paragraph in the same draft — the user caught the imbalance immediately ("почему ты отработал его в Marketplace, а самый главный asset... пропускаешь?").
+**Elaboration-depth check (added 2026-09-21, vacancy #1577) — "implement the action" means giving it the same level of process detail as comparable signals elsewhere in the same CV, not a passing one-line mention.** If an Adaptation Plan action names a specific piece of evidence (a named system, a named process, a specific case) as the answer to a signal, and a comparable signal elsewhere in the same draft gets a full paragraph (what was owned, how it worked, what the candidate's role in it was) — the flagged evidence needs the same treatment, not a generic single clause tacked onto an unrelated sentence. A one-line mention that doesn't actually explain what the candidate did with that evidence does not satisfy "implement the action," even though it technically name-drops the right words. Found live 2026-09-21 on vacancy #1577: the Adaptation Plan named one role's content-management case as real evidence for the JD's localization signal, but the first Phase 3 draft reduced it to one generic clause while a directly comparable signal in another role got a full, detailed paragraph in the same draft — the user caught the imbalance immediately.
 
 **Archetype mismatch handling** (if flagged in Phase 2 Key Barriers or Adaptation Plan):
 - JD wants Founder Proxy → lead with strongest 0→1 ownership evidence from PROFILE.md (co-founder story, product built from scratch); reframe execution roles with "built from scratch" narrative; downplay coordinator/delivery framing
