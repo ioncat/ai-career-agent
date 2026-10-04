@@ -29,7 +29,7 @@
 
 ### 🟡 P2 — Follow-ups from the 2026-10-04 North Star validation runs (found, not started)
 **What:** small defects the four validation runs surfaced; none blocks anything.
-- `phase2_fit.md` (1), `phase3_cv_draft.md` (2), `phase3_6_signal_audit.md` (1) still tell the model to check PROFILE.md's "Additional Evidence" sections, which no longer exist after the 2026-09-23 restructure (evidence now lives inside each role block). Reword.
+- `phase2_fit.md` (1), `phase3_cv_draft.md` (2), `phase3_6_signal_audit.md` (1) still tell the model to check PROFILE.md's "Additional Evidence" sections, which no longer exist after the 2026-09-23 restructure (evidence now lives inside each role block). Reword. Same stale reference in `skill/SKILL.md` Phase 2.5 ("append to PROFILE.md ... `## Additional evidence` block").
 - Dedup marked #1720 as a duplicate of #1713, but by the agents' reports they are different roles (same company and title, different JD content). Check the dedup rule (EPIC-26).
 - `core/cv_metrics.py` table output needs `PYTHONIOENCODING=utf-8` on Windows (emoji). Reconfigure stdout or document it.
 - Phase 3.5 "output language = PROFILE language" produced a Russian review in one run and English in others, against the English-only analysis policy. Decide.
