@@ -1,6 +1,6 @@
 # career-agent — Backlog
 
-> Last updated: 2026-09-23
+> Last updated: 2026-10-04
 > Rules: [documentation-conventions.md](documentation-conventions.md) · History: [CHANGELOG.md](CHANGELOG.md) · Specs: [Epics/](Epics/)
 
 **Priority legend:**
@@ -27,11 +27,14 @@
 ### ✅ Delivered 2026-09-21 — `phase2_fit.md` headline Fit Score/Key Barriers contradicting its own deeper analysis (found 2026-09-07, vacancy #1494)
 **What:** the four output sections used to generate Quick Scan (headline Fit Score/Key Barriers) before Internal Analysis (the deepest evidence matching) — confirmed still live during the 2026-09-21 prompt audit, then fixed: Output Sections reordered so Internal Analysis and Fit Breakdown generate first, Quick Scan is now an explicit derived summary. Also fixed in the same edit: Fit Breakdown now scores domain-fit/method-fit separately for combined requirements; Fit×VScore matrix notation clarified for fractional scores. See [prompt-audit-pm-2026-09-21.md](../discovery/prompt-audit-pm-2026-09-21.md) and CHANGELOG → 2026-09-21.
 
-### 🟠 P1 — North Star Signal Tree: trunk/branch weighting + candidate-differentiation check (design captured 2026-09-21, not started)
-**What:** vacancy #1577's live CV/cover session surfaced 6 corrections tracing to 3 root causes: (A) Signal Coverage Table bundles multiple distinct JD-named functions into one under-decomposed row, causing false-positive evidence matches; (B) Phase 2.5-resolved signals don't get re-prioritized in the Adaptation Plan's fixed action order, causing strong differentiators to stay buried; (C) a separate, already-written PROFILE.md `Additional Evidence` retrieval rule isn't followed reliably. Full design (trunk/branch official terminology, two-input weight formula, "no differentiator found" as a valid honest output): [north-star-signal-tree-discovery-2026-09-21.md](../discovery/north-star-signal-tree-discovery-2026-09-21.md).
-**Not started — needs a multi-vacancy validation pass (§5.4 of the doc) before any prompt edits, same discipline role_balance's taxonomy went through before being written into prompts.**
-**C (retrieval reliability) is explicitly NOT fixed by this mechanism — separate, smaller fix, not yet its own tracked item.**
-
+### 🟡 P2 — Follow-ups from the 2026-10-04 North Star validation runs (found, not started)
+**What:** small defects the four validation runs surfaced; none blocks anything.
+- `phase2_fit.md` (1), `phase3_cv_draft.md` (2), `phase3_6_signal_audit.md` (1) still tell the model to check PROFILE.md's "Additional Evidence" sections, which no longer exist after the 2026-09-23 restructure (evidence now lives inside each role block). Reword.
+- Dedup marked #1720 as a duplicate of #1713, but by the agents' reports they are different roles (same company and title, different JD content). Check the dedup rule (EPIC-26).
+- `core/cv_metrics.py` table output needs `PYTHONIOENCODING=utf-8` on Windows (emoji). Reconfigure stdout or document it.
+- Phase 3.5 "output language = PROFILE language" produced a Russian review in one run and English in others, against the English-only analysis policy. Decide.
+- The Fit score formula (+2 per direct match) saturates; runs hand-adjust it down (#1309: 9.0 to 7.5), which is not reproducible. Look at the arithmetic.
+**Related, bigger:** [profile-prompt-isolation-discovery-2026-10-04.md](../discovery/profile-prompt-isolation-discovery-2026-10-04.md) (separate P1 entry above).
 ### 🟡 P2 — Role Balance: is the mechanism deterministic enough, or does it need a change? (added 2026-09-07, progressed 2026-09-21)
 **What:** after shipping the 6-axis role_balance taxonomy + radar chart (2026-09-06), manually verified vacancy #1488's saved percentages against its JD — result was well-reasoned, confirming the mechanism is an LLM judgment call (no formula, no rubric with point values), not fabrication. Surfaced a bigger question: is this judgment call *deterministic/reproducible* enough to trust the chart's implied precision, and the model's reasoning is never persisted (only the final numbers + archetype label land in DB).
 **2026-09-21 progress:** found live on vacancy #1646 (DAO CV session) that the archetype label alone doesn't reliably reach Phase 3 — a CV led with a business-feature list instead of the technical-complexity framing its own `role_balance.delivery=55%`/archetype implied. Ran a concentration analysis across 88 applied vacancies to check whether `role_balance` is trustworthy enough to build a deterministic enforcement mechanism on top of (it is — see write-up). Shipped a first concrete step: `_RoleBalanceRadar` (Flutter) now classifies and displays the role's shape (Sharp/Dual/Diffuse, >=30% threshold) directly under the chart, so this is visible without reading raw numbers.
