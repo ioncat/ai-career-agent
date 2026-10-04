@@ -13,10 +13,7 @@ Rules:
   `_check_remote_format`) — you won't be asked to re-derive those. Still
   read the section carefully for anything the deterministic checks don't
   cover (e.g. domain, seniority) rather than skimming past it as a benefits
-  list. Found live on vacancy #1060 (2026-08-25): a body-prose mention
-  ("Fully remote work from anywhere in Europe") read as a perk, not a hard
-  geographic restriction — this exact section is where that restriction is
-  actually authoritative.
+  list. A benefits-style section can carry a hard restriction: "Fully remote work from anywhere in Europe" is a geographic restriction, not a perk, and this section is where it is authoritative.
 - Only bullets under a REQUIREMENTS-type heading ("Requirements", "What
   we're looking for", "Must have", "Qualifications", "Що важливо") count as
   something the candidate must already possess. A plain bullet there is a

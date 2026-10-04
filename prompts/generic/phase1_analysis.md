@@ -135,7 +135,7 @@ Determine what kind of role they are actually hiring for:
 
 ### 1.4 Role Balance
 
-**Six-axis taxonomy (empirically derived 2026-09-06 from 628 real PM/PO job descriptions — keyword frequency + TF-IDF clustering + LLM open-coding, triangulated; full methodology: `docs/discovery/role-balance-taxonomy-discovery-2026-09-06.md`).** Same canonical field names as `prompts/pm/phase1_analysis.md`, kept identical across skill_types so `analysis_json.p1.role_balance` is comparable regardless of role family — used verbatim:
+**Six-axis taxonomy.** Same canonical field names as `prompts/pm/phase1_analysis.md`, kept identical across skill_types so `analysis_json.p1.role_balance` is comparable regardless of role family — used verbatim:
 
 - **Strategy** (`strategy`) — deciding what to do and why: planning, prioritization, goal-setting
 - **Discovery** (`discovery`) — research/analysis: understanding a problem, gathering requirements, investigating root causes before acting
@@ -223,7 +223,7 @@ vacancy_score = round(
   1)
 ```
 
-**Do not compute this by hand.** Once the 8 dims are scored, run it through the actual deterministic script and use that output verbatim — for both the `**VScore:** X.X/10` line below and the `vacancy_score` field in the DB write (`vacancy_track.py update-json`). Manual arithmetic on this formula has produced a wrong prose value while the DB got the right one, twice (vacancies #1268, #1192, 2026-08-25) — the two numbers must come from a single computation, not be derived twice from memory.
+**Do not compute this by hand.** Once the 8 dims are scored, run it through the actual deterministic script and use that output verbatim — for both the `**VScore:** X.X/10` line below and the `vacancy_score` field in the DB write (`vacancy_track.py update-json`). The prose value and the DB value must come from a single computation, never derived twice.
 
 ```bash
 python -c "

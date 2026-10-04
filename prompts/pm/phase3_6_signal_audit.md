@@ -31,7 +31,7 @@ For each sentence in the EXPERIENCE section of the saved CV, assess whether it d
 3. **Decompose each sentence into clauses first** (split on em-dashes and comma-separated segments) before mapping — do not map at whole-sentence granularity. Example: "Managed enterprise customer relationships end-to-end — pre-sales, pilot negotiation, onboarding, and ongoing account management — translating direct client feedback into product priorities" splits into at least 3 clauses (the opening claim, the pre-sales/onboarding/account-management list, the client-feedback-to-priorities tail) — only the last one maps to a real signal here. Map EACH clause independently to a JD signal:
    - Clause maps to a signal → ✅ valuable
    - Clause has no mapping → ⚠️ weak (noise) or 🗑️ remove (misleads)
-4. **A sentence counts ✅ valuable only if ALL its clauses carry signal.** If even one clause has no mapping, the sentence is not clean — flag that specific clause (quote the clause, not the whole sentence) per the rules above, even when another clause in the same sentence is genuinely valuable. Added 2026-09-21 (originally found 2026-07-25, vacancy #828) — whole-sentence mapping previously let enterprise-sales-jargon noise ("pre-sales, pilot negotiation... account management") ride along unflagged inside an otherwise-valid sentence.
+4. **A sentence counts ✅ valuable only if ALL its clauses carry signal.** If even one clause has no mapping, the sentence is not clean — flag that specific clause (quote the clause, not the whole sentence) per the rules above, even when another clause in the same sentence is genuinely valuable. Whole-sentence mapping lets a noise clause ride along unflagged inside an otherwise-valid sentence.
 5. Check coverage: are all high/medium ✅/⚠️ signals present in at least one role?
 
 ---
@@ -70,8 +70,7 @@ If no issues:
 - **🗑️ found** → present to user, confirm, remove from CV, re-save CV.md + PDF, **then re-run
   the mechanical lint** (`core.cv_metrics.detect_mechanical_violations` — em-dash + banned-phrase
   list) **and the repetition check** (`detect_phrase_repetition`) against the re-saved text before
-  considering it final. Added 2026-09-21: a removal can leave an awkward join or duplicate
-  phrasing behind, and this file's own re-save step never re-checked for it.
+  considering it final. A removal can leave an awkward join or duplicate phrasing behind.
 - **⚠️ only** → before presenting anything, check PROFILE.md (the same company/role's own
   Experience block, including the notes under it) for unused, honest evidence that would map that
   sentence's slot to a currently weak (⚠️) or under-covered signal from the Signal Coverage
@@ -83,7 +82,7 @@ If no issues:
   duplication problem (see `core.cv_metrics.detect_phrase_repetition`, threshold 2+; in the
   Claude Code local pipeline, where this isn't auto-injected, run it directly via Bash against
   the saved CV before finalizing). **Also re-run `detect_mechanical_violations` against any
-  applied rewrite** (added 2026-09-21) — a rewrite can just as easily reintroduce an em-dash or
+  applied rewrite** — a rewrite can just as easily reintroduce an em-dash or
   banned phrase as any other edit. Present findings with three options per sentence: remove /
   keep as-is / replace with [specific rewrite + which signal it closes]. If no real evidence
   exists to fill the gap, offer only remove/keep — never fabricate evidence to manufacture a

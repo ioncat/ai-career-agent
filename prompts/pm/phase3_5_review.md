@@ -94,7 +94,7 @@ Run this as an explicit, separate pass over the CV draft — not a general impre
 1. **First-person pronouns** (rule #8): "I", "my", "me" anywhere → violation.
 2. **Third-person present-tense verbs with implied subject** (rule #9): any sentence where the (omitted) subject is the candidate and the verb carries a present-tense third-person "-s" form — "Reads", "Holds", "Designs", "Owns", "Understands", "Knows", "Applies", "Works", "Brings", "Has", "Drives", "Runs", "Supports", etc. This includes verbs buried mid-sentence after "and"/comma (e.g. "Read and designs..." — the second verb is the common miss), not just sentence-opening verbs. Do not flag a third-person verb inside a relative clause with its own subject ("a dashboard that tracks X").
 
-**If either is found: add to ❌ (not ⚠️/🔧 — this is a NON-NEGOTIABLE rule violation, not a style preference) and rewrite to past tense or headline-style before output.** This check exists because the two rules were repeatedly missed on prior CVs when relying on general judgment alone (found on vacancy #844, 2026-07-27) — treat it as a hard gate, not a scan-and-hope pass.
+**If either is found: add to ❌ (not ⚠️/🔧 — this is a NON-NEGOTIABLE rule violation, not a style preference) and rewrite to past tense or headline-style before output.** Treat it as a hard gate, not a scan-and-hope pass: general judgment alone misses these two rules.
 
 ---
 
@@ -102,7 +102,7 @@ Run this as an explicit, separate pass over the CV draft — not a general impre
 
 The candidate's actual English level is stated in the profile's Languages entry. Read every sentence in SUMMARY and EXPERIENCE for idiomatic or literary phrasing that signals native-level fluency — e.g. "safety net", "closing the loop", "ends up owning", "no stone unturned", chained metaphors, or any turn of phrase the candidate wouldn't naturally produce or confidently defend if asked about it in an interview. Also flag phrasing lifted near-verbatim from this prompt file's own examples/templates — a recurring failure mode where an illustrative example gets reproduced instead of generating an original equivalent.
 
-**If found: add to ❌ (not ⚠️/🔧) and rewrite in plain, direct vocabulary at the candidate's level before output.** Found recurring across multiple CVs/covers (e.g. vacancy #1169) — treat as a hard gate, not a scan-and-hope pass, same class of check as the Voice Check above.
+**If found: add to ❌ (not ⚠️/🔧) and rewrite in plain, direct vocabulary at the candidate's level before output.** Treat as a hard gate, not a scan-and-hope pass, same class of check as the Voice Check above.
 
 ---
 
@@ -120,7 +120,7 @@ Read the Phase 1 North Star sentence (§1.0.5). Read the drafted SUMMARY cold, a
 2. **Scan CV vocabulary** for tone mismatches against detected type:
    - Enterprise JD + startup language in CV ("founder-led", "scrappy", "0→1") → flag
    - Startup JD + heavy enterprise language ("governance", "compliance framework", "executive alignment") → flag
-3. **Verify Role Balance Shape alignment** — the same deterministic Shape `phase3_cv_draft.md`'s Tailoring Logic computed (sort Phase 1 §1.4's 6 axes descending, ties broken by axis order; Sharp if #1−#2 ≥10, else Dual if #2−#3 ≥10, else Diffuse). Added 2026-09-21 after vacancy #1646: the draft led with a business-feature list instead of the technical-complexity framing its own `role_balance.delivery=55%` implied, and nothing here would have caught it — this step existed only as a vague "does framing match role archetype?" question with no concrete comparison target.
+3. **Verify Role Balance Shape alignment** — the same deterministic Shape `phase3_cv_draft.md`'s Tailoring Logic computed (sort Phase 1 §1.4's 6 axes descending, ties broken by axis order; Sharp if #1−#2 ≥10, else Dual if #2−#3 ≥10, else Diffuse). This is the concrete comparison target for the "does the framing match the role archetype?" question: if the draft's lead framing contradicts the Shape (for example a business-feature list when the top axis is delivery), flag it.
    - **Sharp** — does the CV actually lead with that one axis's strongest matching experience, or did it drift toward a different framing?
    - **Dual** — are both axes woven together, or was one dropped?
    - **Diffuse** — is the CV honestly broad across the top 2 axes, not artificially narrowed to one?

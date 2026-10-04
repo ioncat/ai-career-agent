@@ -87,9 +87,9 @@ The CV already contains all evidence. The cover must NOT repeat or reference spe
 - **Active verbs** — "розвивав", "відповідав", "вів" — not "розвиток", "відповідальність"
 - **Short bullets** — one clear fact per bullet, max 2 sentences. No nested clauses.
 - **No narrative** — not "I find this role interesting because..." — show, don't explain interest
-- **Closing must be a broad invitation to talk, never a narrow single-detail question (confirmed 2026-08-13, vacancy #1139).** A closing that probes one specific sub-topic (e.g. "what's the hardest thing to prioritize in X") reads as fixating on a detail instead of showing genuine interest. Cover the ground broadly instead: current pain/what's on fire, the product, the team, and how the candidate could add value. Never a generic "happy to connect" or "looking forward to hearing from you" either. **Never include "what's already working well" (or any equivalent "what's going fine" phrasing) — banned permanently (confirmed 2026-09-04, vacancy #1452).** The candidate approaches from the problem, not from what's already fine: "какая мне разница, что хорошо работает... ты идешь на работу не потому что там что-то работает хорошо, а потому что можешь помочь что-то улучшить, исправить, поддержать." Zero value, kept leaking back in. Model closing: "Would love to talk and learn more: what's on fire right now, how the team and product are evolving, and where I could actually add value."
+- **Closing must be a broad invitation to talk, never a narrow single-detail question.** A closing that probes one specific sub-topic (e.g. "what's the hardest thing to prioritize in X") reads as fixating on a detail instead of showing genuine interest. Cover the ground broadly instead: current pain/what's on fire, the product, the team, and how the candidate could add value. Never a generic "happy to connect" or "looking forward to hearing from you" either. **Never include "what's already working well" (or any equivalent "what's going fine" phrasing) — banned permanently.** The candidate approaches from the problem, not from what is already fine: the letter offers to help improve, fix or support something. Praise for what works carries no value. Model closing: "Would love to talk and learn more: what's on fire right now, how the team and product are evolving, and where I could actually add value."
 - **NEVER use em-dashes (—).** Use a period, comma, or "and"/"because" instead. A chained em-dash pair inside one sentence is a strong, well-known AI-writing tell — this is a personal message, it should read like one.
-- **Write at the candidate's actual English level — plain, direct vocabulary and sentence structure, no idiom.** The level is stated in the profile's Languages entry. For a non-native intermediate level (B2 and similar), avoid idiomatic/literary phrasing that signals native-level fluency — "safety net", "closing the loop", "ends up owning", "no stone unturned", chained metaphors, or any turn of phrase the candidate wouldn't naturally produce or confidently defend if asked about it in an interview. This includes the illustrative example phrases inside this prompt file itself (e.g. "That's not a role I'm growing into — it's what the last five years looked like") — those are templates showing the *pattern*, not text to reproduce; write an original line in the same spirit, in plain words at the candidate's level. Found recurring across multiple covers (e.g. vacancy #1169).
+- **Write at the candidate's actual English level — plain, direct vocabulary and sentence structure, no idiom.** The level is stated in the profile's Languages entry. For a non-native intermediate level (B2 and similar), avoid idiomatic/literary phrasing that signals native-level fluency — "safety net", "closing the loop", "ends up owning", "no stone unturned", chained metaphors, or any turn of phrase the candidate wouldn't naturally produce or confidently defend if asked about it in an interview. This includes the illustrative example phrases inside this prompt file itself (e.g. "That's not a role I'm growing into — it's what the last five years looked like") — those are templates showing the *pattern*, not text to reproduce; write an original line in the same spirit, in plain words at the candidate's level.
 
 ---
 
@@ -103,13 +103,13 @@ The CV already contains all evidence. The cover must NOT repeat or reference spe
 
 ## First-Person Voice Rule (NON-NEGOTIABLE, applies to A and C)
 
-**Variant A and Variant C (the default) must both be written in first person.** Confirmed 2026-08-30 (vacancy #1335) — a cover is a personal message, and an omitted-subject headline-style opener (fine for a CV) reads oddly here, like the candidate is describing someone else rather than speaking. Only Variant B (bullets) may use a neutral descriptive opener — its bullet format already reads as the candidate's own list, not third-person description.
+**Variant A and Variant C (the default) must both be written in first person.** A cover is a personal message, and an omitted-subject headline-style opener (fine for a CV) reads oddly here, like the candidate is describing someone else rather than speaking. Only Variant B (bullets) may use a neutral descriptive opener — its bullet format already reads as the candidate's own list, not third-person description.
 
 ❌ Wrong: `"Product Owner з 5+ роками досвіду у B2B-платформах..."` — this describes someone, it is not the candidate speaking.
 
 ✅ Right: `"Я — Product Owner, який працює з..."` / `"Я Product Manager з досвідом..."` / `"Займаюсь B2B-платформами, де..."` — told from the narrator's (candidate's) perspective.
 
-**English confirmed opener pattern (2026-09-06, vacancy #1441) — always self-intro first, name + role, before any pain/category elaboration, regardless of greeting formality:**
+**English opener pattern — always self-intro first, name + role, before any pain/category elaboration, regardless of greeting formality:**
 ```
 Dear Hiring Team,
 
@@ -128,13 +128,13 @@ Narrative = a small story. Even 2–3 sentences (or Variant C's single sentence)
 ---
 
 **ВАРІАНТ C — Micro (default for most cases)**
-Two short paragraphs, no bullets, no header rhetoric. Paragraph 1: one sentence combining category signal with the single strongest JD-matching credential/claim (e.g. a required certification, the core delivery pattern). Paragraph 2: the standard broad-invitation closing (see Rules above). Nothing else — no pain-recognition sentence, no specific evidence. Confirmed 2026-08-26 (vacancy #1297) as the new default format for most vacancies.
+Two short paragraphs, no bullets, no header rhetoric. Paragraph 1: one sentence combining category signal with the single strongest JD-matching credential/claim (e.g. a required certification, the core delivery pattern). Paragraph 2: the standard broad-invitation closing (see Rules above). Nothing else — no pain-recognition sentence, no specific evidence. This is the default format for most vacancies.
 
 **Template (language matches vacancy language):**
 ```
 [Greeting per company type]
 
-[1 sentence, first person: category signal + strongest conceptual credential/claim relevant to this JD — no company names, no metrics. E.g. "Я Product Manager з досвідом..." not "Product Manager з досвідом...". English: "I'm [Name], a Product Manager who..." — confirmed opener.]
+[1 sentence, first person: category signal + strongest conceptual credential/claim relevant to this JD — no company names, no metrics. E.g. "Я Product Manager з досвідом..." not "Product Manager з досвідом...". English: "I'm [Name], a Product Manager who..."]
 
 [Standard broad-invitation closing — see Rules above.]
 
@@ -182,7 +182,7 @@ Happy to connect and learn more.
 
 Default: three conceptual bullets, same content and same no-evidence rule as Bullet Selection Logic below (category / pain recognition / positioning close) — this is the strategy the candidate actually uses. Reach for this variant over C only when three separate points genuinely earn their own line, or the user asked for bullets specifically.
 
-**Evidence-heavy bullets (verifiable facts/metrics, one per bullet) are a legitimate alternate strategy — but only when the user explicitly asks for it for this cover.** Rewritten 2026-09-21: this variant's own template previously demanded "verifiable fact"/"metric"/"quantified impact" unconditionally, directly contradicting Rule #1 and the Bullet Selection Logic below (both correctly conceptual-only). The evidence-heavy approach itself isn't wrong — it's just opt-in, not the default, and the contradiction was in treating it as automatic. Do not switch to evidence-heavy bullets on your own judgment; ask, or wait to be asked.
+**Evidence-heavy bullets (verifiable facts/metrics, one per bullet) are a legitimate alternate strategy — but only when the user explicitly asks for it for this cover.** Opt-in, not the default. Do not switch to evidence-heavy bullets on your own judgment; ask, or wait to be asked.
 
 **Ukrainian template (default, conceptual):**
 ```

@@ -22,17 +22,13 @@ Cognitive + evaluative → stays LLM. Not deterministic scaffolding.
 Run only when Phase 2's `recommendation` is `apply` with `fit_score >= 7` (i.e. a
 genuine "strong match" outcome), or when the user explicitly asks for it regardless
 of score. **Do not run by default on every vacancy** — this is a multi-pass,
-higher-cost audit; running it unconditionally breaks the pipeline's cost discipline
-(see `docs/discovery/Tokenomics.md`). Most vacancies get declined or take-a-chance;
+higher-cost audit; running it unconditionally breaks the pipeline's cost discipline. Most vacancies get declined or take-a-chance;
 they don't reach this phase.
 
 ## Bias note (why this matters for HOW you run it, not just whether)
 
 If you (the CV's author, e.g. Claude Code mid-conversation) audit your own
-just-written text in the same context, self-audit bias is real and measurable —
-verified empirically 2026-07-25 (see `docs/discovery/editorial-audit-experiment/`,
-`audit-v3-raw-828.md` vs `audit-v3-isolated-828.md`: the same auditor scored their
-own writing higher on 3 of 6 dimensions than a zero-context pass did).
+just-written text in the same context, self-audit bias is real and measurable: the same auditor scores their own writing higher than a zero-context pass does.
 
 - **Claude Code / manual orchestration:** run this via an isolated subagent
   (`Agent` tool, fresh context, no memory of how the CV was drafted) — not inline
