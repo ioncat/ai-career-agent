@@ -133,6 +133,7 @@
 | **Per-phase LLM routing** | EPIC-27. Each phase (pre-filter, 1, 2, 3, 3.5, 4) can run on its own provider, model and effort instead of one global setting. |
 | **Prompt caching** | The profile is sent as a cached system prompt through `ClaudeProvider`, which cuts cost. Skipped for Ollama, which has no caching. |
 | **Adapter / contract** | Adapters (`adapters/`) are the only way to call external services. Contracts (`contracts/`) are the typed Pydantic models adapters return, never raw dicts. |
+| **Profile contract** | The named profile sections the engine files read (Settings, Name variants, Contacts line, Certifications, Languages, Archetype & Role Positioning, Experience, Generation Rules, CV cutoff year, AI Tooling Paragraph, Vacancy Preferences). `tests/test_profile_contract.py` checks that every local `pm` profile has them and that the engine still mentions each, so a profile restructure cannot silently break the references. |
 | **Deterministic vs cognitive** | EPIC-21 principle. Work with one right answer (PDF render, metrics, scoring, status updates) lives in Python; judgment stays with the LLM. |
 | **pdf-service** | `services/pdf/`, a FastAPI service (port 8002) that renders Markdown to PDF for CVs and covers. |
 | **jd-parser** | `services/parser/`: URL to JD Markdown for Djinni and DOU, plus the salary estimator. |
