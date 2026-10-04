@@ -13,6 +13,12 @@
 
 ## 📌 Now
 
+### 🟠 P1 — Profile ↔ prompt isolation: remove candidate-specific content from engine prompts, move to a structured per-person profile (found 2026-10-04, design captured, not started)
+**What:** 42 candidate-specific occurrences across 6 files in `prompts/pm/` (22 in `phase3_cv_draft.md`: portfolio URL, golden paragraphs, default certification, role-date arithmetic, English level, vacancy numbers). Found when an isolated agent with no conversation context ran the pipeline cold and unlocked a default-omit profile fact by a shared word. Corrections also have no routing policy: they land in the prompt, `PROFILE.md`, or memory, and memory is invisible to the pipeline.
+**Decided:** one profile per person; structured JSON is the source of truth (EPIC-24 direction), Markdown only as a rendered view; vacancy lens reuses the six `role_balance` axes. Not urgent (multi-user is next year, user 2 is a stub); does not block merging `prompt-audit-pm-2026-09-21`.
+**Next:** leak cleanup + leakage lint test, then schema design (fact annotations: usage, unlock_when, never_say), then migration. Needs EPIC-24 re-scope.
+**Spec:** [profile-prompt-isolation-discovery-2026-10-04.md](../discovery/profile-prompt-isolation-discovery-2026-10-04.md)
+
 ### 🟠 P1 — New Phase 3.8: ATS Keyword Coverage (confirmed 2026-09-07, not started)
 **What:** user-requested new pipeline step, confirmed but deferred until current CV work was done. Goal is the opposite of Phase 3.7's "JD-Echo Risk" check — 3.7 flags and *reduces* CV phrases that mirror the JD too closely (human-credibility risk); this new phase should instead *guarantee* the CV literally contains the JD's own load-bearing keywords/terms (ATS keyword-matching risk) wherever real supporting evidence already exists. Found the gap live on vacancies #1491/#1494 this session — the CV was missing literal JD terms (e.g. "process flows", "functional validation and testing", "non-deterministic", "Jira", "testable") despite having real evidence for all of them; this was done ad hoc via an unstructured chat request, not a repeatable phase.
 **Proposed placement:** run before Phase 3.7, not after — 3.7 should then only trim echo-risk findings that are NOT one of the ATS-coverage terms this new phase just deliberately inserted (so the two phases don't fight each other and undo one another's work).
