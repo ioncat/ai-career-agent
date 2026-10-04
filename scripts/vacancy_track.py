@@ -51,6 +51,14 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stdin, "reconfigure"):
+    # Without this, `--data -` on Windows decodes piped/redirected stdin
+    # using the console's active codepage (often cp1252) instead of UTF-8 —
+    # any non-ASCII byte (em-dash, middot, etc.) in the JSON payload gets
+    # mis-decoded and silently corrupted into the DB. Found live 2026-09-23
+    # on vacancy #1680: a "·" character survived on disk correctly but was
+    # re-corrupted into "Â·" purely by passing through this stdin read.
+    sys.stdin.reconfigure(encoding="utf-8")
 
 _ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(_ROOT))
