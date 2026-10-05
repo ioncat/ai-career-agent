@@ -349,3 +349,35 @@ async def test_before_id_restricts_hash_matches_too(env):
     replay = await _classify(env, _words("a", 60), exclude_id=me, content_hash="hx",
                              title="Other", company="Else", before_id=me)
     assert (replay.confirmed_id, replay.possible_id) == (None, None)
+
+
+# ── Linking a duplicate must not bump updated_at ──────────────────────────────
+# The Analyzed/processed folders sort by updated_at; a bulk (re-)link used to
+# push every old vacancy to the top of the list.
+
+async def _stamp_old(vid: int) -> None:
+    async with database.get_db() as db:
+        await db.execute("UPDATE vacancies SET updated_at = '2026-06-01 10:00:00' WHERE id = ?", (vid,))
+        await db.commit()
+
+
+async def _updated_at(vid: int) -> str:
+    async with database.get_db() as db:
+        cur = await db.execute("SELECT updated_at FROM vacancies WHERE id = ?", (vid,))
+        return (await cur.fetchone())["updated_at"]
+
+
+@pytest.mark.asyncio
+async def test_duplicate_linking_keeps_updated_at(env):
+    orig = await _add(env, _words("w", 60))
+    vid = await _add(env, _words("w", 60))
+    await _stamp_old(vid)
+
+    await database.set_possible_duplicate_of(vid, orig)
+    assert await _updated_at(vid) == "2026-06-01 10:00:00"
+
+    await database.set_duplicate_of(vid, orig)
+    assert await _updated_at(vid) == "2026-06-01 10:00:00"
+
+    await database.clear_duplicate_flags(vid)
+    assert await _updated_at(vid) == "2026-06-01 10:00:00"

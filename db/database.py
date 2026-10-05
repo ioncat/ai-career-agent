@@ -984,6 +984,9 @@ async def find_possible_duplicate(
 async def set_duplicate_of(vacancy_id: int, original_id: int) -> None:
     """Mark vacancy as a CONFIRMED duplicate of original_id (clears the possible tier).
 
+    Deliberately does NOT touch updated_at: the Analyzed/processed folders sort by it,
+    so a bulk (re-)linking would push every old vacancy to the top of the list.
+
     Also learns company identity: when the two rows carry DIFFERENT company
     profile keys on DIFFERENT boards (typically Djinni vs DOU), those keys are
     recorded as the same company in company_profile_links. Same-board
@@ -992,8 +995,7 @@ async def set_duplicate_of(vacancy_id: int, original_id: int) -> None:
     """
     async with get_db() as db:
         await db.execute(
-            "UPDATE vacancies SET duplicate_of = ?, possible_duplicate_of = NULL, "
-            "updated_at = datetime('now') WHERE id = ?",
+            "UPDATE vacancies SET duplicate_of = ?, possible_duplicate_of = NULL WHERE id = ?",
             (original_id, vacancy_id),
         )
         try:
@@ -1022,20 +1024,17 @@ async def set_possible_duplicate_of(vacancy_id: int, original_id: int) -> None:
     """Mark vacancy as a POSSIBLE duplicate of original_id (clears the confirmed tier)."""
     async with get_db() as db:
         await db.execute(
-            "UPDATE vacancies SET possible_duplicate_of = ?, duplicate_of = NULL, "
-            "updated_at = datetime('now') WHERE id = ?",
+            "UPDATE vacancies SET possible_duplicate_of = ?, duplicate_of = NULL WHERE id = ?",
             (original_id, vacancy_id),
         )
         await db.commit()
 
 
 async def clear_duplicate_flags(vacancy_id: int) -> None:
-    """Clear both duplicate tiers (re-evaluation found no match). No-op — and no
-    updated_at bump — when neither is set."""
+    """Clear both duplicate tiers (re-evaluation found no match). No-op when neither is set."""
     async with get_db() as db:
         await db.execute(
-            "UPDATE vacancies SET duplicate_of = NULL, possible_duplicate_of = NULL, "
-            "updated_at = datetime('now') "
+            "UPDATE vacancies SET duplicate_of = NULL, possible_duplicate_of = NULL "
             "WHERE id = ? AND (duplicate_of IS NOT NULL OR possible_duplicate_of IS NOT NULL)",
             (vacancy_id,),
         )
