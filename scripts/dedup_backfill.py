@@ -33,7 +33,8 @@ against OLDER vacancies (replaying ingestion order, as_of = the row's own
 created_at) with the current classify_duplicate() — text containment >= 0.90
 across any company/title, title+company with same-company identity — and writes
 research/dedup-missed-scan-2026-10-05_RU.md, grouped confirmed / possible. It
-never writes to the DB and refuses to combine with --apply. --watch 206,863
+never writes to the DB unless --apply-missed is given (the owner applied it
+2026-10-05 after reviewing the report), and refuses to combine with --apply. --watch 206,863
 adds a pair-by-pair check of the listed vacancy ids to the report.
 """
 
@@ -293,6 +294,17 @@ async def _scan_missed() -> tuple[list[dict], dict[int, dict]]:
     return findings, by_id
 
 
+async def _apply_missed(findings: list[dict]) -> int:
+    """Write --scan-missed findings: confirmed -> duplicate_of, possible -> possible_duplicate_of."""
+    await database.init_db()
+    for f in findings:
+        if f["state"] == "confirmed":
+            await database.set_duplicate_of(f["id"], f["orig"])
+        else:
+            await database.set_possible_duplicate_of(f["id"], f["orig"])
+    return len(findings)
+
+
 async def _pair_containment(by_id: dict[int, dict], a: int, b: int) -> float | None:
     ta = await read_jd_text(by_id[a]["markdown_path"], _ROOT) if a in by_id else None
     tb = await read_jd_text(by_id[b]["markdown_path"], _ROOT) if b in by_id else None
@@ -368,6 +380,8 @@ def main() -> None:
     ap.add_argument("--apply", action="store_true", help="WRITE the new state to the DB (default: dry run)")
     ap.add_argument("--scan-missed", action="store_true",
                     help="dry-run scan of vacancies WITHOUT a duplicate flag (never writes)")
+    ap.add_argument("--apply-missed", action="store_true",
+                    help="with --scan-missed: WRITE the findings (duplicate_of / possible_duplicate_of) to the DB")
     ap.add_argument("--watch", default="", help="comma-separated vacancy ids to pair-check in the --scan-missed report")
     args = ap.parse_args()
 
@@ -387,7 +401,10 @@ def main() -> None:
         report_path.write_text(report, encoding="utf-8")
         print(f"{len(findings)} findings: {dict(Counter(f['state'] for f in findings))}")
         print(f"report: {report_path}")
-        print("dry run — DB untouched")
+        if args.apply_missed:
+            print(f"applied {asyncio.run(_apply_missed(findings))} rows")
+        else:
+            print("dry run — DB untouched (use --apply-missed to write)")
         return
     results = asyncio.run(_evaluate())
     report = build_report(results, _parse_verdicts(VERDICTS_FILE))

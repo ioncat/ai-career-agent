@@ -41,7 +41,7 @@
 
 ### 🟡 P2 — Dedup rework (EPIC-26), remaining (added 2026-10-05, updated 2026-10-05)
 **Delivered (see CHANGELOG 2026-10-05):** two tiers, original chosen by text similarity; backfill applied; "already applied" detection (`applied_twin_id`); company identity (`company_profile_url` stored, DOU rows backfilled, `normalize_company_name`, learned `company_profile_links`); text-first duplicates (containment >= 0.90 in a 120-day window, any company); "Applied before #N" hint (`company_applied_id`).
-**Waiting on the owner:** the missed-duplicates scan (`research/dedup-missed-scan-2026-10-05_RU.md`, 176 confirmed + 3 possible among rows with no flag, dry-run, local gitignored) needs a review; then apply it (a new `--apply` for the scan mode, with a DB backup first). Same-URL re-publish of an already-applied vacancy keeps today's behaviour (owner decision); two hash-twin cycles (#205/#233, #388/#467) are untouched.
+**Applied 2026-10-05:** the missed-duplicates scan (176 confirmed + 3 possible among rows that had no flag) was written to the live DB (`dedup_backfill.py --scan-missed --apply-missed`, backup `db/backups/agent.db.bak-2026-10-05-pre-missed-dedup-apply`); the live DB now has 296 confirmed and 29 possible. Same-URL re-publish of an already-applied vacancy keeps today's behaviour (owner decision); two hash-twin cycles (#205/#233, #388/#467) are untouched.
 **Spec:** [research/dedup-audit-2026-10-05_RU.md](../../research/dedup-audit-2026-10-05_RU.md) and [verdicts](../../research/dedup-audit-verdicts-2026-10-05_RU.md) (local, gitignored). Fuzzy title matching rejected (owner, 2026-10-05).
 
 ### 🟡 P2 — Role Balance: is the mechanism deterministic enough, or does it need a change? (added 2026-09-07, progressed 2026-09-21)
