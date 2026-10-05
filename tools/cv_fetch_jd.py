@@ -201,10 +201,8 @@ async def fetch_jd(deps: AgentDeps, url: str) -> int:
     try:
         vacancy_dir.mkdir(parents=True, exist_ok=True)
         jd_path = vacancy_dir / "JD.md"
-        jd_path.write_text(
-            f"# {doc.title}\n\nSource: {doc.source_url}\n\n---\n\n{doc.markdown}",
-            encoding="utf-8",
-        )
+        jd_file_text = f"# {doc.title}\n\nSource: {doc.source_url}\n\n---\n\n{doc.markdown}"
+        jd_path.write_text(jd_file_text, encoding="utf-8")
     except OSError as exc:
         raise FetchError(f"Не удалось записать JD.md: {exc}") from exc
 
@@ -241,16 +239,29 @@ async def fetch_jd(deps: AgentDeps, url: str) -> int:
     try:
         _norm_text = re.sub(r"\s+", " ", doc.markdown.lower())
         content_hash = hashlib.sha256(_norm_text.encode()).hexdigest()
+        norm_title = database._normalize_title(doc.title or "", doc.company)
+        # Two tiers (2026-10-05): a content-hash match or a title+company match
+        # with similar JD text is a CONFIRMED duplicate (duplicate_of); a
+        # title+company match with dissimilar/unreadable text is only a
+        # POSSIBLE one (possible_duplicate_of). Re-evaluation sets one tier and
+        # clears the other (or both, when nothing matches any more).
         original_id = await database.find_duplicate(
-            deps.user_id,
-            content_hash,
-            database._normalize_title(doc.title or "", doc.company),
-            doc.company or "",
-            exclude_id=vacancy_id,
+            deps.user_id, content_hash, norm_title, doc.company or "",
+            exclude_id=vacancy_id, new_text=jd_file_text,
         )
         if original_id is not None:
             log.info("fetch_jd: duplicate of v#%d — marking v#%d", original_id, vacancy_id)
             await database.set_duplicate_of(vacancy_id, original_id)
+        else:
+            possible_id = await database.find_possible_duplicate(
+                deps.user_id, content_hash, norm_title, doc.company or "",
+                exclude_id=vacancy_id, new_text=jd_file_text,
+            )
+            if possible_id is not None:
+                log.info("fetch_jd: possible duplicate of v#%d — marking v#%d", possible_id, vacancy_id)
+                await database.set_possible_duplicate_of(vacancy_id, possible_id)
+            else:
+                await database.clear_duplicate_flags(vacancy_id)
         await database.set_content_hash(vacancy_id, content_hash)
     except Exception as exc:
         log.warning("fetch_jd: dedup step failed for v#%d (non-fatal): %s", vacancy_id, exc)

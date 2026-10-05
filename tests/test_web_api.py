@@ -238,6 +238,26 @@ async def test_api_vacancies_exposes_blocker_stage(client):
         assert "blocker_raw_output" not in v
 
 
+@pytest.mark.asyncio
+async def test_api_vacancies_exposes_possible_duplicate_of(client):
+    """possible_duplicate_of (EPIC-26 rework, 2026-10-05) reaches both list and
+    detail responses next to duplicate_of, and the two tiers never co-occur."""
+    uid = await database.insert_user(name="PossibleDupUser", telegram_chat_id=2202, skill_type="pm")
+    orig = await database.insert_vacancy(url="https://djinni.co/jobs/pd0/", user_id=uid)
+    maybe = await database.insert_vacancy(url="https://djinni.co/jobs/pd1/", user_id=uid)
+    sure = await database.insert_vacancy(url="https://djinni.co/jobs/pd2/", user_id=uid)
+    await database.set_possible_duplicate_of(maybe, orig)
+    await database.set_duplicate_of(sure, orig)
+
+    data = {v["id"]: v for v in client.get(f"/api/vacancies?user_id={uid}").json()}
+    assert (data[maybe]["possible_duplicate_of"], data[maybe]["duplicate_of"]) == (orig, None)
+    assert (data[sure]["possible_duplicate_of"], data[sure]["duplicate_of"]) == (None, orig)
+    assert data[orig]["possible_duplicate_of"] is None
+
+    detail = client.get(f"/api/vacancies/{maybe}").json()
+    assert detail["possible_duplicate_of"] == orig
+
+
 # ── GET /api/vacancies?user_id=N ──────────────────────────────────────────────
 
 @pytest.mark.asyncio

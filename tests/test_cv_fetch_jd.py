@@ -74,6 +74,9 @@ def _mock_dedup(mock_db) -> None:
     mock_db.find_duplicate = AsyncMock(return_value=None)
     mock_db.set_content_hash = AsyncMock()
     mock_db.set_duplicate_of = AsyncMock()
+    mock_db.find_possible_duplicate = AsyncMock(return_value=None)
+    mock_db.set_possible_duplicate_of = AsyncMock()
+    mock_db.clear_duplicate_flags = AsyncMock()
     mock_db.update_vacancy_status = AsyncMock()
 
 
@@ -725,11 +728,83 @@ async def test_fetch_jd_marks_duplicate_when_found(tmp_path):
         mock_db.find_duplicate = AsyncMock(return_value=5)  # original found
         mock_db.set_content_hash = AsyncMock()
         mock_db.set_duplicate_of = AsyncMock()
+        mock_db.find_possible_duplicate = AsyncMock(return_value=None)
+        mock_db.set_possible_duplicate_of = AsyncMock()
+        mock_db.clear_duplicate_flags = AsyncMock()
         mock_db.update_vacancy_status = AsyncMock()
 
         await fetch_jd(deps, "https://djinni.co/jobs/999/")
 
     mock_db.set_duplicate_of.assert_awaited_once_with(20, 5)
+    # Confirmed tier: the possible tier is not even evaluated, nothing cleared.
+    mock_db.find_possible_duplicate.assert_not_awaited()
+    mock_db.set_possible_duplicate_of.assert_not_awaited()
+    mock_db.clear_duplicate_flags.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_fetch_jd_passes_full_jd_file_text_to_dedup(tmp_path):
+    """new_text handed to the similarity check is exactly what was written to
+    JD.md (header + body) — core.dedup strips the header itself."""
+    doc = _make_doc(markdown="## Job\nUnique body text for similarity.")
+    parser = AsyncMock()
+    parser.fetch_markdown = AsyncMock(return_value=doc)
+    deps = _make_deps(tmp_path, parser)
+
+    with patch("tools.cv_fetch_jd.database") as mock_db:
+        mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
+        mock_db.insert_vacancy = AsyncMock(return_value=21)
+        mock_db.update_vacancy_fields = AsyncMock()
+        _mock_dedup(mock_db)
+
+        await fetch_jd(deps, "https://djinni.co/jobs/999/")
+
+    new_text = mock_db.find_duplicate.call_args.kwargs["new_text"]
+    jd_file = next((tmp_path / "vacancies").rglob("JD.md"))
+    assert new_text == jd_file.read_text(encoding="utf-8")
+    assert mock_db.find_possible_duplicate.call_args.kwargs["new_text"] == new_text
+
+
+@pytest.mark.asyncio
+async def test_fetch_jd_marks_possible_duplicate_when_not_confirmed(tmp_path):
+    doc = _make_doc()
+    parser = AsyncMock()
+    parser.fetch_markdown = AsyncMock(return_value=doc)
+    deps = _make_deps(tmp_path, parser)
+
+    with patch("tools.cv_fetch_jd.database") as mock_db:
+        mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
+        mock_db.insert_vacancy = AsyncMock(return_value=22)
+        mock_db.update_vacancy_fields = AsyncMock()
+        _mock_dedup(mock_db)
+        mock_db.find_possible_duplicate = AsyncMock(return_value=7)
+
+        await fetch_jd(deps, "https://djinni.co/jobs/999/")
+
+    mock_db.set_possible_duplicate_of.assert_awaited_once_with(22, 7)
+    mock_db.set_duplicate_of.assert_not_awaited()
+    mock_db.clear_duplicate_flags.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_fetch_jd_clears_duplicate_flags_when_nothing_matches(tmp_path):
+    """Re-evaluation with no match clears both tiers (a stale flag must not survive)."""
+    doc = _make_doc()
+    parser = AsyncMock()
+    parser.fetch_markdown = AsyncMock(return_value=doc)
+    deps = _make_deps(tmp_path, parser)
+
+    with patch("tools.cv_fetch_jd.database") as mock_db:
+        mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
+        mock_db.insert_vacancy = AsyncMock(return_value=23)
+        mock_db.update_vacancy_fields = AsyncMock()
+        _mock_dedup(mock_db)
+
+        await fetch_jd(deps, "https://djinni.co/jobs/999/")
+
+    mock_db.clear_duplicate_flags.assert_awaited_once_with(23)
+    mock_db.set_duplicate_of.assert_not_awaited()
+    mock_db.set_possible_duplicate_of.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -821,10 +896,8 @@ async def test_fetch_jd_markdown_path_saved_before_dedup_runs(tmp_path):
         mock_db.get_vacancy_by_url = AsyncMock(return_value=None)
         mock_db.insert_vacancy = AsyncMock(return_value=202)
         mock_db.update_vacancy_fields = AsyncMock(side_effect=_update_fields)
+        _mock_dedup(mock_db)
         mock_db.find_duplicate = AsyncMock(side_effect=_find_duplicate)
-        mock_db.set_content_hash = AsyncMock()
-        mock_db.set_duplicate_of = AsyncMock()
-        mock_db.update_vacancy_status = AsyncMock()
 
         await fetch_jd(deps, "https://djinni.co/jobs/123/")
 

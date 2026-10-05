@@ -169,6 +169,25 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
                               ),
                             ),
                           ),
+                        // Softer tier (2026-10-05): same title+company as #N but the
+                        // JD texts differ — flagged side only, no reciprocal badge.
+                        if (v.possibleDuplicateOf != null)
+                          Tooltip(
+                            message: 'Looks like the same job as #${v.possibleDuplicateOf}, but the texts differ — check before treating it as a duplicate',
+                            preferBelow: false,
+                            child: MouseRegion(
+                              cursor: widget.onTapRelated != null
+                                  ? SystemMouseCursors.click
+                                  : MouseCursor.defer,
+                              child: GestureDetector(
+                                onTap: widget.onTapRelated != null
+                                    ? () => widget.onTapRelated!(v.possibleDuplicateOf!)
+                                    : null,
+                                behavior: HitTestBehavior.opaque,
+                                child: _PossibleDuplicateBadge(originalId: v.possibleDuplicateOf!),
+                              ),
+                            ),
+                          ),
                         // Reciprocal side: this card IS the canonical posting
                         // some other row points at via duplicateOf — same
                         // badge, reversed tooltip/direction, so the
@@ -470,6 +489,32 @@ class _DuplicateBadge extends StatelessWidget {
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
               color: cs.onSurfaceVariant,
               fontWeight: FontWeight.w600,
+              fontSize: 10,
+            ),
+      ),
+    );
+  }
+}
+
+// Visually weaker than _DuplicateBadge: no fill, faint outline, regular weight.
+class _PossibleDuplicateBadge extends StatelessWidget {
+  final int originalId;
+  const _PossibleDuplicateBadge({required this.originalId});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.6), width: 0.8),
+      ),
+      child: Text(
+        'Maybe dup #$originalId',
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: cs.onSurfaceVariant.withValues(alpha: 0.75),
+              fontWeight: FontWeight.w400,
               fontSize: 10,
             ),
       ),

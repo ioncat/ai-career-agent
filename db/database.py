@@ -18,17 +18,21 @@ import json
 import logging
 import sqlite3
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import AsyncIterator
 from urllib.parse import urlparse, urlunparse
 
 import aiosqlite
 
+from core.dedup import CONFIRM_THRESHOLD, jd_shingles, read_jd_text, shingle_containment
+
 log = logging.getLogger(__name__)
 
 # Default DB path — override via DB_PATH env var or settings
 _DEFAULT_DB_PATH = Path(__file__).parent / "agent.db"
 _SCHEMA_PATH = Path(__file__).parent / "schema.sql"
+_PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 
 _db_path: Path = _DEFAULT_DB_PATH
 
@@ -239,6 +243,11 @@ async def init_db() -> None:
             # posting URLs (parsed from the pasted content's "Source:" line)
             # replaced the synthetic "import://{hash}" scheme. 2026-09-19.
             "ALTER TABLE vacancies ADD COLUMN manual_import INTEGER NOT NULL DEFAULT 0",
+            # EPIC-26 dedup rework (2026-10-05): second, weaker duplicate tier —
+            # a title+company match whose JD text is NOT similar enough to
+            # confirm (see find_possible_duplicate). Never set together with
+            # duplicate_of.
+            "ALTER TABLE vacancies ADD COLUMN possible_duplicate_of INTEGER REFERENCES vacancies(id)",
         ]:
             try:
                 await db.execute(migration)
@@ -753,55 +762,170 @@ def _normalize_title(title: str, company: str | None = None) -> str:
     return _re.sub(r"\s+", " ", title.lower().strip())
 
 
+@dataclass(frozen=True)
+class DuplicateVerdict:
+    """Outcome of classify_duplicate().
+
+    confirmed_id — hard duplicate (content-hash match, or title+company match
+                   with JD containment >= CONFIRM_THRESHOLD) -> duplicate_of.
+    possible_id  — title+company match that could not be confirmed
+                   -> possible_duplicate_of. Never set together with confirmed_id.
+    containment  — containment of the chosen title+company candidate, None for
+                   a hash match or when no text comparison was possible.
+    reason       — "hash" | "title_company" | "title_company_unverified" | "none"
+    """
+    confirmed_id: int | None = None
+    possible_id: int | None = None
+    containment: float | None = None
+    reason: str = "none"
+
+
+async def classify_duplicate(
+    user_id: int,
+    content_hash: str | None,
+    norm_title: str | None,
+    company: str | None,
+    exclude_id: int | None = None,
+    new_text: str | None = None,
+    before_id: int | None = None,
+) -> DuplicateVerdict:
+    """Two-tier duplicate verdict for one vacancy (EPIC-26 rework, 2026-10-05).
+
+    1. content_hash match -> confirmed, unconditionally (lowest id among
+       matches); wins over everything.
+    2. Otherwise title+company candidates (same user, same normalized title and
+       company, excluding `exclude_id`) are scored by containment of `new_text`
+       against each candidate's JD.md; the best score wins, ties -> lowest id
+       (the old "lowest id wins" picked the wrong original whenever a company
+       had several postings under one title). Best containment >=
+       CONFIRM_THRESHOLD -> confirmed; below it, or when new_text / the
+       candidates' files are unreadable -> only possible.
+
+    The similarity score never DROPS a title+company match, only downgrades it
+    (no threshold separates true duplicates from non-duplicates — see
+    core/dedup.py).
+
+    new_text: the new vacancy's full JD.md text (header included — it is
+    stripped by core.dedup). before_id: only consider rows with a smaller id —
+    for backfills that replay ingestion order.
+    """
+    async with get_db() as db:
+        if content_hash:
+            sql = "SELECT id FROM vacancies WHERE user_id = ? AND content_hash = ?"
+            params: list = [user_id, content_hash]
+            if exclude_id is not None:
+                sql += " AND id != ?"
+                params.append(exclude_id)
+            if before_id is not None:
+                sql += " AND id < ?"
+                params.append(before_id)
+            cur = await db.execute(sql + " ORDER BY id ASC LIMIT 1", params)
+            row = await cur.fetchone()
+            if row:
+                return DuplicateVerdict(confirmed_id=row["id"], reason="hash")
+
+        if not (norm_title and company):
+            return DuplicateVerdict()
+
+        sql = (
+            "SELECT id, markdown_path FROM vacancies "
+            "WHERE user_id = ? AND LOWER(TRIM(title)) = ? AND LOWER(TRIM(company)) = ?"
+        )
+        params = [user_id, norm_title.lower(), company.lower().strip()]
+        if exclude_id is not None:
+            sql += " AND id != ?"
+            params.append(exclude_id)
+        if before_id is not None:
+            sql += " AND id < ?"
+            params.append(before_id)
+        cur = await db.execute(sql + " ORDER BY id ASC", params)
+        candidates = [(r["id"], r["markdown_path"]) for r in await cur.fetchall()]
+
+    if not candidates:
+        return DuplicateVerdict()
+
+    best_id, best_score = candidates[0][0], None  # lowest id until proven otherwise
+    if new_text:
+        new_shingles = jd_shingles(new_text)
+        for cand_id, md_path in candidates:  # ascending id: strict ">" keeps lowest on ties
+            cand_text = await read_jd_text(md_path, _PROJECT_ROOT)
+            if cand_text is None:
+                continue
+            score = shingle_containment(new_shingles, jd_shingles(cand_text))
+            if best_score is None or score > best_score:
+                best_id, best_score = cand_id, score
+
+    if best_score is not None and best_score >= CONFIRM_THRESHOLD:
+        return DuplicateVerdict(confirmed_id=best_id, containment=best_score, reason="title_company")
+    return DuplicateVerdict(possible_id=best_id, containment=best_score, reason="title_company_unverified")
+
+
 async def find_duplicate(
     user_id: int,
     content_hash: str | None,
     norm_title: str | None,
     company: str | None,
     exclude_id: int | None = None,
+    new_text: str | None = None,
 ) -> int | None:
-    """Return id of first matching vacancy (original), or None if no duplicate found.
+    """Return the id of the CONFIRMED original of a vacancy, or None.
 
-    Match rule: content_hash collision OR (normalized title + company both match).
+    Confirmed = content_hash collision, or a title+company match whose JD text
+    contains >= CONFIRM_THRESHOLD of the new text (new_text required — without
+    it a title+company match is only "possible", see find_possible_duplicate).
+    The web manual-import path passes no title/company and stays hash-only.
     exclude_id: vacancy id to skip (avoids self-match during re-fetch).
-    Returns the lowest id (earliest insert = original).
     """
-    async with get_db() as db:
-        conditions: list[str] = []
-        params: list = []
+    verdict = await classify_duplicate(user_id, content_hash, norm_title, company, exclude_id, new_text)
+    return verdict.confirmed_id
 
-        if content_hash:
-            conditions.append("content_hash = ?")
-            params.append(content_hash)
 
-        if norm_title and company:
-            conditions.append("(LOWER(TRIM(title)) = ? AND LOWER(TRIM(company)) = ?)")
-            params.append(norm_title.lower())
-            params.append(company.lower().strip())
-
-        if not conditions:
-            return None
-
-        where = f"user_id = ? AND ({' OR '.join(conditions)})"
-        params_full = [user_id] + params
-        if exclude_id is not None:
-            where += " AND id != ?"
-            params_full.append(exclude_id)
-
-        cur = await db.execute(
-            f"SELECT id FROM vacancies WHERE {where} ORDER BY id ASC LIMIT 1",
-            params_full,
-        )
-        row = await cur.fetchone()
-        return row["id"] if row else None
+async def find_possible_duplicate(
+    user_id: int,
+    content_hash: str | None,
+    norm_title: str | None,
+    company: str | None,
+    exclude_id: int | None = None,
+    new_text: str | None = None,
+) -> int | None:
+    """Return the id of the best title+company candidate that could NOT be
+    confirmed (low text containment, no new_text, or unreadable JD file), or
+    None — including when the vacancy is a confirmed duplicate."""
+    verdict = await classify_duplicate(user_id, content_hash, norm_title, company, exclude_id, new_text)
+    return verdict.possible_id
 
 
 async def set_duplicate_of(vacancy_id: int, original_id: int) -> None:
-    """Mark vacancy as a duplicate of original_id."""
+    """Mark vacancy as a CONFIRMED duplicate of original_id (clears the possible tier)."""
     async with get_db() as db:
         await db.execute(
-            "UPDATE vacancies SET duplicate_of = ?, updated_at = datetime('now') WHERE id = ?",
+            "UPDATE vacancies SET duplicate_of = ?, possible_duplicate_of = NULL, "
+            "updated_at = datetime('now') WHERE id = ?",
             (original_id, vacancy_id),
+        )
+        await db.commit()
+
+
+async def set_possible_duplicate_of(vacancy_id: int, original_id: int) -> None:
+    """Mark vacancy as a POSSIBLE duplicate of original_id (clears the confirmed tier)."""
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE vacancies SET possible_duplicate_of = ?, duplicate_of = NULL, "
+            "updated_at = datetime('now') WHERE id = ?",
+            (original_id, vacancy_id),
+        )
+        await db.commit()
+
+
+async def clear_duplicate_flags(vacancy_id: int) -> None:
+    """Clear both duplicate tiers (re-evaluation found no match). No-op — and no
+    updated_at bump — when neither is set."""
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE vacancies SET duplicate_of = NULL, possible_duplicate_of = NULL, "
+            "updated_at = datetime('now') "
+            "WHERE id = ? AND (duplicate_of IS NOT NULL OR possible_duplicate_of IS NOT NULL)",
+            (vacancy_id,),
         )
         await db.commit()
 

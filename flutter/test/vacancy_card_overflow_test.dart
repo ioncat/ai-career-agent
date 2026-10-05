@@ -53,6 +53,27 @@ Widget _harness(VacancyListItem vacancy, {double width = 260, List<Override> ext
 }
 
 void main() {
+
+  testWidgets('possible duplicate shows the softer "Maybe dup" badge, not "Dup"', (tester) async {
+    final vacancy = VacancyListItem.fromJson({
+      'id': 1503,
+      'title': 'Product Manager',
+      'company': 'Checkbox',
+      'site': 'dou',
+      'url': 'https://example.com/1503',
+      'status': 'fetched',
+      'possible_duplicate_of': 1448,
+    });
+    expect(vacancy.possibleDuplicateOf, 1448);
+    expect(vacancy.duplicateOf, isNull);
+    expect(vacancy.toJson()['possible_duplicate_of'], 1448);
+
+    await tester.pumpWidget(_harness(vacancy));
+    await tester.pump();
+
+    expect(find.text('Maybe dup #1448'), findsOneWidget);
+    expect(find.text('Dup #1448'), findsNothing);
+  });
   testWidgets('badge cluster with every badge active does not overflow a narrow card', (tester) async {
     final vacancy = VacancyListItem(
       id: 823,

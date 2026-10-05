@@ -46,6 +46,10 @@ class VacancyListItem {
   final List<String> tags;
   final List<String> roleTags;
   final int? duplicateOf;
+  // Weaker tier of duplicateOf (2026-10-05): same title+company as that vacancy,
+  // but the JD texts differ too much to confirm it. Never set together with
+  // duplicateOf.
+  final int? possibleDuplicateOf;
   final String? republishedAt;
   final String? folderPath;
   final String stage;
@@ -86,6 +90,7 @@ class VacancyListItem {
     this.tags = const [],
     this.roleTags = const [],
     this.duplicateOf,
+    this.possibleDuplicateOf,
     this.republishedAt,
     this.folderPath,
     this.stage = 'inbox',
@@ -122,6 +127,7 @@ class VacancyListItem {
       tags: _parseTags(json['tags']),
       roleTags: _parseStringList(json['role_tags']),
       duplicateOf: json['duplicate_of'] as int?,
+      possibleDuplicateOf: json['possible_duplicate_of'] as int?,
       republishedAt: json['republished_at'] as String?,
       folderPath: json['folder_path'] as String?,
       stage: json['stage'] as String? ?? 'inbox',
@@ -157,6 +163,7 @@ class VacancyListItem {
         'tags': tags.join(','),
         'role_tags': roleTags,
         'duplicate_of': duplicateOf,
+        'possible_duplicate_of': possibleDuplicateOf,
         'republished_at': republishedAt,
         'stage': stage,
         'blocker_flag': blockerFlag,

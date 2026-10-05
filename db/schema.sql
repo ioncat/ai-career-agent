@@ -55,6 +55,10 @@ CREATE TABLE IF NOT EXISTS vacancies (
     -- EPIC-26: deduplication + re-publish detection
     duplicate_of  INTEGER REFERENCES vacancies(id),
                                           -- FK to original vacancy if this is a cross-source duplicate
+    possible_duplicate_of INTEGER REFERENCES vacancies(id),
+                                          -- weaker tier: same title+company as that vacancy but JD text
+                                          -- containment < core.dedup.CONFIRM_THRESHOLD (or unreadable file).
+                                          -- Mutually exclusive with duplicate_of.
     content_hash  TEXT,                   -- sha256(normalize(jd_text)) for content-based dedup
     republished_at TEXT,                  -- set when a declined/skipped vacancy reappears in RSS
     fetch_attempts INTEGER NOT NULL DEFAULT 0,
