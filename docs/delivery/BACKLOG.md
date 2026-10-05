@@ -40,7 +40,7 @@
 **What:** owner has noticed repeatedly that vacancies get confusing or contradictory tag sets (e.g. healthcare and fintech and iGaming together). One cause is fixed (tags computed from `JD_analysis.md` text, see CHANGELOG 2026-10-05), but `classify()` in `core/vacancy_tags.py` is keyword-based and tags are merge-only (never removed). Needs a decision on a stricter approach (tag only from a JD's own domain/product sections, a per-vacancy cap, or re-deriving tags on refetch instead of merging). Owner: "think about it separately".
 
 ### 🟡 P2 — Dedup rework (EPIC-26), remaining (added 2026-10-05, updated 2026-10-05)
-**Delivered (see CHANGELOG 2026-10-05):** two tiers, original chosen by text similarity; backfill applied; "already applied" detection (`applied_twin_id`); company identity (`company_profile_url` stored, DOU rows backfilled, `normalize_company_name`, learned `company_profile_links`); text-first duplicates (containment >= 0.90 in a 120-day window, any company); "Co. applied #N" hint (`company_applied_id`).
+**Delivered (see CHANGELOG 2026-10-05):** two tiers, original chosen by text similarity; backfill applied; "already applied" detection (`applied_twin_id`); company identity (`company_profile_url` stored, DOU rows backfilled, `normalize_company_name`, learned `company_profile_links`); text-first duplicates (containment >= 0.90 in a 120-day window, any company); "Applied before #N" hint (`company_applied_id`).
 **Waiting on the owner:** the missed-duplicates scan (`research/dedup-missed-scan-2026-10-05_RU.md`, 176 confirmed + 3 possible among rows with no flag, dry-run, local gitignored) needs a review; then apply it (a new `--apply` for the scan mode, with a DB backup first). Same-URL re-publish of an already-applied vacancy keeps today's behaviour (owner decision); two hash-twin cycles (#205/#233, #388/#467) are untouched.
 **Spec:** [research/dedup-audit-2026-10-05_RU.md](../../research/dedup-audit-2026-10-05_RU.md) and [verdicts](../../research/dedup-audit-verdicts-2026-10-05_RU.md) (local, gitignored). Fuzzy title matching rejected (owner, 2026-10-05).
 
@@ -420,7 +420,7 @@ No dual-availability state — the button's visibility is a direct, deterministi
 
 ### ~77 old-import rows have JD text in the `company` field — clean up (added 2026-10-05)
 **What:** rows imported early (e.g. ids 439, 443, 447, 462) carry a sentence of JD text instead of a company name (a live query counts 150 rows with a `company` longer than 60 characters).
-**Why:** these rows never match a company, so the "Co. applied" hint and the title+company dedup path ignore them; the list shows junk as the company.
+**Why:** these rows never match a company, so the "Applied before" hint and the title+company dedup path ignore them; the list shows junk as the company.
 **Scope (not started):** re-derive the company from the vacancy URL (DOU slug) or the JD, or blank it where unknown; needs a DB backup and a review of the list first.
 
 ### Backlog structure simplification — BACKLOG.md itself (added 2026-09-01)

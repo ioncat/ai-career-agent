@@ -16,9 +16,11 @@ class VacancyCard extends ConsumerStatefulWidget {
   final bool selected;
   final VoidCallback onTap;
   final void Function(int vacancyId)? onTapRelated;
+
   /// Tap on the "Applied #X" badge — opens that vacancy in the Applied folder.
   /// Falls back to [onTapRelated] when not given.
   final void Function(int vacancyId)? onTapApplied;
+
   /// Mass-action mode (BACKLOG "Batch Analysis Mode") — when true, the card
   /// shows a checkbox instead of opening the detail screen on tap.
   final bool multiSelectMode;
@@ -55,21 +57,35 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
     // The "Applied #X" badge already says it all about vacancy X — a weaker
     // Dup/Maybe-dup badge pointing at the same X would be the same fact twice.
     final appliedTwin = v.appliedTwinId;
-    final duplicatedByThisVacancy = (ref.watch(duplicatedByProvider)[v.id] ?? const <int>[])
-        .where((id) => id != appliedTwin)
-        .toList();
+    final duplicatedByThisVacancy =
+        (ref.watch(duplicatedByProvider)[v.id] ?? const <int>[])
+            .where((id) => id != appliedTwin)
+            .toList();
     final onTapApplied = widget.onTapApplied ?? widget.onTapRelated;
-    // "Co. applied #N" (same company, different job) — hidden when the card
+    // "Applied before #N" (same company, different job) — hidden when the card
     // already shows "Applied #N" for that very vacancy.
     final companyApplied = v.companyAppliedId;
-    final showCompanyApplied = companyApplied != null && companyApplied != appliedTwin;
+    final showCompanyApplied =
+        companyApplied != null && companyApplied != appliedTwin;
+    // Row 3 (status & relations) only renders when it has something to show,
+    // so an empty row adds no height.
+    final hasStatusBadges =
+        v.blockerFlag ||
+        appliedTwin != null ||
+        showCompanyApplied ||
+        (v.duplicateOf != null && v.duplicateOf != appliedTwin) ||
+        (v.possibleDuplicateOf != null &&
+            v.possibleDuplicateOf != appliedTwin) ||
+        duplicatedByThisVacancy.isNotEmpty;
 
-    final highlighted = widget.multiSelectMode ? widget.checked : widget.selected;
+    final highlighted = widget.multiSelectMode
+        ? widget.checked
+        : widget.selected;
     final bgColor = highlighted
         ? cs.surface
         : _hovered
-            ? cs.surfaceContainerLow
-            : cs.surface;
+        ? cs.surfaceContainerLow
+        : cs.surface;
 
     final borderRadius = BorderRadius.circular(12);
 
@@ -87,10 +103,11 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
             color: bgColor,
             borderRadius: borderRadius,
             border: highlighted
-                ? Border.all(color: cs.primary.withValues(alpha: 0.55), width: 1.5)
-                : Border.all(
-                    color: cs.outlineVariant.withValues(alpha: 0.3),
-                  ),
+                ? Border.all(
+                    color: cs.primary.withValues(alpha: 0.55),
+                    width: 1.5,
+                  )
+                : Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
             boxShadow: highlighted
                 ? [
                     BoxShadow(
@@ -102,7 +119,9 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
                   ]
                 : [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: _hovered ? 0.08 : 0.04),
+                      color: Colors.black.withValues(
+                        alpha: _hovered ? 0.08 : 0.04,
+                      ),
                       blurRadius: _hovered ? 8 : 2,
                       offset: Offset(0, _hovered ? 2 : 1),
                     ),
@@ -113,220 +132,250 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Row 1: [checkbox in multi-select] source badge + "New" badge + dedup/republish badges
-              // Row 1b: date + star, right-aligned, its OWN row.
-              //
-              // These two used to share one Row, with the badge Wrap inside
-              // Expanded competing for width against the time text + star
-              // button. That inverted the working pattern from the
-              // 2026-07-05 detail-screen fix ("Wrap + PostedChip
-              // right-pinned"): there, the flexible/sacrificial side
-              // (score dots — a custom-painted graphic that degrades
-              // silently) got Expanded, while the must-stay-readable text
-              // chip (PostedChip) stayed a plain, unconstrained sibling.
-              // Putting SourceBadge — the must-stay-readable element here —
-              // inside Expanded meant it could be squeezed below its own
-              // natural width by time+star claiming their share first
-              // (Row measures non-flex siblings before flex ones,
-              // regardless of source order), which is exactly what
-              // happened: "Djinni" first stretched to fill the row
-              // (Container+alignment quirk, fixed with IntrinsicWidth),
-              // then wrapped to two lines under genuine space pressure
-              // (fixed with maxLines — a narrower patch than this one).
-              // Separating the rows removes the contention outright: badges
-              // get the FULL card width to themselves, time+star get theirs
-              // — nothing has to share a shrinking budget with anything
-              // it's actually not okay to shrink.
+              // Card layout, top to bottom (2026-10-05 — badges were crowding one Wrap):
+              //   0  #id (left) · star (right)
+              //   1  what it is: source, New, Republished
+              //   2  domain tags
+              //   3  status & relations: Blocker, Applied, Applied before, Dup, Maybe dup
+              //   4  role title        5  company (left) · posted time (right)        then role tags, scores, key barrier
+              // Rows 1-3 each get the full card width and wrap inside themselves, and an
+              // empty row renders nothing, so badges of different kinds never compete.
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   if (widget.multiSelectMode) ...[
                     Icon(
-                      widget.checked ? Icons.check_box : Icons.check_box_outline_blank,
+                      widget.checked
+                          ? Icons.check_box
+                          : Icons.check_box_outline_blank,
                       size: 20,
                       color: widget.checked ? cs.primary : cs.onSurfaceVariant,
                     ),
                     const SizedBox(width: 8),
                   ],
-                  Expanded(
-                    child: Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        if (v.site.isNotEmpty) SourceBadge(site: v.site),
-                        for (final tag in v.tags) _TagBadge(tag: tag),
-                        if (isUnread) _NewBadge(),
-                        if (v.republishedAt != null)
-                          Tooltip(
-                            message: 'Re-published by the employer after being declined.\nMoved back to inbox for review.',
-                            preferBelow: false,
-                            child: _RepublishedBadge(),
-                          ),
-                        // No hover tooltip here on purpose — the full reason list
-                        // dwarfed the card (found 2026-07-24). Tap the card to see
-                        // details instead.
-                        if (v.blockerFlag) const _BlockerBadge(),
-                        // Already applied to a duplicate of this job (EPIC-26) — the
-                        // CV and cover for it already exist there. No date on purpose.
-                        if (appliedTwin != null)
-                          Tooltip(
-                            message: 'You already applied to this job as #$appliedTwin (CV and cover are there). Tap to open.',
-                            preferBelow: false,
-                            child: MouseRegion(
-                              cursor: onTapApplied != null
-                                  ? SystemMouseCursors.click
-                                  : MouseCursor.defer,
-                              child: GestureDetector(
-                                onTap: onTapApplied != null
-                                    ? () => onTapApplied(appliedTwin)
-                                    : null,
-                                behavior: HitTestBehavior.opaque,
-                                child: _AppliedTwinBadge(twinId: appliedTwin),
-                              ),
-                            ),
-                          ),
-                        // Applied to ANOTHER job at the same company — a hint, not a
-                        // duplicate: deliberately weaker than "Applied #X".
-                        if (showCompanyApplied)
-                          Tooltip(
-                            message: 'You applied to another job at this company (#$companyApplied). Tap to open.',
-                            preferBelow: false,
-                            child: MouseRegion(
-                              cursor: onTapApplied != null
-                                  ? SystemMouseCursors.click
-                                  : MouseCursor.defer,
-                              child: GestureDetector(
-                                onTap: onTapApplied != null
-                                    ? () => onTapApplied(companyApplied)
-                                    : null,
-                                behavior: HitTestBehavior.opaque,
-                                child: _CompanyAppliedBadge(vacancyId: companyApplied),
-                              ),
-                            ),
-                          ),
-                        if (v.duplicateOf != null && v.duplicateOf != appliedTwin)
-                          Tooltip(
-                            message: 'Same job found on another source (duplicate of #${v.duplicateOf}).\nTap to view the original posting.',
-                            preferBelow: false,
-                            child: MouseRegion(
-                              cursor: widget.onTapRelated != null
-                                  ? SystemMouseCursors.click
-                                  : MouseCursor.defer,
-                              child: GestureDetector(
-                                onTap: widget.onTapRelated != null
-                                    ? () => widget.onTapRelated!(v.duplicateOf!)
-                                    : null,
-                                behavior: HitTestBehavior.opaque,
-                                child: _DuplicateBadge(originalId: v.duplicateOf!),
-                              ),
-                            ),
-                          ),
-                        // Softer tier (2026-10-05): same title+company as #N but the
-                        // JD texts differ — flagged side only, no reciprocal badge.
-                        if (v.possibleDuplicateOf != null && v.possibleDuplicateOf != appliedTwin)
-                          Tooltip(
-                            message: 'Looks like the same job as #${v.possibleDuplicateOf}, but the texts differ — check before treating it as a duplicate',
-                            preferBelow: false,
-                            child: MouseRegion(
-                              cursor: widget.onTapRelated != null
-                                  ? SystemMouseCursors.click
-                                  : MouseCursor.defer,
-                              child: GestureDetector(
-                                onTap: widget.onTapRelated != null
-                                    ? () => widget.onTapRelated!(v.possibleDuplicateOf!)
-                                    : null,
-                                behavior: HitTestBehavior.opaque,
-                                child: _PossibleDuplicateBadge(originalId: v.possibleDuplicateOf!),
-                              ),
-                            ),
-                          ),
-                        // Reciprocal side: this card IS the canonical posting
-                        // some other row points at via duplicateOf — same
-                        // badge, reversed tooltip/direction, so the
-                        // relationship reads from either card.
-                        for (final dupId in duplicatedByThisVacancy)
-                          Tooltip(
-                            message: 'Same job also found on another source, posted as #$dupId.\nTap to view that posting.',
-                            preferBelow: false,
-                            child: MouseRegion(
-                              cursor: widget.onTapRelated != null
-                                  ? SystemMouseCursors.click
-                                  : MouseCursor.defer,
-                              child: GestureDetector(
-                                onTap: widget.onTapRelated != null
-                                    ? () => widget.onTapRelated!(dupId)
-                                    : null,
-                                behavior: HitTestBehavior.opaque,
-                                child: _DuplicateBadge(originalId: dupId),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  if (v.publishedAt != null) ...[
-                    Text(
-                      _relativeTime(v.publishedAt!),
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: cs.secondary,
-                          ),
-                    ),
-                    const SizedBox(width: 6),
-                  ],
-                  _StarButton(vacancyId: v.id, isStarred: v.starred),
-                ],
-              ),
-              const SizedBox(height: 8),
-              // Row 2: role title + #id aligned right
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(
-                    child: Text(
-                      v.role,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: widget.selected ? cs.primary : cs.onSurface,
-                          ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
                   Text(
                     '#${v.id}',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: cs.onSurfaceVariant.withValues(alpha: 0.45),
-                        ),
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+                    ),
                   ),
+                  const Spacer(),
+                  _StarButton(vacancyId: v.id, isStarred: v.starred),
                 ],
               ),
-              const SizedBox(height: 2),
-              // Row 3: company
-              if (v.company.isNotEmpty)
-                Text(
-                  v.company,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: cs.onSurfaceVariant,
+              // Row 1: what it is
+              if (v.site.isNotEmpty || isUnread || v.republishedAt != null) ...[
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    if (v.site.isNotEmpty) SourceBadge(site: v.site),
+                    if (isUnread) _NewBadge(),
+                    if (v.republishedAt != null)
+                      Tooltip(
+                        message:
+                            'Re-published by the employer after being declined.\nMoved back to inbox for review.',
+                        preferBelow: false,
+                        child: _RepublishedBadge(),
                       ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  ],
+                ),
+              ],
+              // Row 2: domain tags
+              if (v.tags.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [for (final tag in v.tags) _TagBadge(tag: tag)],
+                ),
+              ],
+              // Row 3: status & relations
+              if (hasStatusBadges) ...[
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    // No hover tooltip here on purpose — the full reason list
+                    // dwarfed the card (found 2026-07-24). Tap the card to see
+                    // details instead.
+                    if (v.blockerFlag) const _BlockerBadge(),
+                    // Already applied to a duplicate of this job (EPIC-26) — the
+                    // CV and cover for it already exist there. No date on purpose.
+                    if (appliedTwin != null)
+                      Tooltip(
+                        message:
+                            'You already applied to this job as #$appliedTwin (CV and cover are there). Tap to open.',
+                        preferBelow: false,
+                        child: MouseRegion(
+                          cursor: onTapApplied != null
+                              ? SystemMouseCursors.click
+                              : MouseCursor.defer,
+                          child: GestureDetector(
+                            onTap: onTapApplied != null
+                                ? () => onTapApplied(appliedTwin)
+                                : null,
+                            behavior: HitTestBehavior.opaque,
+                            child: _AppliedTwinBadge(twinId: appliedTwin),
+                          ),
+                        ),
+                      ),
+                    // Applied to ANOTHER job at the same company — a hint, not a
+                    // duplicate: deliberately weaker than "Applied #X".
+                    if (showCompanyApplied)
+                      Tooltip(
+                        message:
+                            'You already applied to another job at this company (#$companyApplied). Tap to open it.',
+                        preferBelow: false,
+                        child: MouseRegion(
+                          cursor: onTapApplied != null
+                              ? SystemMouseCursors.click
+                              : MouseCursor.defer,
+                          child: GestureDetector(
+                            onTap: onTapApplied != null
+                                ? () => onTapApplied(companyApplied)
+                                : null,
+                            behavior: HitTestBehavior.opaque,
+                            child: _CompanyAppliedBadge(
+                              vacancyId: companyApplied,
+                            ),
+                          ),
+                        ),
+                      ),
+                    if (v.duplicateOf != null && v.duplicateOf != appliedTwin)
+                      Tooltip(
+                        message:
+                            'Same job found on another source (duplicate of #${v.duplicateOf}).\nTap to view the original posting.',
+                        preferBelow: false,
+                        child: MouseRegion(
+                          cursor: widget.onTapRelated != null
+                              ? SystemMouseCursors.click
+                              : MouseCursor.defer,
+                          child: GestureDetector(
+                            onTap: widget.onTapRelated != null
+                                ? () => widget.onTapRelated!(v.duplicateOf!)
+                                : null,
+                            behavior: HitTestBehavior.opaque,
+                            child: _DuplicateBadge(originalId: v.duplicateOf!),
+                          ),
+                        ),
+                      ),
+                    // Softer tier (2026-10-05): same title+company as #N but the
+                    // JD texts differ — flagged side only, no reciprocal badge.
+                    if (v.possibleDuplicateOf != null &&
+                        v.possibleDuplicateOf != appliedTwin)
+                      Tooltip(
+                        message:
+                            'Looks like the same job as #${v.possibleDuplicateOf}, but the texts differ — check before treating it as a duplicate',
+                        preferBelow: false,
+                        child: MouseRegion(
+                          cursor: widget.onTapRelated != null
+                              ? SystemMouseCursors.click
+                              : MouseCursor.defer,
+                          child: GestureDetector(
+                            onTap: widget.onTapRelated != null
+                                ? () => widget.onTapRelated!(
+                                    v.possibleDuplicateOf!,
+                                  )
+                                : null,
+                            behavior: HitTestBehavior.opaque,
+                            child: _PossibleDuplicateBadge(
+                              originalId: v.possibleDuplicateOf!,
+                            ),
+                          ),
+                        ),
+                      ),
+                    // Reciprocal side: this card IS the canonical posting
+                    // some other row points at via duplicateOf — same
+                    // badge, reversed tooltip/direction, so the
+                    // relationship reads from either card.
+                    for (final dupId in duplicatedByThisVacancy)
+                      Tooltip(
+                        message:
+                            'Same job also found on another source, posted as #$dupId.\nTap to view that posting.',
+                        preferBelow: false,
+                        child: MouseRegion(
+                          cursor: widget.onTapRelated != null
+                              ? SystemMouseCursors.click
+                              : MouseCursor.defer,
+                          child: GestureDetector(
+                            onTap: widget.onTapRelated != null
+                                ? () => widget.onTapRelated!(dupId)
+                                : null,
+                            behavior: HitTestBehavior.opaque,
+                            child: _DuplicateBadge(originalId: dupId),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 8),
+              // Row 4: role title
+              Text(
+                v.role,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: widget.selected ? cs.primary : cs.onSurface,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 2),
+              // Row 5: company (left) · posted time (right). The time shrinks with an
+              // ellipsis only after the company name has been given its space.
+              if (v.company.isNotEmpty || v.publishedAt != null)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        v.company,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (v.publishedAt != null) ...[
+                      const SizedBox(width: 8),
+                      // Pill, same shape as the other badges: a plain coloured
+                      // date blended into the surrounding dark text.
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: cs.secondaryContainer,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          _relativeTime(v.publishedAt!),
+                          maxLines: 1,
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                color: cs.primary,
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               if (v.roleTags.isNotEmpty) ...[
                 const SizedBox(height: 4),
                 Text(
                   v.roleTags.join('  '),
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: cs.secondary.withValues(alpha: 0.65),
-                        letterSpacing: 0.2,
-                      ),
+                    color: cs.secondary.withValues(alpha: 0.65),
+                    letterSpacing: 0.2,
+                  ),
                 ),
               ],
               const SizedBox(height: 10),
@@ -347,27 +396,29 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
               if (v.keyBarriers.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: cs.errorContainer.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: cs.error.withValues(alpha: 0.2),
-                    ),
+                    border: Border.all(color: cs.error.withValues(alpha: 0.2)),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.warning_amber_rounded,
-                          size: 14, color: cs.error),
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        size: 14,
+                        color: cs.error,
+                      ),
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
                           v.keyBarriers.first,
-                          style:
-                              Theme.of(context).textTheme.labelSmall?.copyWith(
-                                    color: cs.onSurfaceVariant,
-                                  ),
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(color: cs.onSurfaceVariant),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -399,10 +450,10 @@ class _NewBadge extends StatelessWidget {
       child: Text(
         'New',
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: const Color(0xFFE65100),
-              fontWeight: FontWeight.w700,
-              fontSize: 10,
-            ),
+          color: const Color(0xFFE65100),
+          fontWeight: FontWeight.w700,
+          fontSize: 10,
+        ),
       ),
     );
   }
@@ -429,10 +480,10 @@ class _TagBadge extends StatelessWidget {
       child: Text(
         tag.toUpperCase(),
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: const Color(0xFF5E35B1),
-              fontWeight: FontWeight.w700,
-              fontSize: 10,
-            ),
+          color: const Color(0xFF5E35B1),
+          fontWeight: FontWeight.w700,
+          fontSize: 10,
+        ),
       ),
     );
   }
@@ -450,9 +501,9 @@ class _FailedBadge extends StatelessWidget {
         Text(
           'Analysis failed · tap to retry',
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: cs.error,
-                fontWeight: FontWeight.w600,
-              ),
+            color: cs.error,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ],
     );
@@ -472,10 +523,10 @@ class _RepublishedBadge extends StatelessWidget {
       child: Text(
         '↑ Republished',
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: const Color(0xFFF57F17),
-              fontWeight: FontWeight.w700,
-              fontSize: 10,
-            ),
+          color: const Color(0xFFF57F17),
+          fontWeight: FontWeight.w700,
+          fontSize: 10,
+        ),
       ),
     );
   }
@@ -512,10 +563,10 @@ class _BlockerBadge extends StatelessWidget {
             // see the removed hover tooltip note above.
             'Blocker',
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: const Color(0xFFC62828),
-                  fontWeight: FontWeight.w700,
-                  fontSize: 10,
-                ),
+              color: const Color(0xFFC62828),
+              fontWeight: FontWeight.w700,
+              fontSize: 10,
+            ),
           ),
         ],
       ),
@@ -536,7 +587,10 @@ class _AppliedTwinBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.applied.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.applied.withValues(alpha: 0.6), width: 0.8),
+        border: Border.all(
+          color: AppColors.applied.withValues(alpha: 0.6),
+          width: 0.8,
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -546,10 +600,10 @@ class _AppliedTwinBadge extends StatelessWidget {
           Text(
             'Applied #$twinId',
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: AppColors.applied,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 10,
-                ),
+              color: AppColors.applied,
+              fontWeight: FontWeight.w700,
+              fontSize: 10,
+            ),
           ),
         ],
       ),
@@ -557,7 +611,7 @@ class _AppliedTwinBadge extends StatelessWidget {
   }
 }
 
-// "Co. applied #N" — weaker than _AppliedTwinBadge: no fill, no icon, faint green
+// "Applied before #N" — weaker than _AppliedTwinBadge: no fill, no icon, faint green
 // outline, regular weight. Same company, different job (not a duplicate).
 class _CompanyAppliedBadge extends StatelessWidget {
   final int vacancyId;
@@ -569,15 +623,18 @@ class _CompanyAppliedBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.applied.withValues(alpha: 0.35), width: 0.8),
+        border: Border.all(
+          color: AppColors.applied.withValues(alpha: 0.35),
+          width: 0.8,
+        ),
       ),
       child: Text(
-        'Co. applied #$vacancyId',
+        'Applied before #$vacancyId',
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: AppColors.applied.withValues(alpha: 0.8),
-              fontWeight: FontWeight.w400,
-              fontSize: 10,
-            ),
+          color: AppColors.applied.withValues(alpha: 0.8),
+          fontWeight: FontWeight.w400,
+          fontSize: 10,
+        ),
       ),
     );
   }
@@ -600,10 +657,10 @@ class _DuplicateBadge extends StatelessWidget {
       child: Text(
         'Dup #$originalId',
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: cs.onSurfaceVariant,
-              fontWeight: FontWeight.w600,
-              fontSize: 10,
-            ),
+          color: cs.onSurfaceVariant,
+          fontWeight: FontWeight.w600,
+          fontSize: 10,
+        ),
       ),
     );
   }
@@ -621,15 +678,18 @@ class _PossibleDuplicateBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.6), width: 0.8),
+        border: Border.all(
+          color: cs.outlineVariant.withValues(alpha: 0.6),
+          width: 0.8,
+        ),
       ),
       child: Text(
         'Maybe dup #$originalId',
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: cs.onSurfaceVariant.withValues(alpha: 0.75),
-              fontWeight: FontWeight.w400,
-              fontSize: 10,
-            ),
+          color: cs.onSurfaceVariant.withValues(alpha: 0.75),
+          fontWeight: FontWeight.w400,
+          fontSize: 10,
+        ),
       ),
     );
   }
@@ -666,10 +726,17 @@ class _StarButtonState extends ConsumerState<_StarButton> {
   Future<void> _toggle() async {
     if (_loading) return;
     final next = !_starred;
-    setState(() { _starred = next; _loading = true; });
+    setState(() {
+      _starred = next;
+      _loading = true;
+    });
     try {
-      final apiUrl = ref.read(settingsProvider).valueOrNull?.apiUrl ?? 'http://localhost:8080';
-      await VacancyRepository(baseUrl: apiUrl).setStarred(widget.vacancyId, next);
+      final apiUrl =
+          ref.read(settingsProvider).valueOrNull?.apiUrl ??
+          'http://localhost:8080';
+      await VacancyRepository(
+        baseUrl: apiUrl,
+      ).setStarred(widget.vacancyId, next);
       if (mounted) ref.read(vacancyListProvider.notifier).refresh();
     } catch (_) {
       if (mounted) setState(() => _starred = !next);
@@ -689,11 +756,14 @@ class _StarButtonState extends ConsumerState<_StarButton> {
           child: Icon(
             _starred ? Icons.star_rounded : Icons.star_outline_rounded,
             size: 18,
-            color: _starred ? const Color(0xFFFFB300) : Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+            color: _starred
+                ? const Color(0xFFFFB300)
+                : Theme.of(
+                    context,
+                  ).colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
           ),
         ),
       ),
     );
   }
 }
-

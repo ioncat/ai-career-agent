@@ -58,7 +58,7 @@ class VacancyListItem {
   // Most recently applied vacancy at the SAME COMPANY (profile identity, then
   // normalized name) — excluding this vacancy and its appliedTwinId; null when
   // none or when this vacancy is itself applied. Drives the weaker
-  // "Co. applied #N" badge (2026-10-05).
+  // "Applied before #N" badge (2026-10-05).
   final int? companyAppliedId;
   final String? republishedAt;
   final String? folderPath;

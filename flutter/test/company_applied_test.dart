@@ -7,7 +7,7 @@ import 'package:career_agent/providers/settings_provider.dart';
 import 'package:career_agent/widgets/vacancy_card.dart';
 
 // "Applied at this company" hint (EPIC-26, 2026-10-05): company_applied_id in
-// the model and the weaker "Co. applied #N" card badge. The layout itself was
+// the model and the weaker "Applied before #N" card badge. The layout itself was
 // not visually checked (no preview for the desktop app) — these tests cover
 // presence, suppression and tap behaviour only.
 
@@ -72,10 +72,10 @@ void main() {
   });
 
   group('card badge', () {
-    testWidgets('shows "Co. applied #N"', (tester) async {
+    testWidgets('shows "Applied before #N"', (tester) async {
       await tester.pumpWidget(_harness(_vacancy({'company_applied_id': 598})));
       await tester.pump();
-      expect(find.text('Co. applied #598'), findsOneWidget);
+      expect(find.text('Applied before #598'), findsOneWidget);
       expect(find.textContaining('Applied #'), findsNothing); // the strong badge is a different one
       expect(tester.takeException(), isNull);
     });
@@ -83,7 +83,7 @@ void main() {
     testWidgets('absent when companyAppliedId is null', (tester) async {
       await tester.pumpWidget(_harness(_vacancy({})));
       await tester.pump();
-      expect(find.textContaining('Co. applied'), findsNothing);
+      expect(find.textContaining('Applied before'), findsNothing);
     });
 
     testWidgets('hidden when the card already shows "Applied #X" for the same id', (tester) async {
@@ -92,7 +92,7 @@ void main() {
       );
       await tester.pump();
       expect(find.text('Applied #598'), findsOneWidget);
-      expect(find.textContaining('Co. applied'), findsNothing);
+      expect(find.textContaining('Applied before'), findsNothing);
     });
 
     testWidgets('shown next to "Applied #X" when they point at different vacancies', (tester) async {
@@ -101,7 +101,7 @@ void main() {
       );
       await tester.pump();
       expect(find.text('Applied #1448'), findsOneWidget);
-      expect(find.text('Co. applied #598'), findsOneWidget);
+      expect(find.text('Applied before #598'), findsOneWidget);
     });
 
     testWidgets('tap opens the vacancy via onTapApplied (same navigation as "Applied #N")',
@@ -114,7 +114,7 @@ void main() {
         ),
       );
       await tester.pump();
-      await tester.tap(find.text('Co. applied #598'));
+      await tester.tap(find.text('Applied before #598'));
       expect(opened, 598);
     });
 
@@ -127,7 +127,7 @@ void main() {
         ),
       );
       await tester.pump();
-      await tester.tap(find.text('Co. applied #598'));
+      await tester.tap(find.text('Applied before #598'));
       expect(opened, 598);
     });
 
