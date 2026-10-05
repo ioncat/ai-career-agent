@@ -52,13 +52,13 @@ class VacancyListItem {
   final int? possibleDuplicateOf;
   // Id of an already-applied vacancy in this one's duplicate group (confirmed or
   // possible links, any direction) — computed by the backend, null when none or
-  // when this vacancy is itself applied. Drives the "Applied #X" badge and the
+  // when this vacancy is itself applied. Drives the red "applied to this job" line and the
   // Analyze guard.
   final int? appliedTwinId;
   // Most recently applied vacancy at the SAME COMPANY (profile identity, then
   // normalized name) — excluding this vacancy and its appliedTwinId; null when
   // none or when this vacancy is itself applied. Drives the weaker
-  // "Applied before #N" badge (2026-10-05).
+  // "applied to this company" line (2026-10-05).
   final int? companyAppliedId;
   final String? republishedAt;
   final String? folderPath;

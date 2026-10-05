@@ -420,7 +420,7 @@ No dual-availability state — the button's visibility is a direct, deterministi
 
 ### ~77 old-import rows have JD text in the `company` field — clean up (added 2026-10-05)
 **What:** rows imported early (e.g. ids 439, 443, 447, 462) carry a sentence of JD text instead of a company name (a live query counts 150 rows with a `company` longer than 60 characters).
-**Why:** these rows never match a company, so the "Applied before" hint and the title+company dedup path ignore them; the list shows junk as the company.
+**Why:** these rows never match a company, so the "applied to this company" hint and the title+company dedup path ignore them; the list shows junk as the company.
 **Scope (not started):** re-derive the company from the vacancy URL (DOU slug) or the JD, or blank it where unknown; needs a DB backup and a review of the list first.
 
 ### Backlog structure simplification — BACKLOG.md itself (added 2026-09-01)

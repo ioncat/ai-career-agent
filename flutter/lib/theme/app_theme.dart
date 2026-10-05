@@ -3,14 +3,9 @@ import 'package:flutter/material.dart';
 // ── Brand colors (from DESIGN.md / Fluid Desktop Workspace) ──────────────────
 
 class AppColors {
-  // Source-platform brand colors (not in M3 ColorScheme)
-  static const sourceDjinni  = Color(0xFF007BFF);
-  static const sourceDou     = Color(0xFF4CAF50);
-  static const sourceLinkedIn = Color(0xFF004182);
-  static const sourceWork    = Color(0xFFFF6D00);  // work.ua brand orange
-  static const sourceRabota  = Color(0xFF00897B);  // rabota.ua
-  static const sourceRobota  = Color(0xFF6A1B9A);  // robota.ua (distinct site from rabota.ua)
-  static const sourceOther   = Color(0xFF7A7582);  // == outline — unrecognized/manual-paste fallback
+  // One colour for every source badge (owner, 2026-10-05) — the per-site brand
+  // colours made the card look like a rainbow.
+  static const source = Color(0xFF4CAF50);
   // The "Applied" green — same value the vacancy-detail Applied toggle uses.
   static const applied       = Color(0xFF2E7D32);
 }
@@ -153,17 +148,7 @@ class VacScoreColors {
 }
 
 class SourceColors {
-  static Color forSite(String site) {
-    switch (site.toLowerCase()) {
-      case 'djinni':   return AppColors.sourceDjinni;
-      case 'dou':      return AppColors.sourceDou;
-      case 'linkedin': return AppColors.sourceLinkedIn;
-      case 'work':     return AppColors.sourceWork;
-      case 'rabota':   return AppColors.sourceRabota;
-      case 'robota':   return AppColors.sourceRobota;
-      default:         return AppColors.sourceOther;
-    }
-  }
+  static Color forSite(String site) => AppColors.source;
 
   static String label(String site) {
     switch (site.toLowerCase()) {

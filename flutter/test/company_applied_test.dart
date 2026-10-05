@@ -7,7 +7,7 @@ import 'package:career_agent/providers/settings_provider.dart';
 import 'package:career_agent/widgets/vacancy_card.dart';
 
 // "Applied at this company" hint (EPIC-26, 2026-10-05): company_applied_id in
-// the model and the weaker "Applied before #N" card badge. The layout itself was
+// the model and the "applied to this company" card line. The layout itself was
 // not visually checked (no preview for the desktop app) — these tests cover
 // presence, suppression and tap behaviour only.
 
@@ -72,39 +72,39 @@ void main() {
   });
 
   group('card badge', () {
-    testWidgets('shows "Applied before #N"', (tester) async {
+    testWidgets('shows the "applied to this company" line', (tester) async {
       await tester.pumpWidget(_harness(_vacancy({'company_applied_id': 598})));
       await tester.pump();
-      expect(find.text('Applied before #598'), findsOneWidget);
-      expect(find.textContaining('Applied #'), findsNothing); // the strong badge is a different one
+      expect(find.text('You already applied to this company:'), findsOneWidget);
+      expect(find.textContaining('to this job'), findsNothing); // the strong badge is a different one
       expect(tester.takeException(), isNull);
     });
 
     testWidgets('absent when companyAppliedId is null', (tester) async {
       await tester.pumpWidget(_harness(_vacancy({})));
       await tester.pump();
-      expect(find.textContaining('Applied before'), findsNothing);
+      expect(find.textContaining('this company'), findsNothing);
     });
 
-    testWidgets('hidden when the card already shows "Applied #X" for the same id', (tester) async {
+    testWidgets('hidden when the card already shows the this-job line for the same id', (tester) async {
       await tester.pumpWidget(
         _harness(_vacancy({'applied_twin_id': 598, 'company_applied_id': 598})),
       );
       await tester.pump();
-      expect(find.text('Applied #598'), findsOneWidget);
-      expect(find.textContaining('Applied before'), findsNothing);
+      expect(find.text('You already applied to this job:'), findsOneWidget);
+      expect(find.textContaining('this company'), findsNothing);
     });
 
-    testWidgets('shown next to "Applied #X" when they point at different vacancies', (tester) async {
+    testWidgets('shown next to the this-job line when they point at different vacancies', (tester) async {
       await tester.pumpWidget(
         _harness(_vacancy({'applied_twin_id': 1448, 'company_applied_id': 598})),
       );
       await tester.pump();
-      expect(find.text('Applied #1448'), findsOneWidget);
-      expect(find.text('Applied before #598'), findsOneWidget);
+      expect(find.text('You already applied to this job:'), findsOneWidget);
+      expect(find.text('You already applied to this company:'), findsOneWidget);
     });
 
-    testWidgets('tap opens the vacancy via onTapApplied (same navigation as "Applied #N")',
+    testWidgets('tap opens the vacancy via onTapApplied (same navigation as the this-job line)',
         (tester) async {
       int? opened;
       await tester.pumpWidget(
@@ -114,7 +114,7 @@ void main() {
         ),
       );
       await tester.pump();
-      await tester.tap(find.text('Applied before #598'));
+      await tester.tap(find.text('You already applied to this company:'));
       expect(opened, 598);
     });
 
@@ -127,7 +127,7 @@ void main() {
         ),
       );
       await tester.pump();
-      await tester.tap(find.text('Applied before #598'));
+      await tester.tap(find.text('You already applied to this company:'));
       expect(opened, 598);
     });
 

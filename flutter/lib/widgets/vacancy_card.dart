@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/vacancy.dart';
 import '../providers/read_vacancies_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/vacancy_list_provider.dart';
 import '../repositories/vacancy_repository.dart';
-import '../theme/app_theme.dart';
 import '../utils/backend_time.dart';
 import 'fit_score_chip.dart';
 import 'vac_score_badge.dart';
@@ -17,7 +17,7 @@ class VacancyCard extends ConsumerStatefulWidget {
   final VoidCallback onTap;
   final void Function(int vacancyId)? onTapRelated;
 
-  /// Tap on the "Applied #X" badge — opens that vacancy in the Applied folder.
+  /// Tap on an "already applied" line — opens that vacancy in the Applied folder.
   /// Falls back to [onTapRelated] when not given.
   final void Function(int vacancyId)? onTapApplied;
 
@@ -54,7 +54,7 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
     final v = widget.vacancy;
     final readIds = ref.watch(readVacanciesProvider).valueOrNull ?? {};
     final isUnread = v.status == 'fetched' && !readIds.contains(v.id);
-    // The "Applied #X" badge already says it all about vacancy X — a weaker
+    // The "applied to this job: #X" line already says it all about vacancy X — a weaker
     // Dup/Maybe-dup badge pointing at the same X would be the same fact twice.
     final appliedTwin = v.appliedTwinId;
     final duplicatedByThisVacancy =
@@ -62,8 +62,8 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
             .where((id) => id != appliedTwin)
             .toList();
     final onTapApplied = widget.onTapApplied ?? widget.onTapRelated;
-    // "Applied before #N" (same company, different job) — hidden when the card
-    // already shows "Applied #N" for that very vacancy.
+    // "applied to this company: #N" (same company, different job) — hidden when the
+    // card already shows the this-job line for that very vacancy.
     final companyApplied = v.companyAppliedId;
     final showCompanyApplied =
         companyApplied != null && companyApplied != appliedTwin;
@@ -71,8 +71,6 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
     // so an empty row adds no height.
     final hasStatusBadges =
         v.blockerFlag ||
-        appliedTwin != null ||
-        showCompanyApplied ||
         (v.duplicateOf != null && v.duplicateOf != appliedTwin) ||
         (v.possibleDuplicateOf != null &&
             v.possibleDuplicateOf != appliedTwin) ||
@@ -136,8 +134,8 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
               //   0  #id (left) · star (right)
               //   1  what it is: source, New, Republished
               //   2  domain tags
-              //   3  status & relations: Blocker, Applied, Applied before, Dup, Maybe dup
-              //   4  role title        5  company (left) · posted time (right)        then role tags, scores, key barrier
+              //   3  status & relations: Blocker, Dup, Maybe dup
+              //   4  role title        5  company (left) · posted time (right)        then role tags, scores, key barrier, and the red "already applied" lines
               // Rows 1-3 each get the full card width and wrap inside themselves, and an
               // empty row renders nothing, so badges of different kinds never compete.
               Row(
@@ -153,10 +151,36 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
                     ),
                     const SizedBox(width: 8),
                   ],
-                  Text(
-                    '#${v.id}',
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+                  // Click copies the bare number (no "#") to the clipboard; the inner
+                  // GestureDetector wins over the card's own tap, so the card is not
+                  // opened by it.
+                  Tooltip(
+                    message: 'Click to copy the ID',
+                    child: MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () {
+                          Clipboard.setData(ClipboardData(text: '${v.id}'));
+                          ScaffoldMessenger.maybeOf(context)
+                            ?..hideCurrentSnackBar()
+                            ..showSnackBar(
+                              SnackBar(
+                                content: Text('Copied ${v.id}'),
+                                duration: const Duration(seconds: 1),
+                              ),
+                            );
+                        },
+                        child: Text(
+                          '#${v.id}',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: cs.onSurface,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 11,
+                              ),
+                        ),
+                      ),
                     ),
                   ),
                   const Spacer(),
@@ -205,48 +229,6 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
                     // dwarfed the card (found 2026-07-24). Tap the card to see
                     // details instead.
                     if (v.blockerFlag) const _BlockerBadge(),
-                    // Already applied to a duplicate of this job (EPIC-26) — the
-                    // CV and cover for it already exist there. No date on purpose.
-                    if (appliedTwin != null)
-                      Tooltip(
-                        message:
-                            'You already applied to this job as #$appliedTwin (CV and cover are there). Tap to open.',
-                        preferBelow: false,
-                        child: MouseRegion(
-                          cursor: onTapApplied != null
-                              ? SystemMouseCursors.click
-                              : MouseCursor.defer,
-                          child: GestureDetector(
-                            onTap: onTapApplied != null
-                                ? () => onTapApplied(appliedTwin)
-                                : null,
-                            behavior: HitTestBehavior.opaque,
-                            child: _AppliedTwinBadge(twinId: appliedTwin),
-                          ),
-                        ),
-                      ),
-                    // Applied to ANOTHER job at the same company — a hint, not a
-                    // duplicate: deliberately weaker than "Applied #X".
-                    if (showCompanyApplied)
-                      Tooltip(
-                        message:
-                            'You already applied to another job at this company (#$companyApplied). Tap to open it.',
-                        preferBelow: false,
-                        child: MouseRegion(
-                          cursor: onTapApplied != null
-                              ? SystemMouseCursors.click
-                              : MouseCursor.defer,
-                          child: GestureDetector(
-                            onTap: onTapApplied != null
-                                ? () => onTapApplied(companyApplied)
-                                : null,
-                            behavior: HitTestBehavior.opaque,
-                            child: _CompanyAppliedBadge(
-                              vacancyId: companyApplied,
-                            ),
-                          ),
-                        ),
-                      ),
                     if (v.duplicateOf != null && v.duplicateOf != appliedTwin)
                       Tooltip(
                         message:
@@ -427,6 +409,25 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
                   ),
                 ),
               ],
+              // Plain-text applied notes (replace the old "Applied #N" /
+              // "Applied before #N" badges, which nobody could decode at a glance).
+              if (appliedTwin != null || showCompanyApplied) ...[
+                const SizedBox(height: 8),
+                if (appliedTwin != null)
+                  _AppliedNote(
+                    label: 'You already applied to this job:',
+                    vacancyId: appliedTwin,
+                    onTap: onTapApplied,
+                  ),
+                if (appliedTwin != null && showCompanyApplied)
+                  const SizedBox(height: 2),
+                if (showCompanyApplied)
+                  _AppliedNote(
+                    label: 'You already applied to this company:',
+                    vacancyId: companyApplied,
+                    onTap: onTapApplied,
+                  ),
+              ],
             ],
           ),
         ),
@@ -574,66 +575,54 @@ class _BlockerBadge extends StatelessWidget {
   }
 }
 
-// "Applied #X" — an already-applied duplicate exists. Distinct from the neutral
-// Dup badges: tinted with the same green as the Applied toggle (AppColors.applied).
-class _AppliedTwinBadge extends StatelessWidget {
-  final int twinId;
-  const _AppliedTwinBadge({required this.twinId});
+// Red; amber looked washed out and green fought with the green source
+// badge (owner, 2026-10-05).
+const _kAppliedNoteColor = Color(0xFFC62828);
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-      decoration: BoxDecoration(
-        color: AppColors.applied.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: AppColors.applied.withValues(alpha: 0.6),
-          width: 0.8,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.check_circle, size: 11, color: AppColors.applied),
-          const SizedBox(width: 3),
-          Text(
-            'Applied #$twinId',
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: AppColors.applied,
-              fontWeight: FontWeight.w700,
-              fontSize: 10,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// "Applied before #N" — weaker than _AppliedTwinBadge: no fill, no icon, faint green
-// outline, regular weight. Same company, different job (not a duplicate).
-class _CompanyAppliedBadge extends StatelessWidget {
+// One plain-text line at the bottom of the card: "You already applied to this exact
+// job: #N" (an applied duplicate exists) or "... to this company: #N" (another job at
+// the same company). Red; the whole line opens vacancy N.
+class _AppliedNote extends StatelessWidget {
+  final String label;
   final int vacancyId;
-  const _CompanyAppliedBadge({required this.vacancyId});
+  final void Function(int vacancyId)? onTap;
+  const _AppliedNote({
+    required this.label,
+    required this.vacancyId,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: AppColors.applied.withValues(alpha: 0.35),
-          width: 0.8,
-        ),
-      ),
-      child: Text(
-        'Applied before #$vacancyId',
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: AppColors.applied.withValues(alpha: 0.8),
-          fontWeight: FontWeight.w400,
-          fontSize: 10,
+    final base = Theme.of(
+      context,
+    ).textTheme.labelMedium?.copyWith(color: _kAppliedNoteColor, fontSize: 10);
+    return MouseRegion(
+      cursor: onTap != null ? SystemMouseCursors.click : MouseCursor.defer,
+      child: GestureDetector(
+        onTap: onTap != null ? () => onTap!(vacancyId) : null,
+        behavior: HitTestBehavior.opaque,
+        child: Row(
+          children: [
+            const Icon(Icons.check_circle, size: 11, color: _kAppliedNoteColor),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: base,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '#$vacancyId',
+              style: base?.copyWith(
+                fontWeight: FontWeight.w700,
+                decoration: TextDecoration.underline,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -755,12 +744,14 @@ class _StarButtonState extends ConsumerState<_StarButton> {
           padding: const EdgeInsets.only(left: 4),
           child: Icon(
             _starred ? Icons.star_rounded : Icons.star_outline_rounded,
+            // Sized and coloured like the bold #id on the other end of row 0, so
+            // the star is not a faint counterweight to it. Still an outline.
             size: 18,
             color: _starred
                 ? const Color(0xFFFFB300)
                 : Theme.of(
                     context,
-                  ).colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+                  ).colorScheme.onSurface.withValues(alpha: 0.85),
           ),
         ),
       ),

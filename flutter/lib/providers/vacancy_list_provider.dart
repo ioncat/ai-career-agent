@@ -174,7 +174,7 @@ final vacancyListProvider =
 
 // One-shot request to switch the sidebar to another folder (value = folder name:
 // inbox/analyzed/processed/applied/archive). VacancyInboxScreen sets it (e.g. the
-// "Applied #X" badge opens vacancy X in the Applied folder), AppShell consumes it
+// "already applied" line opens vacancy X in the Applied folder), AppShell consumes it
 // and resets it to null.
 final folderNavRequestProvider = StateProvider<String?>((ref) => null);
 

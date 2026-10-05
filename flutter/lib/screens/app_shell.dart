@@ -104,7 +104,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     final settingsAsync = ref.watch(settingsProvider);
     final settings = settingsAsync.valueOrNull;
 
-    // "Applied #X" badge (and any future cross-folder jump) asks to switch folder.
+    // "already applied" line (and any future cross-folder jump) asks to switch folder.
     ref.listen<String?>(folderNavRequestProvider, (prev, folder) {
       if (folder == null) return;
       final i = _folders.indexOf(folder);

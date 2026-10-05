@@ -9,7 +9,7 @@ import 'package:career_agent/utils/analyze_guard.dart';
 import 'package:career_agent/widgets/vacancy_card.dart';
 
 // "Already applied" detection (EPIC-26): applied_twin_id in the model, the
-// "Applied #X" card badge, and the Analyze guard (409 already_applied).
+// "already applied" card line, and the Analyze guard (409 already_applied).
 
 class _FakeReadVacancies extends ReadVacanciesNotifier {
   @override
@@ -101,17 +101,17 @@ void main() {
   });
 
   group('card badge', () {
-    testWidgets('shows "Applied #X" without a date', (tester) async {
+    testWidgets('shows the "applied to this job" line', (tester) async {
       await tester.pumpWidget(_harness(_vacancy({'applied_twin_id': 1448})));
       await tester.pump();
-      expect(find.text('Applied #1448'), findsOneWidget);
+      expect(find.text('You already applied to this job:'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 
     testWidgets('absent when there is no applied twin', (tester) async {
       await tester.pumpWidget(_harness(_vacancy({'duplicate_of': 1448})));
       await tester.pump();
-      expect(find.textContaining('Applied #'), findsNothing);
+      expect(find.textContaining('to this job'), findsNothing);
       expect(find.text('Dup #1448'), findsOneWidget);
     });
 
@@ -120,7 +120,7 @@ void main() {
         _harness(_vacancy({'applied_twin_id': 1448, 'duplicate_of': 1448})),
       );
       await tester.pump();
-      expect(find.text('Applied #1448'), findsOneWidget);
+      expect(find.text('You already applied to this job:'), findsOneWidget);
       expect(find.text('Dup #1448'), findsNothing);
     });
 
@@ -129,7 +129,7 @@ void main() {
         _harness(_vacancy({'applied_twin_id': 1448, 'possible_duplicate_of': 1448})),
       );
       await tester.pump();
-      expect(find.text('Applied #1448'), findsOneWidget);
+      expect(find.text('You already applied to this job:'), findsOneWidget);
       expect(find.text('Maybe dup #1448'), findsNothing);
     });
 
@@ -138,7 +138,7 @@ void main() {
         _harness(_vacancy({'applied_twin_id': 1448, 'duplicate_of': 1500})),
       );
       await tester.pump();
-      expect(find.text('Applied #1448'), findsOneWidget);
+      expect(find.text('You already applied to this job:'), findsOneWidget);
       expect(find.text('Dup #1500'), findsOneWidget);
     });
 
@@ -151,7 +151,7 @@ void main() {
         ),
       );
       await tester.pump();
-      await tester.tap(find.text('Applied #1448'));
+      await tester.tap(find.text('You already applied to this job:'));
       expect(opened, 1448);
     });
 
@@ -164,7 +164,7 @@ void main() {
         ),
       );
       await tester.pump();
-      await tester.tap(find.text('Applied #1448'));
+      await tester.tap(find.text('You already applied to this job:'));
       expect(opened, 1448);
     });
 

@@ -295,7 +295,7 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
     }
   }
 
-  /// "Applied #X" badge: open vacancy X and switch to the folder it lives in
+  /// "already applied" line: open vacancy X and switch to the folder it lives in
   /// (Applied). Unlike the Dup badges, which keep the current folder and just
   /// show the target in the detail pane, the applied twin comes with its CV and
   /// cover in the Applied folder — so the list follows.
