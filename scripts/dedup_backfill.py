@@ -26,6 +26,15 @@ same containment/threshold (reason "legacy_link") instead of being reported lost
 --apply writes the new state (init_db() migration first — adds the
 possible_duplicate_of column). Take a DB backup before using it. Rows where the
 new rules find no match at all are NOT touched by --apply (reported for review).
+
+--scan-missed (company identity + text-first rules, 2026-10-05) is a SEPARATE,
+always-dry-run mode: it scans the vacancies that have NO duplicate flag at all
+against OLDER vacancies (replaying ingestion order, as_of = the row's own
+created_at) with the current classify_duplicate() — text containment >= 0.90
+across any company/title, title+company with same-company identity — and writes
+research/dedup-missed-scan-2026-10-05_RU.md, grouped confirmed / possible. It
+never writes to the DB and refuses to combine with --apply. --watch 206,863
+adds a pair-by-pair check of the listed vacancy ids to the report.
 """
 
 from __future__ import annotations
@@ -40,10 +49,17 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
-from core.dedup import CONFIRM_THRESHOLD, containment as containment_of, read_jd_text  # noqa: E402
+from core.dedup import (  # noqa: E402
+    CONFIRM_THRESHOLD,
+    TEXT_CONFIRM_THRESHOLD,
+    containment as containment_of,
+    profile_key,
+    read_jd_text,
+)
 from db import database  # noqa: E402
 
 DEFAULT_REPORT = _ROOT / "research" / "dedup-backfill-dryrun-2026-10-05_RU.md"
+DEFAULT_MISSED_REPORT = _ROOT / "research" / "dedup-missed-scan-2026-10-05_RU.md"
 VERDICTS_FILE = _ROOT / "research" / "dedup-audit-verdicts-2026-10-05_RU.md"
 
 
@@ -239,15 +255,140 @@ async def _apply(results: list[dict]) -> int:
     return n
 
 
+# ── --scan-missed: find duplicates among rows that carry no flag ───────────────
+
+async def _scan_missed() -> tuple[list[dict], dict[int, dict]]:
+    """Classify every unflagged vacancy against OLDER rows (ingestion replay).
+    Returns (findings, all_rows_by_id). Read-only."""
+    async with database.get_db() as db:
+        cur = await db.execute("PRAGMA table_info(vacancies)")
+        if not any(r["name"] == "company_profile_url" for r in await cur.fetchall()):
+            raise SystemExit(
+                "company_profile_url column missing — run scripts/company_profile_backfill.py --apply "
+                "first (additive schema migration)."
+            )
+        cur = await db.execute("SELECT * FROM vacancies ORDER BY id")
+        all_rows = [dict(r) for r in await cur.fetchall()]
+    by_id = {r["id"]: r for r in all_rows}
+    findings: list[dict] = []
+    for r in all_rows:
+        if r["duplicate_of"] is not None or r["possible_duplicate_of"] is not None:
+            continue
+        text = await read_jd_text(r["markdown_path"], _ROOT)
+        verdict = await database.classify_duplicate(
+            r["user_id"], r["content_hash"],
+            database._normalize_title(r["title"] or "", r["company"]), r["company"] or "",
+            exclude_id=r["id"], new_text=text, before_id=r["id"],
+            profile_key=profile_key(r["site"], r["company_profile_url"]),
+            as_of=r["created_at"],
+        )
+        if verdict.confirmed_id is None and verdict.possible_id is None:
+            continue
+        findings.append({
+            "id": r["id"],
+            "state": "confirmed" if verdict.confirmed_id is not None else "possible",
+            "orig": verdict.confirmed_id if verdict.confirmed_id is not None else verdict.possible_id,
+            "containment": verdict.containment, "reason": verdict.reason,
+        })
+    return findings, by_id
+
+
+async def _pair_containment(by_id: dict[int, dict], a: int, b: int) -> float | None:
+    ta = await read_jd_text(by_id[a]["markdown_path"], _ROOT) if a in by_id else None
+    tb = await read_jd_text(by_id[b]["markdown_path"], _ROOT) if b in by_id else None
+    return None if ta is None or tb is None else containment_of(ta, tb)
+
+
+def _desc(by_id: dict[int, dict], vid: int) -> str:
+    r = by_id.get(vid)
+    if r is None:
+        return f"#{vid} (нет в БД)"
+    ap = ", applied" if r["applied"] else ""
+    return f"#{vid} {(r['title'] or '')[:45]} / {(r['company'] or '')[:25]} / {r['site']}{ap}"
+
+
+async def build_missed_report(findings: list[dict], by_id: dict[int, dict], watch: list[int]) -> str:
+    conf = [f for f in findings if f["state"] == "confirmed"]
+    poss = [f for f in findings if f["state"] == "possible"]
+    unflagged = sum(1 for r in by_id.values() if r["duplicate_of"] is None and r["possible_duplicate_of"] is None)
+    reasons = ", ".join(f"{k}: {v}" for k, v in sorted(Counter(f["reason"] for f in conf).items()))
+    out = [
+        "# Скан пропущенных дублей (EPIC-26, 2026-10-05) — dry-run",
+        "",
+        f"Проверены все {unflagged} вакансий без флага дубля (из {len(by_id)}) против более СТАРЫХ вакансий "
+        f"(порядок приёма, окно по тексту — 120 дней до created_at вакансии). Правила: текст с вложенностью "
+        f">= {TEXT_CONFIRM_THRESHOLD:.2f} при любых названии/компании = подтверждённый дубль; название+компания "
+        f"(та же компания по профилю/нормализованному имени) с вложенностью >= {CONFIRM_THRESHOLD:.2f} = подтверждённый, "
+        "ниже = возможный. **Ничего не записано в БД** — ждёт решения владельца.",
+        "",
+        "## Итого",
+        "",
+        f"- Подтверждённые дубли: **{len(conf)}** ({reasons})",
+        f"- Возможные дубли: **{len(poss)}**",
+        "",
+    ]
+    if watch:
+        out += ["## Контрольные пары", "", "| Пара | Вложенность | Что нашёл скан |", "|---|---|---|"]
+        found = {f["id"]: f for f in findings}
+        for i, a in enumerate(watch):
+            for b in watch[i + 1:]:
+                c = await _pair_containment(by_id, a, b)
+                lo, hi = sorted((a, b))
+                f = found.get(hi)
+                if f and f["orig"] == lo:
+                    verdict = f"#{hi} -> #{lo}: {f['state']} ({f['reason']})"
+                elif lo in found and found[lo]["orig"] == hi:
+                    verdict = f"#{lo} -> #{hi}: {found[lo]['state']} ({found[lo]['reason']})"
+                else:
+                    verdict = "связь не найдена"
+                out.append(f"| #{a} / #{b} | {_fmt_c(c)} | {verdict} |")
+        out.append("")
+        for w in watch:
+            f = next((x for x in findings if x["id"] == w), None)
+            if f:
+                out.append(f"- #{w} как новая вакансия: {f['state']} -> #{f['orig']} ({f['reason']}, {_fmt_c(f['containment'])})")
+            else:
+                out.append(f"- #{w} как новая вакансия: без флага (ничего старше не найдено)")
+        out.append("")
+    for title, group in (("## Подтверждённые", conf), ("## Возможные", poss)):
+        out += [title, "", "| Новая (позже) | Оригинал (раньше) | Вложенность | Основание |", "|---|---|---|---|"]
+        for f in sorted(group, key=lambda x: (-(x["containment"] or 0), x["id"])):
+            out.append(f"| {_desc(by_id, f['id'])} | {_desc(by_id, f['orig'])} | {_fmt_c(f['containment'])} | {f['reason']} |")
+        if not group:
+            out.append("| (пусто) | | | |")
+        out.append("")
+    return "\n".join(out)
+
+
 def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--db", default=str(_ROOT / "db" / "agent.db"), help="Path to agent.db")
     ap.add_argument("--report", default=str(DEFAULT_REPORT), help="Where to write the diff report")
     ap.add_argument("--apply", action="store_true", help="WRITE the new state to the DB (default: dry run)")
+    ap.add_argument("--scan-missed", action="store_true",
+                    help="dry-run scan of vacancies WITHOUT a duplicate flag (never writes)")
+    ap.add_argument("--watch", default="", help="comma-separated vacancy ids to pair-check in the --scan-missed report")
     args = ap.parse_args()
 
     database.configure(args.db)
+    if args.scan_missed:
+        if args.apply:
+            raise SystemExit("--scan-missed is dry-run only and cannot be combined with --apply")
+        report_path = Path(args.report) if args.report != str(DEFAULT_REPORT) else DEFAULT_MISSED_REPORT
+        watch = [int(x) for x in args.watch.split(",") if x.strip()]
+
+        async def _go() -> tuple[str, list[dict]]:
+            findings, by_id = await _scan_missed()
+            return await build_missed_report(findings, by_id, watch), findings
+
+        report, findings = asyncio.run(_go())
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(report, encoding="utf-8")
+        print(f"{len(findings)} findings: {dict(Counter(f['state'] for f in findings))}")
+        print(f"report: {report_path}")
+        print("dry run — DB untouched")
+        return
     results = asyncio.run(_evaluate())
     report = build_report(results, _parse_verdicts(VERDICTS_FILE))
     Path(args.report).parent.mkdir(parents=True, exist_ok=True)

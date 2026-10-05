@@ -39,10 +39,11 @@
 ### 🟡 P2 — Auto-tags are unreliable: contradictory tags keep appearing (added 2026-10-05, needs a design discussion)
 **What:** owner has noticed repeatedly that vacancies get confusing or contradictory tag sets (e.g. healthcare and fintech and iGaming together). One cause is fixed (tags computed from `JD_analysis.md` text, see CHANGELOG 2026-10-05), but `classify()` in `core/vacancy_tags.py` is keyword-based and tags are merge-only (never removed). Needs a decision on a stricter approach (tag only from a JD's own domain/product sections, a per-vacancy cap, or re-deriving tags on refetch instead of merging). Owner: "think about it separately".
 
-### 🟡 P2 — Dedup rework (EPIC-26), remaining (added 2026-10-05)
-**Delivered (see CHANGELOG 2026-10-05):** two tiers (confirmed `duplicate_of` at containment >= 0.80, else `possible_duplicate_of`), original chosen by text similarity; backfill applied to the live DB; "already applied" detection (`applied_twin_id`, "Applied #X" badge, analyze guard). Similarity on requirements/stack instead of full text was considered and dropped by the owner.
-**Left as is, by owner decision:** a same-URL re-publish of an already-applied vacancy keeps today's behaviour (no applied-twin handling for it). Two pre-existing hash-twin cycles (#205/#233, #388/#467) are untouched; the applied-twin walk is cycle-safe.
+### 🟡 P2 — Dedup rework (EPIC-26), remaining (added 2026-10-05, updated 2026-10-05)
+**Delivered (see CHANGELOG 2026-10-05):** two tiers, original chosen by text similarity; backfill applied; "already applied" detection (`applied_twin_id`); company identity (`company_profile_url` stored, DOU rows backfilled, `normalize_company_name`, learned `company_profile_links`); text-first duplicates (containment >= 0.90 in a 120-day window, any company); "Co. applied #N" hint (`company_applied_id`).
+**Waiting on the owner:** the missed-duplicates scan (`research/dedup-missed-scan-2026-10-05_RU.md`, 176 confirmed + 3 possible among rows with no flag, dry-run, local gitignored) needs a review; then apply it (a new `--apply` for the scan mode, with a DB backup first). Same-URL re-publish of an already-applied vacancy keeps today's behaviour (owner decision); two hash-twin cycles (#205/#233, #388/#467) are untouched.
 **Spec:** [research/dedup-audit-2026-10-05_RU.md](../../research/dedup-audit-2026-10-05_RU.md) and [verdicts](../../research/dedup-audit-verdicts-2026-10-05_RU.md) (local, gitignored). Fuzzy title matching rejected (owner, 2026-10-05).
+
 ### 🟡 P2 — Role Balance: is the mechanism deterministic enough, or does it need a change? (added 2026-09-07, progressed 2026-09-21)
 **What:** after shipping the 6-axis role_balance taxonomy + radar chart (2026-09-06), manually verified vacancy #1488's saved percentages against its JD — result was well-reasoned, confirming the mechanism is an LLM judgment call (no formula, no rubric with point values), not fabrication. Surfaced a bigger question: is this judgment call *deterministic/reproducible* enough to trust the chart's implied precision, and the model's reasoning is never persisted (only the final numbers + archetype label land in DB).
 **2026-09-21 progress:** found live on vacancy #1646 (DAO CV session) that the archetype label alone doesn't reliably reach Phase 3 — a CV led with a business-feature list instead of the technical-complexity framing its own `role_balance.delivery=55%`/archetype implied. Ran a concentration analysis across 88 applied vacancies to check whether `role_balance` is trustworthy enough to build a deterministic enforcement mechanism on top of (it is — see write-up). Shipped a first concrete step: `_RoleBalanceRadar` (Flutter) now classifies and displays the role's shape (Sharp/Dual/Diffuse, >=30% threshold) directly under the chart, so this is visible without reading raw numbers.
@@ -411,6 +412,16 @@ No dual-availability state — the button's visibility is a direct, deterministi
 **Scope:** Flutter detail screen — new section/tab rendering the stored `analysis_json` (or raw markdown) content; decide whether to show structured (parsed p1/p2 fields) or raw markdown.
 
 ## 🟡 P2
+
+### Djinni company profile for old rows: fill via re-fetch or a slow rate-limited backfill (added 2026-10-05)
+**What:** `vacancies.company_profile_url` is filled for DOU rows (derived from the URL) and for every vacancy fetched from now on; the ~820 older Djinni rows have none, because Djinni's company link lives in the page DOM.
+**Why:** the profile key is the reliable company identity; without it those rows fall back to name matching (and lose the cross-board link to the same company on DOU).
+**Scope (not started):** either let each row fill on its next re-publish / manual "Re-fetch from source" (already saves the URL), or a slow, rate-limited script that re-fetches Djinni pages (same Djinni rate-limit care as the salary probe). Owner to choose.
+
+### ~77 old-import rows have JD text in the `company` field — clean up (added 2026-10-05)
+**What:** rows imported early (e.g. ids 439, 443, 447, 462) carry a sentence of JD text instead of a company name (a live query counts 150 rows with a `company` longer than 60 characters).
+**Why:** these rows never match a company, so the "Co. applied" hint and the title+company dedup path ignore them; the list shows junk as the company.
+**Scope (not started):** re-derive the company from the vacancy URL (DOU slug) or the JD, or blank it where unknown; needs a DB backup and a review of the list first.
 
 ### Backlog structure simplification — BACKLOG.md itself (added 2026-09-01)
 **What:** BACKLOG.md violates its own documented contract (documentation-conventions.md) — mass 10-line-limit breaches, Now-section mixing, no stable entry IDs, done-markers inside open entries, duplicate content.

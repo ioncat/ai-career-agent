@@ -55,6 +55,11 @@ class VacancyListItem {
   // when this vacancy is itself applied. Drives the "Applied #X" badge and the
   // Analyze guard.
   final int? appliedTwinId;
+  // Most recently applied vacancy at the SAME COMPANY (profile identity, then
+  // normalized name) — excluding this vacancy and its appliedTwinId; null when
+  // none or when this vacancy is itself applied. Drives the weaker
+  // "Co. applied #N" badge (2026-10-05).
+  final int? companyAppliedId;
   final String? republishedAt;
   final String? folderPath;
   final String stage;
@@ -97,6 +102,7 @@ class VacancyListItem {
     this.duplicateOf,
     this.possibleDuplicateOf,
     this.appliedTwinId,
+    this.companyAppliedId,
     this.republishedAt,
     this.folderPath,
     this.stage = 'inbox',
@@ -135,6 +141,7 @@ class VacancyListItem {
       duplicateOf: json['duplicate_of'] as int?,
       possibleDuplicateOf: json['possible_duplicate_of'] as int?,
       appliedTwinId: json['applied_twin_id'] as int?,
+      companyAppliedId: json['company_applied_id'] as int?,
       republishedAt: json['republished_at'] as String?,
       folderPath: json['folder_path'] as String?,
       stage: json['stage'] as String? ?? 'inbox',
@@ -172,6 +179,7 @@ class VacancyListItem {
         'duplicate_of': duplicateOf,
         'possible_duplicate_of': possibleDuplicateOf,
         'applied_twin_id': appliedTwinId,
+        'company_applied_id': companyAppliedId,
         'republished_at': republishedAt,
         'stage': stage,
         'blocker_flag': blockerFlag,

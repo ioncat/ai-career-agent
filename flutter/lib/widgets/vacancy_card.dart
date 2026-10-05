@@ -59,6 +59,10 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
         .where((id) => id != appliedTwin)
         .toList();
     final onTapApplied = widget.onTapApplied ?? widget.onTapRelated;
+    // "Co. applied #N" (same company, different job) — hidden when the card
+    // already shows "Applied #N" for that very vacancy.
+    final companyApplied = v.companyAppliedId;
+    final showCompanyApplied = companyApplied != null && companyApplied != appliedTwin;
 
     final highlighted = widget.multiSelectMode ? widget.checked : widget.selected;
     final bgColor = highlighted
@@ -179,6 +183,25 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
                                     : null,
                                 behavior: HitTestBehavior.opaque,
                                 child: _AppliedTwinBadge(twinId: appliedTwin),
+                              ),
+                            ),
+                          ),
+                        // Applied to ANOTHER job at the same company — a hint, not a
+                        // duplicate: deliberately weaker than "Applied #X".
+                        if (showCompanyApplied)
+                          Tooltip(
+                            message: 'You applied to another job at this company (#$companyApplied). Tap to open.',
+                            preferBelow: false,
+                            child: MouseRegion(
+                              cursor: onTapApplied != null
+                                  ? SystemMouseCursors.click
+                                  : MouseCursor.defer,
+                              child: GestureDetector(
+                                onTap: onTapApplied != null
+                                    ? () => onTapApplied(companyApplied)
+                                    : null,
+                                behavior: HitTestBehavior.opaque,
+                                child: _CompanyAppliedBadge(vacancyId: companyApplied),
                               ),
                             ),
                           ),
@@ -529,6 +552,32 @@ class _AppliedTwinBadge extends StatelessWidget {
                 ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// "Co. applied #N" — weaker than _AppliedTwinBadge: no fill, no icon, faint green
+// outline, regular weight. Same company, different job (not a duplicate).
+class _CompanyAppliedBadge extends StatelessWidget {
+  final int vacancyId;
+  const _CompanyAppliedBadge({required this.vacancyId});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.applied.withValues(alpha: 0.35), width: 0.8),
+      ),
+      child: Text(
+        'Co. applied #$vacancyId',
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: AppColors.applied.withValues(alpha: 0.8),
+              fontWeight: FontWeight.w400,
+              fontSize: 10,
+            ),
       ),
     );
   }

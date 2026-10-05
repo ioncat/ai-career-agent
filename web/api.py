@@ -36,7 +36,7 @@ from adapters.parser_adapter import ParserAdapter, ParserError
 from contracts.pipeline import AnalysisJson
 from core import config_store
 from core import vacancy_stage
-from core.dedup import compute_applied_twins
+from core.dedup import compute_applied_twins, compute_company_applied
 from core.vacancy_tags import classify as classify_tags
 from core.vacancy_tags import merge_tags
 from db import database
@@ -345,11 +345,18 @@ async def api_vacancies(
     rows = await database.list_vacancies(status=status, user_id=user_id, since=since, limit=limit)
     # Applied twin (EPIC-26): computed once from a light all-rows projection,
     # NOT from `rows` — status/since/limit filters would hide the twin.
-    applied_twins = compute_applied_twins(await database.get_dedup_link_rows(user_id))
+    link_rows = await database.get_dedup_link_rows(user_id)
+    applied_twins = compute_applied_twins(link_rows)
+    # "Applied at this company" hint: same all-rows pass, plus the learned
+    # cross-board profile links — still no per-row queries.
+    company_applied = compute_company_applied(
+        link_rows, await database.get_company_link_graph(), applied_twins,
+    )
     result = []
     for row in rows:
         item = _normalize_dates(dict(row))
         item["applied_twin_id"] = applied_twins.get(item["id"])
+        item["company_applied_id"] = company_applied.get(item["id"])
         item["applied"] = bool(item.get("applied"))
         item["starred"] = bool(item.get("starred"))
         item["stage"] = vacancy_stage.stage(item.get("status") or "", item["applied"])
@@ -853,6 +860,10 @@ async def _do_refetch_vacancy_from_source(vacancy_id: int, url: str) -> dict:
             # republish's fresh re-fetch was ever going to get another shot
             # at it, and this function didn't touch company until now.
             fields["company"] = doc.company
+        # Company profile page URL = stable company identity on this board
+        # (core.dedup.profile_key); saved on every re-fetch so old rows fill in.
+        if doc.company_profile_url:
+            fields["company_profile_url"] = doc.company_profile_url
         # A prior probe give-up note doesn't count as "already set"
         # (_is_real_salary) — this refetch is itself the retry the user
         # asked for, so it must try the probe again, not treat its own
@@ -1715,6 +1726,7 @@ async def api_vacancy(vacancy_id: int):
         raise HTTPException(status_code=404, detail="Vacancy not found")
     item = _normalize_dates(dict(row))
     item["applied_twin_id"] = await database.get_applied_twin_id(vacancy_id)
+    item["company_applied_id"] = await database.get_company_applied_id(vacancy_id)
     return item
 
 

@@ -59,6 +59,9 @@ CREATE TABLE IF NOT EXISTS vacancies (
                                           -- weaker tier: same title+company as that vacancy but JD text
                                           -- containment < core.dedup.CONFIRM_THRESHOLD (or unreadable file).
                                           -- Mutually exclusive with duplicate_of.
+    company_profile_url TEXT,             -- the company's profile page on its job board (DOU /companies/{slug}/,
+                                          -- Djinni company page); stable company id within that board — see
+                                          -- core.dedup.profile_key. NULL = not fetched yet (old Djinni rows).
     content_hash  TEXT,                   -- sha256(normalize(jd_text)) for content-based dedup
     republished_at TEXT,                  -- set when a declined/skipped vacancy reappears in RSS
     fetch_attempts INTEGER NOT NULL DEFAULT 0,
@@ -235,4 +238,21 @@ CREATE TABLE IF NOT EXISTS provider_config_snapshots (
     thinking_effort TEXT    NOT NULL DEFAULT 'off',
     phase_configs   TEXT,               -- JSON: {phase: {provider, model, thinking_effort}}, absent phase = unpinned
     updated_at      TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
+-- ── company_profile_links ─────────────────────────────────────────────────────
+-- Learned "these two company profile keys are the same employer" pairs across
+-- job boards (e.g. "dou:dripify" == "djinni:jobs/company-dripify"). Written when a
+-- vacancy becomes a CONFIRMED duplicate of one on another board whose company
+-- profile key differs (database.set_duplicate_of). Pair stored ordered
+-- (profile_key_a < profile_key_b); the connected group is walked by
+-- core.dedup.profile_group. vacancy_a/vacancy_b = the evidence rows.
+
+CREATE TABLE IF NOT EXISTS company_profile_links (
+    profile_key_a TEXT NOT NULL,
+    profile_key_b TEXT NOT NULL,
+    vacancy_a     INTEGER,
+    vacancy_b     INTEGER,
+    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (profile_key_a, profile_key_b)
 );

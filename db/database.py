@@ -27,10 +27,16 @@ import aiosqlite
 
 from core.dedup import (
     CONFIRM_THRESHOLD,
+    TEXT_CONFIRM_THRESHOLD,
+    TEXT_SCAN_WINDOW_DAYS,
+    build_link_graph,
     compute_applied_twins,
-    jd_shingles,
-    read_jd_text,
-    shingle_containment,
+    compute_company_applied,
+    in_text_window,
+    parse_as_of,
+    row_profile_key,
+    same_company,
+    score_candidates,
 )
 
 log = logging.getLogger(__name__)
@@ -254,6 +260,11 @@ async def init_db() -> None:
             # confirm (see find_possible_duplicate). Never set together with
             # duplicate_of.
             "ALTER TABLE vacancies ADD COLUMN possible_duplicate_of INTEGER REFERENCES vacancies(id)",
+            # Company identity (2026-10-05): the company's profile page URL on
+            # its job board (DOU /companies/{slug}/, Djinni company page) — a
+            # stable unique company id within that board, already extracted by
+            # the parser at fetch time but never stored. See core.dedup.profile_key.
+            "ALTER TABLE vacancies ADD COLUMN company_profile_url TEXT",
         ]:
             try:
                 await db.execute(migration)
@@ -493,6 +504,7 @@ async def update_vacancy_fields(
     company: str | None = None,
     company_website: str | None = None,
     tags: str | None = None,
+    company_profile_url: str | None = None,
 ) -> None:
     """Update mutable fields of an existing vacancy (e.g. after fetching a queued record).
 
@@ -521,6 +533,9 @@ async def update_vacancy_fields(
     if tags is not None:
         sets.append("tags = ?")
         params.append(tags)
+    if company_profile_url is not None:
+        sets.append("company_profile_url = ?")
+        params.append(company_profile_url)
     if not sets:
         return
     params.append(vacancy_id)
@@ -772,18 +787,32 @@ def _normalize_title(title: str, company: str | None = None) -> str:
 class DuplicateVerdict:
     """Outcome of classify_duplicate().
 
-    confirmed_id — hard duplicate (content-hash match, or title+company match
-                   with JD containment >= CONFIRM_THRESHOLD) -> duplicate_of.
+    confirmed_id — hard duplicate (content-hash match, title+company match with
+                   JD containment >= CONFIRM_THRESHOLD, or a recent vacancy with
+                   containment >= TEXT_CONFIRM_THRESHOLD whatever its title or
+                   company) -> duplicate_of.
     possible_id  — title+company match that could not be confirmed
                    -> possible_duplicate_of. Never set together with confirmed_id.
-    containment  — containment of the chosen title+company candidate, None for
-                   a hash match or when no text comparison was possible.
-    reason       — "hash" | "title_company" | "title_company_unverified" | "none"
+    containment  — containment of the chosen candidate, None for a hash match or
+                   when no text comparison was possible.
+    reason       — "hash" | "title_company" | "text" | "title_company_unverified" | "none"
     """
     confirmed_id: int | None = None
     possible_id: int | None = None
     containment: float | None = None
     reason: str = "none"
+
+
+async def _load_link_graph(db) -> dict[str, set[str]]:
+    cur = await db.execute("SELECT profile_key_a, profile_key_b FROM company_profile_links")
+    return build_link_graph((r["profile_key_a"], r["profile_key_b"]) for r in await cur.fetchall())
+
+
+async def get_company_link_graph() -> dict[str, set[str]]:
+    """Adjacency of learned cross-board company profile links (see
+    core.dedup.profile_group)."""
+    async with get_db() as db:
+        return await _load_link_graph(db)
 
 
 async def classify_duplicate(
@@ -794,26 +823,37 @@ async def classify_duplicate(
     exclude_id: int | None = None,
     new_text: str | None = None,
     before_id: int | None = None,
+    profile_key: str | None = None,
+    as_of: str | None = None,
 ) -> DuplicateVerdict:
-    """Two-tier duplicate verdict for one vacancy (EPIC-26 rework, 2026-10-05).
+    """Duplicate verdict for one vacancy (EPIC-26 rework, 2026-10-05).
 
     1. content_hash match -> confirmed, unconditionally (lowest id among
        matches); wins over everything.
-    2. Otherwise title+company candidates (same user, same normalized title and
-       company, excluding `exclude_id`) are scored by containment of `new_text`
-       against each candidate's JD.md; the best score wins, ties -> lowest id
-       (the old "lowest id wins" picked the wrong original whenever a company
-       had several postings under one title). Best containment >=
-       CONFIRM_THRESHOLD -> confirmed; below it, or when new_text / the
-       candidates' files are unreadable -> only possible.
+    2. Text-first (needs `new_text`): every same-user vacancy created/published
+       within TEXT_SCAN_WINDOW_DAYS before `as_of` is scored by containment of
+       `new_text` against its JD.md; one with containment >=
+       TEXT_CONFIRM_THRESHOLD is CONFIRMED whatever its company or title.
+    3. Title+company candidates: same user, same normalized title (exact —
+       fuzzy title matching was rejected by the owner) and the SAME COMPANY
+       (core.dedup.same_company: profile-key group first, normalized-name
+       fallback), scored the same way; best containment >= CONFIRM_THRESHOLD
+       -> confirmed; below it, or when new_text / the files are unreadable ->
+       only possible.
 
-    The similarity score never DROPS a title+company match, only downgrades it
-    (no threshold separates true duplicates from non-duplicates — see
-    core/dedup.py).
+    Among everything that qualifies as confirmed the best containment wins,
+    ties -> lowest id. The score never DROPS a title+company match, only
+    downgrades it (no threshold separates true duplicates from non-duplicates —
+    see core/dedup.py). A text-only candidate below TEXT_CONFIRM_THRESHOLD is
+    ignored.
 
     new_text: the new vacancy's full JD.md text (header included — it is
     stripped by core.dedup). before_id: only consider rows with a smaller id —
-    for backfills that replay ingestion order.
+    for backfills that replay ingestion order. profile_key: the new vacancy's
+    company profile key (core.dedup.profile_key). as_of: reference timestamp of
+    the recency window (the vacancy's created_at when replaying; default now).
+    Candidate files are read and shingled off the event loop and cached per
+    process (core.dedup.cached_file_shingles).
     """
     async with get_db() as db:
         if content_hash:
@@ -830,14 +870,15 @@ async def classify_duplicate(
             if row:
                 return DuplicateVerdict(confirmed_id=row["id"], reason="hash")
 
-        if not (norm_title and company):
+        want_title_company = bool(norm_title and (company or profile_key))
+        if not (want_title_company or new_text):
             return DuplicateVerdict()
 
         sql = (
-            "SELECT id, markdown_path FROM vacancies "
-            "WHERE user_id = ? AND LOWER(TRIM(title)) = ? AND LOWER(TRIM(company)) = ?"
+            "SELECT id, title, company, site, company_profile_url, markdown_path, "
+            "created_at, published_at FROM vacancies WHERE user_id = ?"
         )
-        params = [user_id, norm_title.lower(), company.lower().strip()]
+        params = [user_id]
         if exclude_id is not None:
             sql += " AND id != ?"
             params.append(exclude_id)
@@ -845,24 +886,56 @@ async def classify_duplicate(
             sql += " AND id < ?"
             params.append(before_id)
         cur = await db.execute(sql + " ORDER BY id ASC", params)
-        candidates = [(r["id"], r["markdown_path"]) for r in await cur.fetchall()]
+        rows = [dict(r) for r in await cur.fetchall()]
+        graph = await _load_link_graph(db) if want_title_company else {}
 
-    if not candidates:
+    # Title+company candidates (exact normalized title + same company).
+    tc_ids: list[int] = []
+    if want_title_company:
+        subject = {"company": company, "profile_key": profile_key}
+        wanted_title = norm_title.lower()
+        for r in rows:
+            if _normalize_title(r["title"] or "", r["company"]) == wanted_title and same_company(r, subject, graph):
+                tc_ids.append(r["id"])  # rows are ascending by id
+
+    scores: dict[int, float | None] = {}
+    if new_text:
+        as_of_dt = parse_as_of(as_of)
+        tc_set = set(tc_ids)
+        to_score = [
+            (r["id"], r["markdown_path"]) for r in rows
+            if r["id"] in tc_set or in_text_window(r["created_at"], r["published_at"], as_of_dt)
+        ]
+        scores = await score_candidates(new_text, to_score, _PROJECT_ROOT)
+
+    # Confirmed: a title+company candidate >= CONFIRM_THRESHOLD, or ANY scored
+    # candidate >= TEXT_CONFIRM_THRESHOLD. Best score wins, ties -> lowest id.
+    tc_set = set(tc_ids)
+    best_conf: tuple[float, int] | None = None
+    for cand_id in sorted(scores):
+        score = scores[cand_id]
+        if score is None:
+            continue
+        if score >= TEXT_CONFIRM_THRESHOLD or (cand_id in tc_set and score >= CONFIRM_THRESHOLD):
+            if best_conf is None or score > best_conf[0]:
+                best_conf = (score, cand_id)
+    if best_conf is not None:
+        score, cand_id = best_conf
+        reason = "title_company" if (cand_id in tc_set and score >= CONFIRM_THRESHOLD) else "text"
+        return DuplicateVerdict(confirmed_id=cand_id, containment=score, reason=reason)
+
+    if not tc_ids:
         return DuplicateVerdict()
 
-    best_id, best_score = candidates[0][0], None  # lowest id until proven otherwise
-    if new_text:
-        new_shingles = jd_shingles(new_text)
-        for cand_id, md_path in candidates:  # ascending id: strict ">" keeps lowest on ties
-            cand_text = await read_jd_text(md_path, _PROJECT_ROOT)
-            if cand_text is None:
-                continue
-            score = shingle_containment(new_shingles, jd_shingles(cand_text))
-            if best_score is None or score > best_score:
-                best_id, best_score = cand_id, score
-
-    if best_score is not None and best_score >= CONFIRM_THRESHOLD:
-        return DuplicateVerdict(confirmed_id=best_id, containment=best_score, reason="title_company")
+    # Unconfirmed title+company match -> possible: best-scoring readable
+    # candidate, else the lowest id.
+    best_id, best_score = tc_ids[0], None
+    for cand_id in tc_ids:  # ascending id: strict ">" keeps lowest on ties
+        score = scores.get(cand_id)
+        if score is None:
+            continue
+        if best_score is None or score > best_score:
+            best_id, best_score = cand_id, score
     return DuplicateVerdict(possible_id=best_id, containment=best_score, reason="title_company_unverified")
 
 
@@ -873,16 +946,20 @@ async def find_duplicate(
     company: str | None,
     exclude_id: int | None = None,
     new_text: str | None = None,
+    profile_key: str | None = None,
 ) -> int | None:
     """Return the id of the CONFIRMED original of a vacancy, or None.
 
-    Confirmed = content_hash collision, or a title+company match whose JD text
-    contains >= CONFIRM_THRESHOLD of the new text (new_text required — without
+    Confirmed = content_hash collision, a title+company match whose JD text
+    contains >= CONFIRM_THRESHOLD of the new text, or any recent vacancy with
+    >= TEXT_CONFIRM_THRESHOLD (new_text required for both text paths — without
     it a title+company match is only "possible", see find_possible_duplicate).
-    The web manual-import path passes no title/company and stays hash-only.
+    The web manual-import path passes no title/company/text and stays hash-only.
     exclude_id: vacancy id to skip (avoids self-match during re-fetch).
     """
-    verdict = await classify_duplicate(user_id, content_hash, norm_title, company, exclude_id, new_text)
+    verdict = await classify_duplicate(
+        user_id, content_hash, norm_title, company, exclude_id, new_text, profile_key=profile_key,
+    )
     return verdict.confirmed_id
 
 
@@ -893,22 +970,51 @@ async def find_possible_duplicate(
     company: str | None,
     exclude_id: int | None = None,
     new_text: str | None = None,
+    profile_key: str | None = None,
 ) -> int | None:
     """Return the id of the best title+company candidate that could NOT be
     confirmed (low text containment, no new_text, or unreadable JD file), or
     None — including when the vacancy is a confirmed duplicate."""
-    verdict = await classify_duplicate(user_id, content_hash, norm_title, company, exclude_id, new_text)
+    verdict = await classify_duplicate(
+        user_id, content_hash, norm_title, company, exclude_id, new_text, profile_key=profile_key,
+    )
     return verdict.possible_id
 
 
 async def set_duplicate_of(vacancy_id: int, original_id: int) -> None:
-    """Mark vacancy as a CONFIRMED duplicate of original_id (clears the possible tier)."""
+    """Mark vacancy as a CONFIRMED duplicate of original_id (clears the possible tier).
+
+    Also learns company identity: when the two rows carry DIFFERENT company
+    profile keys on DIFFERENT boards (typically Djinni vs DOU), those keys are
+    recorded as the same company in company_profile_links. Same-board
+    differences are not learned — an outsourcing vendor reposting one template
+    JD for several clients must not merge their profiles.
+    """
     async with get_db() as db:
         await db.execute(
             "UPDATE vacancies SET duplicate_of = ?, possible_duplicate_of = NULL, "
             "updated_at = datetime('now') WHERE id = ?",
             (original_id, vacancy_id),
         )
+        try:
+            cur = await db.execute(
+                "SELECT id, site, company_profile_url FROM vacancies WHERE id IN (?, ?)",
+                (vacancy_id, original_id),
+            )
+            found = {r["id"]: r for r in await cur.fetchall()}
+            a, b = found.get(vacancy_id), found.get(original_id)
+            if a is not None and b is not None:
+                ka, kb = row_profile_key(a), row_profile_key(b)
+                if ka and kb and ka != kb and (a["site"] or "") != (b["site"] or ""):
+                    key_a, key_b = sorted((ka, kb))
+                    va, vb = (vacancy_id, original_id) if ka <= kb else (original_id, vacancy_id)
+                    await db.execute(
+                        "INSERT OR IGNORE INTO company_profile_links "
+                        "(profile_key_a, profile_key_b, vacancy_a, vacancy_b) VALUES (?, ?, ?, ?)",
+                        (key_a, key_b, va, vb),
+                    )
+        except Exception as exc:  # learning is best-effort, never blocks the flag
+            log.warning("company link learning failed for v#%s -> v#%s: %s", vacancy_id, original_id, exc)
         await db.commit()
 
 
@@ -937,13 +1043,14 @@ async def clear_duplicate_flags(vacancy_id: int) -> None:
 
 
 async def get_dedup_link_rows(user_id: int | None = None) -> list[aiosqlite.Row]:
-    """Light projection of every vacancy's duplicate links + applied state —
-    the input of core.dedup.compute_applied_twins. Deliberately unfiltered by
+    """Light projection of every vacancy's duplicate links, applied state and
+    company identity columns — the input of core.dedup.compute_applied_twins and
+    compute_company_applied. Deliberately unfiltered by
     status/limit/since: the twin of a listed row may be outside the page the
     caller fetched. user_id=None -> all users (the pure helper groups per user)."""
     sql = (
-        "SELECT id, user_id, duplicate_of, possible_duplicate_of, applied, applied_at "
-        "FROM vacancies"
+        "SELECT id, user_id, duplicate_of, possible_duplicate_of, applied, applied_at, "
+        "company, site, company_profile_url FROM vacancies"
     )
     params: list = []
     if user_id is not None:
@@ -968,6 +1075,24 @@ async def get_applied_twin_id(vacancy_id: int) -> int | None:
         return None
     rows = await get_dedup_link_rows(row["u"])
     return compute_applied_twins(rows).get(vacancy_id)
+
+
+async def get_company_applied_id(vacancy_id: int) -> int | None:
+    """Id of the most recently applied vacancy of the same company ("Applied at
+    this company" hint), excluding the vacancy itself and its applied twin;
+    None when there is none or this vacancy is itself applied. See
+    core.dedup.compute_company_applied for the exact rules."""
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT COALESCE(user_id, 1) AS u FROM vacancies WHERE id = ?", (vacancy_id,)
+        )
+        row = await cursor.fetchone()
+        if row is None:
+            return None
+        graph = await _load_link_graph(db)
+    rows = await get_dedup_link_rows(row["u"])
+    twins = compute_applied_twins(rows)
+    return compute_company_applied(rows, graph, twins).get(vacancy_id)
 
 
 async def set_content_hash(vacancy_id: int, content_hash: str) -> None:

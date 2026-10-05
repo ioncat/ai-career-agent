@@ -27,6 +27,7 @@ from pydantic_ai import RunContext
 from adapters.djinni_salary_adapter import DjinniSalaryAdapter
 from adapters.parser_adapter import ParserError
 from core.deps import AgentDeps
+from core.dedup import profile_key as company_profile_key
 from core.vacancy_tags import classify as classify_tags
 from core.vacancy_tags import merge_tags
 from db import database
@@ -228,10 +229,12 @@ async def fetch_jd(deps: AgentDeps, url: str) -> int:
         await database.update_vacancy_fields(
             vacancy_id, title=doc.title, site=site, markdown_path=markdown_path,
             company=doc.company, tags=tags or None, salary=salary,
+            company_profile_url=doc.company_profile_url,
         )
     else:
         await database.update_vacancy_fields(
             vacancy_id, markdown_path=markdown_path, tags=tags or None, salary=salary,
+            company_profile_url=doc.company_profile_url,
         )
 
     # ── EPIC-26: content hash + duplicate detection ───────────────────────────
@@ -240,28 +243,28 @@ async def fetch_jd(deps: AgentDeps, url: str) -> int:
         _norm_text = re.sub(r"\s+", " ", doc.markdown.lower())
         content_hash = hashlib.sha256(_norm_text.encode()).hexdigest()
         norm_title = database._normalize_title(doc.title or "", doc.company)
-        # Two tiers (2026-10-05): a content-hash match or a title+company match
-        # with similar JD text is a CONFIRMED duplicate (duplicate_of); a
-        # title+company match with dissimilar/unreadable text is only a
-        # POSSIBLE one (possible_duplicate_of). Re-evaluation sets one tier and
-        # clears the other (or both, when nothing matches any more).
-        original_id = await database.find_duplicate(
+        # Two tiers (2026-10-05): a content-hash match, a title+company match
+        # with similar JD text, or any recent vacancy with near-identical text
+        # (>= TEXT_CONFIRM_THRESHOLD, whatever its title/company) is a
+        # CONFIRMED duplicate (duplicate_of); a title+company match with
+        # dissimilar/unreadable text is only a POSSIBLE one
+        # (possible_duplicate_of). One classify call (the text scan is the
+        # costly part). Re-evaluation sets one tier and clears the other (or
+        # both, when nothing matches any more).
+        verdict = await database.classify_duplicate(
             deps.user_id, content_hash, norm_title, doc.company or "",
             exclude_id=vacancy_id, new_text=jd_file_text,
+            profile_key=company_profile_key(site, doc.company_profile_url),
         )
-        if original_id is not None:
-            log.info("fetch_jd: duplicate of v#%d — marking v#%d", original_id, vacancy_id)
-            await database.set_duplicate_of(vacancy_id, original_id)
+        if verdict.confirmed_id is not None:
+            log.info("fetch_jd: duplicate of v#%d (%s) — marking v#%d",
+                     verdict.confirmed_id, verdict.reason, vacancy_id)
+            await database.set_duplicate_of(vacancy_id, verdict.confirmed_id)
+        elif verdict.possible_id is not None:
+            log.info("fetch_jd: possible duplicate of v#%d — marking v#%d", verdict.possible_id, vacancy_id)
+            await database.set_possible_duplicate_of(vacancy_id, verdict.possible_id)
         else:
-            possible_id = await database.find_possible_duplicate(
-                deps.user_id, content_hash, norm_title, doc.company or "",
-                exclude_id=vacancy_id, new_text=jd_file_text,
-            )
-            if possible_id is not None:
-                log.info("fetch_jd: possible duplicate of v#%d — marking v#%d", possible_id, vacancy_id)
-                await database.set_possible_duplicate_of(vacancy_id, possible_id)
-            else:
-                await database.clear_duplicate_flags(vacancy_id)
+            await database.clear_duplicate_flags(vacancy_id)
         await database.set_content_hash(vacancy_id, content_hash)
     except Exception as exc:
         log.warning("fetch_jd: dedup step failed for v#%d (non-fatal): %s", vacancy_id, exc)
