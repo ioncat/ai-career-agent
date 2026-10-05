@@ -36,6 +36,11 @@
 - Phase 2's Quick Scan template (VScore line, Why apply, Why not apply) differs from the block SKILL.md puts at the top of `JD_analysis.md`. Documented as "moved; the DB keeps why_apply"; decide whether the file should carry them.
 **Related, bigger:** [profile-prompt-isolation-discovery-2026-10-04.md](../discovery/profile-prompt-isolation-discovery-2026-10-04.md) (separate P1 entry above).
 
+### 🟡 P2 — Functional specification: a "how it works" document, built from code and kept in sync (added 2026-10-05, not started)
+**What:** no document describes system behaviour (what counts as a duplicate, when "You already applied" shows, how companies, blockers, tags and statuses work); the rules live only in CHANGELOG entries and code. Build `docs/functional-spec.md` (or one short section per domain, ~12) from the code with a verification pass, and keep it true via a code-to-section map, a warn-only guard check and a `/spec-sync` command.
+**First step:** pilot on one section, "duplicates, companies, already applied", to judge format and cost before scaling.
+**Full reasoning:** [functional-spec-approach-2026-10-05.md](../discovery/functional-spec-approach-2026-10-05.md).
+
 ### 🟡 P2 — Auto-tags are unreliable: contradictory tags keep appearing (added 2026-10-05, needs a design discussion)
 **What:** owner has noticed repeatedly that vacancies get confusing or contradictory tag sets (e.g. healthcare and fintech and iGaming together). One cause is fixed (tags computed from `JD_analysis.md` text, see CHANGELOG 2026-10-05), but `classify()` in `core/vacancy_tags.py` is keyword-based and tags are merge-only (never removed). Needs a decision on a stricter approach (tag only from a JD's own domain/product sections, a per-vacancy cap, or re-deriving tags on refetch instead of merging). Owner: "think about it separately".
 
