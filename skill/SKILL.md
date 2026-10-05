@@ -739,7 +739,7 @@ Run **Phase 1+2 silently** for every selected vacancy:
 - Save `JD.md` (original JD text) to that folder
 - Run Phase 1+2
 - Save `JD_analysis.md` to `vacancies/inbox/[user_id]/[ID] — [Role — Company]/`
-- Update DB: `vacancy_track.py update --id $ID --status analyzed --path ...`
+- Update DB: `vacancy_track.py update --id $ID --status analyzed --path "<folder>/JD.md"` (always `JD.md`, never `JD_analysis.md` — the path drives the JD view and auto-tags)
 - Save p1+p2 JSON: `vacancy_track.py update-json --id $ID --phase p1 ...` and `--phase p2 ...`
 
 ⚠️ **All DB writes must complete before table is shown.** The user checks the tracker while thinking — it must already reflect the results. Table = confirmation that tracker is current, not a preview.

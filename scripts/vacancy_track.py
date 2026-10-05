@@ -77,6 +77,23 @@ from core.vacancy_tags import merge_tags
 from db import database
 
 
+def _jd_path(path: str | None) -> str | None:
+    """Point a vacancy's markdown_path at JD.md, never at a sibling artifact.
+
+    The Flutter JD view and the auto-tagger both read whatever this path names;
+    JD_analysis.md (or a CV file) there shows the analysis instead of the JD and
+    tags the vacancy from the analysis text. If the named file isn't JD.md and a
+    JD.md sits next to it, use that; folders with no JD.md (old imports) keep the
+    path as given.
+    """
+    if not path:
+        return path
+    p = Path(path)
+    if p.name != "JD.md" and p.with_name("JD.md").exists():
+        return str(p.with_name("JD.md"))
+    return path
+
+
 def _db_path() -> Path:
     return Path(os.getenv("DB_PATH", str(_ROOT / "db" / "agent.db")))
 
@@ -88,6 +105,7 @@ async def cmd_upsert(url: str, title: str | None, user_id: int, path: str | None
 
     Prints vacancy_id (int) to stdout. Idempotent — safe to call on every run.
     """
+    path = _jd_path(path)
     database.configure(_db_path())
     await database.init_db()
 
@@ -116,6 +134,7 @@ async def cmd_upsert(url: str, title: str | None, user_id: int, path: str | None
 
 async def cmd_update(vacancy_id: int, status: str, path: str | None, title: str | None, salary: str | None, tags: str | None = None) -> None:
     """Update vacancy status. Optionally set/update markdown_path, title, salary, tags."""
+    path = _jd_path(path)
     database.configure(_db_path())
     await database.init_db()
 

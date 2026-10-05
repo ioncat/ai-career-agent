@@ -36,6 +36,9 @@
 - Phase 2's Quick Scan template (VScore line, Why apply, Why not apply) differs from the block SKILL.md puts at the top of `JD_analysis.md`. Documented as "moved; the DB keeps why_apply"; decide whether the file should carry them.
 **Related, bigger:** [profile-prompt-isolation-discovery-2026-10-04.md](../discovery/profile-prompt-isolation-discovery-2026-10-04.md) (separate P1 entry above).
 
+### 🟡 P2 — Auto-tags are unreliable: contradictory tags keep appearing (added 2026-10-05, needs a design discussion)
+**What:** owner has noticed repeatedly that vacancies get confusing or contradictory tag sets (e.g. healthcare and fintech and iGaming together). One cause is fixed (tags computed from `JD_analysis.md` text, see CHANGELOG 2026-10-05), but `classify()` in `core/vacancy_tags.py` is keyword-based and tags are merge-only (never removed). Needs a decision on a stricter approach (tag only from a JD's own domain/product sections, a per-vacancy cap, or re-deriving tags on refetch instead of merging). Owner: "think about it separately".
+
 ### 🟡 P2 — Dedup rework (EPIC-26), remaining (added 2026-10-05)
 **Delivered (see CHANGELOG 2026-10-05):** two tiers (confirmed `duplicate_of` at containment >= 0.80, else `possible_duplicate_of`), original chosen by text similarity; backfill applied to the live DB; "already applied" detection (`applied_twin_id`, "Applied #X" badge, analyze guard). Similarity on requirements/stack instead of full text was considered and dropped by the owner.
 **Left as is, by owner decision:** a same-URL re-publish of an already-applied vacancy keeps today's behaviour (no applied-twin handling for it). Two pre-existing hash-twin cycles (#205/#233, #388/#467) are untouched; the applied-twin walk is cycle-safe.
