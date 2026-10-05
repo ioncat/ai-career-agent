@@ -172,6 +172,12 @@ final vacancyListProvider =
     AsyncNotifierProvider<VacancyListNotifier, PollingState>(
         VacancyListNotifier.new);
 
+// One-shot request to switch the sidebar to another folder (value = folder name:
+// inbox/analyzed/processed/applied/archive). VacancyInboxScreen sets it (e.g. the
+// "Applied #X" badge opens vacancy X in the Applied folder), AppShell consumes it
+// and resets it to null.
+final folderNavRequestProvider = StateProvider<String?>((ref) => null);
+
 // Reverse of VacancyListItem.duplicateOf (2026-09-02) — `duplicateOf` is a
 // one-way pointer (the later-found posting points at the canonical one), so
 // the canonical card itself had no way to show it has a known duplicate

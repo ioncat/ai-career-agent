@@ -97,3 +97,69 @@ async def read_jd_text(markdown_path: str | None, project_root: Path) -> str | N
     if path is None:
         return None
     return await asyncio.to_thread(_read_text_sync, path)
+
+
+# ── "Already applied" detection ───────────────────────────────────────────────
+
+def compute_applied_twins(rows) -> dict[int, int]:
+    """Map vacancy id -> id of its *applied twin*, for every non-applied vacancy
+    that has one.
+
+    A vacancy's duplicate group is the connected component of the undirected
+    graph whose edges are the `duplicate_of` and `possible_duplicate_of` links
+    (a link in either direction joins two rows), restricted to one user.
+    Union-find makes the walk transitive and immune to cycles (the DB has
+    hash-twin cycles, e.g. A.duplicate_of=B and B.duplicate_of=A).
+
+    A vacancy has an applied twin when any *other* member of its group has
+    applied = 1. With several applied members the most recent `applied_at`
+    wins (missing applied_at sorts oldest); remaining ties -> lowest id.
+    Applied rows themselves get no entry. Links pointing at a row that is not
+    in `rows`, or at another user's row, are ignored.
+
+    rows: iterable of mappings/sqlite rows with keys id, user_id,
+          duplicate_of, possible_duplicate_of, applied, applied_at.
+          user_id NULL is legacy and counts as user 1.
+    One pass over the input, no I/O — safe to call per list request.
+    """
+    info: dict[int, tuple[int, bool, str]] = {}  # id -> (user, applied, applied_at)
+    links: list[tuple[int, int]] = []
+    for r in rows:
+        rid = r["id"]
+        user = r["user_id"] if r["user_id"] is not None else 1
+        info[rid] = (user, bool(r["applied"]), r["applied_at"] or "")
+        for key in ("duplicate_of", "possible_duplicate_of"):
+            target = r[key]
+            if target is not None:
+                links.append((rid, target))
+
+    parent = {rid: rid for rid in info}
+
+    def find(x: int) -> int:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    for a, b in links:
+        if b not in info or info[a][0] != info[b][0]:
+            continue
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[ra] = rb
+
+    best: dict[int, tuple[str, int]] = {}  # root -> (applied_at, id) of best applied row
+    for rid, (_user, applied, applied_at) in info.items():
+        if not applied:
+            continue
+        root = find(rid)
+        cur = best.get(root)
+        # later applied_at wins; on a tie the lower id wins
+        if cur is None or applied_at > cur[0] or (applied_at == cur[0] and rid < cur[1]):
+            best[root] = (applied_at, rid)
+
+    return {
+        rid: best[find(rid)][1]
+        for rid, (_u, applied, _a) in info.items()
+        if not applied and find(rid) in best
+    }

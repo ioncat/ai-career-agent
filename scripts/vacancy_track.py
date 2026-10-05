@@ -25,6 +25,9 @@ USAGE
         --id 42 --status analyzed \\
         [--path vacancies/001/Acme — PM/JD.md]
 
+    # Is a duplicate of this vacancy already applied to? (read-only, prints JSON)
+    python scripts/vacancy_track.py applied-twin --id 42
+
     # Move inbox folder to processed/
     python scripts/vacancy_track.py move-processed \\
         --folder "SOLAR Digital — AI PM"
@@ -247,6 +250,35 @@ async def cmd_get(vacancy_id: int, field: str | None = None) -> None:
     print(json.dumps(data, ensure_ascii=False, indent=2))
 
 
+# ── applied-twin ──────────────────────────────────────────────────────────────
+
+async def cmd_applied_twin(vacancy_id: int) -> None:
+    """Read-only: print whether a duplicate / possible duplicate of this vacancy was
+    already applied to, as JSON: {"id", "applied_twin_id", "twin_folder"}.
+
+    applied_twin_id / twin_folder are null when there is no applied twin. twin_folder
+    is the folder holding the twin's JD.md (its CV and cover live there too).
+    Exits 1 with a message on stderr if the vacancy does not exist.
+    """
+    database.configure(_db_path())
+    await database.init_db()
+
+    if await database.get_vacancy_by_id(vacancy_id) is None:
+        print(f"ERROR: vacancy id={vacancy_id} not found", file=sys.stderr)
+        sys.exit(1)
+
+    twin_id = await database.get_applied_twin_id(vacancy_id)
+    folder = None
+    if twin_id is not None:
+        twin = await database.get_vacancy_by_id(twin_id)
+        md_path = twin["markdown_path"] if twin else None
+        folder = str(Path(md_path).parent) if md_path else None
+    print(json.dumps(
+        {"id": vacancy_id, "applied_twin_id": twin_id, "twin_folder": folder},
+        ensure_ascii=False,
+    ))
+
+
 # ── delete-inbox ──────────────────────────────────────────────────────────────
 
 def cmd_delete_inbox(folder_name: str) -> None:
@@ -328,6 +360,14 @@ def main() -> None:
     p_get.add_argument("--field", default=None,
                        help="Print only this column's raw value (e.g. markdown_path) instead of the full record")
 
+    # applied-twin
+    p_twin = sub.add_parser(
+        "applied-twin",
+        help="Read-only: is a duplicate of this vacancy already applied to? Prints JSON",
+    )
+    p_twin.add_argument("--id", dest="vacancy_id", type=int, required=True,
+                        help="Vacancy DB id")
+
     # delete-inbox
     p_del = sub.add_parser("delete-inbox", help="Delete raw inbox_manual folder after pipeline processing")
     p_del.add_argument("--folder", required=True,
@@ -360,6 +400,8 @@ def main() -> None:
             ))
         elif args.cmd == "get":
             asyncio.run(cmd_get(vacancy_id=args.vacancy_id, field=args.field))
+        elif args.cmd == "applied-twin":
+            asyncio.run(cmd_applied_twin(vacancy_id=args.vacancy_id))
         elif args.cmd == "move-to-inbox":
             cmd_move_to_inbox(folder_name=args.folder, user_id=args.user_id)
         elif args.cmd == "delete-inbox":

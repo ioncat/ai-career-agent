@@ -11,6 +11,8 @@ class AppColors {
   static const sourceRabota  = Color(0xFF00897B);  // rabota.ua
   static const sourceRobota  = Color(0xFF6A1B9A);  // robota.ua (distinct site from rabota.ua)
   static const sourceOther   = Color(0xFF7A7582);  // == outline — unrecognized/manual-paste fallback
+  // The "Applied" green — same value the vacancy-detail Applied toggle uses.
+  static const applied       = Color(0xFF2E7D32);
 }
 
 // ── Full M3 ColorScheme (Fluid Desktop Workspace palette) ─────────────────────

@@ -63,6 +63,9 @@ Universal principle: never make the candidate appear to be something they are no
 
 ```
 Phase 1 + Phase 2  [run immediately on JD input, no confirmation needed]
+  → Before anything else: run `python scripts/vacancy_track.py applied-twin --id [id]`. If `applied_twin_id`
+    is not null, tell the user "уже подавали на #X" with the `twin_folder` path (its CV and cover are there)
+    and stop — analyze only if the user explicitly confirms.
   → Before running Phase 1: check `salary` on the vacancy DB row (`vacancy_track.py get --id [id]`).
     If non-null, prepend `**Listed salary:** [value]` before the JD text you hand to Phase 1 —
     `salary` is often extracted from RSS/site metadata the JD.md body never mentions, so skipping

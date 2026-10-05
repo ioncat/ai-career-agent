@@ -65,3 +65,36 @@ def test_unknown_field_exits_with_error(temp_db, capsys):
         asyncio.run(vt.cmd_get(vid, field="no_such_column"))
     assert exc.value.code == 1
     assert "unknown field" in capsys.readouterr().err
+
+
+def test_applied_twin_prints_twin_id_and_folder(temp_db, capsys):
+    db, vid = temp_db
+    con = sqlite3.connect(db)
+    con.execute(
+        "INSERT INTO vacancies (url, user_id, markdown_path, applied, applied_at, status) "
+        "VALUES ('https://example.com/jobs/2', 1, 'vacancies/applied/1/x/JD.md', 1, '2026-01-01 10:00:00', 'analyzed')"
+    )
+    twin_id = con.execute("SELECT id FROM vacancies WHERE url = 'https://example.com/jobs/2'").fetchone()[0]
+    con.execute("UPDATE vacancies SET duplicate_of = ? WHERE id = ?", (twin_id, vid))
+    con.commit()
+    con.close()
+    capsys.readouterr()
+    asyncio.run(vt.cmd_applied_twin(vid))
+    out = json.loads(capsys.readouterr().out)
+    assert out["id"] == vid
+    assert out["applied_twin_id"] == twin_id
+    assert out["twin_folder"].replace("\\", "/") == "vacancies/applied/1/x"
+
+
+def test_applied_twin_null_when_none(temp_db, capsys):
+    _, vid = temp_db
+    capsys.readouterr()
+    asyncio.run(vt.cmd_applied_twin(vid))
+    out = json.loads(capsys.readouterr().out)
+    assert out["applied_twin_id"] is None and out["twin_folder"] is None
+
+
+def test_applied_twin_unknown_vacancy_exits_1(temp_db):
+    with pytest.raises(SystemExit) as exc:
+        asyncio.run(vt.cmd_applied_twin(99999))
+    assert exc.value.code == 1

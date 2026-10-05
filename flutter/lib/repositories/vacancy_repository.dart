@@ -15,6 +15,29 @@ class ConfigDriftException implements Exception {
   String toString() => message;
 }
 
+/// Analyze was refused because a duplicate / possible duplicate of this
+/// vacancy was already applied to (backend 409 `already_applied`). Retry with
+/// `force: true` to analyze anyway.
+class AlreadyAppliedException implements Exception {
+  final int twinId;
+  const AlreadyAppliedException(this.twinId);
+  @override
+  String toString() => 'Already applied as #$twinId';
+}
+
+/// Twin id from a 409 body `{"detail": {"error": "already_applied",
+/// "applied_twin_id": N}}`, or null for any other 409 (e.g. "Already analyzing").
+int? parseAlreadyAppliedTwinId(String body) {
+  try {
+    final decoded = jsonDecode(body);
+    final detail = decoded is Map<String, dynamic> ? decoded['detail'] : null;
+    if (detail is Map<String, dynamic> && detail['error'] == 'already_applied') {
+      return detail['applied_twin_id'] as int?;
+    }
+  } catch (_) {}
+  return null;
+}
+
 class VacancyRepository {
   final String baseUrl;
 
@@ -119,11 +142,17 @@ class VacancyRepository {
     if (response.statusCode != 200) throw Exception('Restore failed: ${response.statusCode}');
   }
 
-  Future<void> analyze(int vacancyId) async {
-    final uri = Uri.parse('$baseUrl/api/vacancies/$vacancyId/analyze');
+  /// Throws [AlreadyAppliedException] on 409 `already_applied` unless [force].
+  Future<void> analyze(int vacancyId, {bool force = false}) async {
+    final uri = Uri.parse('$baseUrl/api/vacancies/$vacancyId/analyze')
+        .replace(queryParameters: force ? {'force': 'true'} : null);
     final response = await http.post(uri).timeout(const Duration(seconds: 10));
     if (response.statusCode == 404) throw Exception('Vacancy not found');
-    if (response.statusCode == 409) throw Exception('Already in progress');
+    if (response.statusCode == 409) {
+      final twinId = parseAlreadyAppliedTwinId(response.body);
+      if (twinId != null) throw AlreadyAppliedException(twinId);
+      throw Exception('Already in progress');
+    }
     if (response.statusCode != 202) throw Exception('Analyze failed: ${response.statusCode}');
   }
 

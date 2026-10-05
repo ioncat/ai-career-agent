@@ -5,6 +5,7 @@ import '../providers/read_vacancies_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/vacancy_list_provider.dart';
 import '../repositories/vacancy_repository.dart';
+import '../theme/app_theme.dart';
 import '../utils/backend_time.dart';
 import 'fit_score_chip.dart';
 import 'vac_score_badge.dart';
@@ -15,6 +16,9 @@ class VacancyCard extends ConsumerStatefulWidget {
   final bool selected;
   final VoidCallback onTap;
   final void Function(int vacancyId)? onTapRelated;
+  /// Tap on the "Applied #X" badge — opens that vacancy in the Applied folder.
+  /// Falls back to [onTapRelated] when not given.
+  final void Function(int vacancyId)? onTapApplied;
   /// Mass-action mode (BACKLOG "Batch Analysis Mode") — when true, the card
   /// shows a checkbox instead of opening the detail screen on tap.
   final bool multiSelectMode;
@@ -28,6 +32,7 @@ class VacancyCard extends ConsumerStatefulWidget {
     required this.onTap,
     this.selected = false,
     this.onTapRelated,
+    this.onTapApplied,
     this.multiSelectMode = false,
     this.checked = false,
     this.onCheckToggle,
@@ -47,7 +52,13 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
     final v = widget.vacancy;
     final readIds = ref.watch(readVacanciesProvider).valueOrNull ?? {};
     final isUnread = v.status == 'fetched' && !readIds.contains(v.id);
-    final duplicatedByThisVacancy = ref.watch(duplicatedByProvider)[v.id] ?? const <int>[];
+    // The "Applied #X" badge already says it all about vacancy X — a weaker
+    // Dup/Maybe-dup badge pointing at the same X would be the same fact twice.
+    final appliedTwin = v.appliedTwinId;
+    final duplicatedByThisVacancy = (ref.watch(duplicatedByProvider)[v.id] ?? const <int>[])
+        .where((id) => id != appliedTwin)
+        .toList();
+    final onTapApplied = widget.onTapApplied ?? widget.onTapRelated;
 
     final highlighted = widget.multiSelectMode ? widget.checked : widget.selected;
     final bgColor = highlighted
@@ -152,7 +163,26 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
                         // dwarfed the card (found 2026-07-24). Tap the card to see
                         // details instead.
                         if (v.blockerFlag) const _BlockerBadge(),
-                        if (v.duplicateOf != null)
+                        // Already applied to a duplicate of this job (EPIC-26) — the
+                        // CV and cover for it already exist there. No date on purpose.
+                        if (appliedTwin != null)
+                          Tooltip(
+                            message: 'You already applied to this job as #$appliedTwin (CV and cover are there). Tap to open.',
+                            preferBelow: false,
+                            child: MouseRegion(
+                              cursor: onTapApplied != null
+                                  ? SystemMouseCursors.click
+                                  : MouseCursor.defer,
+                              child: GestureDetector(
+                                onTap: onTapApplied != null
+                                    ? () => onTapApplied(appliedTwin)
+                                    : null,
+                                behavior: HitTestBehavior.opaque,
+                                child: _AppliedTwinBadge(twinId: appliedTwin),
+                              ),
+                            ),
+                          ),
+                        if (v.duplicateOf != null && v.duplicateOf != appliedTwin)
                           Tooltip(
                             message: 'Same job found on another source (duplicate of #${v.duplicateOf}).\nTap to view the original posting.',
                             preferBelow: false,
@@ -171,7 +201,7 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
                           ),
                         // Softer tier (2026-10-05): same title+company as #N but the
                         // JD texts differ — flagged side only, no reciprocal badge.
-                        if (v.possibleDuplicateOf != null)
+                        if (v.possibleDuplicateOf != null && v.possibleDuplicateOf != appliedTwin)
                           Tooltip(
                             message: 'Looks like the same job as #${v.possibleDuplicateOf}, but the texts differ — check before treating it as a duplicate',
                             preferBelow: false,
@@ -460,6 +490,40 @@ class _BlockerBadge extends StatelessWidget {
             'Blocker',
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   color: const Color(0xFFC62828),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 10,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// "Applied #X" — an already-applied duplicate exists. Distinct from the neutral
+// Dup badges: tinted with the same green as the Applied toggle (AppColors.applied).
+class _AppliedTwinBadge extends StatelessWidget {
+  final int twinId;
+  const _AppliedTwinBadge({required this.twinId});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.applied.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.applied.withValues(alpha: 0.6), width: 0.8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.check_circle, size: 11, color: AppColors.applied),
+          const SizedBox(width: 3),
+          Text(
+            'Applied #$twinId',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: AppColors.applied,
                   fontWeight: FontWeight.w700,
                   fontSize: 10,
                 ),

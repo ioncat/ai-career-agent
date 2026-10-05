@@ -104,6 +104,14 @@ class _AppShellState extends ConsumerState<AppShell> {
     final settingsAsync = ref.watch(settingsProvider);
     final settings = settingsAsync.valueOrNull;
 
+    // "Applied #X" badge (and any future cross-folder jump) asks to switch folder.
+    ref.listen<String?>(folderNavRequestProvider, (prev, folder) {
+      if (folder == null) return;
+      final i = _folders.indexOf(folder);
+      if (i >= 0 && i != _selectedIndex) setState(() => _selectedIndex = i);
+      ref.read(folderNavRequestProvider.notifier).state = null;
+    });
+
     ref.listen<AsyncValue<PollingState>>(vacancyListProvider, (prev, next) {
       final newState = next.valueOrNull;
       if (newState == null) return;

@@ -36,6 +36,7 @@ from adapters.parser_adapter import ParserAdapter, ParserError
 from contracts.pipeline import AnalysisJson
 from core import config_store
 from core import vacancy_stage
+from core.dedup import compute_applied_twins
 from core.vacancy_tags import classify as classify_tags
 from core.vacancy_tags import merge_tags
 from db import database
@@ -342,9 +343,13 @@ async def api_vacancies(
            updated after this timestamp. Used by Flutter polling (A5b).
     """
     rows = await database.list_vacancies(status=status, user_id=user_id, since=since, limit=limit)
+    # Applied twin (EPIC-26): computed once from a light all-rows projection,
+    # NOT from `rows` — status/since/limit filters would hide the twin.
+    applied_twins = compute_applied_twins(await database.get_dedup_link_rows(user_id))
     result = []
     for row in rows:
         item = _normalize_dates(dict(row))
+        item["applied_twin_id"] = applied_twins.get(item["id"])
         item["applied"] = bool(item.get("applied"))
         item["starred"] = bool(item.get("starred"))
         item["stage"] = vacancy_stage.stage(item.get("status") or "", item["applied"])
@@ -1548,12 +1553,15 @@ async def api_vacancy_cover_pdf(vacancy_id: int):
 
 
 @app.post("/api/vacancies/{vacancy_id}/analyze", status_code=202)
-async def api_vacancy_analyze(vacancy_id: int, request: Request):
+async def api_vacancy_analyze(vacancy_id: int, request: Request, force: bool = False):
     """Start Phase 1+2 analysis immediately (Flutter Analyze button).
 
     Enqueues into AnalysisWorker — processing starts without polling delay.
     Status transitions: analyzing → analyzed → Web Push fires.
     409 if vacancy is already being analyzed.
+    409 {"error": "already_applied", "applied_twin_id": N} if a duplicate /
+    possible duplicate of this vacancy was already applied to (its CV and cover
+    already exist there) — pass force=true to analyze anyway.
     Falls back to DB-only status when running without agent.py (standalone tracker).
     """
     row = await database.get_vacancy_by_id(vacancy_id)
@@ -1562,6 +1570,13 @@ async def api_vacancy_analyze(vacancy_id: int, request: Request):
     current_status = row["status"] if "status" in row.keys() else None
     if current_status == "analyzing":
         raise HTTPException(status_code=409, detail="Already analyzing")
+    if not force:
+        twin_id = await database.get_applied_twin_id(vacancy_id)
+        if twin_id is not None:
+            raise HTTPException(
+                status_code=409,
+                detail={"error": "already_applied", "applied_twin_id": twin_id},
+            )
     await database.clear_analysis_error(vacancy_id)
     worker = getattr(request.app.state, "analysis_worker", None)
     if worker is not None:
@@ -1698,7 +1713,9 @@ async def api_vacancy(vacancy_id: int):
     row = await database.get_vacancy_by_id(vacancy_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Vacancy not found")
-    return _normalize_dates(dict(row))
+    item = _normalize_dates(dict(row))
+    item["applied_twin_id"] = await database.get_applied_twin_id(vacancy_id)
+    return item
 
 
 @app.get("/api/vacancies/{vacancy_id}/activity")

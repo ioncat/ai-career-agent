@@ -16,6 +16,7 @@ import '../providers/vacancy_list_provider.dart';
 import '../repositories/vacancy_repository.dart';
 import '../providers/vacancy_cv_provider.dart';
 import '../utils/backend_time.dart';
+import '../utils/analyze_guard.dart';
 import '../utils/error_snackbar.dart';
 
 /// Renders a pre-filter reason string ("category: explanation" — as produced by
@@ -295,7 +296,14 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
   Future<void> _analyze() async {
     setState(() => _loadingAnalyze = true);
     try {
-      await _repo.analyze(widget.vacancyId);
+      // Asks "Already applied as #X. Analyze anyway?" when a duplicate of this
+      // job was already applied to; false = the user said no.
+      final queued = await analyzeWithAppliedGuard(
+        context,
+        _repo,
+        widget.vacancyId,
+      );
+      if (!queued) return;
       if (mounted) {
         ref.read(vacancyListProvider.notifier).refresh();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -2209,7 +2217,14 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
   Future<void> _analyze() async {
     setState(() => _loadingAnalyze = true);
     try {
-      await _repo.analyze(widget.vacancyId);
+      // Asks "Already applied as #X. Analyze anyway?" when a duplicate of this
+      // job was already applied to; false = the user said no.
+      final queued = await analyzeWithAppliedGuard(
+        context,
+        _repo,
+        widget.vacancyId,
+      );
+      if (!queued) return;
       if (mounted) {
         ref.read(vacancyListProvider.notifier).refresh();
         ScaffoldMessenger.of(context).showSnackBar(

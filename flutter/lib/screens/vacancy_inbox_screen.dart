@@ -119,10 +119,14 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
     });
     var succeeded = 0;
     var failed = 0;
+    // Analyze only: vacancies refused because a duplicate was already applied to.
+    final skippedApplied = <int, int>{}; // vacancy id -> applied twin id
     for (final id in targetIds) {
       try {
         await action(id);
         succeeded++;
+      } on AlreadyAppliedException catch (e) {
+        skippedApplied[id] = e.twinId;
       } catch (_) {
         failed++;
       }
@@ -132,12 +136,16 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
     setState(() => _batchRunning = false);
     ref.read(vacancyListProvider.notifier).refresh();
     _exitMultiSelect();
+    final skippedNote = skippedApplied.isEmpty
+        ? ''
+        : ', ${skippedApplied.length} skipped (already applied: '
+            '${skippedApplied.values.toSet().map((t) => '#$t').join(', ')})';
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
           failed == 0
-              ? '$label: $succeeded/${targetIds.length} done'
-              : '$label: $succeeded/${targetIds.length} done, $failed failed',
+              ? '$label: $succeeded/${targetIds.length} done$skippedNote'
+              : '$label: $succeeded/${targetIds.length} done, $failed failed$skippedNote',
         ),
         backgroundColor: failed == 0 ? null : Colors.orange,
       ),
@@ -284,6 +292,19 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
       ref.read(readVacanciesProvider.notifier).markRead(id);
       _keyboardFocusNode.requestFocus();
       _scrollSelectedIntoView();
+    }
+  }
+
+  /// "Applied #X" badge: open vacancy X and switch to the folder it lives in
+  /// (Applied). Unlike the Dup badges, which keep the current folder and just
+  /// show the target in the detail pane, the applied twin comes with its CV and
+  /// cover in the Applied folder — so the list follows.
+  void _openAppliedTwin(int id) {
+    _selectByIdAny(id);
+    final all = ref.read(vacancyListProvider).valueOrNull?.vacancies ?? [];
+    final target = all.where((v) => v.id == id).firstOrNull;
+    if (target != null && target.stage != widget.folder) {
+      ref.read(folderNavRequestProvider.notifier).state = target.stage;
     }
   }
 
@@ -681,6 +702,7 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
                                   _keyboardFocusNode.requestFocus();
                                 },
                                 onTapRelated: _selectByIdAny,
+                                onTapApplied: _openAppliedTwin,
                                 multiSelectMode: _multiSelectMode,
                                 checkedIds: _selectedIds,
                                 onCheckToggle: _toggleCheck,
@@ -1539,6 +1561,7 @@ class InboxVacancyList extends StatelessWidget {
   final int? selectedId;
   final ValueChanged<VacancyListItem> onSelect;
   final void Function(int vacancyId)? onTapRelated;
+  final void Function(int vacancyId)? onTapApplied;
   final bool multiSelectMode;
   final Set<int> checkedIds;
   final void Function(int id)? onCheckToggle;
@@ -1556,6 +1579,7 @@ class InboxVacancyList extends StatelessWidget {
     required this.selectedId,
     required this.onSelect,
     this.onTapRelated,
+    this.onTapApplied,
     this.multiSelectMode = false,
     this.checkedIds = const {},
     this.onCheckToggle,
@@ -1608,6 +1632,7 @@ class InboxVacancyList extends StatelessWidget {
           selected: v.id == selectedId,
           onTap: () => onSelect(v),
           onTapRelated: onTapRelated,
+          onTapApplied: onTapApplied,
           multiSelectMode: multiSelectMode,
           checked: checkedIds.contains(v.id),
           onCheckToggle: onCheckToggle == null

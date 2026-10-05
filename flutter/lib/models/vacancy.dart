@@ -50,6 +50,11 @@ class VacancyListItem {
   // but the JD texts differ too much to confirm it. Never set together with
   // duplicateOf.
   final int? possibleDuplicateOf;
+  // Id of an already-applied vacancy in this one's duplicate group (confirmed or
+  // possible links, any direction) — computed by the backend, null when none or
+  // when this vacancy is itself applied. Drives the "Applied #X" badge and the
+  // Analyze guard.
+  final int? appliedTwinId;
   final String? republishedAt;
   final String? folderPath;
   final String stage;
@@ -91,6 +96,7 @@ class VacancyListItem {
     this.roleTags = const [],
     this.duplicateOf,
     this.possibleDuplicateOf,
+    this.appliedTwinId,
     this.republishedAt,
     this.folderPath,
     this.stage = 'inbox',
@@ -128,6 +134,7 @@ class VacancyListItem {
       roleTags: _parseStringList(json['role_tags']),
       duplicateOf: json['duplicate_of'] as int?,
       possibleDuplicateOf: json['possible_duplicate_of'] as int?,
+      appliedTwinId: json['applied_twin_id'] as int?,
       republishedAt: json['republished_at'] as String?,
       folderPath: json['folder_path'] as String?,
       stage: json['stage'] as String? ?? 'inbox',
@@ -164,6 +171,7 @@ class VacancyListItem {
         'role_tags': roleTags,
         'duplicate_of': duplicateOf,
         'possible_duplicate_of': possibleDuplicateOf,
+        'applied_twin_id': appliedTwinId,
         'republished_at': republishedAt,
         'stage': stage,
         'blocker_flag': blockerFlag,

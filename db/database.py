@@ -25,7 +25,13 @@ from urllib.parse import urlparse, urlunparse
 
 import aiosqlite
 
-from core.dedup import CONFIRM_THRESHOLD, jd_shingles, read_jd_text, shingle_containment
+from core.dedup import (
+    CONFIRM_THRESHOLD,
+    compute_applied_twins,
+    jd_shingles,
+    read_jd_text,
+    shingle_containment,
+)
 
 log = logging.getLogger(__name__)
 
@@ -928,6 +934,40 @@ async def clear_duplicate_flags(vacancy_id: int) -> None:
             (vacancy_id,),
         )
         await db.commit()
+
+
+async def get_dedup_link_rows(user_id: int | None = None) -> list[aiosqlite.Row]:
+    """Light projection of every vacancy's duplicate links + applied state —
+    the input of core.dedup.compute_applied_twins. Deliberately unfiltered by
+    status/limit/since: the twin of a listed row may be outside the page the
+    caller fetched. user_id=None -> all users (the pure helper groups per user)."""
+    sql = (
+        "SELECT id, user_id, duplicate_of, possible_duplicate_of, applied, applied_at "
+        "FROM vacancies"
+    )
+    params: list = []
+    if user_id is not None:
+        # legacy NULL user_id counts as user 1 (see insert_vacancy)
+        sql += " WHERE COALESCE(user_id, 1) = ?"
+        params.append(user_id)
+    async with get_db() as db:
+        cursor = await db.execute(sql, params)
+        return await cursor.fetchall()
+
+
+async def get_applied_twin_id(vacancy_id: int) -> int | None:
+    """Id of the already-applied vacancy in this vacancy's duplicate group
+    (confirmed + possible links, both directions, transitive), or None.
+    See core.dedup.compute_applied_twins for the exact rules."""
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT COALESCE(user_id, 1) AS u FROM vacancies WHERE id = ?", (vacancy_id,)
+        )
+        row = await cursor.fetchone()
+    if row is None:
+        return None
+    rows = await get_dedup_link_rows(row["u"])
+    return compute_applied_twins(rows).get(vacancy_id)
 
 
 async def set_content_hash(vacancy_id: int, content_hash: str) -> None:
