@@ -1,6 +1,6 @@
 # career-agent — Backlog
 
-> Last updated: 2026-10-05
+> Last updated: 2026-10-06
 > Rules: [documentation-conventions.md](documentation-conventions.md) · History: [CHANGELOG.md](CHANGELOG.md) · Specs: [Epics/](Epics/)
 
 **Priority legend:**
@@ -103,7 +103,7 @@
 **What:** `/ai-vacancy-report` and `/pm-vacancy-report` (personal market research, `research/` — see [feature entry in CHANGELOG.md → 2026-09-08](CHANGELOG.md)) each now also write a dated, never-overwritten JSON snapshot (`research/{ai,pm}_vacancy_report_raw_YYYY-MM-DD.json`) alongside their working-copy output — pure insurance laid down deliberately so this is buildable later without re-deriving anything. **When asked to "extend analytics" with this data, start here, not from scratch:**
 1. `research/ai-product-vacancy-market-analysis-methodology.md` / `research/pm-vacancy-market-analysis-methodology.md` — the two pipelines' full design (categories, dictionaries, false-positive lessons already learned).
 2. `scripts/ai_vacancy_report.py` / `scripts/pm_vacancy_report.py` — the actual filters + term dictionaries, extendable in place.
-3. `flutter/lib/screens/analytics_screen.dart` — the existing in-app Analytics screen (currently: live vacancy-tag distribution from `core/vacancy_tags.py`'s taxonomy, `_TagChart`/`_BarRow` bar-chart widgets) — the natural home for a new section, not a separate screen.
+3. `flutter/lib/screens/analytics_screen.dart` — the existing in-app Analytics screen (currently: an Overview panel with Analyzed/Applied counters and one shared period, then the Market and Applied tag-distribution charts side by side — taxonomy from `core/vacancy_tags.py`, `TagChart`/`_BarRow` bar-chart widgets, `ChartsRow` for the two-column layout) — the natural home for a new section, not a separate screen.
 **Not started — needs a decision first:** once 3+ dated JSON snapshots exist, add a small `agent.db` table (`report_date`/`category`/`term`/`count`) populated by parsing those snapshots, and a new backend endpoint + Flutter section reading it — confirmed *not* worth a separate database, see discussion this same session.
 
 ### 🟡 P2 — Flutter: visually distinguish a Djinni salary estimate (and a probe give-up note) from a real disclosed salary (backend + pipeline wiring delivered 2026-09-05/07)
@@ -476,10 +476,6 @@ No dual-availability state — the button's visibility is a direct, deterministi
 - [ ] Re-save CV.md + re-render PDF; `vacancy_track.py update-json --phase p3_6`
 - [ ] Flutter: "Apply fixes" button + `VacancyRepository.applyAuditFixes()`
 - [ ] Tests: removal keeps non-🗑️ sentences intact (guard against over-deletion)
-
-### `analyzed_at` — точный timestamp успешного анализа
-**What:** `updated_at` меняется при любом статусе (включая failed) → чип "Analyzed" врёт при retry-failed. Отдельная колонка `analyzed_at`, пишется только при переходе в `analyzed`.
-**Scope:** schema + migration; `cv_analyze.py` write; API response; Flutter `_AnalyzedChip` reads `analyzedAt`.
 
 ### Queue journal / log panel (Flutter)
 **What:** visible panel listing all queued vacancies + statuses when anything enters the analysis queue. Useful for future batch mode.
