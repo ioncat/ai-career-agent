@@ -70,6 +70,8 @@ docs/discovery/
 research/*_RU.md
 research/*_raw.json
 research/*_raw_*.json
+# Backfill dry-run/apply reports list real vacancy ids and local paths.
+research/*-backfill-*.md
 
 # Skill pipeline — base files (SKILL.md, SKILL_TYPES.md, users.example.yaml) are tracked.
 # Personal data (user profiles, the real user registry, active_user state) is private.
