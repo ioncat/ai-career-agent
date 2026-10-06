@@ -352,9 +352,13 @@ async def api_vacancies(
     company_applied = compute_company_applied(
         link_rows, await database.get_company_link_graph(), applied_twins,
     )
+    # Real Phase 2 completion per vacancy (Analytics screen date range) — from
+    # pipeline_runs, never vacancies.updated_at; one query for the whole list.
+    analyzed_at = await database.get_last_phase_completions("phase2")
     result = []
     for row in rows:
         item = _normalize_dates(dict(row))
+        item["analyzed_at"] = _utc_z(analyzed_at.get(item["id"]))
         item["applied_twin_id"] = applied_twins.get(item["id"])
         item["company_applied_id"] = company_applied.get(item["id"])
         item["applied"] = bool(item.get("applied"))

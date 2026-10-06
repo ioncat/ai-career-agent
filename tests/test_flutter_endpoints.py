@@ -90,6 +90,27 @@ async def test_list_vacancies_returns_vacancy(client, db_with_vacancies):
 
 
 @pytest.mark.asyncio
+async def test_list_vacancies_includes_analyzed_at_from_pipeline_runs(client, db_with_vacancies):
+    """List carries the real Phase 2 completion (UTC, explicit Z), null without a
+    run — never vacancies.updated_at (Analytics date range, 2026-10-06)."""
+    database.configure(db_with_vacancies / "test.db")
+    with_run = await database.insert_vacancy(url="https://djinni.co/jobs/20", user_id=1)
+    without_run = await database.insert_vacancy(url="https://djinni.co/jobs/21", user_id=1)
+    run_id = await database.insert_pipeline_run(with_run, "phase2")
+    await database.update_pipeline_run(run_id, "done")
+    # a later run that did not finish must not count
+    err_id = await database.insert_pipeline_run(with_run, "phase2")
+    await database.update_pipeline_run(err_id, "error", error_message="boom")
+
+    by_id = {i["id"]: i for i in client.get("/api/vacancies").json()}
+    assert by_id[with_run]["analyzed_at"].endswith("Z")
+    assert by_id[with_run]["analyzed_at"] == (
+        await database.get_last_phase_completion(with_run, "phase2")
+    ).replace(" ", "T") + "Z"
+    assert by_id[without_run]["analyzed_at"] is None
+
+
+@pytest.mark.asyncio
 async def test_list_vacancies_applied_starred_are_bool(client, db_with_vacancies):
     database.configure(db_with_vacancies / "test.db")
     await database.insert_vacancy(url="https://djinni.co/jobs/2", user_id=1)

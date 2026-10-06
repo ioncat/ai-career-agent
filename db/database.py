@@ -1434,6 +1434,22 @@ async def get_last_phase_completion(vacancy_id: int, phase: str) -> str | None:
         return row["finished_at"] if row else None
 
 
+async def get_last_phase_completions(phase: str) -> dict[int, str]:
+    """{vacancy_id: finished_at} of the latest successful run of `phase`, all
+    vacancies in one query — for list endpoints (same meaning as
+    get_last_phase_completion, without a query per row)."""
+    async with get_db() as db:
+        cursor = await db.execute(
+            """
+            SELECT vacancy_id, MAX(finished_at) AS finished_at FROM pipeline_runs
+            WHERE phase = ? AND status = 'done' AND finished_at IS NOT NULL
+            GROUP BY vacancy_id
+            """,
+            (phase,),
+        )
+        return {r["vacancy_id"]: r["finished_at"] for r in await cursor.fetchall()}
+
+
 # ── Push subscription helpers ─────────────────────────────────────────────────
 
 async def upsert_push_subscription(
