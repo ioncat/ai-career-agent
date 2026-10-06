@@ -42,6 +42,10 @@ class VacancyListItem {
   // when never declined, or for pre-existing Archive rows from before this
   // field existed (those fall back to arrival order — never backfilled).
   final String? declinedAt;
+  // Real Phase 2 completion time (pipeline_runs), NOT updatedAt — see
+  // VacancyAnalysis.analyzedAt. Null when no completed run is recorded.
+  // Drives the Analytics date range (2026-10-06).
+  final String? analyzedAt;
   final String? salary;
   final List<String> tags;
   final List<String> roleTags;
@@ -103,6 +107,7 @@ class VacancyListItem {
     this.possibleDuplicateOf,
     this.appliedTwinId,
     this.companyAppliedId,
+    this.analyzedAt,
     this.republishedAt,
     this.folderPath,
     this.stage = 'inbox',
@@ -142,6 +147,7 @@ class VacancyListItem {
       possibleDuplicateOf: json['possible_duplicate_of'] as int?,
       appliedTwinId: json['applied_twin_id'] as int?,
       companyAppliedId: json['company_applied_id'] as int?,
+      analyzedAt: json['analyzed_at'] as String?,
       republishedAt: json['republished_at'] as String?,
       folderPath: json['folder_path'] as String?,
       stage: json['stage'] as String? ?? 'inbox',
@@ -180,6 +186,7 @@ class VacancyListItem {
         'possible_duplicate_of': possibleDuplicateOf,
         'applied_twin_id': appliedTwinId,
         'company_applied_id': companyAppliedId,
+        'analyzed_at': analyzedAt,
         'republished_at': republishedAt,
         'stage': stage,
         'blocker_flag': blockerFlag,
