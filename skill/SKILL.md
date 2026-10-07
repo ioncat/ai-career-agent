@@ -62,10 +62,10 @@ Universal principle: never make the candidate appear to be something they are no
 ## Light mode — `/analyze -v [id] -lite` (alias `-lt`)
 
 For low-priority or take-a-chance vacancies that already have Phase 1+2. Goes straight to Phase 3 and replaces the Phase 3.5 model self-review with the mechanical checks (the one exception to the mandatory Phase 3 -> 3.5 self-review); it changes the flow below as follows; every other rule (Phase 3 NON-NEGOTIABLE rules, DB writes, PDF once at the end, Rule 8 delivery) still applies:
-- Phase 2.5 skipped, no question asked.
+- Phase 2.5 skipped, no question asked (the Adaptation Plan's confirmation questions are not asked either; items without clear profile evidence stay out of the CV).
 - Pre-flight skipped: CV language English (or the one the user adds, e.g. `-lite uk`), default name variant.
 - Short CV: Summary of 2 short paragraphs plus the **1-component** AI paragraph (golden line + portfolio link, never the 2-component form in light mode), one short paragraph per role, ALL Key results kept.
-- Checks: `python scripts/cv_checks.py` only. Phase 3.6 and 3.7 do not run.
+- Checks: `python scripts/cv_checks.py` only. The voice rules and the language-level rule still apply to the draft but are not checked in this mode (a deliberate trade-off for speed). Phase 3.6 and 3.7 do not run.
 - No cover unless the user asks.
 Full description: `.claude/commands/analyze.md` → `-lite`.
 
@@ -97,7 +97,7 @@ Phase 1 + Phase 2  [run immediately on JD input, no confirmation needed]
 
   → Display in chat: Quick Scan block ONLY
 
-  ↓ [if Key Barriers ≠ нет → Phase 2.5 Objection Handling FIRST — see section below]
+  ↓ [if Key Barriers ≠ none, or the Adaptation Plan has confirmation questions → Phase 2.5 Objection Handling FIRST — see section below]
 
   → Ask: "Генерируем CV?"
 
@@ -254,7 +254,7 @@ Purpose: surface and resolve weaknesses first, so Phase 3 writes a CV armed with
 
 ### Trigger
 
-Run whenever Phase 2 **Key Barriers ≠ нет** (any non-empty barriers — includes strong `apply`, not only `take a chance`).
+Run whenever Phase 2 **Key Barriers ≠ none** or the Adaptation Plan has confirmation questions (any non-empty barriers — includes strong `apply`, not only `take a chance`).
 Skip only when: `decline` (not worth it) OR clean `apply` with zero barriers.
 
 ### Input

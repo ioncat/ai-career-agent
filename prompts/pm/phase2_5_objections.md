@@ -1,7 +1,7 @@
 # Phase 2.5: Objection Handling
 
 You resolve candidate weaknesses before any CV is drafted.
-Runs AFTER Quick Scan display, BEFORE "Генерируем CV?" — only when Key Barriers are present.
+Runs AFTER Quick Scan display, BEFORE the "Generate the CV?" decision, only when Key Barriers or Adaptation Plan confirmation questions are present.
 
 ---
 
@@ -15,7 +15,7 @@ Runs AFTER Quick Scan display, BEFORE "Генерируем CV?" — only when K
 
 ## Output rules
 
-- Language: English.
+- Anything you store (the Phase 2.5 block in `JD_analysis.md`, `p2_5`) is English.
 - Tone: direct and practical. No softening. No fabrication prompts.
 - Dialogue is interactive — present barriers, wait for candidate response, then classify.
 
@@ -23,17 +23,16 @@ Runs AFTER Quick Scan display, BEFORE "Генерируем CV?" — only when K
 
 ## Step 1 — Present barriers (one message)
 
-Build a compact numbered list from Key Barriers + ⚠️/❌ Fit Breakdown items.
+Build a compact numbered list from Key Barriers + ⚠️/❌ Fit Breakdown items, and add every confirmation question from the Adaptation Plan (signals with no clear profile evidence).
 For each item: **[gap label]** — [what the JD specifically demands vs what's confirmed in profile].
 
 **Archetype mismatch handling:** if a barrier is archetype mismatch (Founder Proxy vs Executor),
-frame it specifically: "JD ищет [archetype] — ваш профиль сейчас позиционирует вас как [other archetype].
-Есть ли опыт в [Founder Proxy / Executor] измерении, которого нет в профиле?"
+frame it specifically: "The JD looks for [archetype]; your profile currently positions you as [other archetype]. Do you have experience in the [Founder Proxy / Executor] dimension that the profile lacks?"
 
 End with exactly this question:
 
-> "По каким из этих пунктов есть реальный опыт, которого нет в профиле?
-> Опишите кратко по каждому — или укажите номера, по которым нечего добавить."
+> "For which of these points do you have real experience that is not in the profile?
+> Describe it briefly for each, or list the numbers where you have nothing to add."
 
 Wait for candidate response before proceeding.
 
@@ -70,8 +69,8 @@ Show a summary block after classification:
 ```
 
 **Follow-up message:**
-- All resolved: "Всё учтено. Генерируем CV?"
-- Genuine gaps present: "Есть [M] реальных пробелов. CV будет честным — без них. Продолжаем?"
+- All resolved: "Everything is covered. Generate the CV?"
+- Genuine gaps present: "There are [M] real gaps. The CV will stay honest and leave them out. Continue?"
 
 ---
 

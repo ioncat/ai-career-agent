@@ -199,7 +199,7 @@ Before generating the review, verify three things from `JD_analysis.md`. Use fin
 
 ## Rules
 
-- If no issues in a category, write `• нет замечаний` — do not skip the category header
+- If no issues in a category, write `• none` — do not skip the category header
 - Apply changes to the CV draft directly — do not output a separate diff
 - Flag if AI tooling paragraph risks misleading for this specific role
 - Flag if GitHub should be included or excluded for this specific role
