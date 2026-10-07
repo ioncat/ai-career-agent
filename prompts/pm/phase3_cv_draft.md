@@ -86,7 +86,7 @@ Output valid markdown exactly as shown below. Do NOT substitute `•` for `-`. D
 ## SUMMARY
 
 [2 paragraphs max of positioning text; the AI tooling paragraph below is in addition. Full-arc positioning tailored to this vacancy.]
-[AI tooling paragraph — include on every CV; omit if vacancy is for AI product owner]
+[AI tooling paragraph — include on every CV; an AI product owner vacancy gets the 2-component form, see the AI Tooling Paragraph section below]
 
 ---
 
