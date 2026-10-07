@@ -64,7 +64,7 @@
 ### ✅ Delivered 2026-09-21 — Full phase-by-phase prompt audit, correctness half (`prompts/pm/`)
 **What:** user's recurring doubt, voiced during the #1646 role_balance discussion: the pipeline prompts have grown reactively, one fix at a time, over many sessions — possible bloat, stale/redundant rules, and inconsistency between what a rule *says* and what actually gets applied. All 8 `prompts/pm/` files read fresh, checked for validity/enforcement gaps/cross-file contradictions. Full findings: [prompt-audit-pm-2026-09-21.md](../discovery/prompt-audit-pm-2026-09-21.md) (gitignored, local). Fixed live: the likely actual root cause of #1646 (three uncoordinated "what to lead with" mechanisms in `phase3_cv_draft.md`, no precedence order), the 81-distinct-archetype-value drift (`phase1_analysis.md` §1.4 vocabulary bleed), two already-logged-but-unfixed BACKLOG bugs (Quick Scan/Internal-Analysis ordering in `phase2_fit.md`, sentence-vs-clause granularity in `phase3_6_signal_audit.md`), and a genuine in-file contradiction in `phase4_cover.md` (Variant B vs. Rule #1). See CHANGELOG → 2026-09-21 for the full list.
 **Deliberately NOT done in this pass (the "conciseness" half of the original scope) — see next item.**
-**`prompts/generic/` explicitly out of scope** (user's call, still lags `pm/` — see the existing "Docs — Mirror prompt changes to generic/" tech-debt item).
+**`prompts/generic/` explicitly out of scope** (frozen 2026-10-07: a placeholder for future roles, not maintained; the "Mirror prompt changes to generic/" tech-debt item is out of scope too).
 
 ### 🟠 P1 — Prompt clarity/structure pass — sequencing, redundancy, directness (added 2026-09-21, not started — **user flagged as top priority for upcoming sessions**)
 **What:** distinct from the correctness audit above (which checked *whether each rule is still valid/enforced*) — this checks *whether the prompt's structure helps the model reason well*: is instruction order sequential and non-confusing, is anything stated redundantly, is anything vague where a firm directive would reduce ambiguity. User's own framing: fewer tokens is a real but secondary benefit — the primary goal is a clearer, less "confusing" task for the model, so it fantasizes less and follows instructions more precisely. Direct evidence this class of problem is real, found *during* the correctness audit even though that wasn't its focus: `phase3_cv_draft.md` had three separate emphasis mechanisms with no stated order (structural, not content, bug — root cause of #1646) and `phase4_cover.md` had a genuine in-file contradiction (Variant B vs. Rule #1).
@@ -495,7 +495,7 @@ No dual-availability state — the button's visibility is a direct, deterministi
 - [ ] **VScore → VacScore rename** — везде: prompts, SKILL.md, web/reader.py, tracker.html, Flutter
 - [ ] **RSSWatcher → BackgroundWorker rename** — `core/rss_watcher.py` → `core/background_worker.py`; misleading name (added 2026-07-06)
 
-### Docs — Mirror 2026-07-12 prompt changes to generic/ + CLAUDE.md bump
+### Docs — Mirror 2026-07-12 prompt changes to generic/ + CLAUDE.md bump (out of scope since 2026-10-07: `prompts/generic/` is frozen)
 **What:** changes landed in `prompts/pm/` only. Mirror to `prompts/generic/`: phase1 JD Language detection (§1.0 + header field), phase2 Signal Coverage Table, phase3 Rule 24, create `phase3_6_signal_audit.md`. CLAUDE.md: 1.19 → 1.20 + status.
 
 ---
