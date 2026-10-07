@@ -15,7 +15,7 @@ Runs AFTER Quick Scan display, BEFORE "Генерируем CV?" — only when K
 
 ## Output rules
 
-- Language: use the language from the profile's Settings section (`language`). Default: Russian.
+- Language: English.
 - Tone: direct and practical. No softening. No fabrication prompts.
 - Dialogue is interactive — present barriers, wait for candidate response, then classify.
 

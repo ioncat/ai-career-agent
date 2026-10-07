@@ -61,7 +61,7 @@ Universal principle: never make the candidate appear to be something they are no
 
 ## Light mode — `/analyze -v [id] -lite` (alias `-lt`)
 
-For low-priority or take-a-chance vacancies that already have Phase 1+2. Goes straight to Phase 3+3.5 and changes the flow below as follows; every other rule (Phase 3 NON-NEGOTIABLE rules, DB writes, PDF once at the end, Rule 8 delivery) still applies:
+For low-priority or take-a-chance vacancies that already have Phase 1+2. Goes straight to Phase 3 and replaces the Phase 3.5 model self-review with the mechanical checks (the one exception to the mandatory Phase 3 -> 3.5 self-review); it changes the flow below as follows; every other rule (Phase 3 NON-NEGOTIABLE rules, DB writes, PDF once at the end, Rule 8 delivery) still applies:
 - Phase 2.5 skipped, no question asked.
 - Pre-flight skipped: CV language English (or the one the user adds, e.g. `-lite uk`), default name variant.
 - Short CV: Summary of 2 short paragraphs plus the **1-component** AI paragraph (golden line + portfolio link, never the 2-component form in light mode), one short paragraph per role, ALL Key results kept.

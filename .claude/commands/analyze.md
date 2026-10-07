@@ -90,7 +90,7 @@ What changes versus the full pipeline:
 - **Phase 2.5 (objection handling): skipped**, no question asked.
 - **Pre-flight: no questions.** CV language = English unless the user adds it (`-lite uk`). Name = the profile's default variant.
 - **CV is short:** Summary of 2 short paragraphs plus the **1-component** AI paragraph (the golden line with the portfolio link, from the profile's AI Tooling Paragraph section; never the 2-component form in light mode); 1 short paragraph per role; **all Key results are kept** (rule 20b). Every other Phase 3 rule still applies.
-- **Checks: mechanical only** (`scripts/cv_checks.py`). Phase 3.6 and 3.7 do not run.
+- **Checks: mechanical only** (`scripts/cv_checks.py`). They replace the Phase 3.5 model self-review: this is the one exception to the mandatory Phase 3 -> 3.5 self-review. Phase 3.6 and 3.7 do not run.
 - **Cover: not written unless the user asks.**
 - Everything else is unchanged: no PDF until the final state, link-or-`SendUserFile` delivery (Rule 8), DB writes (`p3`, status `cv_generated`) after approval.
 
