@@ -1088,6 +1088,13 @@ def _extract_title_and_company(content: str, site: str) -> tuple[str, str]:
         if m:
             return m.group(1).strip(), m.group(2).strip()
 
+    if site == "linkedin" and h1:
+        # LinkedIn format: "{role} | {company}" — split on the LAST " | " so a
+        # role that itself contains a pipe keeps it.
+        role, sep, company = h1.rpartition(" | ")
+        if sep and role.strip() and company.strip():
+            return role.strip(), company.strip()
+
     # Generic: "компанія/компания X" anywhere in H1
     if h1:
         m = re.search(r'компані[яї]\s+([^\n,]+)', h1, re.IGNORECASE)

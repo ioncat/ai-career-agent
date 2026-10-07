@@ -2166,3 +2166,40 @@ async def test_import_jd_title_extraction(client, tmp_path):
     })
     assert resp2.status_code == 201
     assert resp2.json()["title"] == "Senior Product Owner"
+
+
+@pytest.mark.asyncio
+async def test_import_jd_linkedin_title_and_company(client):
+    """LinkedIn pastes carry "# Role | Company" — company is split out, title is clean.
+
+    Shape taken from a real LinkedIn paste (H1, Source, Extracted header).
+    """
+    uid = await database.insert_user(name="LiUser", telegram_chat_id=9006, skill_type="pm")
+    content = (
+        "# Technical Product Owner | Forte Group\n\n"
+        "Source: https://www.linkedin.com/jobs/view/4476325344/\n"
+        "Extracted: 2026-10-07T07:32:24.870Z\n\n"
+        "Location: Ukraine\n\n## About the job\n\nForte Group is looking for an AI Technical Product Owner."
+    )
+    resp = client.post("/api/vacancies/import-jd", json={
+        "content": content, "filename": "li.md", "user_id": uid,
+    })
+    assert resp.status_code == 201
+    assert resp.json()["title"] == "Technical Product Owner"
+
+    row = await database.get_vacancy_by_id(resp.json()["vacancy_id"])
+    assert row["company"] == "Forte Group"
+    assert row["site"] == "linkedin"
+    assert row["title"] == "Technical Product Owner"
+
+
+def test_extract_title_and_company_linkedin_edge_cases():
+    from web.api import _extract_title_and_company
+    # pipe inside the role: split on the last separator only
+    assert _extract_title_and_company("# PM | Platform | Acme", "linkedin") == ("PM | Platform", "Acme")
+    # no separator: falls through to the generic path, company stays empty
+    assert _extract_title_and_company("# Senior Product Manager", "linkedin") == ("Senior Product Manager", "")
+    # a bare pipe without spaces is not the LinkedIn separator
+    assert _extract_title_and_company("# PM|Acme", "linkedin") == ("PM|Acme", "")
+    # other sites are untouched
+    assert _extract_title_and_company("# PM | Acme", "djinni") == ("PM | Acme", "")
