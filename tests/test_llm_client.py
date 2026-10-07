@@ -493,6 +493,29 @@ async def test_claudecode_no_system():
 
 
 @pytest.mark.asyncio
+async def test_claudecode_guard_marks_the_run_as_unattended_by_default():
+    provider = ClaudeCodeProvider(profile_md=FAKE_PROFILE)
+    proc = _make_proc(b"OK\n")
+    with patch("asyncio.create_subprocess_exec", return_value=proc):
+        await provider.complete("user input")
+    written = proc.stdin.write.call_args[0][0].decode()
+    assert "UNATTENDED batch run" in written
+    assert "ALREADY confirmed" in written
+    assert "does NOT apply here" in written
+
+
+@pytest.mark.asyncio
+async def test_claudecode_interactive_mode_drops_only_the_unattended_clause():
+    provider = ClaudeCodeProvider(profile_md=FAKE_PROFILE, interactive=True)
+    proc = _make_proc(b"OK\n")
+    with patch("asyncio.create_subprocess_exec", return_value=proc):
+        await provider.complete("user input")
+    written = proc.stdin.write.call_args[0][0].decode()
+    assert "UNATTENDED" not in written
+    assert "NEVER use tools" in written
+
+
+@pytest.mark.asyncio
 async def test_claudecode_cli_not_found():
     provider = ClaudeCodeProvider(profile_md=FAKE_PROFILE)
     with patch("shutil.which", return_value=None), \

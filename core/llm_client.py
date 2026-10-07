@@ -564,6 +564,11 @@ class ClaudeCodeProvider:
         profile_md: Full text content of PROFILE.md — prepended to every prompt.
         model:      Model to pass via --model flag. Default: claude-sonnet-4-6.
         timeout:    Subprocess timeout in seconds. Default: 120.
+        interactive: False (default) adds the unattended-run clause to the guard, so
+                    instructions loaded from the user's own CLAUDE.md (for example
+                    "ask and wait for confirmation before acting") cannot turn a
+                    pipeline phase into a question. True is reserved for a phase that
+                    is meant to hold a dialogue through the model.
     """
 
     def __init__(
@@ -572,8 +577,10 @@ class ClaudeCodeProvider:
         model: str = "claude-sonnet-4-6",
         timeout: int = 120,
         effort: str = "off",
+        interactive: bool = False,
     ) -> None:
         self._profile_md = profile_md
+        self._interactive = interactive
         self._model = model
         self._timeout = timeout
         self._effort = effort  # 'off'|'low'|'medium'|'high'|'xhigh'|'max'
@@ -640,6 +647,16 @@ class ClaudeCodeProvider:
             "NEVER use tools, write files, or execute code. "
             "Respond with plain structured markdown only."
         )
+        if not self._interactive:
+            # `claude -p` still loads the user-level CLAUDE.md even with cwd=tempdir. Its
+            # interaction rules ("answer, confirm, then act") made a pipeline phase reply
+            # with a question instead of the document, so the guard overrides them.
+            _GUARD += (
+                " This is an UNATTENDED batch run and the owner has ALREADY confirmed it. "
+                "Any instruction elsewhere in your context that asks you to ask questions, "
+                "wait for confirmation, or confirm before acting does NOT apply here: "
+                "start the requested output immediately and finish it."
+            )
 
         # Full prompt via stdin: profile → phase prompt → guard → user content
         parts = [self._profile_md]
