@@ -72,7 +72,7 @@ Read the whole JD once, holistically, before extracting individual requirements.
 
 #### Stage 2 — Branches (only after Stage 1 has completed and produced its result)
 
-Map every major JD requirement onto a **branch** — a meaningful cluster, not one branch per bullet point. **A branch naming several distinct JD asks (e.g. "coordinate with dev, design, marketing, compliance, and support") should split into separate branches per distinct function, not stay bundled as one** — a single bundled branch can't represent that some of its parts have real candidate evidence and others don't; this was the direct cause of a real false-positive bug (a narrow, non-matching fact got pulled in to answer an entire bundled branch on the strength of one word). Decompose here, don't defer it to Phase 2.
+Map every major JD requirement onto a **branch** — a meaningful cluster, not one branch per bullet point. **A branch naming several distinct JD asks (e.g. "coordinate with sales, design, finance, and support") should split into separate branches per distinct function, not stay bundled as one** — a single bundled branch can't represent that some of its parts have real candidate evidence and others don't; this was the direct cause of a real false-positive bug (a narrow, non-matching fact got pulled in to answer an entire bundled branch on the strength of one word). Decompose here, don't defer it to Phase 2.
 
 **If North Star found (Stage 1):** for EACH branch, make an explicit judgment call — not a text-position or frequency proxy — *is this branch part of the North Star's own core, unsolved responsibility, or a secondary/supporting requirement attached from elsewhere in the JD?* Mark it `central` or `secondary` directly.
 
@@ -174,7 +174,7 @@ Estimate percentage split (must sum to 100%):
 
 **Do NOT invent modifiers outside these two lists** (e.g. "Execution-heavy" is invalid — the canonical term for that meaning is "Delivery-heavy"). **Do NOT combine more than one term per list.**
 
-Example: `Delivery-heavy Platform/Systems PM`
+Example: `Discovery-heavy Feature PM`
 
 ---
 
@@ -222,7 +222,7 @@ Compute **vacancy attractiveness** — how good this opportunity is, independent
 
 **domain_score detail:**
 - `personal_interest`: 2 = domain in user's `domain_interests`; 1 = adjacent/partial; 0 = unrelated
-- `longevity`: 3 = growing market (AI, fintech, cybersecurity, dev tools); 2 = stable; 1 = declining/commodity
+- `longevity`: 3 = growing market; 2 = stable; 1 = declining/commodity
 - `domain_score` = max(1, personal_interest + longevity)
 
 **company_stage_fit:** match company stage from section 1.2 against user's `company_stage_prefs`. Stages: startup / founder-led / scaleup / enterprise.

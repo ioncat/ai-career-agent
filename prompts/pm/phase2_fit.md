@@ -90,7 +90,7 @@ Mandatory table. Assess the 6–10 most significant JD requirements.
 
 Skip boilerplate requirements (teamwork, communication, responsibility). Focus on substantive ones.
 
-**When a requirement combines a domain + a method/technology** (e.g. "AI implementation in finance/accounting") — score domain-fit and method-fit separately in the Evidence column instead of letting a missing method suppress credit for a real domain match, or vice versa.
+**When a requirement combines a domain + a method/technology** (e.g. "machine-learning forecasting in logistics") — score domain-fit and method-fit separately in the Evidence column instead of letting a missing method suppress credit for a real domain match, or vice versa.
 
 ---
 
@@ -107,11 +107,11 @@ Output this block exactly as shown, filling in the placeholders.
 **Category:** [Primary archetype from Phase 1 section 1.4] · [Remote / On-site / Hybrid]
 **Who they want:** [1 sentence — the ideal candidate archetype this vacancy targets]
 
-**Key Barriers:** none / [semicolon-separated short labels: "gap1; gap2; gap3" — max 5 words each, name the competency/tool/metric gap directly, e.g. "A/B testing; consumer product; PSP/POS integrations; MRR/CAC/LTV"]
+**Key Barriers:** none / [semicolon-separated short labels: "gap1; gap2; gap3" — max 5 words each, name the competency/tool/metric gap directly, e.g. "Kubernetes operations; mobile SDK; ERP integrations"]
 **Hidden Risks:** none / [contextual risks from role/company — NOT candidate gaps]
 **Warnings:** none / [application process risks only — see rules below]
-**Why apply:** [2–3 semicolon-separated short phrases — strongest candidate matches for this vacancy, natural language, e.g. "strong delivery track record; B2B SaaS domain fit; autonomous PM experience"]
-**Why not apply:** [2–3 semicolon-separated short phrases — key gaps or risks that could block the candidate, e.g. "no A/B testing experience; analytics-heavy role vs execution background; early-stage chaos risk"]
+**Why apply:** [2–3 semicolon-separated short phrases — strongest candidate matches for this vacancy, natural language, e.g. "strong delivery track record; fintech domain fit; autonomous ownership experience"]
+**Why not apply:** [2–3 semicolon-separated short phrases — key gaps or risks that could block the candidate, e.g. "no hands-on Kubernetes experience; research-heavy role vs delivery background; early-stage chaos risk"]
 
 ---
 
@@ -220,7 +220,7 @@ This tier stays the fallback signal-strength measure for vacancies where Phase 1
 
 **Distinctive? — a direct judgment call, not a proxy.** Ask directly: *would most competing candidates for this exact role also credibly claim this evidence, or is it distinctive — hard for a typical competitor to match?* `n/a` when `in_profile = ❌` (nothing to judge). Two supporting signals inform this judgment, but neither is the mechanism itself — the judgment must still be made when both are silent:
 - A fact that only got written into PROFILE.md as the direct result of a Phase 2.5 barrier resolution (not present before that dialogue) leans toward `yes` — it wasn't obvious or already documented.
-- PROFILE.md's own explicit rarity language for a piece of evidence (*"rare, edge-case signal, default omit"* vs. *"universal, baseline evidence for ANY commercial PM/PO role"*) is a direct, already-written hint for the same judgment — use it when present.
+- PROFILE.md's own explicit rarity language for a piece of evidence (for example a note marking a fact "rare, default omit" versus "universal baseline") is a direct, already-written hint for the same judgment — use it when present.
 
 **Coverage mandate for Phase 3:**
 Every signal where `importance = high|medium` AND `in_profile = ✅|⚠️` MUST appear explicitly in at least one role entry in the EXPERIENCE section of the CV.
@@ -255,12 +255,12 @@ For each `high` signal where `in_profile = ⚠️` — give explicit framing ins
 
 **Weak-signal overfit check (a safety net: Phase 1 §1.0.5 already decomposes bundled branches upfront, so this should find less to catch, not nothing).** Do this before pulling in ANY specific, narrow PROFILE.md evidence block for a reframing action. Check the signal's own `importance` from the Signal Coverage Table above:
 - `importance = low` (a JD word appearing once, outside Requirements/Qualifications, "nice to have"/"is a plus") does NOT license pairing it with a specific, narrow, or rare PROFILE.md fact just because the words happen to match. A single incidental JD mention is not evidence the company actually needs that exact experience — pulling in a rare evidence block for it produces a CV line the candidate can't defend as a real match, and reads as forced when the recruiter reads past that one word.
-- Reserve specific/narrow evidence blocks (e.g. a one-off legal fact, a single-case interview story) for `high`/`medium`-importance signals — repeated, Requirements-section, or North-Star-linked JD asks — where the pairing is actually load-bearing, not incidental.
+- Reserve specific/narrow evidence blocks (e.g. a one-off niche fact, a single-case interview story) for `high`/`medium`-importance signals — repeated, Requirements-section, or North-Star-linked JD asks — where the pairing is actually load-bearing, not incidental.
 - This is the same failure this rule exists to prevent: the standing rule against manufactured parallels bans fabricated JD↔fact parallels; this check extends it to *real, non-fabricated* facts that are still the wrong match for a weak signal.
 
 **Unlock-condition check.** Some profile facts carry an explicit usage condition written into the profile itself: marked rare, default-omit, or "include only when the JD asks for X". Before pairing any such fact with a signal, at any importance level, verify that the JD asks for the SAME THING the condition names, judged by what the candidate would have to DO (the kind of work or experience requested), not by a shared word. A word that appears in both the JD and the condition (an adjective, a domain label, a tool name) does not unlock the fact when the JD uses it to describe something else, such as the platform, the client, or the domain. High importance does not relax this: importance says how much a signal matters, not whether this specific fact answers it. If the condition's own wording is ambiguous, take the stricter reading and flag the ambiguity in the Adaptation Plan instead of resolving it in favour of inclusion. A flagged ambiguity is not a license to include: the fact stays out of the Adaptation Plan's actions and out of the CV until the profile owner decides. Never include it first and flag it afterward.
 
-**Before reaching for a generic phase3_cv_draft.md template (e.g. the AI Tooling Paragraph's 1-/2-component forms) — check the profile (the role blocks under Experience, the notes under them, and any dedicated project or practice description) for a more specific block that answers the JD's exact wording.** A generic template match ("this JD has an AI/technical signal → use the standard template") is a fallback, not the first move — the profile often already has a dedicated, more precise evidence block for a specific tool or scenario named in the JD, and that block answers a different claim than the generic template (for example, using a tool daily versus building systems with it). If a specific block exists and matches better, cite it by name in the reframing action instead of just naming the template.
+**Before reaching for a generic phase3_cv_draft.md template (e.g. the AI Tooling Paragraph's 1-/2-component forms) — check the profile (the role blocks under Experience, the notes under them, and any dedicated project or practice description) for a more specific block that answers the JD's exact wording.** A generic template match ("this JD has an AI/technical signal → use the standard template") is a fallback, not the first move — the profile often already has a dedicated, more precise evidence block for a specific tool or scenario named in the JD, and that block answers a different claim than the generic template (for example, using a tool daily versus building products with it). If a specific block exists and matches better, cite it by name in the reframing action instead of just naming the template.
 
 Format each action as:
 - **[Action label]:** [Specific instruction — what to change, what to emphasize, exact framing]

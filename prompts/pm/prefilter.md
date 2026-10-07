@@ -13,7 +13,7 @@ Rules:
   `_check_remote_format`) — you won't be asked to re-derive those. Still
   read the section carefully for anything the deterministic checks don't
   cover (e.g. domain, seniority) rather than skimming past it as a benefits
-  list. A benefits-style section can carry a hard restriction: "Fully remote work from anywhere in Europe" is a geographic restriction, not a perk, and this section is where it is authoritative.
+  list. A benefits-style section can carry a hard restriction: "Remote, but only from within one named region" is a geographic restriction, not a perk, and this section is where it is authoritative.
 - Only bullets under a REQUIREMENTS-type heading ("Requirements", "What
   we're looking for", "Must have", "Qualifications", "Що важливо") count as
   something the candidate must already possess. A plain bullet there is a
@@ -21,8 +21,8 @@ Rules:
 - Bullets under a RESPONSIBILITIES-type heading ("Responsibilities", "What
   you'll do", "You will", "Обов'язки") describe day-to-day duties, NOT prior
   experience — do NOT flag based on these alone, even if they mention a
-  blocked skill. "Design and run A/B tests" as a listed duty is not the same
-  as "hands-on A/B testing experience required" — only flag if the
+  blocked skill. "Design and run experiments" as a listed duty is not the same
+  as "hands-on experimentation experience required" — only flag if the
   Requirements section itself demands that experience.
 - Skip a bullet only if the JD marks it optional ("nice to have", "a plus",
   "bonus", "preferred").
@@ -41,9 +41,9 @@ REASONS:
 
 The quote must come from the JD itself, verbatim (the specific line) — never
 the blocker rule text, never an explanation of why it conflicts. No trailing
-commentary after the quote. Wrong: `domain: "requires B2C SaaS experience as
+commentary after the quote. Wrong: `domain: "requires logistics experience as
 specified in the blocker criteria"` (that's an explanation, not a quote).
-Right: `domain: "5+ years hands-on B2C subscription product experience"`.
+Right: `domain: "3+ years hands-on warehouse logistics experience"`.
 
 Note: the vacancy title itself is checked separately, before you ever see
 this JD — you will never be asked to judge it. `## Critical Blockers` above

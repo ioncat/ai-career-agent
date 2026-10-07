@@ -79,8 +79,7 @@ this model, not against a generic house style.
 Identify the 5–8 strongest recurring writing patterns as hypotheses only — do not
 report findings yet. Use these dimensions to generate hypotheses:
 
-- **Sentence structure** — recurring grammatical templates ("turning X into Y,"
-  "owning...," "working directly with...," "from X through Y").
+- **Sentence structure** — recurring grammatical templates (for example the same participial opener, or the same "from X through Y" frame, repeated).
 - **Lexical diversity** — repeated words/concepts (ownership, delivery, execution,
   alignment, platform, cross-functional, roadmap, stakeholders, value, strategy).
 - **Abstract language** — paragraphs dominated by abstract nouns instead of

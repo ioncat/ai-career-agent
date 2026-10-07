@@ -39,15 +39,15 @@ User will provide:
 14. **NO Location**
 15. **GitHub link — never include in contacts.** Portfolio site (from PROFILE.md contacts) already covers it. GitHub URL is redundant and creates noise.
 16. **Summary section header — language rule:** English CV → use `SUMMARY` header. Ukrainian CV → NO header, summary text flows directly after headline/contacts. "РЕЗЮМЕ" as a section label is redundant inside a CV.
-17. **Domain context (e.g. iGaming, fintech, e-commerce) — include only if JD is from that domain.** Never volunteer domain in a generic or unrelated vacancy.
+17. **Domain context (a specific industry vertical) — include only if JD is from that domain.** Never volunteer domain in a generic or unrelated vacancy.
 18. **Add `---` separator between each job entry** for visual spacing in PDF output.
-19. **NEVER use plural forms for things built or owned: no "systems", "portals", "platforms".** Name individual items specifically (singular each), or use "product" / "product suite" as a collective. Exception: "products" is allowed only when referring to multiple distinct products in context.
+19. **NEVER use plural forms for things built or owned.** Name individual items specifically (singular each), or use "product" / "product suite" as a collective. Exception: "products" is allowed only when referring to multiple distinct products in context.
 20. **CERTIFICATIONS: include only the certification(s) the profile marks as the default on every CV (its Certifications section).** Add others only when directly relevant to the specific vacancy.
 20b. **Key results block is mandatory for EVERY role in EXPERIENCE, including the most recent/current one.** Do not skip it for roles that read as execution-only or too short/new to have metrics. Check PROFILE.md's whole entry for that company, including every note under it, before concluding there is genuinely no outcome evidence — that is the only valid reason to omit it for a given role.
 20c. **A Key results bullet states an outcome (a number or a concrete result), never a responsibility.** "Led UAT" or "Made the release decision" is a duty and belongs in the role description. Open each bullet with a result verb ("Reached", "Reduced", "Improved", "Shipped") and avoid weak or ambiguous ones ("Ensured"; "Implemented", which reads as coding). Same rule in every output language.
-21. **NPS/CSAT — always include in Key Results by default when the evidence exists.** Product metrics are asked for in most JDs (explicitly or implicitly) — default to keeping NPS/CSAT alongside other Key Results; removing later is easy if a specific vacancy truly has no use for them.
-22. **Every sentence must earn its place.** After drafting each role paragraph, check every sentence against the Signal Coverage Table. Ask: does this deliver value in the context of this JD's requirements, or lead the recruiter in the wrong direction? If a sentence maps to no JD signal (high/medium/low) — cut it. Factual ≠ relevant. (Phase 3.6 will audit the saved CV — but the draft should already pass this check.) NPS/CSAT are valid product-metrics evidence regardless of role type (per rule 21, default = keep) — combine with error reduction %, automation %, delivery velocity rather than replacing them, especially when the JD explicitly asks for "experience with product metrics and analytics."
-23. **CV describes practice, NOT cases.** Role descriptions state what the candidate did as a pattern (approach, method, ongoing responsibility). Specific examples, named projects, and case-study evidence belong in the interview, not the CV. Wrong: "noticed a delayed invoice on one order and changed its approval step". Right: "reviewed approval steps for delays and defined requirements to remove them." The CV proves breadth of practice; the interview proves depth with specifics.
+21. **Customer-satisfaction metrics (for example NPS or CSAT) — always include in Key Results by default when the evidence exists.** Product metrics are asked for in most JDs (explicitly or implicitly) — default to keeping them alongside other Key Results; removing later is easy if a specific vacancy truly has no use for them.
+22. **Every sentence must earn its place.** After drafting each role paragraph, check every sentence against the Signal Coverage Table. Ask: does this deliver value in the context of this JD's requirements, or lead the recruiter in the wrong direction? If a sentence maps to no JD signal (high/medium/low) — cut it. Factual ≠ relevant. (Phase 3.6 will audit the saved CV — but the draft should already pass this check.) Customer-satisfaction metrics are valid product-metrics evidence regardless of role type (per rule 21, default = keep) — combine them with the other outcome metrics rather than replacing them, especially when the JD explicitly asks for "experience with product metrics and analytics."
+23. **CV describes practice, NOT cases.** Role descriptions state what the candidate did as a pattern (approach, method, ongoing responsibility). Specific examples, named projects, and case-study evidence belong in the interview, not the CV. Wrong: "noticed a missed pickup on one route and rerouted that shipment". Right: "reviewed delivery routes for delays and defined requirements to remove them." The CV proves breadth of practice; the interview proves depth with specifics.
 24. **Years of experience — count ONLY roles titled "Product Manager" or "Product Owner" (both count equally).** Default summary = "Product Manager with N+ years…" (or "Product Owner", matched to whichever title this specific CV uses — see rule 24b), with N computed from the role dates in the profile (sum the months of those roles, "Present" counts up to today) and rounded down. A role with any other title (e.g. "Project Manager") is not product experience — never fold it in, unless the profile explicitly says otherwise. Recompute whenever the profile gains a role or time passes.
 
 24b. **Title choice (Product Manager vs Product Owner) is JD-driven by default.** Treat the two terms as interchangeable in principle: some companies/recruiters/ATS filters screen strictly on one term over the other. Default to whichever term the target JD's own role title uses (JD says "Product Manager" → CV role titles say "Product Manager"; JD says "Product Owner" → CV role titles say "Product Owner"). **Exception: a role whose profile entry marks its title as fixed (the literal title held there) always keeps that title, regardless of the JD.** If the JD uses a different or ambiguous term, default to the profile's own default term. This does not change what work was actually done — only the title label applied to it.
@@ -102,7 +102,7 @@ Key results:
 - [Metric/outcome]
 - [Metric/outcome]
 
-**Multi-role at same company (e.g. a PO role followed by a PM role):** each role gets its own `### Role Title` + `Company | Dates` line independently. NEVER create a parent company block (e.g. `### Company · 6 years`) above two roles — it breaks PDF layout. Both roles follow the same flat pattern.
+**Multi-role at same company (two consecutive roles there):** each role gets its own `### Role Title` + `Company | Dates` line independently. NEVER create a parent company block (e.g. `### Company · 6 years`) above two roles — it breaks PDF layout. Both roles follow the same flat pattern.
 
 ---
 
@@ -126,13 +126,13 @@ Key results:
 - Contacts: **copy verbatim** from the profile's Contacts line (Identity & Contact section) — markdown links, exact separators, all four items including portfolio. **NEVER use plain-text URLs. NEVER omit portfolio link.** Never add the GitHub link.
 
 **Headline options:**
-- **Never append a narrow specialization qualifier like "(UX)" to the headline or Summary opening, even when the JD's own title uses it.** A narrow specialization is one part of product work, not a separate title or discipline the candidate claims. Headline stays plain "Product Manager" / "Product Owner"; UX signal goes into Summary/EXPERIENCE content, never into the title.
+- **Never append a narrow specialization qualifier in parentheses to the headline or Summary opening, even when the JD's own title uses it.** A narrow specialization is one part of product work, not a separate title or discipline the candidate claims. Headline stays plain "Product Manager" / "Product Owner"; that signal goes into Summary/EXPERIENCE content, never into the title.
 - **Headline always tracks the JD's own term.** JD says "Product Manager" → headline is `Product Manager`. JD says "Product Owner" → headline is `Product Owner`. This applies regardless of what any individual role's title in EXPERIENCE says (e.g. a role whose title is fixed per rule 24b does NOT pull the headline toward a combined "Product Manager / Product Owner").
 - If the JD itself uses both terms interchangeably or is ambiguous → combined `Product Manager / Product Owner` is the fallback default.
 - Adjust only if role archetype strongly differs (e.g. `Technical Program Manager`)
 
 **Summary opening term — asymmetric, JD-driven — does NOT apply to the headline above, only to the Summary's opening sentence:**
-- JD title = "Product Owner" → Summary opens with the combined `Product Owner / Product Manager` (e.g. "Product Owner / Product Manager with 6+ years..."). Most of the candidate's role titles default to "Product Manager" (rule 24b), so "Product Owner" alone in Summary can read as narrower/inconsistent to a reader cross-referencing LinkedIn or other applications.
+- JD title = "Product Owner" → Summary opens with the combined `Product Owner / Product Manager` (e.g. "Product Owner / Product Manager with N+ years..."). Most of the candidate's role titles default to "Product Manager" (rule 24b), so "Product Owner" alone in Summary can read as narrower/inconsistent to a reader cross-referencing LinkedIn or other applications.
 - JD title = "Product Manager" → Summary opens with `Product Manager` alone, no combined form — that's already the default term, nothing to hedge.
 
 **AI Tooling Paragraph: taken from the profile.**
@@ -160,7 +160,7 @@ Three separate mechanisms below all decide "what to lead with." Resolve in this 
 
 ## Primary Asset vs. Supporting Roles
 
-Before drafting, identify which 1–2 roles are the **primary asset** for this vacancy — the roles most directly matching the core JD requirement (e.g., for a CRM-focused role → the role where CRM experience was built; for a marketplace discovery role → the role that owned marketplace discovery).
+Before drafting, identify which 1–2 roles are the **primary asset** for this vacancy — the roles most directly matching the core JD requirement (e.g., for a role centered on one domain or tool → the role where that domain or tool was used most).
 
 For the primary asset role(s): lead with the vocabulary, metrics, and framing that directly match the JD's main requirement.
 
@@ -197,7 +197,7 @@ Emphasis = adjust language and which Key Results to surface first. Not deleting 
 **Elaboration-depth check — "implement the action" means giving it the same level of process detail as comparable signals elsewhere in the same CV, not a passing one-line mention.** If an Adaptation Plan action names a specific piece of evidence (a named system, a named process, a specific case) as the answer to a signal, and a comparable signal elsewhere in the same draft gets a full paragraph (what was owned, how it worked, what the candidate's role in it was) — the flagged evidence needs the same treatment, not a generic single clause tacked onto an unrelated sentence. A one-line mention that doesn't actually explain what the candidate did with that evidence does not satisfy "implement the action," even though it technically name-drops the right words.
 
 **Archetype mismatch handling** (if flagged in Phase 2 Key Barriers or Adaptation Plan):
-- JD wants Founder Proxy → lead with strongest 0→1 ownership evidence from PROFILE.md (co-founder story, product built from scratch); reframe execution roles with "built from scratch" narrative; downplay coordinator/delivery framing
+- JD wants Founder Proxy → lead with the strongest 0→1 ownership evidence in the profile; reframe execution roles toward whole-product ownership; downplay coordinator/delivery framing
 - JD wants Executor → lead with strongest delivery metrics track record from PROFILE.md; keep execution/delivery roles prominent; de-emphasize founding/ownership angle
 - If not flagged → use default Tailoring Logic above
 

@@ -22,7 +22,7 @@ User will provide:
 ## Pre-flight — Before Writing
 
 **Step 1: Formulate the vacancy's core pain in one sentence.**
-Not "they need a PM" — what specific organisational problem is this hire solving *right now*? (Example: "Founder is still the PM and needs someone to take over product ownership so they can focus on scaling.")
+Not "they need a PM" — what specific organisational problem is this hire solving *right now*? (Example: "The team lead is covering product work and needs someone to take it over.")
 
 This sentence drives the cover opening. The cover speaks to *their situation*, not the candidate's background.
 
@@ -30,7 +30,7 @@ This sentence drives the cover opening. The cover speaks to *their situation*, n
 - First PM / founding PM roles — the core ask is ownership, not execution support
 - Founder-led / startup environments — personal contribution and individual judgment matter
 - Roles where the candidate's autonomy = the primary value delivered
-- **JD explicitly names a company pain or problem** (e.g. "ми масштабуємо поточні проєкти і запускаємо нові", "founder is still the PM", "we need someone to own vision") → use that explicit pain as the hook, regardless of company type (scaleup, enterprise, etc.). Naming their stated pain shows "I read your JD and understand your situation" — strongest possible opener.
+- **JD explicitly names a company pain or problem** (e.g. "we are scaling the product", "we need someone to own the roadmap") → use that explicit pain as the hook, regardless of company type (scaleup, enterprise, etc.). Naming their stated pain shows "I read your JD and understand your situation" — strongest possible opener.
 
 **When to use a different angle:**
 - Large enterprise / corp where JD states NO explicit pain — impersonal scale makes pain-first feel presumptuous; use domain or delivery signal instead
@@ -55,7 +55,7 @@ The CV already contains all evidence. The cover must NOT repeat or reference spe
 
 2. **Pain recognition** — mirror their specific organisational pain in your own words. Show you understand the context: what's broken, what they're trying to fix. One sentence. No JD phrases verbatim. No evidence needed here — just understanding.
 
-3. **Positioning close** — one sentence that asserts fit without proving it. The proof is in the CV. Think: "That's not a role I'm growing into — it's what the last five years looked like." (or equivalent in tone). Creates confidence gap → they open the CV to verify.
+3. **Positioning close** — one sentence that asserts fit without proving it. The proof is in the CV. Think of a short, calm sentence that states the fit as settled fact. Creates confidence gap → they open the CV to verify.
 
 **The cover is NOT a CV summary.** It does not need to cover everything. It needs to create the impulse: *"this sounds relevant — I want to see more."*
 
@@ -63,7 +63,7 @@ The CV already contains all evidence. The cover must NOT repeat or reference spe
 
 ## Rules (NON-NEGOTIABLE)
 
-- **Pain-first opening (founder-led / first PM roles)** — do NOT open with self-description ("I've been...", "I've spent...", "Most of my work..."). Open with THEIR situation — the transition they're navigating, the gap they need filled. The candidate appears as the answer to their pain, not as the headline. Self-lead = talking about yourself; pain-lead = talking about their problem and positioning yourself as the solution.
+- **Pain-first opening (founder-led / first PM roles)** — do NOT open with self-description ("I've been...", "I've spent...", "I have worked..."). Open with THEIR situation — the transition they're navigating, the gap they need filled. The candidate appears as the answer to their pain, not as the headline. Self-lead = talking about yourself; pain-lead = talking about their problem and positioning yourself as the solution.
 
 - **Header (mandatory)** — every cover starts with the candidate header block (same as CV), then `---`, then greeting. Read from the profile's Contacts line (Identity & Contact section).
 ```
@@ -87,9 +87,9 @@ The CV already contains all evidence. The cover must NOT repeat or reference spe
 - **Active verbs** — "розвивав", "відповідав", "вів" — not "розвиток", "відповідальність"
 - **Short bullets** — one clear fact per bullet, max 2 sentences. No nested clauses.
 - **No narrative** — not "I find this role interesting because..." — show, don't explain interest
-- **Closing must be a broad invitation to talk, never a narrow single-detail question.** A closing that probes one specific sub-topic (e.g. "what's the hardest thing to prioritize in X") reads as fixating on a detail instead of showing genuine interest. Cover the ground broadly instead: current pain/what's on fire, the product, the team, and how the candidate could add value. Never a generic "happy to connect" or "looking forward to hearing from you" either. **Never include "what's already working well" (or any equivalent "what's going fine" phrasing) — banned permanently.** The candidate approaches from the problem, not from what is already fine: the letter offers to help improve, fix or support something. Praise for what works carries no value. Model closing: "Would love to talk and learn more: what's on fire right now, how the team and product are evolving, and where I could actually add value."
+- **Closing must be a broad invitation to talk, never a narrow single-detail question.** A closing that probes one specific sub-topic (e.g. "what's the hardest thing to prioritize in X") reads as fixating on a detail instead of showing genuine interest. Cover the ground broadly instead: current pain/what's on fire, the product, the team, and how the candidate could add value. Never a generic "happy to connect" or "looking forward to hearing from you" either. **Never include "what's already working well" (or any equivalent "what's going fine" phrasing) — banned permanently.** The candidate approaches from the problem, not from what is already fine: the letter offers to help improve, fix or support something. Praise for what works carries no value.
 - **NEVER use em-dashes (—).** Use a period, comma, or "and"/"because" instead. A chained em-dash pair inside one sentence is a strong, well-known AI-writing tell — this is a personal message, it should read like one.
-- **Write at the candidate's actual English level — plain, direct vocabulary and sentence structure, no idiom.** The level is stated in the profile's Languages entry. For a non-native intermediate level (B2 and similar), avoid idiomatic/literary phrasing that signals native-level fluency — "safety net", "closing the loop", "ends up owning", "no stone unturned", chained metaphors, or any turn of phrase the candidate wouldn't naturally produce or confidently defend if asked about it in an interview. This includes the illustrative example phrases inside this prompt file itself (e.g. "That's not a role I'm growing into — it's what the last five years looked like") — those are templates showing the *pattern*, not text to reproduce; write an original line in the same spirit, in plain words at the candidate's level.
+- **Write at the candidate's actual English level — plain, direct vocabulary and sentence structure, no idiom.** The level is stated in the profile's Languages entry. For a non-native intermediate level (B2 and similar), avoid idiomatic/literary phrasing that signals native-level fluency — "safety net", "closing the loop", "ends up owning", "no stone unturned", chained metaphors, or any turn of phrase the candidate wouldn't naturally produce or confidently defend if asked about it in an interview. This includes any illustrative phrase in this prompt file: examples show a pattern, not text to reproduce; write an original line in the same spirit, in plain words at the candidate's level.
 
 ---
 
@@ -105,7 +105,7 @@ The CV already contains all evidence. The cover must NOT repeat or reference spe
 
 **Variant A and Variant C (the default) must both be written in first person.** A cover is a personal message, and an omitted-subject headline-style opener (fine for a CV) reads oddly here, like the candidate is describing someone else rather than speaking. Only Variant B (bullets) may use a neutral descriptive opener — its bullet format already reads as the candidate's own list, not third-person description.
 
-❌ Wrong: `"Product Owner з 5+ роками досвіду у B2B-платформах..."` — this describes someone, it is not the candidate speaking.
+❌ Wrong: `"Product Owner з N+ роками досвіду у [домені]..."` — this describes someone, it is not the candidate speaking.
 
 ✅ Right: `"Я — Product Owner, який працює з..."` / `"Я Product Manager з досвідом..."` / `"Займаюсь B2B-платформами, де..."` — told from the narrator's (candidate's) perspective.
 
@@ -128,7 +128,7 @@ Narrative = a small story. Even 2–3 sentences (or Variant C's single sentence)
 ---
 
 **ВАРІАНТ C — Micro (default for most cases)**
-Two short paragraphs, no bullets, no header rhetoric. Paragraph 1: one sentence combining category signal with the single strongest JD-matching credential/claim (e.g. a required certification, the core delivery pattern). Paragraph 2: the standard broad-invitation closing (see Rules above). Nothing else — no pain-recognition sentence, no specific evidence. This is the default format for most vacancies.
+Two short paragraphs, no bullets, no header rhetoric. Paragraph 1: one sentence combining category signal with the single strongest JD-matching credential/claim (e.g. a required qualification, the core delivery pattern). Paragraph 2: the standard broad-invitation closing (see Rules above). Nothing else — no pain-recognition sentence, no specific evidence. This is the default format for most vacancies.
 
 **Template (language matches vacancy language):**
 ```
@@ -158,7 +158,7 @@ Concise, direct. Leads with tenure + role scope. Second paragraph: domain releva
 
 [1 sentence: domain relevance, conceptual — the strongest bridge between candidate's experience and JD focus, without naming companies/metrics.]
 
-Буду радий поспілкуватися детальніше.
+[Closing: a broad invitation to talk, per the closing rule above.]
 
 [Candidate name]
 ```
@@ -171,7 +171,7 @@ Hi!
 
 [1 sentence: domain relevance, conceptual.]
 
-Happy to connect and learn more.
+[Closing: a broad invitation to talk, per the closing rule above.]
 
 [Candidate name]
 ```

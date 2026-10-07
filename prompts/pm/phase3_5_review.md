@@ -79,7 +79,7 @@ Then output the updated CV draft with all identified changes already applied.
 
 The repeated terms list is pre-computed and provided in the user message under `### Repeated Terms`. For each listed term → add to ⚠️ section with a suggested variation or removal.
 
-**Also check `### Repeated Phrases`** (pre-computed, same user message) — this is a SEPARATE signal from Repeated Terms above and catches a different failure mode: single-word frequency cannot see a verbatim 3+ word phrase or sentence construction reused across unrelated sections (e.g. "as part of the team" appearing in three different role paragraphs), because each individual word in it may be common or even a stopword. For each phrase listed at 2+ occurrences → add to ⚠️ with a suggested reword for all but one instance. Exception: a short prose sentence and its own Key Results bullet restating the same fact in the same role block is a legitimate pattern, not a violation — do not flag that specific case.
+**Also check `### Repeated Phrases`** (pre-computed, same user message) — this is a SEPARATE signal from Repeated Terms above and catches a different failure mode: single-word frequency cannot see a verbatim 3+ word phrase or sentence construction reused across unrelated sections (e.g. the same stock phrase appearing in three different role paragraphs), because each individual word in it may be common or even a stopword. For each phrase listed at 2+ occurrences → add to ⚠️ with a suggested reword for all but one instance. Exception: a short prose sentence and its own Key Results bullet restating the same fact in the same role block is a legitimate pattern, not a violation — do not flag that specific case.
 
 Also check visually for structural patterns not captured by frequency count:
 - Same verb ("owned", "drove", "managed") starting multiple bullets in the same block
@@ -177,7 +177,7 @@ Every tailored CV has 1–2 roles that carry the primary fit signal for this vac
 
 **Steps (internal):**
 
-1. Identify primary asset roles: which 1–2 roles most directly address the vacancy's core requirement? (e.g., for a CRM PM role → the role where CRM/sales domain experience was built)
+1. Identify primary asset roles: which 1–2 roles most directly address the vacancy's core requirement? (e.g., for a role centered on one domain → the role where that domain experience was built)
 2. For each remaining (supporting) role: scan for an underutilized signal that maps to a secondary JD requirement — even a small, honest strengthening compounds the overall CV effect.
 3. Do NOT force the primary keyword into supporting roles where it doesn't belong.
 4. If a supporting role has an unused signal → add to 🔧 with a specific suggestion.
