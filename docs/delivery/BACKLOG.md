@@ -1,6 +1,6 @@
 # career-agent — Backlog
 
-> Last updated: 2026-10-06
+> Last updated: 2026-10-07
 > Rules: [documentation-conventions.md](documentation-conventions.md) · History: [CHANGELOG.md](CHANGELOG.md) · Specs: [Epics/](Epics/)
 
 **Priority legend:**
