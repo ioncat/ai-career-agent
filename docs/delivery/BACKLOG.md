@@ -22,6 +22,7 @@
 ### 🟡 P2 — User-configurable personal rules, separate from the profile (added 2026-10-07, not started)
 **What:** any user must be able to tune the system to themselves ("for AI roles always this form of the AI paragraph", wording bans, defaults) without touching engine prompts. Today such rules sit in the engine prompts or in the owner's `PROFILE.md`.
 **Idea:** the profile stays the experience entity (facts; edited mostly when the experience itself changes); personal rules go to a separate per-user file (for example `skill/users/<id>/RULES.md`, or a JSON section) that the engine reads next to the profile.
+**Examples of settings (defaults decided 2026-10-07):** role-title policy, default = follow the JD's term (Product Manager or Product Owner) except roles whose title the profile fixes; the user may switch it to "always as in the profile", once for one vacancy or as a standing setting, and change it later through MCP. AI-paragraph form per role type is another one.
 **Why:** keeps the prompts profile-free (ROADMAP_Q4 steps 5 and 9) and gives a home to the knowledge parked in `skill/users/1/PROMPT_REMOVED_KNOWLEDGE_2026-10-07.md`.
 **Next:** choose the format and where the engine reads it; migrate the AI paragraph Usage line and the parked file into it. Belongs with the Profile isolation item (P1).
 
