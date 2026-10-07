@@ -13,10 +13,11 @@
 
 ## 📌 Now
 
-### 🟠 P1 — Profile ↔ prompt isolation: remove candidate-specific content from engine prompts, move to a structured per-person profile (found 2026-10-04, design captured, not started)
+### 🟠 P1 — Profile ↔ prompt isolation: remove candidate-specific content from engine prompts, move to a structured per-person profile (found 2026-10-04; leak cleanup and lint tests done 2026-10-07; schema and migration not started)
 **What:** 42 candidate-specific occurrences across 6 files in `prompts/pm/` (22 in `phase3_cv_draft.md`: portfolio URL, golden paragraphs, default certification, role-date arithmetic, English level, vacancy numbers). Found when an isolated agent with no conversation context ran the pipeline cold and unlocked a default-omit profile fact by a shared word. Corrections also have no routing policy: they land in the prompt, `PROFILE.md`, or memory, and memory is invisible to the pipeline.
 **Decided:** one profile per person; structured JSON is the source of truth (EPIC-24 direction), Markdown only as a rendered view; vacancy lens reuses the six `role_balance` axes. Not urgent (multi-user is next year, user 2 is a stub); does not block merging `prompt-audit-pm-2026-09-21`.
-**Next:** leak cleanup + leakage lint test, then schema design (fact annotations: usage, unlock_when, never_say), then migration. Needs EPIC-24 re-scope.
+**Done 2026-10-07:** leak cleanup of the PdM prompts, `tests/test_prompt_isolation.py`, `tests/test_profile_contract.py`, `tests/test_no_personal_data.py`, per-user candidate name, the AI paragraph choice moved into the profile, neutral examples (the removed wording is parked in `skill/users/1/PROMPT_REMOVED_KNOWLEDGE_2026-10-07.md`, local).
+**Next:** schema design (fact annotations: usage, unlock_when, never_say), the separate personal-rules file (next entry), then migration. Needs EPIC-24 re-scope.
 **Spec:** [profile-prompt-isolation-discovery-2026-10-04.md](../discovery/profile-prompt-isolation-discovery-2026-10-04.md) (problem and decisions) · [profile-schema-v0-2026-10-04.md](../discovery/profile-schema-v0-2026-10-04.md) (schema draft and EPIC-24 re-scope)
 
 ### 🟡 P2 — User-configurable personal rules, separate from the profile (added 2026-10-07, not started)
@@ -45,6 +46,10 @@
 - App pipeline output quality (found by the 2026-10-07 chat-versus-app measurement on #1693, after the unattended-guard fix): `cv_generate` logs mechanical violations (em-dash) and saves the CV anyway (2 left in the re-run, 15 before the fix); fix options: auto-replace, or one corrective re-prompt. Also: `claude_cli` reports no token counts (all zeros in `llm_usage`), so cost and size cannot be compared; the saved file is `Alex_Bondarenko_CV.md` not `CV.md`; the app is configured with `claude-sonnet-5` at medium effort (the chat runs on a stronger model), which may explain part of the remaining gap. Next measurement: the same vacancy with the app's model at a higher effort.
 - Phase 2's Quick Scan template (VScore line, Why apply, Why not apply) differs from the block SKILL.md puts at the top of `JD_analysis.md`. Documented as "moved; the DB keeps why_apply"; decide whether the file should carry them.
 **Related, bigger:** [profile-prompt-isolation-discovery-2026-10-04.md](../discovery/profile-prompt-isolation-discovery-2026-10-04.md) (separate P1 entry above).
+
+### 🟡 P2 — PDF render snippets use a relative fonts path and crash (found 2026-10-07, vacancy #1800, not started)
+**What:** `skill/SKILL.md` (PDF generation, ~line 475) and `.claude/commands/analyze.md` (`-pdf`, ~line 342) tell the agent to run `CAREER_AGENT_FONTS=fonts/ python -c "... render_to_bytes ..."`. With a relative value `services/pdf/render.py` fails at `FONT_DIR.as_uri()`: `ValueError: relative path can't be expressed as a file URI`. An absolute path works (used instead for #1800).
+**Fix:** resolve the font dir in `render.py` (`FONT_DIR = Path(...).resolve()`) and add a test; the snippets then stay valid as written. The skill and command files are under review on the prompts branch, so touch them only after that merges.
 
 ### 🟡 P2 — Functional specification: a "how it works" document, built from code and kept in sync (added 2026-10-05, not started)
 **What:** no document describes system behaviour (what counts as a duplicate, when "You already applied" shows, how companies, blockers, tags and statuses work); the rules live only in CHANGELOG entries and code. Build `docs/functional-spec.md` (or one short section per domain, ~12) from the code with a verification pass, and keep it true via a code-to-section map, a warn-only guard check and a `/spec-sync` command.
@@ -369,6 +374,7 @@ No dual-availability state — the button's visibility is a direct, deterministi
 - [ ] Write `prompts/pm/system_quality_rules.md` + `prompts/generic/system_quality_rules.md` + per-user `skill/users/[id]/quality_rules.md`
 - [ ] `core/llm_client.py` — load + append after PROFILE.md (second cached block); same for ClaudeCodeProvider
 - [ ] Validate: same vacancy skill mode vs API mode — compare tone, barriers, positioning, language compliance
+- Progress 2026-10-07: first measurement on #1693 (chat flow vs the app's own pipeline code on copies). The big gap was a provider bug, not the missing rules: the user's own `CLAUDE.md` rules leaked into `claude -p` and Phase 3 returned a question; fixed with an unattended-run guard (`ClaudeCodeProvider(interactive=False)`). After the fix the app output matches the chat flow in decision and structure. Still open: the rules extraction above, the model/effort difference (app: `claude-sonnet-5`, medium), two more vacancies to measure.
 
 ### Phase 2.5 Objection Handling in Flutter (4-C4) (added 2026-07-06)
 **What:** after Phase 1+2, present Key Barriers to candidate → user responds with evidence → LLM classifies `resolved | gap` → feeds Phase 3 (address resolved, don't overclaim gaps).

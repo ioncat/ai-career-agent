@@ -1,6 +1,6 @@
 # Roadmap Q4 2026: a working Flutter app on the shared engine
 
-> Written 2026-10-07. This is the map; the work items live in [BACKLOG.md](BACKLOG.md). Update the Status column when a step moves.
+> Written 2026-10-07, updated the same evening. This is the map; the work items live in [BACKLOG.md](BACKLOG.md). Update the Status column when a step moves.
 
 ## Goal
 
@@ -21,15 +21,15 @@ A good CV is produced in the chat today because quality is built there: the mode
 
 | # | Goal | Why | Problem | Caused by | Action | Backlog | Status |
 |---|---|---|---|---|---|---|---|
-| 1 | Measure "good" | The 2-3 edits criterion needs a number | No metric; chat and Flutter output never compared on one vacancy | Quality judged by eye, only in the chat | Run 2-3 vacancies through chat, API and CLI; compare tone, barriers, positioning, language; count edits | Quality Parity (last item); **new: measurement** | not started |
-| 2 | Flutter quality = chat quality | The main gap | API and CLI see fewer quality rules | Rules live in `SKILL.md` and memory | Quality Parity: rules into system prompts and profile | LLM Quality Parity | not started |
+| 1 | Measure "good" | The 2-3 edits criterion needs a number | No metric; chat and Flutter output never compared on one vacancy | Quality judged by eye, only in the chat | Run 2-3 vacancies through chat, API and CLI; compare tone, barriers, positioning, language; count edits | Quality Parity (last item); **new: measurement** | first measurement done (#1693, 2026-10-07): the app output was far below chat because of a provider bug (fixed); after the fix fit and structure match, 2 em-dashes left. Repeat on 2 more vacancies and with the app's model at higher effort |
+| 2 | Flutter quality = chat quality | The main gap | API and CLI see fewer quality rules | Rules live in `SKILL.md` and memory | Quality Parity: rules into system prompts and profile | LLM Quality Parity | partly: the root cause of the first gap found and fixed (the user-level rules leaked into `claude -p`); rules extraction (Quality Parity) not started; model and effort difference open |
 | 3 | Flutter uses all backend tools | Criterion 1 | No Phase 2.5, 3.6, 3.7, Light mode, ATS keyword step in the app/API | These phases grew in the chat | Add to API and UI | Phase 2.5 in Flutter (4-C4), Phase 3.8 ATS Keyword Coverage, Worker-Critic | not started |
-| 4 | Dialogue and edits inside Flutter | Quality is made in iterations | Flutter "Analyze" is a one-shot batch | No feedback loop in the app | Hybrid: Annotated CV Revision, targeted interactive points | conversational-refinement-gap, Annotated CV Revision | not started |
+| 4 | Dialogue and edits inside Flutter | Quality is made in iterations | Flutter "Analyze" is a one-shot batch | No feedback loop in the app | Hybrid: Annotated CV Revision, targeted interactive points | conversational-refinement-gap, Annotated CV Revision | not started (design sketch: `docs/discovery/flutter-dialogue-points-2026-10-07.md`, local) |
 | 5 | Profile as a structure | Any profile plugs in | Three partial representations; corrections stay in memory | Profile grew as Markdown | JSON schema with fact annotations; correction loop | Profile isolation (P1), EPIC-24 keep-or-deprecate decision | schema draft only |
 | 6 | Reliable retrieval of profile facts | The CV uses the right facts | The right evidence block is not always found | No deterministic evidence lookup | Mandatory evidence scan per JD signal | **new** (north-star discovery section 4) | not started |
-| 7 | Clear, clean prompts | Predictable output | Redundancy, order, no self-check in Phase 2 | Rules added as patches | Prompt clarity/structure pass | Prompt clarity/structure pass (P1) | directives-only cleanup done; clarity pass not started |
+| 7 | Clear, clean prompts | Predictable output | Redundancy, order, no self-check in Phase 2 | Rules added as patches | Prompt clarity/structure pass | Prompt clarity/structure pass (P1) | directives-only cleanup done and merged (prompts, `SKILL.md`, `analyze.md`, guarded by a test); clarity pass not started |
 | 8 | Role axes as an entity | Precise role analysis and ATS keywords | No Analytics axis; axes hard-wired; no drift watch | First set built from PM/PO only | Audit script on the database; axis set per profile with versions | [role-axes-design-2026-10-04.md](../discovery/role-axes-design-2026-10-04.md); **new** | design draft awaiting approval |
-| 9 | Engine free of personal data | Multi-user | Leaks into prompts; name in Settings; chat ids in a public repo | Single-user start | Cleanup, per-user name, leak tests, history rewrite | done on branch `refactor/prompts-directives-only-2026-10-04` | done; waits for review, merge and the owner's force-push |
+| 9 | Engine free of personal data | Multi-user | Leaks into prompts; name in Settings; chat ids in a public repo | Single-user start | Cleanup, per-user name, leak tests, history rewrite | done on branch `refactor/prompts-directives-only-2026-10-04` | done: merged to `master`, history cleaned on GitHub (2026-10-07) |
 | 10 | MCP | Criterion 3 | Only a stub (`docs/discovery/mcp-server.md`, July) | Never designed | Design the MCP surface and the local skill | **new** | not started |
 | 11 | Authorization and billing | A product for other people | Absent | Personal tool | Design, then build | EPIC-25 | design first |
 
@@ -39,9 +39,15 @@ A good CV is produced in the chat today because quality is built there: the mode
 
 Reasoning: measure first so every later step has a number. Rules and missing phases (2, 3) before profile structure (5, 6), because they are cheaper and show how much of the gap remains. The dialogue loop (4) only if the gap persists. MCP (10) comes after quality, since an external agent would call the same unfinished tools. Auth and billing (11) last.
 
+## Progress log
+
+- **2026-10-07** — The cleanup branch was merged into `master` and the rewritten history (chat ids replaced) was force-pushed; the old remote branch was deleted. Added the repeatable `PROMPT_REVIEW_CHECKLIST.md` and ran it with three independent reviewers; their findings were fixed. Examples taken from the candidate's own history were replaced with neutral ones; `prompts/generic/` was frozen. First chat-versus-app measurement on #1693: the app's Phase 3 returned a question instead of a CV because the user's own CLAUDE.md rules leaked into `claude -p`; fixed with an unattended-run guard (`ClaudeCodeProvider(interactive=False)`), after which the app output matches the chat flow in structure and decision.
+
 ## Decisions pending from the owner
 
-- Review and merge the branch (step 9); force-push `master` and `refactor/prompt-profile-isolation-2026-10-04`.
 - Approve the role-axes design (step 8) and answer its four questions.
-- Answer the six open questions of [profile-schema-v0-2026-10-04.md](../discovery/profile-schema-v0-2026-10-04.md) (step 5).
-- Choose the dialogue option for step 4 (chat in Flutter, hybrid, or accept a personal tool).
+- Answer the six open questions of `profile-schema-v0-2026-10-04.md` (step 5).
+- Choose the dialogue option for step 4 (structured cards in Flutter, chat, or hybrid); the sketch is in the local discovery note.
+- Role-title policy in Experience (default follows the vacancy; to become a user setting, see BACKLOG "User-configurable personal rules").
+- Next measurement: the same vacancy with the app's model at higher effort, or automatic correction of mechanical violations in the app first.
+- Read the two CVs of the #1693 measurement and say how many edits each would need (the 2-3 edits criterion).

@@ -151,3 +151,7 @@
 | **Details header / action bar** | `_JdModeView` (before analysis) and `_ActionBar` (after analysis) in `vacancy_detail_screen.dart`. Two widgets treated as one template: any change to a shared element must be made in both. |
 | **Offline cache** | The Flutter status line "Offline · cache from N min ago" means the last list poll failed and the app shows its cached list. The backend can be healthy at the same time, for example when one malformed record breaks parsing of the whole list. |
 | **Isolated (blind) agent run** | A subagent started with no conversation context, given only the files a fresh run would read. Used to validate prompts without the author's knowledge leaking into the result. |
+| **Prompt review checklist** | `docs/delivery/PROMPT_REVIEW_CHECKLIST.md`: the repeatable read-only review run before merging prompt changes. Verdict by rule (do not merge / merge after fixing N / can merge). |
+| **Introduced vs baseline finding** | In a review, a finding the branch added or worsened (decides the verdict) versus one already present at the base commit (listed separately, never blocks that merge). |
+| **Unattended guard** | The clause `ClaudeCodeProvider` adds to every pipeline call: the run is unattended, the owner already confirmed, instructions to ask or wait do not apply. Off only with `interactive=True`. |
+| **Roadmap Q4** | `docs/delivery/ROADMAP_Q4.md`: the map from today to a working Flutter app on the shared engine (11 steps, then auth and billing). |
