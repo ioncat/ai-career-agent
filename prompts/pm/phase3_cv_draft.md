@@ -47,7 +47,7 @@ User will provide:
 20c. **A Key results bullet states an outcome (a number or a concrete result), never a responsibility.** "Led UAT" or "Made the release decision" is a duty and belongs in the role description. Open each bullet with a result verb ("Reached", "Reduced", "Improved", "Shipped") and avoid weak or ambiguous ones ("Ensured"; "Implemented", which reads as coding). Same rule in every output language.
 21. **NPS/CSAT — always include in Key Results by default when the evidence exists.** Product metrics are asked for in most JDs (explicitly or implicitly) — default to keeping NPS/CSAT alongside other Key Results; removing later is easy if a specific vacancy truly has no use for them.
 22. **Every sentence must earn its place.** After drafting each role paragraph, check every sentence against the Signal Coverage Table. Ask: does this deliver value in the context of this JD's requirements, or lead the recruiter in the wrong direction? If a sentence maps to no JD signal (high/medium/low) — cut it. Factual ≠ relevant. (Phase 3.6 will audit the saved CV — but the draft should already pass this check.) NPS/CSAT are valid product-metrics evidence regardless of role type (per rule 21, default = keep) — combine with error reduction %, automation %, delivery velocity rather than replacing them, especially when the JD explicitly asks for "experience with product metrics and analytics."
-23. **CV describes practice, NOT cases.** Role descriptions state what the candidate did as a pattern (approach, method, ongoing responsibility). Specific examples, named projects, and case-study evidence belong in the interview, not the CV. Wrong: "identified an off-hours revenue gap and built an automated flow". Right: "applied gap analysis to identify process discrepancies and defined requirements to close them." The CV proves breadth of practice; the interview proves depth with specifics.
+23. **CV describes practice, NOT cases.** Role descriptions state what the candidate did as a pattern (approach, method, ongoing responsibility). Specific examples, named projects, and case-study evidence belong in the interview, not the CV. Wrong: "noticed a delayed invoice on one order and changed its approval step". Right: "reviewed approval steps for delays and defined requirements to remove them." The CV proves breadth of practice; the interview proves depth with specifics.
 24. **Years of experience — count ONLY roles titled "Product Manager" or "Product Owner" (both count equally).** Default summary = "Product Manager with N+ years…" (or "Product Owner", matched to whichever title this specific CV uses — see rule 24b), with N computed from the role dates in the profile (sum the months of those roles, "Present" counts up to today) and rounded down. A role with any other title (e.g. "Project Manager") is not product experience — never fold it in, unless the profile explicitly says otherwise. Recompute whenever the profile gains a role or time passes.
 
 24b. **Title choice (Product Manager vs Product Owner) is JD-driven by default.** Treat the two terms as interchangeable in principle: some companies/recruiters/ATS filters screen strictly on one term over the other. Default to whichever term the target JD's own role title uses (JD says "Product Manager" → CV role titles say "Product Manager"; JD says "Product Owner" → CV role titles say "Product Owner"). **Exception: a role whose profile entry marks its title as fixed (the literal title held there) always keeps that title, regardless of the JD.** If the JD uses a different or ambiguous term, default to the profile's own default term. This does not change what work was actually done — only the title label applied to it.
@@ -86,7 +86,7 @@ Output valid markdown exactly as shown below. Do NOT substitute `•` for `-`. D
 ## SUMMARY
 
 [2 paragraphs max of positioning text; the AI tooling paragraph below is in addition. Full-arc positioning tailored to this vacancy.]
-[AI tooling paragraph — include on every CV; an AI product owner vacancy gets the 2-component form, see the AI Tooling Paragraph section below]
+[AI tooling paragraph per the profile's AI Tooling Paragraph section]
 
 ---
 
@@ -113,7 +113,7 @@ Key results:
 ## CERTIFICATIONS
 
 [the profile's default certification(s)]
-[Add AI certs only if vacancy explicitly focuses on AI product ownership]
+[other certifications only as the profile's Certifications section directs]
 ```
 
 **Formatting rules (mandatory):**
@@ -135,18 +135,15 @@ Key results:
 - JD title = "Product Owner" → Summary opens with the combined `Product Owner / Product Manager` (e.g. "Product Owner / Product Manager with 6+ years..."). Most of the candidate's role titles default to "Product Manager" (rule 24b), so "Product Owner" alone in Summary can read as narrower/inconsistent to a reader cross-referencing LinkedIn or other applications.
 - JD title = "Product Manager" → Summary opens with `Product Manager` alone, no combined form — that's already the default term, nothing to hedge.
 
-**AI Tooling Paragraph — default on every CV, not conditional on an AI signal in the JD (a PM/PO vacancy always carries a product signal):**
+**AI Tooling Paragraph: taken from the profile.**
 
-**Before defaulting to the 1-/2-component templates below — check the profile (role blocks under Experience, the notes under them, and any dedicated project or practice description) for a more specific block matching the JD's exact wording (named tool, specific use case).** The templates are a fallback for a generic AI signal, not the first move. Do not pattern-match "AI signal present → use 2-component form" without checking whether the profile already has a more precise evidence block for that specific signal — using the generic template when a specific one exists produces a claim the JD didn't ask for and skips the evidence the JD actually asked for. A JD that names a specific tool is answered by the profile's block about using that tool, not by the generic "building LLM pipelines" paragraph, which answers a different claim.
+**Before defaulting to the profile's standard 1-/2-component forms — check the profile (role blocks under Experience, the notes under them, and any dedicated project or practice description) for a more specific block matching the JD's exact wording (named tool, specific use case).** The templates are a fallback for a generic AI signal, not the first move. Do not pattern-match "AI signal present → use 2-component form" without checking whether the profile already has a more precise evidence block for that specific signal — using the generic template when a specific one exists produces a claim the JD didn't ask for and skips the evidence the JD actually asked for. A JD that names a specific tool is answered by the profile's block about using that tool, not by the generic "building LLM pipelines" paragraph, which answers a different claim.
 
-**The wording of this paragraph belongs to the profile, not to this file.** Use the profile's AI Tooling Paragraph section (Generation Rules) verbatim, in the matching form:
-- **1-component** (most roles, daily practice only): the profile's golden line, with the portfolio link appended to it.
-- **2-component** (AI/technical depth roles: explicit AI product ownership, LLM/technical PM, hands-on AI signal required): the profile's two-paragraph form, the pipeline-building paragraph first and the golden line standalone after it. Use the named term the profile uses (for example "human-in-the-loop"), not a paraphrase: a paraphrase reads as guessing at the concept.
-- **Development/Analysis split** and language-specific forms (for example Ukrainian): as defined in the profile, only under the conditions the profile states.
+**The wording, the conditions and the form of this paragraph belong to the profile, not to this file.** Use the profile's AI Tooling Paragraph section: it states when to include the paragraph, which form to use for this vacancy, the wording (verbatim), and any language-specific form. Use the named terms the profile uses, not paraphrases.
 
 The golden line is fixed text, used verbatim every time, never trimmed or reworded per vacancy. The portfolio link (taken from the profile's Contacts block) appears exactly once in the AI paragraph. **If the profile has no AI Tooling Paragraph section, omit the paragraph instead of inventing wording.**
 
-**Personal projects stay anchored as personal.** Never describe them in a way that implies commercial or professional context, never imply other engineers were involved in solo work, and never call the code examples a "portfolio" (use "personal projects"). The profile lists any additional banned wordings for this paragraph; they apply as written.
+**Personal projects stay anchored as personal.** Never describe them in a way that implies commercial or professional context, never imply other engineers were involved in solo work, and follow the profile's banned wordings for them as written.
 
 ---
 
