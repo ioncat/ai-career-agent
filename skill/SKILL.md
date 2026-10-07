@@ -17,7 +17,7 @@ description: >
 
 ## Golden Rule — North Star Mirroring
 
-**Confirmed 2026-08-27, vacancy #1307.** Marketing's core principle applies across the whole pipeline: understand what's in the employer's head (the Phase 1 North Star — the one-sentence outcome the company is actually paying for) and consciously reflect that same image back through the CV and cover — not just by checking off individual JD signals, but by making the SUMMARY and cover opening recognizably answer the North Star sentence itself.
+Marketing's core principle applies across the whole pipeline: understand what's in the employer's head (the Phase 1 North Star — the one-sentence outcome the company is actually paying for) and consciously reflect that same image back through the CV and cover — not just by checking off individual JD signals, but by making the SUMMARY and cover opening recognizably answer the North Star sentence itself.
 
 This runs end to end, not as a single-phase check:
 - **Phase 1** — North Star (§1.0.5) is the source of truth; everything downstream traces back to it.
@@ -82,12 +82,10 @@ Phase 1 + Phase 2  [run immediately on JD input, no confirmation needed]
     If non-null, prepend `**Listed salary:** [value]` before the JD text you hand to Phase 1 —
     `salary` is often extracted from RSS/site metadata the JD.md body never mentions, so skipping
     this check makes Phase 1 score compensation as "not stated" when the system already knows it.
-    Found live twice (#1154, #1192) — see BACKLOG/CHANGELOG 2026-08-25.
   → Same check for `company` on the vacancy DB row. If non-null, prepend `**Known company:** [value]`
     before the JD text — `company` is extracted structurally by the parser (URL/DOM), and some Djinni
     postings never name the employer in the ad copy body itself. Skipping this makes Phase 1 write a
-    placeholder like "[not disclosed in JD]" into §1.0, which also clobbers the DB title. Found live
-    on #1284 and #1297 (2026-08-26).
+    placeholder like "[not disclosed in JD]" into §1.0, which also clobbers the DB title.
   → Create folder vacancies/inbox/[user_id]/[Role — Company]/   [silent]
   → Save full output to JD_analysis.md   [silent — no confirmation needed]
   → Save p1+p2 to DB analysis_json       [silent — see Analysis JSON section below]
@@ -123,9 +121,7 @@ Phase 3.5: Self-Review     [review tables + verdict shown to user; CV body NEVER
     `detect_repetition` = single words, 3+ occurrences. `detect_phrase_repetition` = 3-5 word
     phrases, 2+ occurrences — this is the one that actually catches a verbatim construction like
     "as part of the team" reused across unrelated role paragraphs, which single-word frequency
-    can't see at all (found live 2026-09-06, vacancy #1441 — three phrase-level duplicates
-    slipped through an eyeball-only Phase 3.5 pass and only surfaced when the user asked for a
-    dedicated dedup check). Feed both lists into the Repetition Check below same as the
+    can't see at all. Feed both lists into the Repetition Check below same as the
     Python pipeline would.
   → Also run the mechanical-violation lint (em-dash + banned-phrase list — rule 25 and
     several dated feedback rules recurred multiple times despite already being stated once
@@ -134,8 +130,7 @@ Phase 3.5: Self-Review     [review tables + verdict shown to user; CV body NEVER
     Any hit is a required fix before presenting the review — this is advisory to a human
     reviewer in the Python pipeline (logged, not blocking), but here there is no separate
     human review step downstream, so treat every hit as something to fix now.
-  → Also run the JD-echo scan (added 2026-09-23, see
-    `docs/discovery/north-star-signal-tree-discovery-2026-09-21.md` §4.1.1) — a cheap,
+  → Also run the JD-echo scan — a cheap,
     mechanical pre-filter for CV phrases that mirror the JD's own distinctive wording, run
     BEFORE any Phase 3.7 isolated audit (which also catches paraphrased, non-literal echo this
     n-gram scan can't see — the two are layered, not redundant):
@@ -143,9 +138,7 @@ Phase 3.5: Self-Review     [review tables + verdict shown to user; CV body NEVER
     Advisory, not auto-blocking — some findings are legitimate shared vocabulary (a required
     tool name, a role title term) a human dismisses on read-through, but any hit that echoes
     the JD's own distinctive editorial voice (not a tool/domain term) is a required fix before
-    presenting the review. Found live 2026-09-21 (vacancy #1658): a Summary opening sentence
-    used the JD's own "running ceremonies" phrase, lifted from the exact line describing what
-    the company does NOT want.
+    presenting the review.
   → Also run a grammar/sentence-construction pass before presenting the review: unnecessary
     commas (esp. before "and" joining only two items, or between an adjective and the noun
     phrase it modifies, e.g. "a shipped, production system" should be "a shipped production
@@ -154,9 +147,7 @@ Phase 3.5: Self-Review     [review tables + verdict shown to user; CV body NEVER
     as an infinitive purpose clause: "X starts with discovery to identify..."), and awkward
     verb-object pairings (e.g. "led an automated flow" — you lead delivery/a team, not a flow;
     "led the delivery of an automated flow" is correct). This is a real, separate check from
-    the repetition/tone passes above — found missing live 2026-09-09 (vacancy #1515): several
-    rounds of small phrase edits went out with no one checking the resulting sentence was still
-    grammatically clean, until the user asked directly "почему не проверяешь грамматику?"
+    the repetition/tone passes above.
   → Save [Name]_CV.md to existing folder (already created after Phase 1+2)
   → Present a markdown link to the saved CV.md — per Rule 8, never paste the CV body itself.
     ⛔ NO PDF YET — PDF is generated exactly once, at the end of the whole CV review arc (see
@@ -170,11 +161,11 @@ Phase 3.6: Signal Audit    [runs after save, verdict shown to user — CV body s
   → Read saved CV (EXPERIENCE section) + Signal Coverage Table from JD_analysis.md
   → Decompose each sentence into clauses first (split on em-dashes/commas), then assess EACH
     clause's value vs JD requirements (valuable / weak / remove) — a sentence is only "valuable"
-    if ALL its clauses are (see phase3_6_signal_audit.md's Algorithm, tightened 2026-09-21)
+    if ALL its clauses are (see phase3_6_signal_audit.md's Algorithm)
   → Check coverage: all high/medium signals present in at least one role?
   → Display audit report (findings only, not the CV text)
   → If 🗑️ sentences found: confirm with user → remove → re-save CV.md only (no PDF) → re-run the
-    mechanical lint + repetition check against the re-saved text (2026-09-21)
+    mechanical lint + repetition check against the re-saved text
   → If ⚠️ only: present to user, they decide → any applied rewrite also gets the same re-lint, .md only
   → If clean: proceed
 
@@ -287,7 +278,7 @@ Skip only when: `decline` (not worth it) OR clean `apply` with zero barriers.
 - **Per-vacancy → append an `## Phase 2.5: Objection Handling` block to `JD_analysis.md`** (resolved + genuine gaps + decision).
 - Pass resolved objections into Phase 3 context (CV must surface these counter-arguments).
 - Optional DB: store under `analysis_json` key `p2_5` (`{resolved:[...], gaps:[...]}`).
-- **DB Profile write-back (EPIC-24 T5) — only when `PROFILE_SOURCE=db` for this session.** Gated 2026-09-21: this call was previously unconditional, but `PROFILE_SOURCE` defaults to `md` and every real session traced so far ran in `md` mode — meaning this write-back wrote into a store nothing downstream ever read back, while carrying a documented brittle `claude` CLI subprocess failure risk (`.claude/sessions/2026-08-10-...md`). Whether to keep investing in `progressive_profile` at all (finish EPIC-24 T7/T9) or deprecate it is an open strategic question — see `docs/delivery/BACKLOG.md` "EPIC-24 progressive_profile — keep investing or deprecate?" — not a decision this gate makes; the gate just stops paying the cost silently in the mode that never benefits from it.
+- **DB Profile write-back (EPIC-24 T5) — only when `PROFILE_SOURCE=db` for this session.** The default is `md`; in that mode skip this call, because nothing reads the written store back.
   ```bash
   python scripts/profile_merge.py --user-id [id] --evidence "[resolved evidence text]"
   # Or write evidence to temp file first:
@@ -314,7 +305,7 @@ Run only when Phase 2 `recommendation = apply` AND `fit_score ≥ 7`, or when th
 
 ### Why isolated context matters here (Claude Code mode specifically)
 
-Self-audit bias is real and measurable — verified 2026-07-25 on vacancy #828: the same auditor (mid-conversation, same context as the document's author) scored their own writing higher on 3 of 6 dimensions than a zero-context pass did on the identical text. **Run this via an isolated subagent** (`Agent` tool, `isolation: "worktree"`), never inline in the same conversation that drafted the document.
+Self-audit bias is real and measurable: the same auditor (mid-conversation, same context as the document's author) scores their own writing higher than a zero-context pass does on the identical text. **Run this via an isolated subagent** (`Agent` tool, `isolation: "worktree"`), never inline in the same conversation that drafted the document.
 
 **Note (worktree write persistence):** subagent worktree file writes have been observed to not reliably persist after the agent finishes. Always instruct the subagent to return the FULL audit text verbatim in its final response (not a summary) as the primary deliverable — treat any file it writes as best-effort secondary, and save the returned text yourself.
 
@@ -410,12 +401,12 @@ vacancies/
 **[user_id]** — read from `skill/active_user`. Plain integer string: `1`, `2`, etc.
 **[Role — Company]** — extracted from JD during analysis. Format: `Product Manager — Acme Corp`. Em dash ( — ).
 **Folder name format:** `{vacancy_id} — {Role — Company}` — e.g. `405 — Product Manager — MWDN`. ID from DB (upsert first, then mkdir).
-**Strip `#` and `,` from every vacancy folder name, no exceptions — not just N-iX.** These two characters break the chat client's markdown-link decoding for ANY file path that contains them (confirmed 2026-09-04, vacancy #1460: `%23`/`%2C` were left un-decoded while everything else — spaces, em-dash, en-dash — decoded fine, making every `SendUserFile`-adjacent markdown link to that folder 404). This is a recurring problem (multiple vacancies over the prior ~1.5 weeks), not a one-off — treat it as a hard folder-naming rule, checked on every vacancy, every session, regardless of source site:
-- Job-board IDs in the title (`(#5749)`, `#1234`, etc.) — drop entirely, the URL already has this.
+**Strip `#` and `,` from every vacancy folder name, no exceptions — not just N-iX.** These two characters break the chat client's markdown-link decoding for ANY file path that contains them (`%23`/`%2C` stay un-decoded while spaces and dashes decode fine, so every markdown link to that folder gives a 404). Treat it as a hard folder-naming rule, checked on every vacancy, every session, regardless of source site:
+- Job-board IDs in the title (a `#` followed by digits, with or without parentheses) — drop entirely, the URL already has this.
 - Commas inside the title (e.g. `(Product, UX)`) — drop the comma (join with a space, or use `;` if a separator is really needed).
 - Any other punctuation beyond letters/digits/spaces/hyphens/en-dash/em-dash/parentheses that shows up in a scraped title — treat as suspect and strip before using it in a folder name.
 - The DB `title` field may keep the original text if useful for display; only the **folder name** (and any path derived from it) must be stripped.
-- If an existing vacancy folder is later found to contain `#` or `,`, rename it and update `markdown_path` in the DB the same way as vacancy #1460 — don't leave old ones broken.
+- If an existing vacancy folder is later found to contain `#` or `,`, rename it and update `markdown_path` in the DB the same way — don't leave old ones broken.
 **With a tag** (see below): `{vacancy_id} — [TAG] — {Role — Company}` — e.g. `1303 — [DEFTECH] — AI Product Manager — Everstar`. Tag in brackets, uppercase, right after the ID so it's the first thing visible in a sorted folder listing.
 **DB title** — stores `Role — Company` only (without ID prefix).
 
@@ -465,8 +456,7 @@ Date: [date]
 
 ## PDF Generation — render once, at the end
 
-**NON-NEGOTIABLE (confirmed 2026-09-19/21, repeated live violation 2026-09-21 on vacancy #1577):
-never render or send a CV/cover PDF during an iterative edit/review loop.** Every edit-round save
+**NON-NEGOTIABLE: never render or send a CV/cover PDF during an iterative edit/review loop.** Every edit-round save
 during Phase 3.5, 3.6, 3.7, or Phase 4's approval cycle touches the `.md` file only. Render the PDF
 exactly once — when the document reaches a final, no-more-edits state for that phase (user says
 "ок"/"всё ок"/no further changes, or the phase ends and hands off to the next one) — then present
@@ -559,22 +549,18 @@ python scripts/vacancy_track.py update-json --id $VACANCY_ID --phase p1 --data '
 }'
 ```
 
-> **`role_balance` — six-axis taxonomy, empirically derived 2026-09-06 (keyword frequency + TF-IDF clustering + LLM open-coding, triangulated across 628 real PM/PO JDs — see `docs/discovery/role-balance-taxonomy-discovery-2026-09-06.md`).** Canonical keys are `strategy`/`discovery`/`delivery`/`growth`/`stakeholder`/`operational` — always these exact names, not synonyms (`execution`, `coordination`, `ops` were the old, inconsistently-applied names; a DB audit found the model split roughly 50/50 between two different naming conventions for the same two dimensions before this fix). `growth` is a new axis — vacancies analyzed before 2026-09-06 do not have it.
+> **`role_balance` — six-axis taxonomy.** Canonical keys are `strategy`/`discovery`/`delivery`/`growth`/`stakeholder`/`operational` — always these exact names, not synonyms (`execution`, `coordination`, `ops` are old names; do not use them). Analyses written earlier may lack `growth`.
 
 > **Every field above is REQUIRED — this must validate against `contracts/pipeline.py:Phase1Data`.**
 > `role`/`company` are the most consequential (see below), but any missing field
 > (`north_star`, `primary_archetype`, `vacscore_dims`, ...) or a `company_type`
 > value outside `product|hybrid|outsourcing` makes the whole `analysis_json`
 > fail strict validation — the API then falls back to a legacy parser that
-> only reads `role`/`company` (fixed 2026-07-25, previously dropped them too).
-> Found live 2026-07-25 on vacancies #828/#832 — this exact template was
-> stale relative to the schema (missing fields, wrong `company_type` enum,
-> old `vacancy_dims` name), producing invalid JSON for every locally-run
-> vacancy until caught. If unsure the current template still matches the
-> schema, check `contracts/pipeline.py:Phase1Data`/`Phase2Data` directly —
+> only reads `role`/`company`.
+> If unsure the current template still matches the schema, check `contracts/pipeline.py:Phase1Data`/`Phase2Data` directly —
 > don't trust this doc blindly.
 >
-> **`role` and `company` are MANDATORY, not optional.** The web tracker list view reads `analysis_json.p1.role` and `.company` (`_parse_analysis_summary` in `web/api.py`). If omitted, the UI silently falls back to the raw DB `company`/`title` columns — which for RSS/scraped vacancies can be a garbage JD-text snippet instead of the actual company name (found on vacancy #690, 2026-07-16: DB company was a scraped mission-statement fragment, not "Solidgate", because `update-json --phase p1` omitted `role`/`company`).
+> **`role` and `company` are MANDATORY, not optional.** The web tracker list view reads `analysis_json.p1.role` and `.company` (`_parse_analysis_summary` in `web/api.py`). If omitted, the UI silently falls back to the raw DB `company`/`title` columns — which for RSS/scraped vacancies can be a garbage JD-text snippet instead of the actual company name.
 
 python scripts/vacancy_track.py update-json --id $VACANCY_ID --phase p2 --data '{
   "fit_score": N,
@@ -611,10 +597,7 @@ python scripts/vacancy_track.py update --id $VACANCY_ID --status analyzed
 ```
 
 > **Почему MANDATORY:** без этого шага вакансия остаётся в статусе `fetching` в DB и трекере,
-> даже если анализ выполнен и analysis_json сохранён. Баг обнаружен на вакансии #461 (Navis)
-> — трекер показывал company=MONTE-PRO и status=fetching после полного pipeline.
-> Этот шаг ранее существовал только в секции URL-flow (ниже), но отсутствовал здесь,
-> и Claude Desktop его пропускал. Исправлено 2026-07-02.
+> даже если анализ выполнен и analysis_json сохранён.
 
 **After Phase 3.5 approval — save p3, then update status (MANDATORY):**
 
@@ -641,9 +624,6 @@ python scripts/vacancy_track.py update --id $VACANCY_ID --status cover_generated
 > folder; without this step the vacancy stays in "Analyzed" forever even
 > after a CV/cover was actually written, because `analysis_json.p3`/`.p4`
 > existing is invisible to the stage classifier — only `status` drives it.
-> Found live 2026-07-25 on vacancy #828: CV was generated and approved, but
-> `status` was never advanced past `analyzed`, so it looked "stuck"/missing
-> from the folder the user expected it in.
 
 ---
 

@@ -31,14 +31,22 @@ _CLEANED_DIRS = ["pm", "generic"]
 # Placeholder file, not a pipeline prompt: its header may point at the design doc.
 _EXEMPT = {"onboarding_interview.md"}
 
+_ROOT = _PROMPTS.parent
+# Other files that instruct the agent follow the same rule.
+_EXTRA_FILES = [_ROOT / "skill" / "SKILL.md", _ROOT / ".claude" / "commands" / "analyze.md"]
+# Lines that match a marker but are not history: a creation-date field inside an output template.
+_ALLOWED_LINES = [re.compile(r"^\s*Создана: ")]
+
 _FILES = sorted(
     f for d in _CLEANED_DIRS for f in (_PROMPTS / d).glob("*.md") if f.name not in _EXEMPT
-)
+) + _EXTRA_FILES
 
 
 def _findings(text: str) -> list[str]:
     out = []
     for lineno, line in enumerate(text.splitlines(), 1):
+        if any(a.search(line) for a in _ALLOWED_LINES):
+            continue
         for pattern, label in _HISTORY_MARKERS:
             if pattern.search(line):
                 out.append(f"line {lineno}: {label}")

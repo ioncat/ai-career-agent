@@ -122,8 +122,8 @@ Key results:
 - `## SECTION` — H2 for SUMMARY / EXPERIENCE / CERTIFICATIONS
 - `### Role Title` — H3 for each job role title
 - `Key results:` followed by **blank line**, then `- item` list (NOT `•`)
-- `---` between each job entry (rule 17)
-- Contacts: **copy verbatim** from the profile's Contacts line (Identity & Contact section) — markdown links, exact separators, all four items including portfolio. **NEVER use plain-text URLs. NEVER omit portfolio link.** Never add GitHub (rule 14).
+- `---` between each job entry
+- Contacts: **copy verbatim** from the profile's Contacts line (Identity & Contact section) — markdown links, exact separators, all four items including portfolio. **NEVER use plain-text URLs. NEVER omit portfolio link.** Never add the GitHub link.
 
 **Headline options:**
 - **Never append a narrow specialization qualifier like "(UX)" to the headline or Summary opening, even when the JD's own title uses it.** A narrow specialization is one part of product work, not a separate title or discipline the candidate claims. Headline stays plain "Product Manager" / "Product Owner"; UX signal goes into Summary/EXPERIENCE content, never into the title.
