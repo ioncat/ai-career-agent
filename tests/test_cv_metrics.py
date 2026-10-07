@@ -69,6 +69,43 @@ class TestTopNWords:
         result = top_n_words(text)
         assert len(result) <= 15
 
+    def test_counts_ukrainian_words(self):
+        # The tokenizer used to match Latin letters only, so a Ukrainian JD/CV
+        # produced an almost empty table.
+        result = dict(top_n_words("продукт продукт продукт аналітика аналітика"))
+        assert result["продукт"] == 3
+        assert result["аналітика"] == 2
+
+    def test_counts_russian_words(self):
+        result = dict(top_n_words("продукт продукт аналитика ёлка ёлка ёлка"))
+        assert result["продукт"] == 2
+        assert result["ёлка"] == 3
+
+    def test_cyrillic_stopwords_excluded(self):
+        text = "для що також досвід команда для для що продукт"
+        words = [w for w, _ in top_n_words(text)]
+        assert words == ["продукт"]
+
+    def test_cyrillic_case_insensitive(self):
+        result = dict(top_n_words("Продукт продукт ПРОДУКТ"))
+        assert result["продукт"] == 3
+
+    def test_ukrainian_apostrophe_word_kept_whole(self):
+        # "м'який" must not be split into fragments; both apostrophe forms
+        # count as the same word.
+        result = dict(top_n_words("м'який мʼякий м’який"))
+        assert result == {"м'який": 3}
+
+    def test_cyrillic_min_word_length_three(self):
+        words = [w for w, _ in top_n_words("та це продукт")]
+        assert words == ["продукт"]
+
+    def test_mixed_language_text_counts_both_scripts(self):
+        result = dict(top_n_words("roadmap roadmap дорожня карта roadmap Jira Jira"))
+        assert result["roadmap"] == 3
+        assert result["jira"] == 2
+        assert result["дорожня"] == 1
+
 
 # ── scan_tools ────────────────────────────────────────────────────────────────
 

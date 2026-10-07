@@ -507,10 +507,9 @@ No dual-availability state — the button's visibility is a direct, deterministi
 **Still broken:** user tested live after the fix and selection still doesn't work properly. Root cause not re-diagnosed — the `SelectionArea` wrap may not be reaching the actual problem widgets, or there may be a second, unrelated cause.
 **Priority:** explicitly low — user's own call ("низкий приоритет, оставим на потом"). Not started.
 
-### `core.cv_metrics.top_n_words` (and the Top-15 Word Frequency check it feeds) is Latin-script-only — near-useless for a Cyrillic JD/CV pair (found 2026-09-21, regression test on vacancy #1656)
-**What:** the tokenizer only matches `[a-zA-Z]{4,}` — for a Ukrainian JD/CV, it returns almost nothing but English-embedded terms and contact-link boilerplate, giving `phase3_5_review.md`'s Top-15 Frequency Check essentially no real signal to work with. Found live during the post-audit regression test (isolated subagent run, vacancy #1656 — TEST COPY of #1646, Ukrainian JD): the subagent ran the check per instructions, got near-empty output, flagged it explicitly as low-value, and fell back to the Signal Coverage Table (manual reading) as the real check instead.
-**Why it matters:** this candidate applies to Ukrainian-language JDs regularly (see PROFILE.md language settings) — every one of those Phase 3.5 passes has been running this check essentially blind, silently, with nobody flagging it before now.
-**Fix direction:** extend the word-boundary regex (and the stopword list) to cover Cyrillic characters (`[а-яА-ЯіїєґІЇЄҐ]{4,}` or similar), or explicitly skip/replace the check with a language-aware alternative when `cv_language != 'en'`.
+### The other `core/cv_metrics.py` checks are still Latin-only for a Cyrillic CV (found 2026-10-07, remainder of the `top_n_words` fix)
+**What:** `top_n_words` (Top-15 table) now counts Ukrainian/Russian words (CHANGELOG 2026-10-07). `detect_repetition`, `detect_phrase_repetition` and `detect_jd_echo` still use `[a-zA-Z]` tokenizers, so for a Ukrainian CV the Phase 3.5 repeated-terms/phrases checks and the JD-echo check see almost nothing. Words are not lemmatized, so inflected forms ("продукту" and "продукт") count separately in every one of these checks.
+**Next:** reuse the Cyrillic token pattern and stopword set in the three functions, with a test for each; decide whether lemmatization is worth it.
 **Not started.**
 
 ### `SKILL.md`'s stated trigger conditions for Phase 4 (cover) vs. Phase 3.7 (editorial audit) are inconsistently documented (found 2026-09-21, regression test on vacancy #1656)

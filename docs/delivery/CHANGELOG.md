@@ -6,6 +6,10 @@
 
 ---
 
+## 2026-10-07
+
+- **Bug fix — the Top-15 Word Frequency check was blind to Cyrillic (`core/cv_metrics.py`).** `top_n_words` only matched Latin letters, so for a Ukrainian JD/CV pair `phase3_5_review.md`'s Top-15 table held almost nothing but English-embedded terms (found 2026-09-21 in the #1656 regression run, the subagent fell back to manual reading). The tokenizer now also reads Ukrainian/Russian words (3+ letters, apostrophe words like "м'який" kept whole, both apostrophe forms merged), with a separate Ukrainian/Russian stopword set of function words and generic JD/CV filler. English output is unchanged. Checked on the real #1646 JD: the table now lists "продукту", "роль", "рішення", "команду", "самостійно", "розробки". 7 new tests (77 in `tests/test_cv_metrics.py`). Open remainder: `detect_repetition`, `detect_phrase_repetition`, `detect_jd_echo` are still Latin-only, and words are not lemmatized (BACKLOG).
+
 ## 2026-10-06
 
 - **Feature — `/analyze -v [id] -lite` (alias `-lt`): light CV mode (`.claude/commands/analyze.md`, `skill/SKILL.md`).** Goes straight to Phase 3+3.5 for a vacancy that already has Phase 1+2: no Phase 2.5, no language/name questions (English, default name), a short CV (2 short Summary paragraphs plus the standard AI paragraph, one short paragraph per role, all Key results kept), mechanical checks only (`scripts/cv_checks.py`; no Phase 3.6/3.7), no cover unless asked. `-l` was already taken by `-list`, hence `-lite`. Motivation: a take-a-chance vacancy (#1739) got a usable CV in a few minutes this way. Prompt/docs change only, no code or tests.

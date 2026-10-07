@@ -51,6 +51,54 @@ _STOPWORDS: frozenset[str] = frozenset(
     }
 )
 
+# Ukrainian + Russian counterpart of the English noise list above, used only by
+# top_n_words. Function words and generic JD/CV filler, nothing that names a
+# domain, tool or skill (those must stay countable).
+_STOPWORDS_CYRILLIC: frozenset[str] = frozenset(
+    {
+        # Ukrainian: conjunctions, prepositions, pronouns, particles
+        "але", "або", "щоб", "що", "які", "який", "яка", "яке", "яких", "якого",
+        "якій", "цей", "ця", "цього", "цій", "цих", "той", "тих", "його", "їх",
+        "їхній", "наш", "наші", "нашої", "нашій", "нашого", "ваш", "ваші",
+        "для", "при", "про", "від", "під", "над", "між", "через", "після",
+        "перед", "без", "щодо", "серед", "коли", "тому", "тоді", "також",
+        "дуже", "лише", "тільки", "вже", "ще", "все", "всі", "всіх", "кожен",
+        "кожна", "інші", "інших", "інший", "буде", "будуть", "бути", "був",
+        "була", "було", "були", "має", "мають", "мати", "можна", "може",
+        "можуть", "потрібно", "необхідно", "нас", "вас", "нам", "вам", "вони",
+        "вона", "воно", "саме", "понад", "більше", "менше",
+        # Ukrainian: generic JD/CV noise (mirrors "experience", "work", "team"...)
+        "досвід", "досвіду", "досвідом", "робота", "роботи", "роботу",
+        "працювати", "команда", "команди", "команді", "компанія", "компанії",
+        "компанію", "вимоги", "обов'язки", "знання", "навички", "вміння",
+        "вміти", "здатність", "рівень", "рівня", "сильні", "сильний",
+        "відмінні", "хороші", "бажано", "вакансія", "вакансії", "кандидат",
+        "кандидата", "пропонуємо", "шукаємо", "запрошуємо", "років", "роки",
+        "рік", "року", "мінімум",
+        # Russian: conjunctions, prepositions, pronouns, particles
+        "что", "чтобы", "как", "который", "которая", "которое", "которые",
+        "этот", "эта", "это", "эти", "его", "для", "при", "про", "под",
+        "над", "между", "через", "после", "перед", "без", "когда", "тоже",
+        "также", "очень", "только", "уже", "еще", "ещё", "все", "всех",
+        "каждый", "другие", "будет", "будут", "быть", "был", "была", "было",
+        "были", "есть", "имеет", "имеют", "иметь", "можно", "может", "могут",
+        "нужно", "необходимо", "они", "она", "более", "менее",
+        # Russian: generic JD/CV noise
+        "опыт", "опыта", "работа", "работы", "работу", "команда", "команды",
+        "компания", "компании", "требования", "обязанности", "знание",
+        "знания", "навыки", "умение", "умения", "уровень", "сильные",
+        "отличные", "хорошие", "желательно", "вакансия", "кандидат",
+        "предлагаем", "ищем", "лет", "года", "год", "минимум",
+    }
+)
+
+# English words stay Latin-only with a 3+ letter floor (unchanged behaviour);
+# Ukrainian/Russian words may contain an apostrophe inside the word
+# ("м'який"), so a plain \b-bounded run would split them.
+_TOP_WORDS_RE = re.compile(
+    r"\b[a-zA-Z]{3,}\b|[а-яёіїєґ]+(?:['ʼ’][а-яёіїєґ]+)*"
+)
+
 # ── Tool registry ─────────────────────────────────────────────────────────────
 
 _TOOL_REGISTRY: dict[str, list[str]] = {
@@ -89,8 +137,14 @@ def top_n_words(text: str, n: int = 15) -> list[tuple[str, int]]:
     Returns:
         List of (word, count) sorted descending by count.
     """
-    words = re.findall(r"\b[a-zA-Z]{3,}\b", text.lower())
-    counts = Counter(w for w in words if w not in _STOPWORDS)
+    words = [
+        w.replace("ʼ", "'").replace("’", "'")
+        for w in _TOP_WORDS_RE.findall(text.lower())
+    ]
+    counts = Counter(
+        w for w in words
+        if len(w) >= 3 and w not in _STOPWORDS and w not in _STOPWORDS_CYRILLIC
+    )
     return counts.most_common(n)
 
 
