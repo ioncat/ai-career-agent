@@ -512,12 +512,6 @@ No dual-availability state — the button's visibility is a direct, deterministi
 **Next:** reuse the Cyrillic token pattern and stopword set in the three functions, with a test for each; decide whether lemmatization is worth it.
 **Not started.**
 
-### `SKILL.md`'s stated trigger conditions for Phase 4 (cover) vs. Phase 3.7 (editorial audit) are inconsistently documented (found 2026-09-21, regression test on vacancy #1656)
-**What:** `SKILL.md`'s Pipeline Flow diagram gates Phase 4 behind "[user explicitly requests cover]" as the literal comment, while a `recommendation=apply AND fit≥7` condition appears nearby and is written for Phase 3.7 specifically. During the isolated-subagent regression test, the task brief (written by the main session, not by SKILL.md itself) named the Phase 3.7 condition as if it were also Phase 4's trigger — the subagent flagged this explicitly as an inconsistency it had to resolve without a human to ask, rather than something SKILL.md itself states clearly.
-**Why it matters:** exactly the kind of "does what a rule says match where it's actually applied" gap the whole prompt audit was about — found immediately once a genuinely fresh, unbiased read tried to follow the file literally.
-**Fix direction:** re-read `SKILL.md`'s Pipeline Flow section and make each phase's trigger condition unambiguous and attached to the right phase — candidate for folding into the still-open "Prompt clarity/structure pass" BACKLOG item (`SKILL.md` itself, not just `prompts/pm/`, may need the same treatment).
-**Not started.**
-
 ### Stage 2 Critical Blocker prefilter can false-positive when JD's required level equals candidate's own (found 2026-08-15, vacancy #795)
 **What:** `prompts/pm|generic/prefilter.md` Stage 2 LLM check flagged #795 BLOCKED for "english: JD requires Upper-Intermediate, candidate is B2" — but Upper-Intermediate *is* B2 (candidate's own level), and the JD literally said "Upper-Intermediate або вище" (or higher), which the candidate meets, not fails. PROFILE.md's `## Critical Blockers` only wants a block for strictly-above-B2 (C1/C2) — the LLM reacted to an English-requirement mention without checking the specific level against the rule.
 **Why:** Stage 1's deterministic regex (`tools/cv_prefilter.py:_check_english_level`) only fires on a literal CEFR code merged from Djinni's structured sidebar — #795 predates that merge (no `## Vacancy Requirements` section in its JD.md), so it fell through to Stage 2 LLM judgment, which got it wrong.

@@ -184,11 +184,11 @@ Phase 3.6: Signal Audit    [runs after save, verdict shown to user — CV body s
     render once, at the end" below — do not render/send a PDF at any earlier point in this arc.
   → Ask: "Переходим к cover?"
 
-  ↓ [OPT-IN, only if recommendation = apply AND fit_score ≥ 7, or user asks explicitly]
+  ↓ [Phase 3.7 only if recommendation = apply AND fit_score ≥ 7, or user asks explicitly]
 
 Phase 3.7: Editorial Audit  [opt-in final polish — see below]
 
-  ↓ [user explicitly requests cover]
+  ↓ [Phase 4 only if the user explicitly requests a cover; independent of Phase 3.7, a cover can follow Phase 3.6 directly]
 
 Phase 4: Cover Message
   → Review/approval cycle (verdict/summary in chat, never the full cover text — Rule 8). Every
