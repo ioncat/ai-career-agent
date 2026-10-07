@@ -247,6 +247,8 @@ This is advisory only — it informs the "Генерируем CV?" decision, it
 
 Provide 3–5 concrete reframing actions derived from the signal table. Each action = specific and actionable.
 
+Name a specific piece of profile evidence only when the profile states it clearly. Where the profile has no clear evidence for a signal (`in_profile = ❌`, or `⚠️` and ambiguous), do not prescribe a fact: write a confirmation question for the candidate instead ("Do you have experience with X? Describe it in your own words"), to be asked in Phase 2.5. When an action does name evidence, state it as a practice pattern (what was done and how), not as a one-event story (the Phase 3 rule that the CV describes practice, not cases).
+
 Lead with archetype delta correction if JD archetype ≠ candidate's current CV framing.
 If the profile states a candidate archetype (single or dual, e.g. Execution and Founder Proxy), use the
 matching section of the profile's Archetype & Role Positioning to guide which experience to surface.

@@ -19,6 +19,12 @@
 **Next:** leak cleanup + leakage lint test, then schema design (fact annotations: usage, unlock_when, never_say), then migration. Needs EPIC-24 re-scope.
 **Spec:** [profile-prompt-isolation-discovery-2026-10-04.md](../discovery/profile-prompt-isolation-discovery-2026-10-04.md) (problem and decisions) · [profile-schema-v0-2026-10-04.md](../discovery/profile-schema-v0-2026-10-04.md) (schema draft and EPIC-24 re-scope)
 
+### 🟡 P2 — User-configurable personal rules, separate from the profile (added 2026-10-07, not started)
+**What:** any user must be able to tune the system to themselves ("for AI roles always this form of the AI paragraph", wording bans, defaults) without touching engine prompts. Today such rules sit in the engine prompts or in the owner's `PROFILE.md`.
+**Idea:** the profile stays the experience entity (facts; edited mostly when the experience itself changes); personal rules go to a separate per-user file (for example `skill/users/<id>/RULES.md`, or a JSON section) that the engine reads next to the profile.
+**Why:** keeps the prompts profile-free (ROADMAP_Q4 steps 5 and 9) and gives a home to the knowledge parked in `skill/users/1/PROMPT_REMOVED_KNOWLEDGE_2026-10-07.md`.
+**Next:** choose the format and where the engine reads it; migrate the AI paragraph Usage line and the parked file into it. Belongs with the Profile isolation item (P1).
+
 ### 🟠 P1 — New Phase 3.8: ATS Keyword Coverage (confirmed 2026-09-07, not started)
 **What:** user-requested new pipeline step, confirmed but deferred until current CV work was done. Goal is the opposite of Phase 3.7's "JD-Echo Risk" check — 3.7 flags and *reduces* CV phrases that mirror the JD too closely (human-credibility risk); this new phase should instead *guarantee* the CV literally contains the JD's own load-bearing keywords/terms (ATS keyword-matching risk) wherever real supporting evidence already exists. Found the gap live on vacancies #1491/#1494 this session — the CV was missing literal JD terms (e.g. "process flows", "functional validation and testing", "non-deterministic", "Jira", "testable") despite having real evidence for all of them; this was done ad hoc via an unstructured chat request, not a repeatable phase.
 **Proposed placement:** run before Phase 3.7, not after — 3.7 should then only trim echo-risk findings that are NOT one of the ATS-coverage terms this new phase just deliberately inserted (so the two phases don't fight each other and undo one another's work).
