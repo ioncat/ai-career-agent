@@ -13,6 +13,10 @@ CHECKS
     :8002/health         — pdf-service (renders PDFs)
     db/agent.db          — SQLite reachable (SELECT 1)
     Telegram ping        — optional, only if --telegram flag
+    job-monitor feeds    — optional, only if --monitor flag: reads the monitor's
+                           feed_health.json; fails if a feed has an unrecovered
+                           failure alert or its last check is older than
+                           --monitor-max-age minutes (monitor stopped)
 
 OUTPUT
 ------
@@ -44,6 +48,7 @@ import os
 import sqlite3
 import sys
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 from pathlib import Path
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -68,6 +73,10 @@ BOT_TOKEN   = os.getenv("TELEGRAM_BOT_TOKEN", "")
 CHAT_ID     = os.getenv("TELEGRAM_CHAT_ID", "")
 
 HTTP_TIMEOUT = 5  # seconds per request
+
+# job-monitor writes feed_health.json into its DATA_DIR (default: its own folder).
+MONITOR_DIR = Path(os.getenv("JOB_MONITOR_DATA_DIR", str(_ROOT / "services" / "job-monitor")))
+MONITOR_MAX_AGE_MIN = 30  # monitor polls every 5 minutes by default
 
 
 # ── Result ────────────────────────────────────────────────────────────────────
@@ -137,6 +146,50 @@ async def check_telegram_bot() -> CheckResult:
         return CheckResult("telegram", ok=False, detail=str(exc)[:120])
 
 
+def check_monitor(
+    monitor_dir: Path | None = None,
+    max_age_minutes: int = MONITOR_MAX_AGE_MIN,
+    now: datetime | None = None,
+) -> CheckResult:
+    """job-monitor feeds: read feed_health.json (written by services/job-monitor/monitor.py).
+
+    Fails when the file is missing or unreadable, when a feed carries an unrecovered
+    failure alert (`alerted`), or when a feed's last check is older than
+    max_age_minutes (the monitor is not running).
+    """
+    import json
+
+    path = Path(monitor_dir or MONITOR_DIR) / "feed_health.json"
+    if not path.exists():
+        return CheckResult("job-monitor", ok=False, detail=f"no state file: {path}")
+    try:
+        health = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(health, dict):
+            raise ValueError("not a JSON object")
+    except Exception as exc:
+        return CheckResult("job-monitor", ok=False, detail=f"unreadable {path.name}: {str(exc)[:80]}")
+    if not health:
+        return CheckResult("job-monitor", ok=False, detail="no feeds recorded yet")
+
+    now = now or datetime.now()
+    problems: list[str] = []
+    for name, h in sorted(health.items()):
+        failures = int(h.get("consecutive_failures", 0) or 0)
+        if h.get("alerted"):
+            problems.append(f"{name}: failing ({failures} checks in a row)")
+            continue
+        last = h.get("last_check")
+        try:
+            age_ok = now - datetime.fromisoformat(last) <= timedelta(minutes=max_age_minutes)
+        except (TypeError, ValueError):
+            age_ok = False
+        if not age_ok:
+            problems.append(f"{name}: stale (last check {last or 'never'})")
+    if problems:
+        return CheckResult("job-monitor", ok=False, detail="; ".join(problems))
+    return CheckResult("job-monitor", ok=True, detail=f"{len(health)} feed(s) healthy")
+
+
 # ── Alert ─────────────────────────────────────────────────────────────────────
 
 async def send_telegram_alert(failures: list[CheckResult]) -> None:
@@ -190,6 +243,12 @@ async def run(args: argparse.Namespace) -> int:
     # DB check (sync — fast)
     results.append(check_db())
 
+    if args.monitor:
+        results.append(check_monitor(
+            Path(args.monitor_dir) if args.monitor_dir else None,
+            args.monitor_max_age,
+        ))
+
     # Print results
     all_ok = True
     for r in results:
@@ -216,6 +275,18 @@ def main() -> None:
     parser.add_argument(
         "--telegram", action="store_true",
         help="Also check Telegram bot token + send alert on failure",
+    )
+    parser.add_argument(
+        "--monitor", action="store_true",
+        help="Also check the job-monitor feeds (feed_health.json): failing or stale feeds fail the run",
+    )
+    parser.add_argument(
+        "--monitor-dir", default=None,
+        help=f"Folder holding the monitor's feed_health.json (default: {MONITOR_DIR})",
+    )
+    parser.add_argument(
+        "--monitor-max-age", type=int, default=MONITOR_MAX_AGE_MIN,
+        help=f"Minutes without a monitor check before a feed counts as stale (default: {MONITOR_MAX_AGE_MIN})",
     )
     parser.add_argument(
         "--pdf-url", default=None,

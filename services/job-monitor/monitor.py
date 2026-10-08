@@ -30,6 +30,7 @@ _BASE = Path(os.environ.get("DATA_DIR", str(Path(__file__).parent)))
 _PROJECT = Path(__file__).parent
 LOG_FILE = _BASE / "monitor.log"
 STATE_FILE = _BASE / "seen_jobs.json"
+HEALTH_FILE = _BASE / "feed_health.json"
 LOCK_FILE = _BASE / "monitor.lock"
 FEEDS_FILE = _PROJECT / "feeds.json"
 CONFIG_FILE = _PROJECT / "config.json"
@@ -62,6 +63,10 @@ HTTP_TIMEOUT = aiohttp.ClientTimeout(
 BACKOFF_SCHEDULE = list(DEFAULT_CONFIG["retry"]["backoff_schedule_seconds"])
 MAX_ATTEMPTS = len(BACKOFF_SCHEDULE) + 1
 CHECK_TIMEOUT: int = DEFAULT_CONFIG["check_timeout_seconds"]
+
+# A feed that fails this many checks in a row raises one Telegram alert; the first
+# successful check afterwards raises one recovery alert. See "Feed health" below.
+ALERT_AFTER_FAILURES = 3
 
 # Salary extraction from DOU titles (e.g. "$1500–2000").
 SALARY_RE = re.compile(r"\$\s*\d{1,5}(?:\s*[–—\-]\s*\d{1,5})?")
@@ -406,6 +411,130 @@ def save_state(state: dict) -> None:
         log.error("Failed to save state: %s", e)
 
 
+# ── Feed health (feed_health.json) ────────────────────────────────────────────
+#
+# A silent feed failure starves the whole pipeline (this monitor is its first
+# stage) and used to show up only in monitor.log. One record per feed, kept in a
+# file of its own: seen_jobs.json maps links to deliveries and several readers
+# (migrate_state, scripts/import_seen_jobs.py) treat every top-level key as a link.
+#
+# {
+#   "DOU.ua - Product Manager": {
+#     "consecutive_failures": 0,
+#     "alerted": false,            # a failure alert was sent and no recovery yet
+#     "last_check": "2026-10-08T16:20:00",
+#     "last_ok": "2026-10-08T16:20:00" | null,
+#     "last_failure": "..." | null,
+#     "last_error": "..." | null
+#   }
+# }
+
+
+def load_feed_health() -> dict:
+    if not HEALTH_FILE.exists():
+        return {}
+    try:
+        data = json.loads(HEALTH_FILE.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except Exception as e:
+        log.error("feed_health.json is unreadable (%s) - starting with empty health", e)
+        return {}
+
+
+def save_feed_health(health: dict) -> None:
+    try:
+        _BASE.mkdir(parents=True, exist_ok=True)
+        HEALTH_FILE.write_text(json.dumps(health, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception as e:
+        log.error("Failed to save feed health: %s", e)
+
+
+_URL_IN_TEXT_RE = re.compile(r"https?://[^\s'\")>\]]+")
+
+
+def _scrub_error(error: str | None) -> str:
+    """Error text for the health file and the alert: URLs removed (a feed URL can carry a
+    personal key) and cut to 300 characters."""
+    return _URL_IN_TEXT_RE.sub("<url>", error or "")[:300]
+
+
+def record_fetch_result(health: dict, feed_name: str, ok: bool, error: str | None = None,
+                        now: datetime | None = None) -> tuple[str | None, int]:
+    """Update one feed's record after a fetch. Returns (event, failures):
+    event is "failing" exactly once, when the failure streak reaches
+    ALERT_AFTER_FAILURES, "recovered" exactly once, on the first success after
+    an alert, and None otherwise. failures is the streak length behind the event."""
+    now_iso = (now or datetime.now()).isoformat(timespec="seconds")
+    h = health.setdefault(feed_name, {
+        "consecutive_failures": 0, "alerted": False, "last_check": None,
+        "last_ok": None, "last_failure": None, "last_error": None,
+    })
+    h["last_check"] = now_iso
+    if ok:
+        streak = int(h.get("consecutive_failures", 0))
+        was_alerted = bool(h.get("alerted"))
+        h.update(consecutive_failures=0, alerted=False, last_ok=now_iso, last_error=None)
+        return ("recovered", streak) if was_alerted else (None, 0)
+    h["consecutive_failures"] = int(h.get("consecutive_failures", 0)) + 1
+    h["last_failure"] = now_iso
+    h["last_error"] = _scrub_error(error)
+    if h["consecutive_failures"] >= ALERT_AFTER_FAILURES and not h.get("alerted"):
+        h["alerted"] = True
+        return "failing", h["consecutive_failures"]
+    return None, 0
+
+
+def format_feed_alert(event: str, feed_name: str, failures: int, last_error: str | None) -> str:
+    if event == "failing":
+        return (f"\U0001F534 job-monitor: feed \"{feed_name}\" failed {failures} checks in a row.\n"
+                f"Last error: {last_error or 'unknown'}\n"
+                "New vacancies from this feed are not being collected.")
+    return (f"\U0001F7E2 job-monitor: feed \"{feed_name}\" is working again "
+            f"(it had failed {failures} checks in a row).")
+
+
+async def send_telegram_message(session: aiohttp.ClientSession, text: str) -> bool:
+    """Push one message through the Telegram Bot API, with the same credentials the
+    rest of the project uses (TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID; the container
+    gets them from .env). This service ships as its own image without the project
+    code, so core/telegram.py (aiogram) cannot be imported here.
+
+    Returns True when the alert is delivered or cannot be delivered at all
+    (credentials missing: it is logged at ERROR level instead, so it is not
+    retried every cycle). Returns False on a send failure worth retrying next
+    cycle. Never logs the token: aiohttp errors can carry the request URL."""
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID", "")
+    if not token or not chat_id:
+        log.error("[ALERT] Telegram is not configured (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID): %s",
+                  text.replace("\n", " | "))
+        return True
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    try:
+        async with session.post(url, json={"chat_id": chat_id, "text": text},
+                                timeout=aiohttp.ClientTimeout(total=15)) as resp:
+            if resp.status >= 400:
+                log.error("[ALERT] Telegram answered HTTP %d - will retry next cycle", resp.status)
+                return False
+        return True
+    except Exception as e:
+        log.error("[ALERT] Telegram send failed (%s) - will retry next cycle", type(e).__name__)
+        return False
+
+
+async def track_feed_result(session: aiohttp.ClientSession, health: dict, feed_name: str,
+                            ok: bool, error: str | None = None) -> None:
+    """record_fetch_result + the alert it asks for. A failed send is undone, so the
+    same event is raised again on the next cycle instead of being lost."""
+    event, failures = record_fetch_result(health, feed_name, ok, error)
+    if event is None:
+        return
+    text = format_feed_alert(event, feed_name, failures, health[feed_name].get("last_error"))
+    log.warning("[%s] feed health: %s after %d failed checks - alerting", feed_name, event, failures)
+    if not await send_telegram_message(session, text):
+        health[feed_name]["alerted"] = event == "recovered"
+
+
 def _parse_pub_date(pub_date: str) -> str | None:
     """Parse RFC 2822 pubDate to ISO 8601 UTC string. Returns None on failure."""
     if not pub_date:
@@ -573,12 +702,17 @@ async def check_feed(
     silent: bool,
     career_agent_url: str,
     debug: bool = False,
+    health: dict | None = None,
 ) -> int:
     try:
         jobs = await fetch_jobs(session, feed["url"])
     except Exception as e:
         log.error("[%s] fetch failed: %s", feed["name"], e)
+        if health is not None and not debug:
+            await track_feed_result(session, health, feed["name"], ok=False, error=str(e))
         return 0
+    if health is not None and not debug:
+        await track_feed_result(session, health, feed["name"], ok=True)
 
     # Enrich each job with company + salary extracted from RSS data
     for j in jobs:
@@ -648,6 +782,11 @@ async def check_feed(
 async def check(silent: bool, career_agent_url: str, feeds: list[dict], debug: bool = False) -> int:
     state = load_state()
     migrate_state(state, feeds)
+    health = {} if debug else load_feed_health()
+    # A feed that is no longer configured must not look stale in `health_check.py --monitor`.
+    configured = {f["name"] for f in feeds}
+    for name in [n for n in health if n not in configured]:
+        del health[name]
 
     async with aiohttp.ClientSession(timeout=HTTP_TIMEOUT, headers=HEADERS) as session:
         if not silent and not debug:
@@ -656,7 +795,7 @@ async def check(silent: bool, career_agent_url: str, feeds: list[dict], debug: b
                 log.info("%d pending delivery(s) succeeded.", retried)
 
         results = await asyncio.gather(
-            *[check_feed(session, f, state, silent, career_agent_url, debug) for f in feeds],
+            *[check_feed(session, f, state, silent, career_agent_url, debug, health) for f in feeds],
             return_exceptions=True,
         )
 
@@ -668,6 +807,8 @@ async def check(silent: bool, career_agent_url: str, feeds: list[dict], debug: b
             total += result
 
     save_state(state)
+    if not debug:
+        save_feed_health(health)
     return total
 
 

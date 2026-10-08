@@ -339,13 +339,6 @@ No dual-availability state — the button's visibility is a direct, deterministi
 - [ ] Map status → active phase; red state on `*_failed`
 - [ ] Tooltips per chip (phase name + fit/score if available)
 
-### Job Monitor — Error Alerting (added 2026-07-06)
-**What:** per-feed failure counter in `seen_jobs.json` → Telegram alert at 3 consecutive failures → recovery alert; `health_check.py --monitor` flag.
-**Why:** monitor is first stage; silent failure kills entire pipeline — errors currently only in logs.
-**Scope:**
-- [ ] `services/job-monitor/monitor.py` — `_feed_health` counters, alert on threshold, reset on success
-- [ ] `scripts/health_check.py` — `--monitor`: read state file, exit 1 on stale/failed feeds
-
 ### Tracker: editable salary — remaining wiring
 **What:** API (`PATCH /salary`) + Flutter `SalaryDisplay` done. Remaining: `tracker.html` inline click-to-edit field; auto-fill `p2.salary` → `vacancies.salary` at Phase 2 completion (`tools/cv_analyze.py`).
 
