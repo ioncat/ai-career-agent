@@ -89,13 +89,13 @@
 
 ### 🟠 P1 — Audit and restructure `CLAUDE.md` — shrink it, move what doesn't belong (added 2026-09-07, for next session)
 **What:** `CLAUDE.md` is read at the start of every session (this project's own convention) — its token cost is paid every single time, whether or not that session's task needs most of it. It has grown substantially and reactively over many sessions (currently v1.24) without a step-back pass. User's explicit framing: "определить, чему там не место, и его ужать, для того, чтобы каждый раз его перечитывая, не тратить избыточное количество токенов."
-**Concrete candidate found already (don't treat as the only one — do the actual audit):** the `**Status:**` line's own text says "this line only tracks the version bump, not a running history" — but it has in practice accumulated a long, growing per-date prose history (2026-08-30 through 2026-09-07 and counting) that duplicates what `docs/delivery/CHANGELOG.md` already records in full detail. That's the file whose whole job is being that history — `CLAUDE.md`'s copy of it is pure token cost with no unique value.
+**Done 2026-10-08:** the `**Status:**` per-date history (5.5K characters, all of it already in `CHANGELOG.md`) was replaced by a short status with pointers; the stale `Current phase` line and the stale test counts were fixed (file 21.6K -> 16.3K characters).
 **Scope for next session:**
 1. Read the whole file fresh, section by section (Project Overview, Technology Stack, Project Structure, Session Memory, Project Memory, Global Rules, Documentation Rules, Common Commands, Critical Rules, the new Flutter header section added 2026-09-07) — judge each: is this something every session genuinely needs loaded, or reference material that could live elsewhere and be read on demand?
 2. Decide, per section, whether it stays / shrinks / moves (to `CHANGELOG.md`, a `docs/` file, or elsewhere) — this is a judgment call the user wants made deliberately, not a predetermined list from this note.
 3. Apply Rule 5 (task ordering by blockers) and the existing global `INTERACTION_RULES.md` pointer pattern already used for Global Rules — sections that are themselves just "how to work" conventions might belong there instead of duplicated per-project.
 4. `CLAUDE.md` itself is gitignored (local-only) — no git history to preserve carefully, but don't delete real information, relocate it.
-**Not started.**
+**Remaining:** the section-by-section audit (points 1-3), for example the long Project Structure tree.
 
 ### 🟡 P2 — Duplicate of an already-processed (not applied) vacancy: cheap requirements-check, and salary backfill (added 2026-09-23, narrowed 2026-10-05)
 **Covered since 2026-10-05:** when a duplicate or possible duplicate was already **applied** to, Analyze is refused (HTTP 409 `already_applied`; Flutter asks "Analyze anyway?", mass-action skips; `/analyze` stops and names the twin). The guard sits in `POST /api/vacancies/{id}/analyze`, so it covers every caller of that endpoint.
