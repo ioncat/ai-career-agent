@@ -35,6 +35,7 @@ from core.cover_worker import CoverWorker
 from core.rss_watcher import RSSWatcher
 from core.settings import ConfigError, load_settings
 from core.telegram import TelegramBot
+from core.vacancy_paths import repair_markdown_paths
 from db import database
 
 _LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
@@ -87,6 +88,10 @@ async def main() -> None:
     database.configure(settings.db_path)
     await database.init_db()
     await database.reset_stuck_statuses()  # must run before workers start
+    try:  # a hand-renamed inbox folder must not leave a dead markdown_path; never blocks startup
+        await repair_markdown_paths(settings.vacancies_path, Path(__file__).resolve().parent)
+    except Exception:
+        log.exception("DB recovery: markdown_path repair failed (non-fatal)")
 
     # Seed default user from TELEGRAM_CHAT_ID on first run; returns existing id on subsequent runs.
     default_user_id = await database.get_or_create_default_user(
