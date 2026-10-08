@@ -169,7 +169,7 @@ Phase 3.6: Signal Audit    [runs after save, verdict shown to user — CV body s
   → If ⚠️ only: present to user, they decide → any applied rewrite also gets the same re-lint, .md only
   → If clean: proceed
 
-  → Once the CV reaches a final, no-more-edits state (end of the whole Phase 3.5→3.6[→3.7] arc):
+  → Once the CV reaches a final, no-more-edits state (end of the Phase 3.5→3.6 arc; if Phase 3.7 runs afterwards and changes the CV, it re-renders once after its confirmed fixes):
     generate the PDF exactly once via http://localhost:8002/render → save PDF bytes → present the
     CV.md + CV.pdf together (Rule 8 — never paste full CV text in chat). See "PDF Generation —
     render once, at the end" below — do not render/send a PDF at any earlier point in this arc.
@@ -220,7 +220,7 @@ Resolved: N/N · Genuine gaps: [list]
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ✅ Phase 3+3.5 — CV сгенерирован
-[Name] · [language] · [N] правок · CV.md + CV.pdf
+[Name] · [language] · [N] правок · CV.md
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
@@ -321,6 +321,7 @@ Prompt file: `prompts/[skill_type]/phase3_7_editorial_audit.md` (full methodolog
 ### After the audit
 
 - **Quick Win findings** (includes JD-Echo Risk by default) → present to user → confirm → apply → re-save CV.md only. Once all Quick Win fixes for this audit round are applied and confirmed: regenerate the PDF once from the final CV.md (do not render on each individual fix).
+- **Cover audited after its PDF exists** → apply the confirmed fixes to Cover.md only, then re-render Cover.pdf once.
 - **Medium Investment / Major Rewrite** → present, let the user decide — do not auto-apply.
 - Append the full audit output to `JD_analysis.md` under `## Phase 3.7: Editorial Audit`.
 

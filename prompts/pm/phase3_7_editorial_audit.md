@@ -218,7 +218,7 @@ raw occurrence count as you would for a full-page CV.
 - **Quick Win findings** → present to user, confirm → apply → **re-run
   `core.cv_metrics.detect_mechanical_violations` (em-dash + banned-phrase list) and
   `detect_phrase_repetition` against the edited text** (an editorial rewrite can reintroduce either) → re-save the
-  audited document (CV.md + PDF, or Cover.md + PDF) — never overwrite silently.
+  audited document (CV.md or Cover.md only, no PDF while fixes are being applied; once they are confirmed, re-render the PDF once if one was already rendered for this document) — never overwrite silently.
 - **Medium Investment / Major Rewrite** → present, let the user decide — do not
   auto-apply.
 - **JD-Echo Risk findings** → treat as Quick Win by default (cheap, high-value

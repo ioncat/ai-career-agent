@@ -1,6 +1,6 @@
 # Phase 3.6: Signal Audit
 
-Run after CV is saved and PDF generated. Final quality gate before cover generation.
+Run after the CV is saved as CV.md (the PDF is rendered once, at the end of the review arc, not before). Final quality gate before cover generation.
 
 ---
 
@@ -67,7 +67,7 @@ If no issues:
 
 ## After audit
 
-- **🗑️ found** → present to user, confirm, remove from CV, re-save CV.md + PDF, **then re-run
+- **🗑️ found** → present to user, confirm, remove from CV, re-save CV.md only (no PDF), **then re-run
   the mechanical lint** (`core.cv_metrics.detect_mechanical_violations` — em-dash + banned-phrase
   list) **and the repetition check** (`detect_phrase_repetition`) against the re-saved text before
   considering it final. A removal can leave an awkward join or duplicate phrasing behind.
