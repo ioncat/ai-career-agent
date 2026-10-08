@@ -447,11 +447,6 @@ No dual-availability state — the button's visibility is a direct, deterministi
 - [ ] **VScore → VacScore rename** — везде: prompts, SKILL.md, web/reader.py, tracker.html, Flutter
 - [ ] **RSSWatcher → BackgroundWorker rename** — `core/rss_watcher.py` → `core/background_worker.py`; misleading name (added 2026-07-06)
 
-### Docs — Mirror 2026-07-12 prompt changes to generic/ + CLAUDE.md bump (out of scope since 2026-10-07: `prompts/generic/` is frozen)
-**What:** changes landed in `prompts/pm/` only. Mirror to `prompts/generic/`: phase1 JD Language detection (§1.0 + header field), phase2 Signal Coverage Table, phase3 Rule 24, create `phase3_6_signal_audit.md`. CLAUDE.md: 1.19 → 1.20 + status.
-
----
-
 ## 🐛 Bugs
 
 ### Text selection on the vacancy detail screen still doesn't drag-select across paragraphs, despite a `SelectionArea` fix (found + attempted-fixed 2026-09-21, low priority — deprioritized by user)
