@@ -90,6 +90,6 @@ A one-line verdict, then the findings, blockers first:
 
 Report all blockers and at most 15 remarks and minors (state how many more there are). End with: what was checked and what was **not** checked.
 
-## Known open item (not a new finding)
+## Known open items (not new findings)
 
-`prompts/pm/phase4_cover.md`: the Ukrainian example with a third-person relative clause conflicts with the cover rule (deferred, low priority; see BACKLOG "Ukrainian-output polish"). It does not block a merge while its baseline count stays at 1: `grep -rnE 'який працює|яка працює' prompts | wc -l` gave 1 on 2026-10-07. A higher count means it spread and is an introduced finding.
+None at the moment. Add one here, with a baseline count that is checked mechanically, when a deferred finding is accepted.

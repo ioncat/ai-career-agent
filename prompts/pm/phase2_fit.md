@@ -144,6 +144,7 @@ Output this block exactly as shown, filling in the placeholders.
 - -2.0 for each hard blocker (missing must-have)
 - -1.0 for archetype mismatch (JD wants Founder Proxy, candidate CV frames as Executor, or reverse)
 - Cap at 9.5 — no perfect scores
+- **Count each piece of evidence once.** One experience, project or result earns the +2.0 or +1.0 for ONE major requirement: the one where it earns the most points. When the same evidence also appears under another requirement, that requirement keeps its status in the Fit Breakdown but adds nothing to the score (a -1.5 pet-project deduction also applies once per piece of evidence), unless the profile holds a different experience, project or result for it. This concerns the score only; the Signal Coverage Table may map one fact to several signals.
 
 **Multi-track JDs** — if Phase 1 section 1.0.6 lists `Candidate Profile Tracks` (not "none"):
 1. Pick the ONE track the candidate matches best, before building anything below.

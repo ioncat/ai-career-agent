@@ -35,6 +35,7 @@ PM_PROFILE_CONTRACT: dict[str, tuple[str, str]] = {
     "CV cutoff year": (r"^#{2,3} CV cutoff year\b", "cutoff"),
     "AI Tooling Paragraph": (r"^#{2,3} AI Tooling Paragraph\b", "AI Tooling Paragraph"),
     "Vacancy Preferences": (r"^#{2,3} Vacancy Preferences\b", "Vacancy Preferences"),
+    "Critical Blockers": (r"^#{2,3} Critical Blockers\b", "Critical Blockers"),
 }
 
 
@@ -96,6 +97,7 @@ def test_checker_flags_a_missing_section():
             "CV cutoff year": "### CV cutoff year",
             "AI Tooling Paragraph": "### AI Tooling Paragraph",
             "Vacancy Preferences": "### Vacancy Preferences",
+            "Critical Blockers": "### Critical Blockers",
         }.values()
     )
     assert missing_sections(full) == []

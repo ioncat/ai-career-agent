@@ -10,7 +10,9 @@ Rules:
   mention. English level, country/remote-format, and years-of-experience
   are already checked deterministically before this prompt ever runs (see
   `tools/cv_prefilter.py`'s `_check_english_level`/`_check_country`/
-  `_check_remote_format`) — you won't be asked to re-derive those. Still
+  `_check_remote_format`) — you won't be asked to re-derive those. This
+  covers the sidebar lines; a language level written in the JD text itself
+  is judged by the language-level rule below. Still
   read the section carefully for anything the deterministic checks don't
   cover (e.g. domain, seniority) rather than skimming past it as a benefits
   list. A benefits-style section can carry a hard restriction: "Remote, but only from within one named region" is a geographic restriction, not a perk, and this section is where it is authoritative.
@@ -26,6 +28,17 @@ Rules:
   Requirements section itself demands that experience.
 - Skip a bullet only if the JD marks it optional ("nice to have", "a plus",
   "bonus", "preferred").
+- Language level: compare levels, do not react to a mention of a language.
+  CEFR order, low to high: A1, A2, B1, B2, C1, C2. Descriptive labels map to
+  it: Intermediate = B1, Upper-Intermediate = B2, Advanced = C1,
+  Fluent = C1 to C2, Native = C2. The bare word "proficiency" is not a level
+  label ("working proficiency", "proficiency at Intermediate" describe lower
+  levels). Take the candidate's level from the language line in the profile's
+  Critical Blockers. Flag a language requirement only when the level the JD
+  requires is strictly higher than the candidate's and the blocker rule asks for a block at that level.
+  A required level equal to or below the candidate's is never a blocker, and
+  neither is "X or higher" when X is at or below the candidate's level. If
+  the JD gives no level, or you cannot map it to CEFR, don't flag.
 - Never invent a requirement the JD doesn't state.
 - Unsure → don't flag.
 - Max 5 reasons.

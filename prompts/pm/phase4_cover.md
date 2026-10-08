@@ -107,7 +107,7 @@ The CV already contains all evidence. The cover must NOT repeat or reference spe
 
 ❌ Wrong: `"Product Owner з N+ роками досвіду у [домені]..."` — this describes someone, it is not the candidate speaking.
 
-✅ Right: `"Я — Product Owner, який працює з..."` / `"Я Product Manager з досвідом..."` / `"Займаюсь B2B-платформами, де..."` — told from the narrator's (candidate's) perspective.
+✅ Right: `"Я Product Manager з досвідом..."` / `"Займаюсь B2B-платформами, де..."` — told from the narrator's (candidate's) perspective.
 
 **English opener pattern — always self-intro first, name + role, before any pain/category elaboration, regardless of greeting formality:**
 ```
