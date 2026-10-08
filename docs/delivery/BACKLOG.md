@@ -174,7 +174,7 @@
 - Djinni: the requirements sidebar scrape already exists (`requirements_selector: "aside .card.card-body"`, `services/parser/config.py`) — the "Опубліковано ..." text sits nearby in the DOM but is confirmed NOT inside that selector (not present in scraped `## Vacancy Requirements` block for #1228). Needs a fresh look at raw HTML to find the right selector, then parse Ukrainian month-name dates (no year in the string — assume current year, roll back to prior year if the parsed date would be in the future).
 - Thread through: `services/parser/app.py` `_parse_html()` return tuple + `ParsedDocument` contract (`contracts/parsed_document.py`) + `adapters/parser_adapter.py` + `tools/cv_fetch_jd.py` → `insert_vacancy(published_at=...)`.
 - DOU not investigated — separate site config, may or may not expose the same data.
-- Cheap interim option (not chosen yet): relabel `_PostedChip` to "Added"/"Загружено" for honesty until real scraping lands, so the UI stops implying a platform date it doesn't have.
+- UI interim done 2026-10-08 (CHANGELOG): `_PostedChip` reads "Added" when `published_at` equals `created_at`, "Posted" otherwise, with a tooltip. Once the real platform date is scraped, these vacancies switch to "Posted" on their own.
 **Found via:** user's own suspicion, confirmed by reading `web/api.py`/`database.py`/`cv_fetch_jd.py` (no date capture in the manual path) and one live check of Djinni's actual page (`https://djinni.co/jobs/843985-product-manager`) showing "Опубліковано 20 серпня" vs our stored 23 серпня.
 
 ---

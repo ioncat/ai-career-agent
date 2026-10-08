@@ -36,3 +36,19 @@ String relativeTimeFromBackend(String iso) {
     return iso;
   }
 }
+
+/// True when [publishedAt] is really the ingestion time, not a job-board
+/// publish date: the manual paths (`/analyze`, direct URL, JD import) store
+/// `published_at` equal to `created_at`, while the RSS path stores the feed's
+/// own pubDate. A few seconds of slack covers two separate `now()` calls.
+bool isIngestionDate(String publishedAt, String? createdAt) {
+  if (createdAt == null || createdAt.isEmpty) return false;
+  try {
+    final diff = parseBackendUtc(
+      publishedAt,
+    ).difference(parseBackendUtc(createdAt)).abs();
+    return diff <= const Duration(seconds: 5);
+  } catch (_) {
+    return false;
+  }
+}

@@ -77,4 +77,33 @@ void main() {
       expect(result, isNot(contains('d ago')));
     });
   });
+
+  group('isIngestionDate', () {
+    test('published_at equal to created_at is the ingestion time', () {
+      expect(
+        isIngestionDate('2026-08-23T09:33:48Z', '2026-08-23 09:33:48'),
+        isTrue,
+      );
+    });
+
+    test('a few seconds apart still counts as ingestion time', () {
+      expect(
+        isIngestionDate('2026-08-23T09:33:50Z', '2026-08-23T09:33:48Z'),
+        isTrue,
+      );
+    });
+
+    test('an older feed date is a real publish date', () {
+      expect(
+        isIngestionDate('2026-08-20T07:00:00Z', '2026-08-23T09:33:48Z'),
+        isFalse,
+      );
+    });
+
+    test('missing or unparsable created_at falls back to a publish date', () {
+      expect(isIngestionDate('2026-08-23T09:33:48Z', null), isFalse);
+      expect(isIngestionDate('2026-08-23T09:33:48Z', ''), isFalse);
+      expect(isIngestionDate('2026-08-23T09:33:48Z', 'garbage'), isFalse);
+    });
+  });
 }

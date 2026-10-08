@@ -29,6 +29,9 @@ class VacancyListItem {
   final String? recommendationLabel;
   final String? category;
   final String? publishedAt;
+  // Ingestion time. For manually added vacancies publishedAt is set to this
+  // same moment (no board publish date is captured), see [isIngestionDate].
+  final String? createdAt;
   final String? updatedAt;
   final List<String> keyBarriers;
   final String? analysisError;
@@ -93,6 +96,7 @@ class VacancyListItem {
     this.recommendationLabel,
     this.category,
     this.publishedAt,
+    this.createdAt,
     this.updatedAt,
     this.keyBarriers = const [],
     this.analysisError,
@@ -133,6 +137,7 @@ class VacancyListItem {
       recommendationLabel: json['recommendation_label'] as String?,
       category: json['category'] as String?,
       publishedAt: json['published_at'] as String?,
+      createdAt: json['created_at'] as String?,
       updatedAt: json['updated_at'] as String?,
       keyBarriers: _parseStringList(json['key_barriers']),
       analysisError: json['analysis_error'] as String?,
@@ -172,6 +177,7 @@ class VacancyListItem {
         'recommendation_label': recommendationLabel,
         'category': category,
         'published_at': publishedAt,
+        'created_at': createdAt,
         'updated_at': updatedAt,
         'key_barriers': keyBarriers,
         'analysis_error': analysisError,

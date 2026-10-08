@@ -2893,7 +2893,11 @@ class _VacancyHero extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   if (publishedAt != null)
-                    _PostedChip(publishedAt: publishedAt, cs: cs),
+                    _PostedChip(
+                      publishedAt: publishedAt,
+                      createdAt: vacancy?.createdAt,
+                      cs: cs,
+                    ),
                   if (analyzedAt != null) ...[
                     if (publishedAt != null) const SizedBox(height: 4),
                     _AnalyzedChip(analyzedAt: analyzedAt!, cs: cs),
@@ -3325,34 +3329,51 @@ class _AppliedChip extends StatelessWidget {
 
 class _PostedChip extends StatelessWidget {
   final String publishedAt;
+  final String? createdAt;
   final ColorScheme cs;
 
-  const _PostedChip({required this.publishedAt, required this.cs});
+  const _PostedChip({
+    required this.publishedAt,
+    required this.createdAt,
+    required this.cs,
+  });
+
+  static const _postedHint =
+      'Posted: when the job board published this vacancy '
+      '(the date comes from the RSS feed).';
+  static const _addedHint =
+      'Added: when this vacancy was added to Career Agent. '
+      "For vacancies added by hand the job board's own publish date "
+      'is not captured, so it may have been online for longer.';
 
   String _relativeTime() => relativeTimeFromBackend(publishedAt);
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 28,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainer,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.schedule, size: 14, color: cs.onSurfaceVariant),
-          const SizedBox(width: 4),
-          Text(
-            'Posted ${_relativeTime()}',
-            style: Theme.of(
-              context,
-            ).textTheme.labelMedium?.copyWith(color: cs.onSurfaceVariant),
-          ),
-        ],
+    final added = isIngestionDate(publishedAt, createdAt);
+    return Tooltip(
+      message: added ? _addedHint : _postedHint,
+      child: Container(
+        height: 28,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: cs.surfaceContainer,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.schedule, size: 14, color: cs.onSurfaceVariant),
+            const SizedBox(width: 4),
+            Text(
+              '${added ? 'Added' : 'Posted'} ${_relativeTime()}',
+              style: Theme.of(
+                context,
+              ).textTheme.labelMedium?.copyWith(color: cs.onSurfaceVariant),
+            ),
+          ],
+        ),
       ),
     );
   }
