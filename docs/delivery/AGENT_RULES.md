@@ -6,7 +6,7 @@ Roles used below: **owner** (the human), **dispatcher** (the agent that hands ou
 
 ## Reports
 
-1. **Report to the owner first.** If everything is clean, the owner (or the agent on the owner's behalf) then forwards the report to the dispatcher. If there are problems, report only to the owner and wait.
+1. **Where a report goes.** A clean result goes to the dispatcher only, with the commit hash and the test numbers; the dispatcher checks it and gives the owner one line. A problem, a doubt or a decision that needs the owner goes to the owner directly, with a one-line copy to the dispatcher. Hard questions are discussed between the owner and the agent directly, not through the dispatcher.
 2. **One format, short:** the verdict first, then the problems, then the questions. Details go into a file and the report links to it. Never paste a full CV, cover or long report into chat.
 3. **Faithful status.** A failing test, a skipped step or an unchecked item is stated plainly, with the output. "Done" means done and verified.
 
