@@ -54,3 +54,48 @@ def test_headline_and_contacts_render_as_separate_paragraphs_after_fix():
     pdf_bytes = render_to_bytes(text)
     assert pdf_bytes[:4] == b"%PDF"
     assert len(pdf_bytes) > 0
+
+
+# ── CAREER_AGENT_FONTS: a relative value must not break the render ────────────
+
+@pytest.fixture()
+def reload_render():
+    """Reload render.py after the env var is set; reload again with the env restored."""
+    import importlib
+    import render
+
+    def _reload():
+        return importlib.reload(render)
+
+    yield _reload
+
+
+def test_relative_fonts_env_becomes_an_absolute_path(monkeypatch, reload_render):
+    """The documented command sets CAREER_AGENT_FONTS=fonts/; Path.as_uri() rejects a relative path."""
+    monkeypatch.setenv("CAREER_AGENT_FONTS", "fonts/")
+    try:
+        module = reload_render()
+        assert module.FONT_DIR.is_absolute()
+        assert module.FONT_DIR.as_uri().startswith("file:///")
+    finally:
+        monkeypatch.delenv("CAREER_AGENT_FONTS", raising=False)
+        reload_render()
+
+
+def test_default_fonts_dir_is_unchanged_without_the_env_var(monkeypatch, reload_render):
+    monkeypatch.delenv("CAREER_AGENT_FONTS", raising=False)
+    module = reload_render()
+    assert module.FONT_DIR == module._PROJECT_ROOT / "fonts"
+
+
+def test_render_works_with_a_relative_fonts_env(monkeypatch, reload_render):
+    """End to end: the exact command from SKILL.md produces a PDF instead of raising."""
+    monkeypatch.setenv("CAREER_AGENT_FONTS", "fonts/")
+    monkeypatch.chdir(Path(__file__).parent.parent)
+    try:
+        module = reload_render()
+        pdf = module.render_to_bytes("# Name\nHeadline\n\ncontacts\n\n---\n\n## SUMMARY\n\nText.\n")
+        assert pdf.startswith(b"%PDF")
+    finally:
+        monkeypatch.delenv("CAREER_AGENT_FONTS", raising=False)
+        reload_render()

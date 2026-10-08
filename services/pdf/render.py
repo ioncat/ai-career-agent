@@ -39,7 +39,9 @@ except ImportError:
     pass
 
 _env_fonts = os.environ.get("CAREER_AGENT_FONTS")
-FONT_DIR = Path(_env_fonts.rstrip("/\\")) if _env_fonts else _PROJECT_ROOT / "fonts"
+# A relative CAREER_AGENT_FONTS (e.g. "fonts/") is resolved against the working directory at
+# import: Path.as_uri() below raises ValueError for a relative path.
+FONT_DIR = Path(_env_fonts.rstrip("/\\")).resolve() if _env_fonts else _PROJECT_ROOT / "fonts"
 
 _TEMPLATES_DIR = _SCRIPT_DIR / "templates"
 _jinja_env = Environment(loader=FileSystemLoader(str(_TEMPLATES_DIR)), autoescape=False)

@@ -44,10 +44,6 @@
 - Phase 2's Quick Scan template (VScore line, Why apply, Why not apply) differs from the block SKILL.md puts at the top of `JD_analysis.md`. Documented as "moved; the DB keeps why_apply"; decide whether the file should carry them.
 **Related, bigger:** [profile-prompt-isolation-discovery-2026-10-04.md](../discovery/profile-prompt-isolation-discovery-2026-10-04.md) (separate P1 entry above).
 
-### 🟡 P2 — PDF render snippets use a relative fonts path and crash (found 2026-10-07, vacancy #1800, not started)
-**What:** `skill/SKILL.md` (PDF generation, ~line 475) and `.claude/commands/analyze.md` (`-pdf`, ~line 342) tell the agent to run `CAREER_AGENT_FONTS=fonts/ python -c "... render_to_bytes ..."`. With a relative value `services/pdf/render.py` fails at `FONT_DIR.as_uri()`: `ValueError: relative path can't be expressed as a file URI`. An absolute path works (used instead for #1800).
-**Fix:** resolve the font dir in `render.py` (`FONT_DIR = Path(...).resolve()`) and add a test; the snippets then stay valid as written. The skill and command files are under review on the prompts branch, so touch them only after that merges.
-
 ### 🟡 P2 — Functional specification: a "how it works" document, built from code and kept in sync (added 2026-10-05, not started)
 **What:** no document describes system behaviour (what counts as a duplicate, when "You already applied" shows, how companies, blockers, tags and statuses work); the rules live only in CHANGELOG entries and code. Build `docs/functional-spec.md` (or one short section per domain, ~12) from the code with a verification pass, and keep it true via a code-to-section map, a warn-only guard check and a `/spec-sync` command.
 **First step:** pilot on one section, "duplicates, companies, already applied", to judge format and cost before scaling.
