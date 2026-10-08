@@ -1,28 +1,14 @@
 import 'package:flutter/material.dart';
 
-/// Shows an error SnackBar that stays on screen until the user closes it
-/// themselves (or it's replaced by another SnackBar) — never auto-dismisses
-/// after a few seconds.
+import 'toast.dart';
+
+/// Shows an error toast that stays on screen until the user closes it —
+/// never auto-dismisses after a few seconds.
 ///
 /// Confirmed 2026-09-08 (vacancy #1504, "Check blockers" OAuth failure): the
 /// default SnackBar duration made real failure reasons disappear before the
 /// user could read them, especially on longer backend error messages.
+/// Since 2026-10-08 it is a top toast (`toast.dart`), not a bottom SnackBar.
 void showErrorSnackBar(BuildContext context, String message) {
-  ScaffoldMessenger.of(context)
-    ..hideCurrentSnackBar()
-    ..showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Theme.of(context).colorScheme.error,
-        duration: const Duration(days: 1),
-        behavior: SnackBarBehavior.floating,
-        action: SnackBarAction(
-          label: 'Закрыть',
-          textColor: Theme.of(context).colorScheme.onError,
-          onPressed: () {
-            ScaffoldMessenger.of(context).hideCurrentSnackBar();
-          },
-        ),
-      ),
-    );
+  showToast(context, message, kind: ToastKind.error);
 }

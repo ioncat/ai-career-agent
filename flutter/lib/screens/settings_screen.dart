@@ -4,6 +4,7 @@ import '../providers/config_provider.dart';
 import '../providers/settings_provider.dart';
 import '../widgets/phase_llm_config_tile.dart';
 import '../utils/error_snackbar.dart';
+import '../utils/toast.dart';
 // RemoteConfig used by _ModelDropdown
 
 /// Runs a config_provider patch (model/effort) and surfaces the result.
@@ -15,9 +16,7 @@ Future<void> _patchConfigAndReport(BuildContext context, Future<void> Function()
     await patch();
   } on ConfigDriftException catch (e) {
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$e — settings refreshed'), backgroundColor: Colors.orange.shade700),
-      );
+      showToast(context, '$e — settings refreshed', kind: ToastKind.warning);
     }
   } catch (e) {
     if (context.mounted) {
@@ -468,9 +467,7 @@ class _RefreshModelsButtonState extends ConsumerState<_RefreshModelsButton> {
     try {
       await ref.read(remoteConfigProvider.notifier).refreshModels();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Model list refreshed'), duration: Duration(seconds: 2)),
-        );
+        showToast(context, 'Model list refreshed');
       }
     } catch (e) {
       if (mounted) {

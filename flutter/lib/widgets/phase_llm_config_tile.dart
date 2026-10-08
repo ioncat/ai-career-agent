@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/phase_config_provider.dart';
 import '../utils/error_snackbar.dart';
+import '../utils/toast.dart';
 
 /// Runs a phase config_provider patch and surfaces drift/failure to the user.
 /// Same contract as settings_screen.dart's _patchConfigAndReport.
@@ -15,9 +16,7 @@ Future<void> _patchPhaseAndReport(BuildContext context, Future<void> Function() 
     await patch();
   } on ConfigDriftException catch (e) {
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$e — settings refreshed'), backgroundColor: Colors.orange.shade700),
-      );
+      showToast(context, '$e — settings refreshed', kind: ToastKind.warning);
     }
   } catch (e) {
     if (context.mounted) {

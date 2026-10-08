@@ -17,6 +17,7 @@ import '../repositories/vacancy_repository.dart';
 import '../providers/vacancy_cv_provider.dart';
 import '../utils/backend_time.dart';
 import '../utils/salary_kind.dart';
+import '../utils/toast.dart';
 import '../utils/analyze_guard.dart';
 import '../utils/error_snackbar.dart';
 
@@ -70,11 +71,7 @@ class _VacancyIdLine extends StatelessWidget {
     // request) — the id is pasted elsewhere as a bare number (search boxes,
     // scripts, chat), where the "#" would just have to be stripped again.
     Clipboard.setData(ClipboardData(text: '$vacancyId'));
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(content: Text('ID copied'), duration: Duration(seconds: 2)),
-      );
+    showToast(context, 'ID copied');
   }
 
   @override
@@ -307,12 +304,7 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
       if (!queued) return;
       if (mounted) {
         ref.read(vacancyListProvider.notifier).refresh();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Analysis queued'),
-            duration: Duration(seconds: 2),
-          ),
-        );
+        showToast(context, 'Analysis queued');
       }
     } catch (e) {
       if (mounted) {
@@ -356,9 +348,7 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
           final msg = blocked
               ? 'Possible blocker found — see below'
               : 'Checked — no blockers found';
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(msg), duration: const Duration(seconds: 3)),
-          );
+          showToast(context, msg);
         }
       }
     } catch (e) {
@@ -398,8 +388,10 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                     ? 'Re-fetched — content unchanged'
                     : 'Re-fetched — updated: $changed');
         }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(msg), backgroundColor: ok ? null : Colors.red),
+        showToast(
+          context,
+          msg,
+          kind: ok ? ToastKind.info : ToastKind.error,
         );
       }
     } catch (e) {
@@ -594,12 +586,7 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
       await _repo.restore(widget.vacancyId);
       if (mounted) {
         ref.read(vacancyListProvider.notifier).refresh();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Moved to inbox'),
-            duration: Duration(seconds: 2),
-          ),
-        );
+        showToast(context, 'Moved to inbox', kind: ToastKind.notice);
       }
     } catch (e) {
       if (mounted) {
@@ -1053,12 +1040,7 @@ class _AnalysisErrorViewState extends ConsumerState<_AnalysisErrorView> {
       await _repo.analyze(widget.vacancyId);
       if (mounted) {
         ref.read(vacancyListProvider.notifier).refresh();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Reset & queued for analysis'),
-            duration: Duration(seconds: 2),
-          ),
-        );
+        showToast(context, 'Reset & queued for analysis');
       }
     } catch (e) {
       if (mounted) {
@@ -2199,11 +2181,10 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
       await _repo.generateCv(widget.vacancyId, language: language);
       if (mounted) {
         ref.read(vacancyListProvider.notifier).refresh();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('CV generation queued'),
-            duration: Duration(seconds: 2),
-          ),
+        _showRunQueuedToast(
+          'CV generation queued',
+          'Generating CV for #${widget.vacancyId}. It is in Inbox while '
+              'running and moves to Processed when done.',
         );
       }
     } catch (e) {
@@ -2228,11 +2209,10 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
       if (!queued) return;
       if (mounted) {
         ref.read(vacancyListProvider.notifier).refresh();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Analysis queued'),
-            duration: Duration(seconds: 2),
-          ),
+        _showRunQueuedToast(
+          'Analysis queued',
+          'Re-analyzing #${widget.vacancyId}. It is in Inbox while running '
+              'and returns to Analyzed when done.',
         );
       }
     } catch (e) {
@@ -2244,6 +2224,20 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
     }
   }
 
+  /// A run moves the vacancy to Inbox until it finishes (core/vacancy_stage.py
+  /// maps in-progress statuses there). Say so, unless it stays put anyway:
+  /// Applied and Archive win over the run's status. No "Show in Inbox"
+  /// action: the detail panel keeps the vacancy open during the run, so
+  /// jumping to Inbox adds nothing (owner, 2026-10-08).
+  void _showRunQueuedToast(String plain, String moved) {
+    final staysPut = _applied || widget.status == 'declined';
+    if (staysPut) {
+      showToast(context, plain);
+      return;
+    }
+    showToast(context, moved, kind: ToastKind.notice);
+  }
+
   Future<void> _resetAndRetry() async {
     setState(() => _loadingReset = true);
     try {
@@ -2252,12 +2246,7 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
       if (mounted) {
         ref.read(vacancyListProvider.notifier).refresh();
         ref.invalidate(vacancyDetailProvider(widget.vacancyId));
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Reset & queued for analysis'),
-            duration: Duration(seconds: 2),
-          ),
-        );
+        showToast(context, 'Reset & queued for analysis');
       }
     } catch (e) {
       if (mounted) {
@@ -2274,12 +2263,7 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
       await _repo.generateCover(widget.vacancyId);
       if (mounted) {
         ref.read(vacancyListProvider.notifier).refresh();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Cover generation queued'),
-            duration: Duration(seconds: 2),
-          ),
-        );
+        showToast(context, 'Cover generation queued');
       }
     } catch (e) {
       if (mounted) {
@@ -2291,18 +2275,16 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
   }
 
   Future<void> _downloadPdf(String type) async {
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.showSnackBar(
-      const SnackBar(
-        content: Text('Preparing PDF...'),
-        duration: Duration(minutes: 1),
-      ),
+    final toaster = Toaster.of(context);
+    final preparing = toaster.show(
+      'Preparing PDF...',
+      duration: const Duration(minutes: 1),
     );
     try {
       final bytes = type == 'cv'
           ? await _repo.getCvPdfBytes(widget.vacancyId)
           : await _repo.getCoverPdfBytes(widget.vacancyId);
-      messenger.hideCurrentSnackBar();
+      preparing.dismiss();
       if (!mounted) return;
       final label = type == 'cv' ? 'CV' : 'Cover Letter';
       final fileName =
@@ -2317,16 +2299,11 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
       if (path != null) {
         await File(path).writeAsBytes(bytes, flush: true);
         if (mounted) {
-          messenger.showSnackBar(
-            SnackBar(
-              content: Text('Saved: $path'),
-              duration: const Duration(seconds: 3),
-            ),
-          );
+          toaster.show('Saved: $path');
         }
       }
     } catch (e) {
-      messenger.hideCurrentSnackBar();
+      preparing.dismiss();
       if (mounted) {
         showErrorSnackBar(context, 'PDF error: $e');
       }
@@ -2354,12 +2331,7 @@ class _ActionBarState extends ConsumerState<_ActionBar> {
       await _repo.restore(widget.vacancyId);
       if (mounted) {
         ref.read(vacancyListProvider.notifier).refresh();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Moved to inbox'),
-            duration: Duration(seconds: 2),
-          ),
-        );
+        showToast(context, 'Moved to inbox', kind: ToastKind.notice);
       }
     } catch (e) {
       if (mounted) {

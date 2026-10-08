@@ -7,6 +7,7 @@ import '../providers/settings_provider.dart';
 import '../providers/vacancy_list_provider.dart';
 import '../repositories/vacancy_repository.dart';
 import '../utils/backend_time.dart';
+import '../utils/toast.dart';
 import 'fit_score_chip.dart';
 import 'vac_score_badge.dart';
 import 'source_badge.dart';
@@ -162,14 +163,7 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
                         behavior: HitTestBehavior.opaque,
                         onTap: () {
                           Clipboard.setData(ClipboardData(text: '${v.id}'));
-                          ScaffoldMessenger.maybeOf(context)
-                            ?..hideCurrentSnackBar()
-                            ..showSnackBar(
-                              SnackBar(
-                                content: Text('Copied ${v.id}'),
-                                duration: const Duration(seconds: 1),
-                              ),
-                            );
+                          showToast(context, 'Copied ${v.id}');
                         },
                         child: Text(
                           '#${v.id}',

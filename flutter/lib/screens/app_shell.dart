@@ -17,6 +17,7 @@ import '../widgets/polling_progress_bar.dart';
 import '../widgets/processing_wrapper.dart' show SnakePainter;
 import '../widgets/status_line.dart';
 import '../utils/error_snackbar.dart';
+import '../utils/toast.dart';
 import 'vacancy_inbox_screen.dart';
 import 'analytics_screen.dart';
 import 'settings_screen.dart';
@@ -75,7 +76,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     final repo = VacancyRepository(baseUrl: settings.apiUrl);
 
     if (!mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
+    final toaster = Toaster.of(context);
     try {
       final (:vacancyId, :title) = await repo.importJd(
         content: content,
@@ -84,10 +85,10 @@ class _AppShellState extends ConsumerState<AppShell> {
       );
       ref.read(vacancyListProvider.notifier).refresh();
       if (!mounted) return;
-      messenger.showSnackBar(SnackBar(
-        content: Text('Imported: $title (#$vacancyId)'),
-        duration: const Duration(seconds: 5),
-      ));
+      toaster.show(
+        'Imported: $title (#$vacancyId)',
+        kind: ToastKind.notice,
+      );
     } catch (e) {
       if (!mounted) return;
       showErrorSnackBar(context, 'Import failed: $e');
@@ -144,7 +145,7 @@ class _AppShellState extends ConsumerState<AppShell> {
         // OS-level desktop notification
         NotificationService.showPipelineEvent(n);
 
-        // In-app SnackBar (non-blocking). Failures stay on screen until the
+        // In-app toast (non-blocking). Failures stay on screen until the
         // user closes them (showErrorSnackBar) — a background pipeline
         // failure is exactly the kind of thing a brief auto-dismiss hides.
         if (context.mounted) {
@@ -152,15 +153,7 @@ class _AppShellState extends ConsumerState<AppShell> {
           if (n.isFailure) {
             showErrorSnackBar(context, label);
           } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(label, style: const TextStyle(fontSize: 13)),
-                backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.9),
-                duration: const Duration(seconds: 4),
-                behavior: SnackBarBehavior.floating,
-                margin: const EdgeInsets.all(16),
-              ),
-            );
+            showToast(context, label, kind: ToastKind.notice);
           }
         }
       }

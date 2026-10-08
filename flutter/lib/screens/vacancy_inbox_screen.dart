@@ -7,8 +7,10 @@ import '../providers/read_vacancies_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/vacancy_list_provider.dart';
 import '../repositories/vacancy_repository.dart';
+import '../utils/active_status.dart';
 import '../utils/backend_time.dart';
 import '../utils/error_snackbar.dart';
+import '../utils/toast.dart';
 import '../widgets/processing_wrapper.dart';
 import '../widgets/vacancy_card.dart';
 import 'vacancy_detail_screen.dart';
@@ -140,15 +142,12 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
         ? ''
         : ', ${skippedApplied.length} skipped (already applied: '
             '${skippedApplied.values.toSet().map((t) => '#$t').join(', ')})';
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          failed == 0
-              ? '$label: $succeeded/${targetIds.length} done$skippedNote'
-              : '$label: $succeeded/${targetIds.length} done, $failed failed$skippedNote',
-        ),
-        backgroundColor: failed == 0 ? null : Colors.orange,
-      ),
+    showToast(
+      context,
+      failed == 0
+          ? '$label: $succeeded/${targetIds.length} done$skippedNote'
+          : '$label: $succeeded/${targetIds.length} done, $failed failed$skippedNote',
+      kind: failed == 0 ? ToastKind.info : ToastKind.warning,
     );
   }
 
@@ -442,12 +441,26 @@ class _VacancyInboxScreenState extends ConsumerState<VacancyInboxScreen> {
 
     // Clear selection if selected vacancy no longer in this folder or filtered out
     // Skip cleanup during cross-folder navigation (badge → original in Archive, etc.)
+    // and while a run moves it out temporarily (re-analysis, CV generation):
+    // the panel keeps showing it, synced from the full list.
     if (!_crossFolderNav &&
         _selected != null &&
         !filtered.any((v) => v.id == _selected!.id)) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() => _selected = null);
-      });
+      final fresh = listState?.vacancies
+          .where((v) => v.id == _selected!.id)
+          .firstOrNull;
+      if (keepSelectionOutsideFolder(fresh?.status)) {
+        if (fresh!.status != _selected!.status ||
+            fresh.updatedAt != _selected!.updatedAt) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) setState(() => _selected = fresh);
+          });
+        }
+      } else {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() => _selected = null);
+        });
+      }
     }
 
     final cs = Theme.of(context).colorScheme;
