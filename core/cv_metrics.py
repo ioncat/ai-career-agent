@@ -255,8 +255,8 @@ def detect_phrase_repetition(
 
 # Words that combine into a title/role phrase (e.g. "Product Manager", "Senior
 # Product Owner") and therefore legitimately overlap between CV and JD by
-# design — the CV headline is REQUIRED to track the JD's own title term
-# (phase3_cv_draft.md's headline rule). Local to detect_jd_echo only — do NOT
+# design — the CV headline may legitimately echo the JD's own title term (when
+# the profile's title rules say the headline follows the vacancy). Local to detect_jd_echo only — do NOT
 # merge into _STOPWORDS, which other functions use for within-document
 # repetition where these words carry real signal.
 _ROLE_TITLE_WORDS: frozenset[str] = frozenset(
@@ -292,7 +292,7 @@ def detect_jd_echo(cv_text: str, jd_text: str, min_n: int = 2, max_n: int = 6) -
     professional-vocabulary overlap):
       - phrases made entirely of stopwords or role/title words (e.g. "the
         product manager", "senior product owner" — expected to match, the
-        CV headline is required to track the JD's own title term)
+        CV headline may echo the JD's own title term)
       - phrases that are a known tool/technology name (see _TOOL_REGISTRY)
         — the CV SHOULD name a tool the JD asks for; that is ATS coverage,
         the opposite problem from JD-echo

@@ -48,6 +48,5 @@ Reasoning: measure first so every later step has a number. Rules and missing pha
 - Approve the role-axes design (step 8) and answer its four questions.
 - Answer the six open questions of `profile-schema-v0-2026-10-04.md` (step 5).
 - Choose the dialogue option for step 4 (structured cards in Flutter, chat, or hybrid); the sketch is in the local discovery note.
-- Role-title policy in Experience (default follows the vacancy; to become a user setting, see BACKLOG "User-configurable personal rules").
 - Next measurement: the same vacancy with the app's model at higher effort, or automatic correction of mechanical violations in the app first.
 - Read the two CVs of the #1693 measurement and say how many edits each would need (the 2-3 edits criterion).

@@ -349,7 +349,7 @@ Report result:
 
   ✅ JD_analysis.pdf
   ✅ John_CV.pdf
-  ❌ John_CV.pdf — ошибка: [message]
+  ❌ Jane_CV.pdf — ошибка: [message]
 ```
 
 Stop after report. Do not start pipeline.
