@@ -330,7 +330,7 @@ No dual-availability state — the button's visibility is a direct, deterministi
 - **Part 1 — surface what we already store:** Activity LLM Calls table falls back to `profile+prompt+user_tokens` (estimated input) when `input_tokens==0`; mark it visually as estimate (e.g. `~12.3k est`). Cheap, no backend change beyond API exposing the fields.
 - **Part 2 — get REAL CLI numbers:** `claude -p --output-format json` returns `usage` + `total_cost_usd` in the result JSON. `ClaudeCodeProvider._run` currently reads stream and discards it → parse the final result JSON, populate real `input_tokens/output_tokens/cost_usd`. Then CLI has exact numbers like the API path. Also estimate output (`len(text)//4`) as fallback if JSON parse fails.
 **Scope:**
-- [ ] `web/api.py` activity endpoint — include profile/prompt/user_tokens; flag estimate vs exact
+- [x] `web/api.py` activity endpoint — done 2026-10-08: each entry of `GET /api/vacancies/{id}/activity` now also carries `profile_tokens`, `prompt_tokens`, `user_tokens`, `input_tokens_estimate` (their sum) and `input_is_estimate` (true when exact `input_tokens` is 0 and an estimate exists). Output is not estimated yet (Part 2).
 - [ ] Flutter Activity table — show estimated input when exact==0, `~est` marker
 - [ ] `ClaudeCodeProvider._run` — `--output-format json`, parse usage → real tokens/cost
 - [ ] Output estimate fallback (`len//4`) when usage missing

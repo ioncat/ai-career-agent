@@ -1760,6 +1760,26 @@ async def api_vacancy(vacancy_id: int):
     return item
 
 
+def _with_input_estimate(entry: dict) -> dict:
+    """Add the input-token estimate fields to one llm_usage entry.
+
+    The `claude` CLI reports no usage, so claude_cli rows carry input_tokens=0 and
+    cost 0, but the provider stores a length-based input estimate (len // 4,
+    about +-10%) split into profile_tokens + prompt_tokens + user_tokens.
+    `input_tokens_estimate` is that sum; `input_is_estimate` is true when the exact
+    input_tokens is missing (0) and an estimate exists, so a client shows
+    `~<estimate>` instead of a dash. Output tokens are not estimated.
+    """
+    estimate = (
+        int(entry.get("profile_tokens") or 0)
+        + int(entry.get("prompt_tokens") or 0)
+        + int(entry.get("user_tokens") or 0)
+    )
+    entry["input_tokens_estimate"] = estimate
+    entry["input_is_estimate"] = int(entry.get("input_tokens") or 0) == 0 and estimate > 0
+    return entry
+
+
 @app.get("/api/vacancies/{vacancy_id}/activity")
 async def api_vacancy_activity(vacancy_id: int):
     """Return full activity log for a vacancy: pipeline_runs + llm_usage.
@@ -1777,7 +1797,7 @@ async def api_vacancy_activity(vacancy_id: int):
     return {
         "vacancy_id": vacancy_id,
         "pipeline_runs": [_normalize_dates(r) for r in runs],
-        "entries": [_normalize_dates(e) for e in entries],
+        "entries": [_with_input_estimate(_normalize_dates(e)) for e in entries],
     }
 
 

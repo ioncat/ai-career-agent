@@ -2262,3 +2262,54 @@ async def test_vacancy_patch_on_missing_vacancy_logs_nothing(client, caplog):
     resp = client.patch("/api/vacancies/9999/starred", json={"starred": True})
     assert resp.status_code == 404
     assert _patch_log_lines(caplog, "starred") == []
+
+
+# ── GET /api/vacancies/{id}/activity: input-token estimate ────────────────────
+
+async def _insert_usage(vid, provider, input_tokens, breakdown):
+    profile, prompt, user = breakdown
+    await database.insert_llm_usage(
+        phase="phase1", model="m", input_tokens=input_tokens, output_tokens=0,
+        cache_write_tokens=0, cache_read_tokens=0, cost_usd=0.0, vacancy_id=vid,
+        profile_tokens=profile, prompt_tokens=prompt, user_tokens=user, provider=provider,
+    )
+
+
+@pytest.mark.asyncio
+async def test_activity_claude_cli_row_carries_input_estimate(client):
+    """The CLI reports no usage (input_tokens 0), so the estimate sum is exposed and flagged."""
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/act-cli/")
+    await _insert_usage(vid, "claude_cli", 0, (1000, 200, 50))
+
+    entry = client.get(f"/api/vacancies/{vid}/activity").json()["entries"][0]
+
+    assert entry["provider"] == "claude_cli"
+    assert entry["input_tokens"] == 0
+    assert (entry["profile_tokens"], entry["prompt_tokens"], entry["user_tokens"]) == (1000, 200, 50)
+    assert entry["input_tokens_estimate"] == 1250
+    assert entry["input_is_estimate"] is True
+
+
+@pytest.mark.asyncio
+async def test_activity_exact_input_is_not_flagged_as_estimate(client):
+    """An API row with exact input_tokens keeps them; the estimate is still reported but not flagged."""
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/act-api/")
+    await _insert_usage(vid, "claude_api", 4200, (1000, 200, 50))
+
+    entry = client.get(f"/api/vacancies/{vid}/activity").json()["entries"][0]
+
+    assert entry["input_tokens"] == 4200
+    assert entry["input_tokens_estimate"] == 1250
+    assert entry["input_is_estimate"] is False
+
+
+@pytest.mark.asyncio
+async def test_activity_row_without_any_numbers_has_no_estimate(client):
+    """Nothing exact and nothing estimated: estimate 0, not flagged (the client shows a dash)."""
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/act-none/")
+    await _insert_usage(vid, "claude_cli", 0, (0, 0, 0))
+
+    entry = client.get(f"/api/vacancies/{vid}/activity").json()["entries"][0]
+
+    assert entry["input_tokens_estimate"] == 0
+    assert entry["input_is_estimate"] is False

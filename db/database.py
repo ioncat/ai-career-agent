@@ -1370,6 +1370,7 @@ async def get_vacancy_activity(vacancy_id: int) -> list[dict]:
             """
             SELECT phase, provider, model, thinking_effort,
                    elapsed_ms, input_tokens, output_tokens,
+                   profile_tokens, prompt_tokens, user_tokens,
                    cache_read_tokens, cost_usd, created_at
             FROM llm_usage
             WHERE vacancy_id = ?
