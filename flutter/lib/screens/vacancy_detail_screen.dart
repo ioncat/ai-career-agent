@@ -16,6 +16,7 @@ import '../providers/vacancy_list_provider.dart';
 import '../repositories/vacancy_repository.dart';
 import '../providers/vacancy_cv_provider.dart';
 import '../utils/backend_time.dart';
+import '../utils/salary_kind.dart';
 import '../utils/analyze_guard.dart';
 import '../utils/error_snackbar.dart';
 
@@ -3588,9 +3589,41 @@ class _SalaryInlineState extends State<_SalaryInline> {
       );
     }
 
-    final hasSalary = _committedSalary?.isNotEmpty == true;
+    final kind = salaryKind(_committedSalary);
+    final hasSalary = kind != SalaryKind.none;
+    final muted = cs.onSurfaceVariant.withValues(alpha: 0.45);
+    final (String tooltip, IconData icon, Color iconColor) = switch (kind) {
+      SalaryKind.real => (
+        'Salary from the vacancy. Click to edit.',
+        Icons.attach_money,
+        cs.primary,
+      ),
+      SalaryKind.estimate => (
+        "Estimate: Djinni hides the salary; this is the highest value of "
+            "Djinni's salary filter that still finds this vacancy. "
+            'Click to edit.',
+        Icons.attach_money,
+        cs.tertiary,
+      ),
+      SalaryKind.note => (
+        "Salary unknown: ${salaryDisplayText(_committedSalary!)}.\n"
+            'The automatic search will try again on the next re-fetch. '
+            'Click to enter it by hand.',
+        Icons.info_outline,
+        muted,
+      ),
+      SalaryKind.none => ('Click to add salary', Icons.attach_money, muted),
+    };
+    final text = switch (kind) {
+      SalaryKind.real || SalaryKind.estimate => salaryDisplayText(
+        _committedSalary!,
+      ),
+      SalaryKind.note => 'Salary unknown',
+      SalaryKind.none => 'Add salary…',
+    };
+    final plain = kind == SalaryKind.real || kind == SalaryKind.estimate;
     return Tooltip(
-      message: 'Click to edit salary',
+      message: tooltip,
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
         child: GestureDetector(
@@ -3598,24 +3631,37 @@ class _SalaryInlineState extends State<_SalaryInline> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                Icons.attach_money,
-                size: widget.fontSize + 2,
-                color: hasSalary
-                    ? cs.primary
-                    : cs.onSurfaceVariant.withValues(alpha: 0.45),
-              ),
+              Icon(icon, size: widget.fontSize + 2, color: iconColor),
               const SizedBox(width: 3),
               Text(
-                hasSalary ? _committedSalary! : 'Add salary…',
+                text,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: hasSalary
-                      ? cs.onSurfaceVariant
-                      : cs.onSurfaceVariant.withValues(alpha: 0.45),
-                  fontStyle: hasSalary ? FontStyle.normal : FontStyle.italic,
+                  color: plain ? cs.onSurfaceVariant : muted,
+                  fontStyle: plain ? FontStyle.normal : FontStyle.italic,
                   fontSize: widget.fontSize,
                 ),
               ),
+              if (kind == SalaryKind.estimate) ...[
+                const SizedBox(width: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 1,
+                  ),
+                  decoration: BoxDecoration(
+                    color: cs.tertiaryContainer.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    'est.',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: cs.tertiary,
+                      fontSize: widget.fontSize - 2,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
               if (hasSalary) ...[
                 const SizedBox(width: 4),
                 Icon(
