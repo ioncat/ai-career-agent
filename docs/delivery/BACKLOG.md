@@ -152,11 +152,6 @@
 
 ---
 
-### 🧊 Icebox — `agent.log` has zero PATCH-request logging (found 2026-08-11, investigating vacancy #597)
-**What:** none of the state-mutating `PATCH /api/vacancies/{id}/*` endpoints (applied, starred, salary, ...) log anything — made root-causing "what touched this row's `updated_at`" for #597 impossible via logs alone, had to reason from code paths only. Worth a one-line addition (log vacancy_id + endpoint on every state-mutating PATCH) next time `web/api.py` is touched. Not blocking anything currently.
-
----
-
 ### 🔴 P0 — `ClaudeCodeProvider` error message drops stdout, only surfaces stderr — real failure reason never reaches DB/UI (found 2026-08-10, vacancy #1073)
 **What:** `core/llm_client.py` ~lines 700-736 — `_read_stdout()` captures the CLI's stdout into `output_lines` (also written live to `logs/cli_debug.log`), `_read_stderr()` separately captures `stderr_lines`. On non-zero exit, the error-raising block only reads `stderr_lines`:
 ```python

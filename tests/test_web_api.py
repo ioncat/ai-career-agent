@@ -8,6 +8,7 @@ Run: python -m pytest tests/test_web_api.py -v
 """
 
 import datetime
+import logging
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -2203,3 +2204,61 @@ def test_extract_title_and_company_linkedin_edge_cases():
     assert _extract_title_and_company("# PM|Acme", "linkedin") == ("PM|Acme", "")
     # other sites are untouched
     assert _extract_title_and_company("# PM | Acme", "djinni") == ("PM | Acme", "")
+
+
+# ── PATCH /api/vacancies/{id}/* audit log ─────────────────────────────────────
+
+def _patch_log_lines(caplog, endpoint):
+    return [r.getMessage() for r in caplog.records if f"api/patch-{endpoint}:" in r.getMessage()]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("endpoint,body,expected_value", [
+    ("decline", None, "'declined'"),
+    ("restore", None, "'queued'"),
+    ("applied", {"applied": True}, "'True'"),
+    ("starred", {"starred": True}, "'True'"),
+    ("salary", {"salary": "$4500"}, "'$4500'"),
+    ("tags", {"tags": "deftech,ai"}, "'deftech,ai'"),
+])
+async def test_vacancy_patch_writes_one_log_line(client, caplog, endpoint, body, expected_value):
+    """Every state-mutating PATCH /api/vacancies/{id}/* logs endpoint, vacancy id and new value once."""
+    vid = await database.insert_vacancy(url=f"https://djinni.co/jobs/patchlog-{endpoint}/")
+    if endpoint == "restore":
+        await database.update_vacancy_status(vid, "declined")
+    caplog.set_level(logging.INFO, logger="web.api")
+
+    resp = client.patch(f"/api/vacancies/{vid}/{endpoint}", json=body) if body is not None         else client.patch(f"/api/vacancies/{vid}/{endpoint}")
+    assert resp.status_code == 200
+
+    lines = _patch_log_lines(caplog, endpoint)
+    assert len(lines) == 1
+    assert f"vacancy_id={vid}" in lines[0]
+    assert f"value={expected_value}" in lines[0]
+
+
+@pytest.mark.asyncio
+async def test_vacancy_patch_log_cuts_long_free_text(client, caplog):
+    """A pasted blob in salary/tags is cut in the log line (the DB keeps the full value)."""
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/patchlog-long/")
+    caplog.set_level(logging.INFO, logger="web.api")
+    blob = "x" * 500
+
+    resp = client.patch(f"/api/vacancies/{vid}/salary", json={"salary": blob})
+    assert resp.status_code == 200
+
+    lines = _patch_log_lines(caplog, "salary")
+    assert len(lines) == 1
+    assert blob not in lines[0]
+    assert "..." in lines[0]
+    assert (await database.get_vacancy_by_id(vid))["salary"] == blob
+
+
+@pytest.mark.asyncio
+async def test_vacancy_patch_on_missing_vacancy_logs_nothing(client, caplog):
+    """A 404 changes nothing, so it writes no audit line."""
+    caplog.set_level(logging.INFO, logger="web.api")
+
+    resp = client.patch("/api/vacancies/9999/starred", json={"starred": True})
+    assert resp.status_code == 404
+    assert _patch_log_lines(caplog, "starred") == []

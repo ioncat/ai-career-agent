@@ -1358,6 +1358,22 @@ async def api_vapid_public_key():
     return {"publicKey": key}
 
 
+_PATCH_LOG_VALUE_MAX = 80
+
+
+def _log_vacancy_patch(endpoint: str, vacancy_id: int, value) -> None:
+    """One audit line per state-mutating PATCH /api/vacancies/{id}/* call.
+
+    Written after the DB write succeeded. Free-text values (salary, tags) are
+    cut so a pasted blob cannot flood the log. Nothing secret passes through
+    these endpoints: only flags, status names, salary and tag text.
+    """
+    text = str(value)
+    if len(text) > _PATCH_LOG_VALUE_MAX:
+        text = text[:_PATCH_LOG_VALUE_MAX] + "..."
+    log.info("api/patch-%s: vacancy_id=%d value=%r", endpoint, vacancy_id, text)
+
+
 @app.patch("/api/vacancies/{vacancy_id}/decline")
 async def api_vacancy_decline(vacancy_id: int):
     """Flutter Decline button — moves vacancy to archive folder."""
@@ -1365,6 +1381,7 @@ async def api_vacancy_decline(vacancy_id: int):
     if row is None:
         raise HTTPException(status_code=404, detail="Vacancy not found")
     await database.update_vacancy_status(vacancy_id, "declined")
+    _log_vacancy_patch("decline", vacancy_id, "declined")
     return {"id": vacancy_id, "status": "declined"}
 
 
@@ -1386,9 +1403,11 @@ async def api_vacancy_restore(vacancy_id: int):
         raise HTTPException(status_code=404, detail="Vacancy not found")
     if not row["analysis_json"] and not row["markdown_path"]:
         await database.requeue_fetch(vacancy_id)
+        _log_vacancy_patch("restore", vacancy_id, "queued")
         return {"id": vacancy_id, "status": "queued"}
     restore_status = "analyzed" if row["analysis_json"] else "fetched"
     await database.update_vacancy_status(vacancy_id, restore_status)
+    _log_vacancy_patch("restore", vacancy_id, restore_status)
     return {"id": vacancy_id, "status": restore_status}
 
 
@@ -1773,6 +1792,7 @@ async def api_set_applied(vacancy_id: int, req: AppliedUpdate):
     if row is None:
         raise HTTPException(status_code=404, detail="Vacancy not found")
     await database.set_vacancy_applied(vacancy_id, req.applied)
+    _log_vacancy_patch("applied", vacancy_id, req.applied)
     return {"vacancy_id": vacancy_id, "applied": req.applied}
 
 
@@ -1787,6 +1807,7 @@ async def api_set_starred(vacancy_id: int, req: StarredUpdate):
     if row is None:
         raise HTTPException(status_code=404, detail="Vacancy not found")
     await database.set_vacancy_starred(vacancy_id, req.starred)
+    _log_vacancy_patch("starred", vacancy_id, req.starred)
     return {"vacancy_id": vacancy_id, "starred": req.starred}
 
 
@@ -1801,6 +1822,7 @@ async def api_set_salary(vacancy_id: int, req: SalaryUpdate):
     if row is None:
         raise HTTPException(status_code=404, detail="Vacancy not found")
     await database.set_vacancy_salary(vacancy_id, req.salary)
+    _log_vacancy_patch("salary", vacancy_id, req.salary)
     return {"vacancy_id": vacancy_id, "salary": req.salary}
 
 
@@ -1815,6 +1837,7 @@ async def api_set_tags(vacancy_id: int, req: TagsUpdate):
     if row is None:
         raise HTTPException(status_code=404, detail="Vacancy not found")
     await database.set_vacancy_tags(vacancy_id, req.tags)
+    _log_vacancy_patch("tags", vacancy_id, req.tags)
     return {"vacancy_id": vacancy_id, "tags": req.tags}
 
 
