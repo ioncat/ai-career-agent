@@ -17,6 +17,7 @@
 | 15 Docs | `docs/delivery/CHANGELOG.md` and `BACKLOG.md`, following `documentation-conventions.md` |
 | 16 UI | The Flutter desktop app; there is no browser preview, the owner confirms in the running app. Read the CLAUDE.md section "Vacancy Detail Header/Action-Bar" before touching the vacancy detail screen |
 | 18 Session log | `.claude/sessions/YYYY-MM-DD-short-description.md` (gitignored) |
+| 19 Tests and the live DB | `tests/conftest.py` has an autouse fixture that sets `DB_PATH` to a throwaway file for every test; a test that starts the app (TestClient) therefore cannot open `db/agent.db` |
 
 ## File ownership (rule 9)
 
