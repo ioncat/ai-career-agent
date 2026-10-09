@@ -17,7 +17,8 @@ Roles used below: **owner** (the human), **dispatcher** (the agent that hands ou
 
    | Part | Content |
    |---|---|
-   | Question | Task name and id, which agent asks |
+   | Question / Task | One of the two, never both: `Task: <name and backlog id>` when the message is about a backlog task, or `Question: <topic>` when it is a standalone question. Also which agent asks |
+   | Problem statement | The general description of the problem being solved, very short (one or two sentences): why this exists at all |
    | Context | Two or three lines: what is being done, where it stopped, what blocks it |
    | The question | One sentence |
    | Options | `[1] [2] [3]`, each with its consequence; the recommended one first, with the reason in one line |
