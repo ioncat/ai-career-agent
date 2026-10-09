@@ -20,7 +20,10 @@ def _adapter(url: str = "http://localhost:8002") -> CVAdapter:
     return CVAdapter(pdf_service_url=url)
 
 
-def _mock_response(status_code: int = 200, content: bytes = b"%PDF-1.4") -> MagicMock:
+VALID_PDF = b"%PDF-1.4\n" + b"0" * 400   # the adapter rejects a header-only response
+
+
+def _mock_response(status_code: int = 200, content: bytes = VALID_PDF) -> MagicMock:
     resp = MagicMock()
     resp.status_code = status_code
     resp.content = content
@@ -46,13 +49,13 @@ async def test_generate_pdf_returns_pdf_path(tmp_path):
     md.write_text("# CV\nContent.", encoding="utf-8")
     pdf = tmp_path / "CV.pdf"
 
-    ctx = _mock_client(_mock_response(200, b"%PDF-1.4 bytes"))
+    ctx = _mock_client(_mock_response(200, VALID_PDF))
     with patch("adapters.cv_adapter.httpx.AsyncClient", return_value=ctx):
         result = await _adapter().generate_pdf(md, pdf)
 
     assert result == pdf
     assert pdf.exists()
-    assert pdf.read_bytes() == b"%PDF-1.4 bytes"
+    assert pdf.read_bytes() == VALID_PDF
 
 
 @pytest.mark.asyncio
@@ -61,7 +64,7 @@ async def test_generate_pdf_default_output_path(tmp_path):
     md = tmp_path / "Name_CV.md"
     md.write_text("# CV", encoding="utf-8")
 
-    ctx = _mock_client(_mock_response(200, b"%PDF"))
+    ctx = _mock_client(_mock_response(200, VALID_PDF))
     with patch("adapters.cv_adapter.httpx.AsyncClient", return_value=ctx):
         result = await _adapter().generate_pdf(md)
 
@@ -75,7 +78,7 @@ async def test_generate_pdf_posts_markdown_text(tmp_path):
     md = tmp_path / "CV.md"
     md.write_text("# My CV\nGreat experience.", encoding="utf-8")
 
-    mock_resp = _mock_response(200, b"%PDF")
+    mock_resp = _mock_response(200, VALID_PDF)
     mock_client = AsyncMock()
     mock_client.post = AsyncMock(return_value=mock_resp)
     ctx = MagicMock()
@@ -180,3 +183,34 @@ def test_trailing_slash_stripped():
 def test_default_url_contains_port():
     adapter = CVAdapter()
     assert "8002" in adapter._url
+
+
+# ── generate_pdf - the response must be a real PDF, not just HTTP 200 ─────────
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("content", [
+    b"",                                     # empty body
+    b"%PDF-1.4",                             # header only: an empty render
+    b"<html>Internal Server Error</html>" + b"0" * 400,   # an error page served as 200
+])
+async def test_generate_pdf_rejects_a_200_that_is_not_a_real_pdf(tmp_path, content):
+    md = tmp_path / "CV.md"
+    md.write_text("# CV", encoding="utf-8")
+
+    ctx = _mock_client(_mock_response(200, content))
+    with patch("adapters.cv_adapter.httpx.AsyncClient", return_value=ctx):
+        with pytest.raises(CVAdapterError):
+            await _adapter().generate_pdf(md)
+
+    assert not md.with_suffix(".pdf").exists()      # nothing broken is left on disk
+
+
+@pytest.mark.asyncio
+async def test_generate_pdf_write_failure_is_an_adapter_error(tmp_path):
+    md = tmp_path / "CV.md"
+    md.write_text("# CV", encoding="utf-8")
+
+    ctx = _mock_client(_mock_response(200, VALID_PDF))
+    with patch("adapters.cv_adapter.httpx.AsyncClient", return_value=ctx):
+        with pytest.raises(CVAdapterError):
+            await _adapter().generate_pdf(md, tmp_path / "missing_dir" / "CV.pdf")

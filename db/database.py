@@ -684,15 +684,18 @@ async def update_vacancy_status(vacancy_id: int, status: str) -> None:
 
 # Status written on a successful run -> the kind of generation whose stored failure it ends.
 _SUCCESS_STATUS_KIND = {"cv_generated": "cv", "cover_generated": "cover"}
-GENERATION_KINDS = ("cv", "cover")
+GENERATION_KINDS = ("cv", "cover", "pdf")   # 'pdf' = the document exists, only its render failed
+PDF_TARGETS = ("cv", "cover")               # which document a 'pdf' failure is about
 GENERATION_FAILURE_REASON_MAX = 500
 
 
 def decode_generation_failure(raw: str | None) -> dict | None:
-    """Parse the stored `last_generation_failure` JSON into {kind, reason, at}.
+    """Parse the stored `last_generation_failure` JSON into {kind, target, reason, at}.
 
-    None for NULL, empty, unparsable or malformed values, so an old row or a bad
-    value never breaks an API response.
+    `target` is "cv" or "cover" for kind "pdf" (which document failed to render) and
+    None for kind "cv" / "cover". None for NULL, empty, unparsable or malformed values
+    (including kind "pdf" without a valid target), so an old row or a bad value never
+    breaks an API response.
     """
     if not raw:
         return None
@@ -702,11 +705,30 @@ def decode_generation_failure(raw: str | None) -> dict | None:
         return None
     if not isinstance(data, dict) or data.get("kind") not in GENERATION_KINDS:
         return None
+    target = data.get("target")
+    if data["kind"] == "pdf":
+        if target not in PDF_TARGETS:
+            return None
+    else:
+        target = None
     return {
         "kind": data["kind"],
+        "target": target,
         "reason": str(data.get("reason") or ""),
         "at": data.get("at"),
     }
+
+
+def _failure_payload(kind: str, reason: str, target: str | None = None) -> str:
+    return json.dumps(
+        {
+            "kind": kind,
+            "target": target,
+            "reason": (reason or "")[:GENERATION_FAILURE_REASON_MAX],
+            "at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+        },
+        ensure_ascii=False,
+    )
 
 
 async def fail_generation(vacancy_id: int, kind: str, reason: str, rollback_status: str) -> None:
@@ -717,24 +739,57 @@ async def fail_generation(vacancy_id: int, kind: str, reason: str, rollback_stat
     bumped), so a client polling with `since` gets both. declined_at is cleared like
     any non-declined status in update_vacancy_status.
     """
-    if kind not in GENERATION_KINDS:
+    if kind not in ("cv", "cover"):
         raise ValueError(f"unknown generation kind {kind!r}")
     log.info("DB: vacancy #%d %s generation failed -> status %s", vacancy_id, kind, rollback_status)
-    payload = json.dumps(
-        {
-            "kind": kind,
-            "reason": (reason or "")[:GENERATION_FAILURE_REASON_MAX],
-            "at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
-        },
-        ensure_ascii=False,
-    )
     async with get_db() as db:
         await db.execute(
             "UPDATE vacancies SET status = ?, last_generation_failure = ?, "
             "updated_at = datetime('now'), declined_at = NULL WHERE id = ?",
-            (rollback_status, payload, vacancy_id),
+            (rollback_status, _failure_payload(kind, reason), vacancy_id),
         )
         await db.commit()
+
+
+async def record_pdf_failure(vacancy_id: int, target: str, reason: str) -> None:
+    """Record that rendering the PDF of `target` ("cv" or "cover") failed.
+
+    Unlike fail_generation, the status is NOT touched: the CV or cover exists and is
+    usable, only its PDF is missing. The single failure slot is overwritten (the latest
+    failure wins); updated_at is bumped so a `since` poll returns the vacancy.
+    """
+    if target not in PDF_TARGETS:
+        raise ValueError(f"unknown PDF target {target!r}")
+    log.info("DB: vacancy #%d %s PDF render failed", vacancy_id, target)
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE vacancies SET last_generation_failure = ?, updated_at = datetime('now') WHERE id = ?",
+            (_failure_payload("pdf", reason, target), vacancy_id),
+        )
+        await db.commit()
+
+
+async def clear_pdf_failure(vacancy_id: int, target: str) -> bool:
+    """A PDF of `target` rendered successfully: end a stored PDF failure for that target.
+
+    Leaves any other stored failure (a CV / cover failure, or a PDF failure of the other
+    document) alone. Returns True when something was cleared; bumps updated_at then, so
+    a `since` poll sees the mark go.
+    """
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT last_generation_failure FROM vacancies WHERE id = ?", (vacancy_id,)
+        )
+        row = await cursor.fetchone()
+        stored = decode_generation_failure(row["last_generation_failure"]) if row else None
+        if not stored or stored["kind"] != "pdf" or stored["target"] != target:
+            return False
+        await db.execute(
+            "UPDATE vacancies SET last_generation_failure = NULL, updated_at = datetime('now') WHERE id = ?",
+            (vacancy_id,),
+        )
+        await db.commit()
+        return True
 
 
 async def set_analysis_error(vacancy_id: int, error: str | None) -> None:

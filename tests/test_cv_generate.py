@@ -113,6 +113,8 @@ def _mock_db(vacancy_row=None, run_ids: list[int] | None = None) -> MagicMock:
     db.update_pipeline_run = AsyncMock()
     db.update_vacancy_status = AsyncMock()
     db.insert_llm_usage = AsyncMock()
+    db.record_pdf_failure = AsyncMock()
+    db.clear_pdf_failure = AsyncMock()
     return db
 
 
@@ -618,3 +620,50 @@ async def test_generate_phase35_llm_error(tmp_path):
     # [Name]_CV.md must NOT be written
     assert not (jd_path.parent / "Oleksii_Bondarenko_CV.md").exists()
 
+
+
+# ── cv_generate - the PDF result is kept on the vacancy ───────────────────────
+
+@pytest.mark.asyncio
+async def test_pdf_failure_is_recorded_on_the_vacancy_and_the_cv_still_succeeds(tmp_path):
+    jd_path, _ = _write_vacancy_files(tmp_path)
+    llm = _make_llm(side_effect=[_PHASE3_DRAFT, _PHASE35_SAMPLE])
+    cv_adapter = AsyncMock(spec=CVAdapter)
+    cv_adapter.generate_pdf = AsyncMock(side_effect=CVAdapterError("pdf-service unreachable"))
+    ctx = _make_ctx(tmp_path, llm, cv_adapter)
+    mock_db = _mock_db(vacancy_row=_make_vacancy_row(jd_path))
+
+    with patch("tools.cv_generate.database", mock_db):
+        result = await cv_generate(ctx, 1)
+
+    assert "✅" in result
+    mock_db.record_pdf_failure.assert_awaited_once_with(1, "cv", "pdf-service unreachable")
+    mock_db.clear_pdf_failure.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_pdf_success_ends_an_earlier_pdf_failure(tmp_path):
+    jd_path, _ = _write_vacancy_files(tmp_path)
+    llm = _make_llm(side_effect=[_PHASE3_DRAFT, _PHASE35_SAMPLE])
+    ctx = _make_ctx(tmp_path, llm)
+    mock_db = _mock_db(vacancy_row=_make_vacancy_row(jd_path))
+
+    with patch("tools.cv_generate.database", mock_db):
+        await cv_generate(ctx, 1)
+
+    mock_db.clear_pdf_failure.assert_awaited_once_with(1, "cv")
+    mock_db.record_pdf_failure.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_a_bookkeeping_error_never_breaks_cv_generation(tmp_path):
+    jd_path, _ = _write_vacancy_files(tmp_path)
+    llm = _make_llm(side_effect=[_PHASE3_DRAFT, _PHASE35_SAMPLE])
+    ctx = _make_ctx(tmp_path, llm)
+    mock_db = _mock_db(vacancy_row=_make_vacancy_row(jd_path))
+    mock_db.clear_pdf_failure = AsyncMock(side_effect=RuntimeError("db locked"))
+
+    with patch("tools.cv_generate.database", mock_db):
+        result = await cv_generate(ctx, 1)
+
+    assert "✅" in result

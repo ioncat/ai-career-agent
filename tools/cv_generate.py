@@ -290,12 +290,16 @@ async def cv_generate(
 
     # ── Generate PDF (best-effort) ────────────────────────────────────────────
     pdf_msg = ""
+    pdf_error: str | None = None
     try:
         pdf_path = await ctx.deps.cv_adapter.generate_pdf(cv_md_path)
         pdf_msg = f"PDF: <code>{pdf_path}</code>\n"
     except (CVAdapterError, FileNotFoundError, Exception) as exc:
         log.warning("cv_generate: PDF generation failed: %s", exc)
         pdf_msg = "PDF: не удалось сгенерировать (проверь логи)\n"
+        pdf_error = str(exc).strip() or type(exc).__name__
+    # The CV exists either way; a failed render is kept on the vacancy until a render succeeds.
+    await _track_pdf_result(vacancy_id, pdf_error)
 
     # ── Build Telegram reply ──────────────────────────────────────────────────
     return (
@@ -308,6 +312,19 @@ async def cv_generate(
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
+async def _track_pdf_result(vacancy_id: int, error: str | None) -> None:
+    """Record a failed CV PDF render on the vacancy, or end an earlier one after a success.
+
+    Bookkeeping only: never raises, never changes the vacancy status or the tool result.
+    """
+    try:
+        if error is None:
+            await database.clear_pdf_failure(vacancy_id, "cv")
+        else:
+            await database.record_pdf_failure(vacancy_id, "cv", error)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("cv_generate: could not update the PDF failure mark for v#%d: %s", vacancy_id, exc)
 
 def _next_version_path(base_path: Path) -> Path:
     """Return base_path if it doesn't exist; else base_path with _v2/_v3/... suffix."""

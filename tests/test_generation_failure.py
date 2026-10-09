@@ -150,7 +150,8 @@ def test_decode_ignores_missing_or_malformed_values(raw):
 
 def test_decode_keeps_kind_reason_at():
     raw = json.dumps({"kind": "cover", "reason": "r", "at": "2026-10-09 10:00:00"})
-    assert database.decode_generation_failure(raw) == {"kind": "cover", "reason": "r", "at": "2026-10-09 10:00:00"}
+    assert database.decode_generation_failure(raw) == {
+        "kind": "cover", "target": None, "reason": "r", "at": "2026-10-09 10:00:00"}
 
 
 # ── the workers ───────────────────────────────────────────────────────────────
@@ -233,3 +234,84 @@ async def test_a_failed_retry_leaves_one_current_failure(db_path):
         await _worker(CVWorker)._execute(vid, "auto")
 
     assert (await _failure(vid))["reason"] == "second"
+
+
+# ── kind "pdf": the document exists, only its render failed ───────────────────
+
+@pytest.mark.asyncio
+async def test_pdf_failure_is_recorded_without_touching_the_status(db_path):
+    vid = await _vacancy(20, status="cv_generated")
+
+    await database.record_pdf_failure(vid, "cv", "pdf-service unavailable")
+
+    row = await database.get_vacancy_by_id(vid)
+    assert row["status"] == "cv_generated"
+    failure = database.decode_generation_failure(row["last_generation_failure"])
+    assert (failure["kind"], failure["target"], failure["reason"]) == ("pdf", "cv", "pdf-service unavailable")
+
+
+@pytest.mark.asyncio
+async def test_pdf_failure_rejects_an_unknown_target_and_fail_generation_rejects_pdf(db_path):
+    vid = await _vacancy(21, status="cv_generated")
+
+    with pytest.raises(ValueError):
+        await database.record_pdf_failure(vid, "letter", "boom")
+    with pytest.raises(ValueError):
+        await database.fail_generation(vid, "pdf", "boom", "cv_generated")   # pdf never rolls back a status
+
+
+@pytest.mark.asyncio
+async def test_pdf_failure_is_picked_up_by_the_since_poll(db_path):
+    vid = await _vacancy(22, status="cv_generated")
+    con = sqlite3.connect(db_path)
+    con.execute("UPDATE vacancies SET updated_at = '2026-01-01 00:00:00' WHERE id = ?", (vid,))
+    con.commit()
+    con.close()
+
+    await database.record_pdf_failure(vid, "cover", "boom")
+
+    assert vid in [r["id"] for r in await database.list_vacancies(since="2026-06-01T00:00:00")]
+
+
+@pytest.mark.asyncio
+async def test_successful_render_of_the_same_target_clears_the_pdf_failure(db_path):
+    vid = await _vacancy(23, status="cv_generated")
+    await database.record_pdf_failure(vid, "cv", "boom")
+
+    assert await database.clear_pdf_failure(vid, "cv") is True
+    assert await _failure(vid) is None
+    assert await database.clear_pdf_failure(vid, "cv") is False        # nothing left to clear
+
+
+@pytest.mark.asyncio
+async def test_render_of_the_other_target_keeps_the_pdf_failure(db_path):
+    vid = await _vacancy(24, status="cv_generated")
+    await database.record_pdf_failure(vid, "cv", "boom")
+
+    assert await database.clear_pdf_failure(vid, "cover") is False
+    assert (await _failure(vid))["target"] == "cv"
+
+
+@pytest.mark.asyncio
+async def test_a_render_never_clears_a_cv_or_cover_generation_failure(db_path):
+    vid = await _vacancy(25)
+    await database.fail_generation(vid, "cv", "LLM error", "analyzed")
+
+    assert await database.clear_pdf_failure(vid, "cv") is False
+    assert (await _failure(vid))["kind"] == "cv"
+
+
+@pytest.mark.asyncio
+async def test_a_successful_cv_status_does_not_clear_a_pdf_failure(db_path):
+    """Only the render outcome ends a pdf failure, not the CV status write."""
+    vid = await _vacancy(26)
+    await database.record_pdf_failure(vid, "cv", "boom")
+
+    await database.update_vacancy_status(vid, "cv_generated")
+
+    assert (await _failure(vid))["kind"] == "pdf"
+
+
+@pytest.mark.parametrize("raw", ['{"kind": "pdf", "reason": "x"}', '{"kind": "pdf", "target": "letter", "reason": "x"}'])
+def test_decode_rejects_a_pdf_failure_without_a_valid_target(raw):
+    assert database.decode_generation_failure(raw) is None

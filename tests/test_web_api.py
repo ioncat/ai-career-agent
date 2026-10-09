@@ -2406,3 +2406,145 @@ async def test_since_poll_returns_the_vacancy_after_a_failure(client):
     rows = client.get("/api/vacancies", params={"since": "2000-01-01T00:00:00"}).json()
 
     assert next(r for r in rows if r["id"] == vid)["generation_failure"]["kind"] == "cover"
+
+import httpx  # noqa: E402
+
+
+# ── PDF render failures: kind "pdf", recorded by the download and retry endpoints ──
+
+_VALID_PDF = b"%PDF-1.4\n" + b"0" * 400
+
+
+def _pdf_service(status=200, content=_VALID_PDF, exc=None):
+    """Patch the pdf-service HTTP call made by web.api."""
+    from unittest.mock import MagicMock
+    resp = MagicMock(status_code=status, content=content)
+    client = AsyncMock()
+    client.post = AsyncMock(return_value=resp, side_effect=exc)
+    ctx = MagicMock()
+    ctx.__aenter__ = AsyncMock(return_value=client)
+    ctx.__aexit__ = AsyncMock(return_value=False)
+    return patch("web.api.httpx.AsyncClient", return_value=ctx)
+
+
+async def _vacancy_with_docs(tmp_path, n, status="cover_generated"):
+    folder = tmp_path / f"v{n}"
+    folder.mkdir()
+    (folder / "JD.md").write_text("# jd", encoding="utf-8")
+    (folder / "Name_CV.md").write_text("# cv", encoding="utf-8")
+    (folder / "Name_Cover.md").write_text("cover", encoding="utf-8")
+    vid = await database.insert_vacancy(url=f"https://djinni.co/jobs/pdf{n}/", status=status)
+    await database.update_vacancy_fields(vid, markdown_path=str(folder / "JD.md"))
+    return vid, folder
+
+
+async def _stored_failure(vid):
+    return database.decode_generation_failure((await database.get_vacancy_by_id(vid))["last_generation_failure"])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("endpoint,target", [("cv-pdf", "cv"), ("cover-pdf", "cover")])
+@pytest.mark.parametrize("service,code", [
+    ({"exc": httpx.ConnectError("down")}, 503),
+    ({"status": 500}, 502),
+    ({"content": b"<html>error</html>" + b"0" * 400}, 502),     # HTTP 200 that is not a PDF
+    ({"content": b"%PDF-1.4"}, 502),                            # header only
+])
+async def test_pdf_download_failure_is_recorded_on_the_vacancy(client, tmp_path, endpoint, target, service, code):
+    vid, _ = await _vacancy_with_docs(tmp_path, 1)
+
+    with _pdf_service(**service):
+        resp = client.get(f"/api/vacancies/{vid}/{endpoint}")
+
+    assert resp.status_code == code
+    failure = await _stored_failure(vid)
+    assert (failure["kind"], failure["target"]) == ("pdf", target)
+    assert (await database.get_vacancy_by_id(vid))["status"] == "cover_generated"   # status untouched
+
+
+@pytest.mark.asyncio
+async def test_pdf_download_success_clears_the_failure_of_that_target_only(client, tmp_path):
+    vid, _ = await _vacancy_with_docs(tmp_path, 2)
+    await database.record_pdf_failure(vid, "cv", "boom")
+
+    with _pdf_service():
+        assert client.get(f"/api/vacancies/{vid}/cover-pdf").status_code == 200
+    assert (await _stored_failure(vid))["target"] == "cv"                           # other target stays
+
+    with _pdf_service():
+        resp = client.get(f"/api/vacancies/{vid}/cv-pdf")
+    assert resp.status_code == 200 and resp.content == _VALID_PDF
+    assert await _stored_failure(vid) is None
+
+
+@pytest.mark.asyncio
+async def test_pdf_download_of_a_missing_document_is_a_404_not_a_failure(client, tmp_path):
+    vid, folder = await _vacancy_with_docs(tmp_path, 3)
+    (folder / "Name_Cover.md").unlink()
+
+    with _pdf_service():
+        resp = client.get(f"/api/vacancies/{vid}/cover-pdf")
+
+    assert resp.status_code == 404
+    assert await _stored_failure(vid) is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("target,pdf_name", [("cv", "Name_CV.pdf"), ("cover", "Name_Cover.pdf")])
+async def test_render_pdf_saves_the_file_next_to_the_markdown_and_clears_the_failure(client, tmp_path, target, pdf_name):
+    vid, folder = await _vacancy_with_docs(tmp_path, 4)
+    await database.record_pdf_failure(vid, target, "boom")
+
+    with _pdf_service():
+        resp = client.post(f"/api/vacancies/{vid}/render-pdf", json={"target": target})
+
+    assert resp.status_code == 200
+    assert resp.json() == {"id": vid, "target": target, "pdf": pdf_name}
+    assert (folder / pdf_name).read_bytes() == _VALID_PDF
+    assert await _stored_failure(vid) is None
+
+
+@pytest.mark.asyncio
+async def test_render_pdf_failure_saves_nothing_and_records_the_failure(client, tmp_path):
+    vid, folder = await _vacancy_with_docs(tmp_path, 5)
+
+    with _pdf_service(status=500):
+        resp = client.post(f"/api/vacancies/{vid}/render-pdf", json={"target": "cv"})
+
+    assert resp.status_code == 502
+    assert not (folder / "Name_CV.pdf").exists()
+    assert (await _stored_failure(vid))["target"] == "cv"
+
+
+@pytest.mark.asyncio
+async def test_render_pdf_save_failure_is_recorded(client, tmp_path):
+    vid, folder = await _vacancy_with_docs(tmp_path, 6)
+    (folder / "Name_CV.pdf").mkdir()                    # a directory where the file must go: the write fails
+
+    with _pdf_service():
+        resp = client.post(f"/api/vacancies/{vid}/render-pdf", json={"target": "cv"})
+
+    assert resp.status_code == 500
+    assert "could not write" in (await _stored_failure(vid))["reason"]
+
+
+@pytest.mark.asyncio
+async def test_render_pdf_rejects_an_unknown_target_and_a_missing_vacancy(client):
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/pdf-x/")
+
+    assert client.post(f"/api/vacancies/{vid}/render-pdf", json={"target": "letter"}).status_code == 422
+    assert client.post("/api/vacancies/9999/render-pdf", json={"target": "cv"}).status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_api_exposes_the_pdf_failure_with_its_target(client, tmp_path):
+    vid, _ = await _vacancy_with_docs(tmp_path, 7)
+    await database.record_pdf_failure(vid, "cover", "pdf-service unavailable")
+
+    listed = next(r for r in client.get("/api/vacancies").json() if r["id"] == vid)
+    detail = client.get(f"/api/vacancies/{vid}").json()
+
+    for item in (listed, detail):
+        assert item["generation_failure"]["kind"] == "pdf"
+        assert item["generation_failure"]["target"] == "cover"
+        assert item["generation_failure"]["at"].endswith("Z")

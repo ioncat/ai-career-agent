@@ -19,9 +19,27 @@ log = logging.getLogger(__name__)
 
 _DEFAULT_TIMEOUT = 60.0  # seconds — PDF rendering can be slow for large CVs
 
+PDF_MAGIC = b"%PDF-"
+# A one-page PDF with fonts is tens of kilobytes; anything this small is a header with
+# no document in it (a broken or empty render that still came back as HTTP 200).
+MIN_PDF_BYTES = 256
+
 
 class CVAdapterError(Exception):
     """Raised when the pdf-service returns an error or is unreachable."""
+
+
+def validate_pdf_bytes(content: bytes) -> None:
+    """Raise CVAdapterError unless `content` looks like a real rendered PDF.
+
+    HTTP 200 alone proves nothing: the check is the `%PDF-` header and a minimum size.
+    Shared by the adapter and the on-demand PDF endpoints, so "rendered" means the same
+    thing everywhere.
+    """
+    if not content.startswith(PDF_MAGIC):
+        raise CVAdapterError("pdf-service returned a response that is not a PDF")
+    if len(content) < MIN_PDF_BYTES:
+        raise CVAdapterError(f"pdf-service returned a PDF of only {len(content)} bytes (empty render)")
 
 
 class CVAdapter:
@@ -48,7 +66,8 @@ class CVAdapter:
             Path to the generated PDF file.
 
         Raises:
-            CVAdapterError: Service returned an error or is unreachable.
+            CVAdapterError: Service returned an error, is unreachable, returned
+                something that is not a valid PDF, or the file could not be written.
             FileNotFoundError: md_path does not exist.
         """
         md_path = Path(md_path)
@@ -85,7 +104,12 @@ class CVAdapter:
                 f"pdf-service returned {response.status_code}: {body}"
             )
 
+        validate_pdf_bytes(response.content)
+
         pdf_path = Path(pdf_path)
-        pdf_path.write_bytes(response.content)
+        try:
+            pdf_path.write_bytes(response.content)
+        except OSError as exc:
+            raise CVAdapterError(f"could not write the PDF to {pdf_path}: {exc}") from exc
         log.info("CVAdapter: PDF written → %s (%d bytes)", pdf_path, len(response.content))
         return pdf_path

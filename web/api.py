@@ -16,6 +16,7 @@ from collections import Counter
 import contextlib
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Literal
 from urllib.parse import quote as _url_quote, urlparse
 
 import httpx
@@ -31,6 +32,7 @@ try:
 except ImportError:
     pass
 
+from adapters.cv_adapter import CVAdapterError, validate_pdf_bytes
 from adapters.djinni_salary_adapter import DjinniSalaryAdapter
 from adapters.parser_adapter import ParserAdapter, ParserError
 from contracts.pipeline import AnalysisJson
@@ -1552,8 +1554,38 @@ async def api_vacancy_cv(vacancy_id: int):
     return result
 
 
-async def _render_doc_pdf(vacancy_id: int, glob_pattern: str, not_found_msg: str) -> Response:
-    """Shared helper: find a markdown doc in the vacancy folder, render via pdf-service, return bytes."""
+async def _note_pdf_failure(vacancy_id: int, target: str, reason: str) -> None:
+    """Keep a failed PDF render on the vacancy (bookkeeping, never raises)."""
+    try:
+        await database.record_pdf_failure(vacancy_id, target, reason)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("api/pdf: could not record the PDF failure for v#%d: %s", vacancy_id, exc)
+
+
+async def _note_pdf_ok(vacancy_id: int, target: str) -> None:
+    """A PDF of this target rendered: end its stored failure, if any (never raises)."""
+    try:
+        await database.clear_pdf_failure(vacancy_id, target)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("api/pdf: could not clear the PDF failure for v#%d: %s", vacancy_id, exc)
+
+
+# target -> (glob of the markdown source in the vacancy folder, 404 text)
+_PDF_SOURCES = {
+    "cv": ("*_CV*.md", "CV not yet generated"),
+    "cover": ("*Cover.md", "Cover not yet generated"),
+}
+
+
+async def _render_doc_pdf_bytes(vacancy_id: int, target: str) -> tuple[Path, bytes]:
+    """Find the target's markdown doc in the vacancy folder, render it via pdf-service.
+
+    Returns (markdown file, validated PDF bytes). 404 when there is nothing to render
+    (not a failure). A failed render (service down, non-200, not a real PDF) is recorded
+    on the vacancy as a `pdf` failure and raised as 503 / 502; the caller ends the stored
+    failure after it has actually delivered or saved the PDF.
+    """
+    glob_pattern, not_found_msg = _PDF_SOURCES[target]
     row = await database.get_vacancy_by_id(vacancy_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Vacancy not found")
@@ -1569,21 +1601,36 @@ async def _render_doc_pdf(vacancy_id: int, glob_pattern: str, not_found_msg: str
 
     md_file = files[-1]
     markdown_text = md_file.read_text(encoding="utf-8")
-    pdf_name = md_file.stem + ".pdf"
 
     pdf_service_url = os.getenv("PDF_SERVICE_URL", "http://localhost:8002")
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
             resp = await client.post(f"{pdf_service_url}/render", json={"markdown": markdown_text})
-    except (httpx.ConnectError, httpx.TimeoutException) as exc:
-        raise HTTPException(status_code=503, detail=f"pdf-service unavailable: {exc}")
+    except httpx.HTTPError as exc:
+        reason = f"pdf-service unavailable: {exc}"
+        await _note_pdf_failure(vacancy_id, target, reason)
+        raise HTTPException(status_code=503, detail=reason)
 
     if resp.status_code != 200:
-        raise HTTPException(status_code=502, detail=f"pdf-service error {resp.status_code}")
+        reason = f"pdf-service error {resp.status_code}"
+        await _note_pdf_failure(vacancy_id, target, reason)
+        raise HTTPException(status_code=502, detail=reason)
 
-    pdf_name_encoded = _url_quote(pdf_name.encode("utf-8"), safe="")
+    try:
+        validate_pdf_bytes(resp.content)
+    except CVAdapterError as exc:
+        await _note_pdf_failure(vacancy_id, target, str(exc))
+        raise HTTPException(status_code=502, detail=str(exc))
+    return md_file, resp.content
+
+
+async def _render_doc_pdf(vacancy_id: int, target: str) -> Response:
+    """Render the target document and return it as a Save As download."""
+    md_file, pdf_bytes = await _render_doc_pdf_bytes(vacancy_id, target)
+    await _note_pdf_ok(vacancy_id, target)
+    pdf_name_encoded = _url_quote((md_file.stem + ".pdf").encode("utf-8"), safe="")
     return Response(
-        content=resp.content,
+        content=pdf_bytes,
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename*=UTF-8''{pdf_name_encoded}"},
     )
@@ -1594,9 +1641,11 @@ async def api_vacancy_cv_pdf(vacancy_id: int):
     """Render CV.md to PDF via pdf-service and return for Save As download.
 
     Always re-renders from latest *_CV.md so PDF is always fresh.
-    503 if pdf-service is down. 404 if CV not yet generated.
+    503 if pdf-service is down, 502 if it errors or returns something that is not a PDF
+    (both are kept on the vacancy as a `pdf` failure until a render succeeds).
+    404 if CV not yet generated.
     """
-    return await _render_doc_pdf(vacancy_id, "*_CV*.md", "CV not yet generated")
+    return await _render_doc_pdf(vacancy_id, "cv")
 
 
 @app.get("/api/vacancies/{vacancy_id}/cover-pdf")
@@ -1604,9 +1653,34 @@ async def api_vacancy_cover_pdf(vacancy_id: int):
     """Render Cover.md to PDF via pdf-service and return for Save As download.
 
     Always re-renders from latest *Cover.md so PDF is always fresh.
-    503 if pdf-service is down. 404 if Cover not yet generated.
+    503 / 502 as for cv-pdf. 404 if Cover not yet generated.
     """
-    return await _render_doc_pdf(vacancy_id, "*Cover.md", "Cover not yet generated")
+    return await _render_doc_pdf(vacancy_id, "cover")
+
+
+class RenderPdfRequest(BaseModel):
+    target: Literal["cv", "cover"]
+
+
+@app.post("/api/vacancies/{vacancy_id}/render-pdf")
+async def api_vacancy_render_pdf(vacancy_id: int, req: RenderPdfRequest):
+    """Flutter "Retry PDF": render the latest CV or cover and save the PDF next to its .md.
+
+    Ends a stored `pdf` failure of the same target once the file is written. 404 when the
+    document does not exist; 503 / 502 / 500 when the render or the save fails (recorded on
+    the vacancy as a `pdf` failure).
+    """
+    md_file, pdf_bytes = await _render_doc_pdf_bytes(vacancy_id, req.target)
+    pdf_path = md_file.with_suffix(".pdf")
+    try:
+        pdf_path.write_bytes(pdf_bytes)
+    except OSError as exc:
+        reason = f"could not write the PDF to {pdf_path.name}: {exc}"
+        await _note_pdf_failure(vacancy_id, req.target, reason)
+        raise HTTPException(status_code=500, detail=reason)
+    await _note_pdf_ok(vacancy_id, req.target)
+    log.info("api/render-pdf: v#%d %s -> %s (%d bytes)", vacancy_id, req.target, pdf_path.name, len(pdf_bytes))
+    return {"id": vacancy_id, "target": req.target, "pdf": pdf_path.name}
 
 
 @app.post("/api/vacancies/{vacancy_id}/analyze", status_code=202)
