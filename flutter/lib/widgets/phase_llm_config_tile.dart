@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/phase_config_provider.dart';
 import '../utils/error_snackbar.dart';
 import '../utils/toast.dart';
+import '../utils/model_options.dart';
 
 /// Runs a phase config_provider patch and surfaces drift/failure to the user.
 /// Same contract as settings_screen.dart's _patchConfigAndReport.
@@ -240,6 +241,9 @@ class _PhaseModelDropdown extends ConsumerWidget {
     final cs = Theme.of(context).colorScheme;
     final saved = config.availableModels.contains(config.model);
     final current = saved ? config.model : config.availableModels.firstOrNull;
+    // Same guard as the main Settings model dropdown (no duplicates, value
+    // always among the items).
+    final options = modelDropdownOptions(config.availableModels, current);
 
     if (!saved && current != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -257,7 +261,13 @@ class _PhaseModelDropdown extends ConsumerWidget {
         isDense: true,
         borderRadius: BorderRadius.circular(8),
         style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurface, fontWeight: FontWeight.w600),
-        items: config.availableModels.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+        items: [
+          for (final m in options.items)
+            DropdownMenuItem(
+              value: m,
+              child: Text(options.selectedMissing && m == current ? '$m (not in the list)' : m),
+            ),
+        ],
         onChanged: (m) {
           if (m != null) {
             _patchPhaseAndReport(

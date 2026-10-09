@@ -5,6 +5,7 @@ import '../providers/settings_provider.dart';
 import '../widgets/phase_llm_config_tile.dart';
 import '../utils/error_snackbar.dart';
 import '../utils/toast.dart';
+import '../utils/model_options.dart';
 // RemoteConfig used by _ModelDropdown
 
 /// Runs a config_provider patch (model/effort) and surfaces the result.
@@ -372,6 +373,9 @@ class _ModelDropdown extends ConsumerWidget {
     final cs = Theme.of(context).colorScheme;
     final saved = config.availableModels.contains(config.model);
     final current = saved ? config.model : config.availableModels.firstOrNull;
+    // No duplicates, and the value always among the items: the dropdown
+    // asserts otherwise (a provider can list one model twice).
+    final options = modelDropdownOptions(config.availableModels, current);
 
     // If the DB-saved model isn't in the current list (e.g. provider just
     // switched → model reset to an env default that isn't a real option),
@@ -396,9 +400,17 @@ class _ModelDropdown extends ConsumerWidget {
               color: cs.onSurface,
               fontWeight: FontWeight.w600,
             ),
-        items: config.availableModels
-            .map((m) => DropdownMenuItem(value: m, child: Text(m)))
-            .toList(),
+        items: [
+          for (final m in options.items)
+            DropdownMenuItem(
+              value: m,
+              child: Text(
+                options.selectedMissing && m == current
+                    ? '$m (not in the list)'
+                    : m,
+              ),
+            ),
+        ],
         onChanged: (m) {
           if (m != null) {
             _patchConfigAndReport(
