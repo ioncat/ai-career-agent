@@ -98,3 +98,21 @@ LANGUAGE_CODES = {"English": "en", "Ukrainian": "uk", "both": "both", "auto": "a
 def language_code(language: str | None) -> str | None:
     """The API code for a CV language name, or None when it is not a known name."""
     return LANGUAGE_CODES.get(language) if language else None
+
+
+def analysis_failure_code(source: BaseException | None) -> str:
+    """The failure code for an analysis run that raised, or that returned a warning text (a SoftFailure).
+
+    A timeout or a model error keeps its specific code; a missing JD file keeps `jd_missing`; anything
+    the vocabulary has no better word for is `analysis_failed`.
+    """
+    if source is None:
+        return failure_codes.ANALYSIS_FAILED
+    code = failure_codes.normalize(getattr(source, "code", None))
+    if code not in (failure_codes.UNKNOWN, failure_codes.GENERATION_FAILED):
+        return code
+    if isinstance(source, (TimeoutError, asyncio.TimeoutError)):
+        return failure_codes.LLM_TIMEOUT
+    if isinstance(source, LLMError):
+        return failure_codes.LLM_TIMEOUT if "timed out" in str(source) else failure_codes.LLM_ERROR
+    return failure_codes.ANALYSIS_FAILED

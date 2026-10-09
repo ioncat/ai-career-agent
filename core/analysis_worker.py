@@ -11,7 +11,10 @@ from contextlib import suppress
 from dataclasses import dataclass
 
 from core import config_store
+from core import failure_codes
 from core.deps import AgentDeps
+from core.generation_failure import analysis_failure_code, exception_reason, soft_failure
+from core.pipeline_events import emit_done, emit_failure, record_analysis_failure
 from core.settings import Settings
 from db import database
 
@@ -54,11 +57,15 @@ class AnalysisWorker:
                     await task
         log.info("AnalysisWorker: stopped")
 
-    async def enqueue(self, vacancy_id: int) -> None:
-        """Set status to 'analyzing' immediately, then queue for processing."""
+    async def enqueue(self, vacancy_id: int, origin: str = "auto") -> None:
+        """Set status to 'analyzing' immediately, then queue for processing.
+
+        `origin` is "user" when an API endpoint was hit from the app, "auto" for the recovery sweep
+        and anything else the backend started on its own; it is carried into the events of this run.
+        """
         await database.update_vacancy_status(vacancy_id, "analyzing")
-        await self._queue.put(vacancy_id)
-        log.info("AnalysisWorker: enqueued v#%d", vacancy_id)
+        await self._queue.put((vacancy_id, origin))
+        log.info("AnalysisWorker: enqueued v#%d origin=%s", vacancy_id, origin)
 
     # ── Internal ──────────────────────────────────────────────────────────────
 
@@ -82,8 +89,8 @@ class AnalysisWorker:
     async def _run(self) -> None:
         while True:
             try:
-                vacancy_id = await asyncio.wait_for(self._queue.get(), timeout=300)
-                asyncio.create_task(self._execute(vacancy_id))
+                vacancy_id, origin = await asyncio.wait_for(self._queue.get(), timeout=300)
+                asyncio.create_task(self._execute(vacancy_id, origin))
             except asyncio.TimeoutError:
                 # Periodic sweep: pick up any analysis_queued vacancies missed by enqueue()
                 # (e.g. set via standalone tracker fallback while agent.py wasn't serving)
@@ -91,7 +98,7 @@ class AnalysisWorker:
 
     _ANALYSIS_TIMEOUT = 600  # 10 minutes — covers slow claude CLI runs
 
-    async def _execute(self, vacancy_id: int) -> None:
+    async def _execute(self, vacancy_id: int, origin: str = "auto") -> None:
         from tools.cv_analyze import cv_analyze
 
         async with self._llm_sem:
@@ -106,23 +113,51 @@ class AnalysisWorker:
                     profile=self._deps.profile,
                 )
                 ctx = _Ctx(deps=fresh_deps)
-                await asyncio.wait_for(
+                result = await asyncio.wait_for(
                     cv_analyze(ctx, vacancy_id),  # type: ignore[arg-type]
                     timeout=self._ANALYSIS_TIMEOUT,
                 )
-                log.info("AnalysisWorker: done — v#%d", vacancy_id)
-                await self._push_result(vacancy_id)
             except asyncio.TimeoutError:
                 log.error(
                     "AnalysisWorker: timeout v#%d (>%ds)", vacancy_id, self._ANALYSIS_TIMEOUT
                 )
-                await database.set_analysis_error(
-                    vacancy_id, f"Analysis timed out after {self._ANALYSIS_TIMEOUT // 60} minutes"
+                await record_analysis_failure(
+                    self._deps.user_id, vacancy_id, origin,
+                    f"Analysis timed out after {self._ANALYSIS_TIMEOUT // 60} minutes",
+                    failure_codes.LLM_TIMEOUT,
                 )
             except Exception as exc:
-                err_msg = str(exc)[:500]
+                err_msg = exception_reason(exc)[:500]
                 log.error("AnalysisWorker: failed v#%d: %s", vacancy_id, err_msg)
-                await database.set_analysis_error(vacancy_id, err_msg)
+                await record_analysis_failure(
+                    self._deps.user_id, vacancy_id, origin, err_msg, analysis_failure_code(exc),
+                )
+            else:
+                await self._finish(vacancy_id, result, origin)
+
+    async def _finish(self, vacancy_id: int, result: object, origin: str) -> None:
+        """The tool returned: decide from the vacancy's state (the truth) what happened, then tell the channels.
+
+        cv_analyze writes `analysis_failed` itself for most failures and `analyzed` on success, and it
+        also reports some failures only as a returned warning text, leaving the vacancy "analyzing"
+        (a missing JD file); that last case is recorded here, so the vacancy cannot stay stuck.
+        """
+        soft = soft_failure(result)
+        row = await database.get_vacancy_by_id(vacancy_id)
+        status = row["status"] if row else None
+        user_id = self._deps.user_id
+        if status == "analysis_failed":
+            reason = (row["analysis_error"] if row else None) or (str(soft) if soft else "")
+            log.error("AnalysisWorker: failed v#%d: %s", vacancy_id, reason)
+            await emit_failure("analysis", user_id, vacancy_id, origin, reason, analysis_failure_code(soft))
+        elif soft is not None:
+            log.error("AnalysisWorker: failed v#%d: %s", vacancy_id, soft)
+            await record_analysis_failure(
+                user_id, vacancy_id, origin, str(soft)[:500], analysis_failure_code(soft)
+            )
+        else:
+            log.info("AnalysisWorker: done — v#%d", vacancy_id)
+            await emit_done("analysis", user_id, vacancy_id, origin)
 
     async def _fresh_llm(self, phase: str) -> object:
         """Build LLM provider for `phase` via core.config_store (single source of truth).
@@ -131,24 +166,3 @@ class AnalysisWorker:
         (phase1, phase2), each independently resolvable (EPIC-27).
         """
         return await config_store.build_llm_client(phase, self._settings)
-
-    async def _push_result(self, vacancy_id: int) -> None:
-        from contracts.pipeline import AnalysisJson
-        from core.push import send_push
-
-        try:
-            row = await database.get_vacancy_by_id(vacancy_id)
-            if not row:
-                return
-            aj_str = row["analysis_json"] if "analysis_json" in row.keys() else None
-            aj = AnalysisJson.model_validate_json(aj_str or "{}")
-            if not aj.p2:
-                return
-            title = row["title"] or f"Vacancy #{vacancy_id}"
-            await send_push(
-                user_id=self._deps.user_id,
-                title=f"✅ {title}",
-                body=f"Fit {aj.p2.fit_score}/10 · {aj.p2.recommendation_label}",
-            )
-        except Exception as exc:
-            log.warning("AnalysisWorker: push failed v#%d: %s", vacancy_id, exc)

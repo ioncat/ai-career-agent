@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from core import config_store
 from core.deps import AgentDeps
 from core.generation_failure import exception_code, exception_reason, language_code, soft_failure
+from core.pipeline_events import emit_done, record_generation_failure
 from core.settings import Settings
 from db import database
 
@@ -50,20 +51,24 @@ class CVWorker:
                 await self._task
         log.info("CVWorker: stopped")
 
-    async def enqueue(self, vacancy_id: int, language: str = "auto") -> None:
-        """Set status to 'cv_generating' immediately, then queue for processing."""
+    async def enqueue(self, vacancy_id: int, language: str = "auto", origin: str = "auto") -> None:
+        """Set status to 'cv_generating' immediately, then queue for processing.
+
+        `origin` is "user" when an API endpoint was hit from the app, "auto" for anything the backend
+        started on its own; it is carried into the events this run raises.
+        """
         await database.update_vacancy_status(vacancy_id, "cv_generating")
-        await self._queue.put((vacancy_id, language))
-        log.info("CVWorker: enqueued v#%d language=%s", vacancy_id, language)
+        await self._queue.put((vacancy_id, language, origin))
+        log.info("CVWorker: enqueued v#%d language=%s origin=%s", vacancy_id, language, origin)
 
     # ── Internal ──────────────────────────────────────────────────────────────
 
     async def _run(self) -> None:
         while True:
-            vacancy_id, language = await self._queue.get()
-            asyncio.create_task(self._execute(vacancy_id, language))
+            vacancy_id, language, origin = await self._queue.get()
+            asyncio.create_task(self._execute(vacancy_id, language, origin))
 
-    async def _execute(self, vacancy_id: int, language: str) -> None:
+    async def _execute(self, vacancy_id: int, language: str, origin: str = "auto") -> None:
         from tools.cv_generate import cv_generate
 
         async with self._llm_sem:
@@ -85,11 +90,13 @@ class CVWorker:
             except Exception as exc:
                 err_msg = exception_reason(exc)[:500]
                 log.error("CVWorker: failed v#%d: %s", vacancy_id, err_msg)
-                # Rollback + the failure on the vacancy in one write (shown until the next success).
-                await database.fail_generation(
-                    vacancy_id, "cv", err_msg, "analyzed", code=exception_code(exc),
-                    lang=language_code(language),
+                # Rollback, the failure on the vacancy and its event: one transaction (core/pipeline_events.py).
+                await record_generation_failure(
+                    "cv", self._deps.user_id, vacancy_id, origin, err_msg, exception_code(exc),
+                    "analyzed", lang=language_code(language),
                 )
+            else:
+                await emit_done("cv", self._deps.user_id, vacancy_id, origin)
 
     async def _fresh_llm(self, phase: str) -> object:
         """Build LLM provider for `phase` via core.config_store (single source of truth).

@@ -1484,7 +1484,7 @@ async def api_vacancy_generate_cv(vacancy_id: int, request: Request):
         raise HTTPException(status_code=409, detail="CV generation already in progress")
     worker = getattr(request.app.state, "cv_worker", None)
     if worker is not None:
-        await worker.enqueue(vacancy_id, language)
+        await worker.enqueue(vacancy_id, language, origin="user")
         return {"id": vacancy_id, "status": "cv_generating", "language": language}
     # Standalone fallback
     await database.update_vacancy_status(vacancy_id, "cv_queued")
@@ -1507,7 +1507,7 @@ async def api_vacancy_generate_cover(vacancy_id: int, request: Request):
         raise HTTPException(status_code=409, detail="Cover generation already in progress")
     worker = getattr(request.app.state, "cover_worker", None)
     if worker is not None:
-        await worker.enqueue(vacancy_id)
+        await worker.enqueue(vacancy_id, origin="user")
         return {"id": vacancy_id, "status": "cover_generating"}
     await database.update_vacancy_status(vacancy_id, "cover_generating")
     return {"id": vacancy_id, "status": "cover_generating"}
@@ -1741,7 +1741,7 @@ async def api_vacancy_analyze(vacancy_id: int, request: Request, force: bool = F
     await database.clear_analysis_error(vacancy_id)
     worker = getattr(request.app.state, "analysis_worker", None)
     if worker is not None:
-        await worker.enqueue(vacancy_id)
+        await worker.enqueue(vacancy_id, origin="user")
         return {"id": vacancy_id, "status": "analyzing"}
     # Standalone fallback (no agent.py running)
     await database.update_vacancy_status(vacancy_id, "analysis_queued")

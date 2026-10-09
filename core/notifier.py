@@ -52,6 +52,37 @@ _WEB_PUSH_EVENTS: frozenset[PipelineEvent] = frozenset({
 # ── Public API ────────────────────────────────────────────────────────────────
 
 
+def build_event(
+    event: PipelineEvent,
+    user_id: int | None,
+    vacancy_id: int | None,
+    title: str,
+    body: str = "",
+    *,
+    origin: str = "auto",
+    code: str | None = None,
+    key: str | None = None,
+    severity: str | None = None,
+) -> dict:
+    """The arguments of one event as a dict.
+
+    Pass it to a state write that stores its event in the same transaction
+    (`database.fail_generation(..., notification=event)`), then call `fan_out()` with its fields.
+    The keys are exactly the arguments of `database.insert_notification`.
+    """
+    return {
+        "user_id": user_id,
+        "event": event,
+        "vacancy_id": vacancy_id,
+        "title": title,
+        "body": body,
+        "severity": severity,
+        "origin": origin,
+        "code": code,
+        "key": key,
+    }
+
+
 async def notify(
     user_id: int | None,
     event: PipelineEvent,
@@ -91,11 +122,21 @@ async def notify(
     except Exception as exc:
         log.error("notifier: DB insert failed (user=%s event=%s): %s", user_id, event, exc)
 
+    await fan_out(user_id, event, title, body)
+
+
+async def fan_out(user_id: int | None, event: str, title: str = "", body: str = "") -> None:
+    """Send an already stored event to the channels that go beyond the database (Web Push today).
+
+    Split out of notify() so a state write that stored its event in the same transaction
+    (database.fail_generation, database.set_analysis_error) can still reach the channels afterwards.
+    Never raises. No per-user channel for a system event (user_id None).
+    """
     if event in _WEB_PUSH_EVENTS and user_id is not None:
         try:
             await _try_web_push(user_id, title or event, body)
         except Exception as exc:
-            log.warning("notifier: web push channel error (user=%d): %s", user_id, exc)
+            log.warning("notifier: web push channel error (user=%s): %s", user_id, exc)
 
 
 # ── Internal ──────────────────────────────────────────────────────────────────

@@ -159,12 +159,17 @@ async def test_execute_timeout_sets_analysis_error():
         patch("core.analysis_worker.database.update_vacancy_status", new_callable=AsyncMock),
         patch("core.analysis_worker.config_store.get_config", new_callable=AsyncMock, return_value=cfg),
         patch("core.analysis_worker.database.set_analysis_error", new_callable=AsyncMock) as mock_err,
+        patch("core.pipeline_events.vacancy_label", new_callable=AsyncMock, return_value="#99"),
+        patch("core.pipeline_events.fan_out", new_callable=AsyncMock),
         patch("tools.cv_analyze.cv_analyze", hanging_analyze),
     ):
-        mock_err.side_effect = lambda vid, msg: error_calls.append((vid, msg))
+        mock_err.side_effect = lambda vid, msg, **kw: error_calls.append((vid, msg, kw))
         await worker._execute(99)
 
     assert len(error_calls) == 1
-    vid, msg = error_calls[0]
+    vid, msg, kw = error_calls[0]
     assert vid == 99
     assert "timed out" in msg.lower()
+    # the event travels with the state write (one transaction in the real database layer)
+    event = kw["notification"]
+    assert (event["event"], event["code"], event["origin"]) == ("analysis_failed", "llm_timeout", "auto")

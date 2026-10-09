@@ -48,6 +48,7 @@
 **What:** no document describes system behaviour (what counts as a duplicate, when "You already applied" shows, how companies, blockers, tags and statuses work); the rules live only in CHANGELOG entries and code. Build `docs/functional-spec.md` (or one short section per domain, ~12) from the code with a verification pass, and keep it true via a code-to-section map, a warn-only guard check and a `/spec-sync` command.
 **First step:** pilot on one section, "duplicates, companies, already applied", to judge format and cost before scaling.
 **Full reasoning:** [functional-spec-approach-2026-10-05.md](../discovery/functional-spec-approach-2026-10-05.md).
+**Home (2026-10-09):** `docs/reference/` is the new folder for living "how it works" documents; this specification goes there, next to `NOTIFICATIONS_RULES.md`.
 
 ### 🟡 P2 — Auto-tags are unreliable: contradictory tags keep appearing (added 2026-10-05, needs a design discussion)
 **What:** owner has noticed repeatedly that vacancies get confusing or contradictory tag sets (e.g. healthcare and fintech and iGaming together). One cause is fixed (tags computed from `JD_analysis.md` text, see CHANGELOG 2026-10-05), but `classify()` in `core/vacancy_tags.py` is keyword-based and tags are merge-only (never removed). Needs a decision on a stricter approach (tag only from a JD's own domain/product sections, a per-vacancy cap, or re-deriving tags on refetch instead of merging). Owner: "think about it separately".
@@ -346,6 +347,14 @@ No dual-availability state — the button's visibility is a direct, deterministi
 **Scope:** Flutter detail screen — new section/tab rendering the stored `analysis_json` (or raw markdown) content; decide whether to show structured (parsed p1/p2 fields) or raw markdown.
 
 ## 🟡 P2
+
+### Editorial Audit (Phase 3.8): connect it to the app as an optional step (owner decision 2026-10-09, ROADMAP step 3)
+**What:** Phase 3.8 runs only inside the unused `core/pipeline_runner.py`, so it never runs in the app's backend (the `pipeline_runs` table has no such phase). The owner wants it connected to the app later as an **optional** step; the form (a button in the detail panel, or an element of the pipeline) is open.
+**For now:** no change in `pipeline_runner`. **Scope when started:** decide the form with the owner, wire it into the workers or a new endpoint, give it an event and a failure code like the other steps, and add it to the notification routing table.
+
+### Notifications phase 8: the reference document and its drift test (owner decision 2026-10-09)
+**What:** `docs/reference/NOTIFICATIONS_RULES.md` (new folder `docs/reference/`) describes all notification routing in detail (events, origins, channels, texts, retention, keys), written at the end of the notifications plan as an extra last phase.
+**Test:** a test compares the routing table in that document with the table in `core/notifier.py` (data in one place), so the document and the code cannot drift apart. **Depends on:** phase 4 (the router with its table in code). Owner: backend.
 
 ### Input limits and a vocabulary check for event fields, before `POST /api/events` (reviewer, 2026-10-09)
 **What:** `insert_notification` rejects a `key` over 200 characters, but `title`, `body` and `code` have no length limit and `code` is not checked against `core/failure_codes.py`.

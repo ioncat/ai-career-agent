@@ -838,14 +838,17 @@ def _failure_payload(
 
 async def fail_generation(
     vacancy_id: int, kind: str, reason: str, rollback_status: str, code: str | None = None,
-    lang: str | None = None,
-) -> None:
+    lang: str | None = None, notification: dict | None = None,
+) -> int | None:
     """Record a failed CV / cover generation and roll the status back, in one write.
 
     kind is 'cv' or 'cover'; reason is cut to GENERATION_FAILURE_REASON_MAX characters;
     the time is stored in UTC. Status and failure change together (and updated_at is
     bumped), so a client polling with `since` gets both. declined_at is cleared like
     any non-declined status in update_vacancy_status.
+
+    `notification` (a dict of _insert_notification arguments) is stored in the SAME transaction, so
+    the card and the toast cannot diverge; returns the stored event's id, or None.
     """
     if kind not in ("cv", "cover"):
         raise ValueError(f"unknown generation kind {kind!r}")
@@ -856,7 +859,10 @@ async def fail_generation(
             "updated_at = datetime('now'), declined_at = NULL WHERE id = ?",
             (rollback_status, _failure_payload(kind, reason, code=code, lang=lang), vacancy_id),
         )
+        event_id = await _insert_event_with_state(db, notification)
         await db.commit()
+    await _maybe_prune(event_id)
+    return event_id
 
 
 async def record_pdf_failure(vacancy_id: int, target: str, reason: str, code: str | None = None) -> None:
@@ -900,14 +906,23 @@ async def clear_pdf_failure(vacancy_id: int, target: str) -> bool:
         return True
 
 
-async def set_analysis_error(vacancy_id: int, error: str | None) -> None:
-    """Store analysis error message and set status to analysis_failed."""
+async def set_analysis_error(
+    vacancy_id: int, error: str | None, notification: dict | None = None
+) -> int | None:
+    """Store analysis error message and set status to analysis_failed.
+
+    `notification` (a dict of _insert_notification arguments) is stored in the same transaction;
+    returns the stored event's id, or None.
+    """
     async with get_db() as db:
         await db.execute(
             "UPDATE vacancies SET analysis_error = ?, status = 'analysis_failed', updated_at = datetime('now') WHERE id = ?",
             (error, vacancy_id),
         )
+        event_id = await _insert_event_with_state(db, notification)
         await db.commit()
+    await _maybe_prune(event_id)
+    return event_id
 
 
 async def set_vacancy_blocker(
@@ -2002,6 +2017,35 @@ async def insert_notification(
     the same key already exists for this user (or among system events), nothing is inserted and None
     is returned. Every 100th row triggers a retention pass (prune_notifications).
     """
+    async with get_db() as db:
+        row_id = await _insert_notification(
+            db, user_id, event, vacancy_id, title, body,
+            severity=severity, origin=origin, code=code, key=key,
+        )
+        await db.commit()
+    await _maybe_prune(row_id)
+    return row_id
+
+
+async def _insert_notification(
+    db: aiosqlite.Connection,
+    user_id: int | None,
+    event: str,
+    vacancy_id: int | None = None,
+    title: str = "",
+    body: str = "",
+    *,
+    severity: str | None = None,
+    origin: str = "auto",
+    code: str | None = None,
+    key: str | None = None,
+) -> int | None:
+    """Validate and insert one event on an open connection; the caller commits.
+
+    Used by insert_notification and by the state writes that must store their event in the SAME
+    transaction (fail_generation, set_analysis_error). Returns the row id, or None when the key
+    already exists. Validation errors raise ValueError; a database error (NOT NULL, CHECK) raises.
+    """
     severity = severity or default_notification_severity(event)
     if severity not in NOTIFICATION_SEVERITIES:
         raise ValueError(f"unknown notification severity {severity!r}")
@@ -2010,26 +2054,44 @@ async def insert_notification(
     key = (key or "").strip() or None
     if key is not None and len(key) > NOTIFICATION_KEY_MAX:
         raise ValueError(f"notification key longer than {NOTIFICATION_KEY_MAX} characters")
-    async with get_db() as db:
-        cursor = await db.execute(
-            """
-            INSERT INTO notifications
-                (user_id, vacancy_id, event, title, body, severity, origin, code, key)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT (COALESCE(user_id, 0), key) WHERE key IS NOT NULL DO NOTHING
-            """,
-            (user_id, vacancy_id, event, title, body, severity, origin, code, key),
-        )
-        await db.commit()
-        if cursor.rowcount == 0:
-            return None
-        row_id = cursor.lastrowid
+    cursor = await db.execute(
+        """
+        INSERT INTO notifications
+            (user_id, vacancy_id, event, title, body, severity, origin, code, key)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT (COALESCE(user_id, 0), key) WHERE key IS NOT NULL DO NOTHING
+        """,
+        (user_id, vacancy_id, event, title, body, severity, origin, code, key),
+    )
+    if cursor.rowcount == 0:
+        return None
+    return cursor.lastrowid
+
+
+async def _insert_event_with_state(db: aiosqlite.Connection, notification: dict | None) -> int | None:
+    """Store the event that belongs to a state write, inside that write's transaction.
+
+    `notification` is a dict of _insert_notification arguments (core/pipeline_events.py builds it).
+    A bad event must never cost the state write: an event that cannot be stored is logged and
+    skipped, and the state still commits (a failed statement does not abort the transaction).
+    """
+    if not notification:
+        return None
+    try:
+        return await _insert_notification(db, **notification)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("notifications: event not stored with its state write (%s): %s",
+                    notification.get("event"), exc)
+        return None
+
+
+async def _maybe_prune(row_id: int | None) -> None:
+    """Every 100th row triggers a retention pass; a failing pass is logged, never raised."""
     if row_id and row_id % 100 == 0:
         try:
             await prune_notifications()
         except Exception as exc:  # the row is saved; a retention failure is not an insert failure
             log.warning("notifications: retention pass failed: %s", exc)
-    return row_id
 
 
 async def prune_notifications(
