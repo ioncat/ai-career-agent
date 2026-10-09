@@ -363,11 +363,6 @@ No dual-availability state — the button's visibility is a direct, deterministi
 **Scope:** full analysis + step-by-step plan already written up.
 **Spec:** [../discovery/backlog-simplification.md](../discovery/backlog-simplification.md)
 
-### Audit other Phase 1/2 fields for the same "correctly flagged but buried in UI" gap (added 2026-08-26)
-**What:** the `_WarningsBanner` fix (2026-08-26, see CHANGELOG) solved this for `p2.warnings` — check whether `hiddenRisks`/`keyBarriers` inside `_QuickOverviewCard` have the same visibility problem, or whether their current row treatment is prominent enough.
-**Why:** vacancy #1228 — backend correctly flagged a hybrid-Kyiv-office warning, but the user missed it because it sat as one small row among other fields; confirmed a real product decision (not cosmetic), see memory `feedback_critical_ui_signals_must_be_prominent`. Same rendering pattern may hide other decision-relevant signals.
-**Scope:** review `_QuickOverviewCard` in `vacancy_detail_screen.dart` for `keyBarriers`/`hiddenRisks`; decide per-field whether it needs its own prominent block like warnings, or stays list-style because it's lower-stakes.
-
 ### Backfill garbled `company` on 188 pre-existing Djinni vacancies (added 2026-07-25)
 **What:** 188 Djinni-sourced vacancies have a `company` value that's actually a truncated RSS-description sentence fragment (e.g. `"Headway Inc is a global tech company, revolutionizing..."` instead of `"Headway Inc"`) — root cause fixed same day (the correctly-parsed company from `services/parser`'s `<title>`-tag extraction now gets persisted, see CHANGELOG), but these 188 rows predate the fix and are stuck with the bad value.
 **Why:** low urgency — display-only cosmetic issue on old rows, doesn't block anything (dedup/analysis still work off other fields).

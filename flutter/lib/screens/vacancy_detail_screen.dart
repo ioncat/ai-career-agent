@@ -2898,6 +2898,10 @@ class _VacancyHero extends StatelessWidget {
           const SizedBox(height: 10),
           _WarningsBanner(warnings: p2.warnings),
         ],
+        if (p2.keyBarriers.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          _KeyBarriersBanner(barriers: p2.keyBarriers),
+        ],
       ],
     );
   }
@@ -2909,6 +2913,63 @@ class _VacancyHero extends StatelessWidget {
 /// among Category/Key Barriers/Hidden Risks in Quick Overview and went unnoticed
 /// (vacancy #1228). Shown right under the Fit/Attraction + pre-filter block so
 /// it can't be missed before the candidate decides to apply.
+/// Key Barriers — gaps between the JD's requirements and the profile; they
+/// decide "apply or not", so they get their own block right under Warnings
+/// instead of a row in Quick Overview below the fold (2026-10-09, owner).
+/// Red, a bulleted list and the count in the title, so several barriers do
+/// not read as one sentence. Hidden Risks stay in Quick Overview: they are
+/// in almost every analysis and a red block on each vacancy would be noise.
+class _KeyBarriersBanner extends StatelessWidget {
+  final List<String> barriers;
+
+  const _KeyBarriersBanner({required this.barriers});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final fg = cs.onErrorContainer;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: cs.errorContainer.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: cs.error, width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.report_gmailerrorred_rounded, size: 20, color: cs.error),
+              const SizedBox(width: 8),
+              Text(
+                'Key Barriers (${barriers.length})',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: fg,
+                  fontSize: 15,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ...barriers.map(
+            (b) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: SelectableText(
+                '•  $b',
+                style: TextStyle(color: fg, fontSize: 13.5, height: 1.35),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _WarningsBanner extends StatelessWidget {
   final List<String> warnings;
 
@@ -3845,11 +3906,8 @@ class _QuickOverviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final hasContent =
-        p2.category.isNotEmpty ||
-        p2.keyBarriers.isNotEmpty ||
-        p2.hiddenRisks.isNotEmpty;
+    // Key Barriers moved to their own block under Warnings (_KeyBarriersBanner).
+    final hasContent = p2.category.isNotEmpty || p2.hiddenRisks.isNotEmpty;
 
     if (!hasContent) return const SizedBox.shrink();
 
@@ -3867,22 +3925,13 @@ class _QuickOverviewCard extends StatelessWidget {
               icon: Icons.label_outline,
               iconColor: const Color(0xFF2E7D32),
             ),
-          if (p2.keyBarriers.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            _OverviewRow(
-              label: 'Key Barriers',
-              text: p2.keyBarriers.join('; '),
-              icon: Icons.warning_amber_rounded,
-              iconColor: cs.error,
-            ),
-          ],
           if (p2.hiddenRisks.isNotEmpty) ...[
             const SizedBox(height: 10),
-            _OverviewRow(
+            _OverviewList(
               label: 'Hidden Risks',
-              text: p2.hiddenRisks.join('; '),
+              items: p2.hiddenRisks,
               icon: Icons.warning_amber_rounded,
-              iconColor: cs.error,
+              iconColor: const Color(0xFFB26A00),
             ),
           ],
         ],
@@ -4006,6 +4055,56 @@ class _WhyCard extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+
+/// Like _OverviewRow, but one bullet per item: several items joined with "; "
+/// read as one long sentence and hid how many there were.
+class _OverviewList extends StatelessWidget {
+  final String label;
+  final List<String> items;
+  final IconData icon;
+  final Color iconColor;
+
+  const _OverviewList({
+    required this.label,
+    required this.items,
+    required this.icon,
+    required this.iconColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 13, color: iconColor),
+            const SizedBox(width: 5),
+            Text(
+              '$label (${items.length})',
+              style: tt.bodySmall?.copyWith(
+                color: iconColor,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        ...items.map(
+          (item) => Padding(
+            padding: const EdgeInsets.only(left: 18, bottom: 3),
+            child: SelectableText(
+              '•  $item',
+              style: tt.bodySmall?.copyWith(color: cs.onSurface, height: 1.35),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
 
 class _OverviewRow extends StatelessWidget {
   final String label;
