@@ -438,6 +438,14 @@ class ActivityEntry {
   final int cacheReadTokens;
   final double costUsd;
   final String createdAt;
+  // Length-based input estimate (text length / 4, about +-10%) for calls whose
+  // provider reports no usage (claude_cli). inputIsEstimate is true when the
+  // exact inputTokens is 0 and an estimate exists (backend b5ef655).
+  final int profileTokens;
+  final int promptTokens;
+  final int userTokens;
+  final int inputTokensEstimate;
+  final bool inputIsEstimate;
 
   const ActivityEntry({
     required this.phase,
@@ -450,6 +458,11 @@ class ActivityEntry {
     required this.cacheReadTokens,
     required this.costUsd,
     required this.createdAt,
+    this.profileTokens = 0,
+    this.promptTokens = 0,
+    this.userTokens = 0,
+    this.inputTokensEstimate = 0,
+    this.inputIsEstimate = false,
   });
 
   factory ActivityEntry.fromJson(Map<String, dynamic> json) {
@@ -464,6 +477,35 @@ class ActivityEntry {
       cacheReadTokens: json['cache_read_tokens'] as int? ?? 0,
       costUsd: (json['cost_usd'] as num?)?.toDouble() ?? 0.0,
       createdAt: json['created_at'] as String? ?? '',
+      profileTokens: json['profile_tokens'] as int? ?? 0,
+      promptTokens: json['prompt_tokens'] as int? ?? 0,
+      userTokens: json['user_tokens'] as int? ?? 0,
+      inputTokensEstimate: json['input_tokens_estimate'] as int? ?? 0,
+      inputIsEstimate: json['input_is_estimate'] as bool? ?? false,
     );
+  }
+
+  static String _k(int n) =>
+      n >= 1000 ? '${(n / 1000).toStringAsFixed(1)}k' : '$n';
+
+  /// Tokens column: "in→out". An estimated input reads "~12.3k" and an
+  /// unreported output "?" (unknown, not zero); a dash when nothing is known.
+  String get tokensText {
+    if (inputIsEstimate) {
+      if (inputTokensEstimate <= 0) return '—';
+      final out = outputTokens > 0 ? _k(outputTokens) : '?';
+      return '~${_k(inputTokensEstimate)}→$out';
+    }
+    if (inputTokens == 0 && outputTokens == 0) return '—';
+    return '${_k(inputTokens)}→${_k(outputTokens)}';
+  }
+
+  /// Tooltip for an estimated row; null when the numbers are exact.
+  String? get tokensHint {
+    if (!inputIsEstimate || inputTokensEstimate <= 0) return null;
+    return 'Estimate: this provider reports no token usage. '
+        'Input ≈ text length / 4 (about ±10%): profile ${_k(profileTokens)}, '
+        'prompt ${_k(promptTokens)}, vacancy text ${_k(userTokens)}. '
+        'Output tokens and cost are unknown.';
   }
 }

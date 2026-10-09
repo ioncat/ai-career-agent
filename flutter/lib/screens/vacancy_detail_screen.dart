@@ -1889,8 +1889,6 @@ class _ActivityLogViewState extends ConsumerState<_ActivityLogView> {
 
   String _fmtMs(int ms) =>
       ms >= 1000 ? '${(ms / 1000).toStringAsFixed(1)}s' : '${ms}ms';
-  String _k(int n) => n >= 1000 ? '${(n / 1000).toStringAsFixed(1)}k' : '$n';
-
   // ── Shared container ──────────────────────────────────────────────────────────
 
   Widget _section(BuildContext context, String label, Widget body) {
@@ -2086,9 +2084,8 @@ class _ActivityLogViewState extends ConsumerState<_ActivityLogView> {
               ],
             ),
             ...entries.map((e) {
-              final tok = e.provider == 'claude_cli'
-                  ? '—'
-                  : '${_k(e.inputTokens)}→${_k(e.outputTokens)}';
+              final tok = e.tokensText;
+              final tokHint = e.tokensHint;
               final cost = e.costUsd > 0
                   ? '\$${e.costUsd.toStringAsFixed(4)}'
                   : '—';
@@ -2103,7 +2100,12 @@ class _ActivityLogViewState extends ConsumerState<_ActivityLogView> {
                   cell(e.provider),
                   cell(modelText),
                   cell(_fmtMs(e.elapsedMs), a: TextAlign.right),
-                  cell(tok, a: TextAlign.right),
+                  tokHint == null
+                      ? cell(tok, a: TextAlign.right)
+                      : Tooltip(
+                          message: tokHint,
+                          child: cell(tok, a: TextAlign.right),
+                        ),
                   cell(cost, a: TextAlign.right),
                 ],
               );
