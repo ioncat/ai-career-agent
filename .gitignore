@@ -45,6 +45,8 @@ vacancies/
 seen_jobs.json
 # job-monitor lock file (runtime, prevents double-start)
 services/job-monitor/monitor.lock
+# job-monitor feed health state (runtime, rewritten on every poll)
+services/job-monitor/feed_health.json
 # SQLite runtime DB and backups — not versioned
 *.db
 *.sqlite
@@ -72,6 +74,9 @@ research/*_raw.json
 research/*_raw_*.json
 # Backfill dry-run/apply reports list real vacancy ids and local paths.
 research/*-backfill-*.md
+# Path-repair dry-run reports and profile drafts: real vacancy ids, local paths, the candidate's facts.
+research/*-dryrun-*.md
+research/profile-draft-*.md
 
 # Skill pipeline — base files (SKILL.md, SKILL_TYPES.md, users.example.yaml) are tracked.
 # Personal data (user profiles, the real user registry, active_user state) is private.

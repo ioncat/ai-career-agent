@@ -8,6 +8,8 @@
 
 ## 2026-10-09
 
+- **Docs (hygiene) — `.gitignore`: local research drafts and the job-monitor health state stay out of GitHub Desktop's changed-files list.** New rules: `research/*-dryrun-*.md` and `research/profile-draft-*.md` (real vacancy ids, local paths, the candidate's facts) and `services/job-monitor/feed_health.json` (runtime state of the feed alert).
+
 - **Docs (hygiene) — the example user handle in `docs/local-app.md` is neutral (RF-046).** `/analyze -u <handle>` showed a handle equal to the start of the owner's e-mail; now `jdoe`. The old line stays in the pushed history; no rewrite.
 
 - **Process (docs) — `BACKLOG.md` deprecated.** The file is a one-paragraph pointer to Linear (the last version with the entries and the epics table: `git show b5fcc6d:docs/delivery/BACKLOG.md`); the epics overview table was dropped because each epic file carries its status in its header. Live references updated: `documentation-conventions.md` (section 2 is now "Open tasks (Linear)"), `AGENT_RULES.md`, `roles/dispatcher.md`, `ROADMAP_Q4.md`, `ARCHITECTURE.md`, and the local `CLAUDE.md`. Old mentions in CHANGELOG, discovery documents and the review register stay as history. The file will be deleted when nothing links to it.
