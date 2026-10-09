@@ -6,13 +6,16 @@ BACKLOG.md, CHANGELOG.md, or epic files. Referenced from `CLAUDE.md`.
 Complements [product-delivery-conventions.md](product-delivery-conventions.md)
 (User Story structure) — this document covers **where records live and when they are written**.
 
+> **From 2026-10-09 open tasks live in Linear** (one writer: the dispatcher). Entries are moved from `BACKLOG.md` to the board in waves; a moved entry is deleted from BACKLOG in the same step and not edited there afterwards.
+
 ---
 
 ## 1. Document map
 
 | Document | Location | Contains | Never contains |
 |---|---|---|---|
-| **BACKLOG.md** | `docs/delivery/BACKLOG.md` | Active work only: Now / P0–P2 / Icebox / Bugs | History, delivered features, full design specs |
+| **Task tracker** | Linear, team `VBA` (see `AGENT_RULES.md`, rule 20) | Open work: issues with status, priority, role label | History, delivered features |
+| **BACKLOG.md** | `docs/delivery/BACKLOG.md` | Entries **not yet moved** to the tracker (Now / P0–P2 / Icebox / Bugs); once all are moved it becomes a pointer to the board | History, delivered features, full design specs |
 | **CHANGELOG.md** | `docs/delivery/CHANGELOG.md` | Delivered features + fixes, reverse-chron by date | Plans, open tasks |
 | **Epics** | `docs/delivery/Epics/EPIC-NN-slug.md` | Full design specs for epic-sized work | — |
 | **Ideas** | `docs/discovery/*.md` | Designs not yet committed to (experiments, P3 concepts) | — |
@@ -61,7 +64,7 @@ with explicit dependencies ("blocked by X") where they exist.
 |---|---|
 | New task/idea agreed in session | Add entry to correct priority section, same session |
 | Work starts on a task | Move entry to `## 📌 Now` |
-| Task delivered | **Delete** entry from BACKLOG + add CHANGELOG entry (same session, atomically) |
+| Task delivered | Add the CHANGELOG entry and close the Linear issue (the dispatcher closes it); a task still only in BACKLOG: **delete** the entry + add the CHANGELOG entry (same session, atomically). The CHANGELOG bullet names the `VBA-n` when there is one |
 | Task obsolete/superseded | Delete entry; if the design is worth keeping → move text to `docs/discovery/` |
 | Design grows past ~10 lines | Move full text to `Epics/` or `docs/discovery/`, leave entry + link |
 | Session ends | Verify `Last updated` date; verify no delivered work still listed as open |
@@ -127,12 +130,12 @@ One bullet per feature/fix:
 ```
 idea → docs/discovery/*.md (optional) → BACKLOG entry (priority section)
      → work starts → entry moves to "Now"
-     → delivered  → entry deleted + CHANGELOG bullet (same session)
+     → delivered  → issue closed in Linear (or entry deleted if still in BACKLOG) + CHANGELOG bullet (same session)
      → epic done  → epic status flipped + CHANGELOG closure bullet
 ```
 
 Session-end checklist (Claude Code, every session with delivery):
 1. CHANGELOG bullet written for every delivered feature
-2. BACKLOG: delivered entries removed, `Last updated` bumped
+2. Linear: delivered issues closed; BACKLOG (if the entry is still there): delivered entries removed, `Last updated` bumped
 3. `.claude/sessions/` log created
 4. `docs/effort-log.md` updated if session is significant
