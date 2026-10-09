@@ -25,6 +25,13 @@ from pydantic_ai import RunContext
 
 from core.cv_metrics import detect_mechanical_violations
 from core.deps import AgentDeps
+from core.generation_failure import (
+    ANALYSIS_MISSING_TEXT,
+    CV_MISSING_TEXT,
+    JD_MISSING_TEXT,
+    LLM_ERROR_TEXT,
+    WARNING_SIGN,
+)
 from core.llm_client import LLMError
 from db import database
 
@@ -75,12 +82,12 @@ async def cv_cover(ctx: RunContext[AgentDeps], vacancy_id: int) -> str:
     # ── Read source files ─────────────────────────────────────────────────────
     jd_path = Path(markdown_path)
     if not jd_path.exists():
-        return f"⚠️ Файл JD.md не найден:\n<code>{jd_path}</code>"
+        return f"{WARNING_SIGN} {JD_MISSING_TEXT}:\n<code>{jd_path}</code>"
 
     analysis_path = jd_path.parent / "JD_analysis.md"
     if not analysis_path.exists():
         return (
-            f"⚠️ JD_analysis.md не найден. "
+            f"{WARNING_SIGN} {ANALYSIS_MISSING_TEXT}. "
             f"Сначала запусти анализ для вакансии #{vacancy_id}."
         )
 
@@ -92,7 +99,7 @@ async def cv_cover(ctx: RunContext[AgentDeps], vacancy_id: int) -> str:
     cv_candidates = sorted(jd_path.parent.glob("*_CV*.md"))
     if not cv_candidates:
         return (
-            f"⚠️ CV не найден в папке вакансии. "
+            f"{WARNING_SIGN} {CV_MISSING_TEXT}. "
             f"Сначала сгенерируй CV для вакансии #{vacancy_id}."
         )
     cv_path = cv_candidates[-1]
@@ -130,7 +137,7 @@ async def cv_cover(ctx: RunContext[AgentDeps], vacancy_id: int) -> str:
     except LLMError as exc:
         await database.update_pipeline_run(run_id, status="error", error_message=str(exc))
         log.error("cv_cover: Phase 4 LLM error: %s", exc)
-        return f"⚠️ Ошибка Claude на фазе 4:\n{exc}"
+        return f"{WARNING_SIGN} {LLM_ERROR_TEXT} на фазе 4:\n{exc}"
 
     # ── Save [Name]_Cover.md (versioned if already exists) ───────────────────
     cover_md_path = _next_version_path(jd_path.parent / f"{safe_name}_Cover.md")

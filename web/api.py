@@ -32,7 +32,7 @@ try:
 except ImportError:
     pass
 
-from adapters.cv_adapter import CVAdapterError, validate_pdf_bytes
+from adapters.cv_adapter import CVAdapterError, transport_error_code, validate_pdf_bytes
 from adapters.djinni_salary_adapter import DjinniSalaryAdapter
 from adapters.parser_adapter import ParserAdapter, ParserError
 from contracts.pipeline import AnalysisJson
@@ -82,6 +82,7 @@ def _expose_generation_failure(item: dict) -> None:
     failure = database.decode_generation_failure(item.pop("last_generation_failure", None))
     if failure is not None:
         failure["at"] = _utc_z(failure["at"])
+        failure["code"] = failure_codes.normalize(failure["code"])    # same value as in `failure`
     item["generation_failure"] = failure
     # One read-only shape for every failure type (core/failure_projection.py); the fields above
     # stay as they are.
@@ -1619,7 +1620,7 @@ async def _render_doc_pdf_bytes(vacancy_id: int, target: str) -> tuple[Path, byt
             resp = await client.post(f"{pdf_service_url}/render", json={"markdown": markdown_text})
     except httpx.HTTPError as exc:
         reason = f"pdf-service unavailable: {exc}"
-        await _note_pdf_failure(vacancy_id, target, reason, failure_codes.PDF_SERVICE_UNREACHABLE)
+        await _note_pdf_failure(vacancy_id, target, reason, transport_error_code(exc))
         raise HTTPException(status_code=503, detail=reason)
 
     if resp.status_code != 200:

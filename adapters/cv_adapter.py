@@ -37,6 +37,18 @@ class CVAdapterError(Exception):
         self.code = code
 
 
+def transport_error_code(exc: Exception) -> str:
+    """The failure code for an httpx error raised while calling the pdf-service.
+
+    A refused or timed-out connection means the service is not reachable (it is not running);
+    any other transport error (a read timeout, a broken or truncated response) means the service
+    is up but the exchange failed, so the client must not tell the user to start it.
+    """
+    if isinstance(exc, (httpx.ConnectError, httpx.ConnectTimeout)):
+        return "pdf_service_unreachable"
+    return "pdf_service_error"
+
+
 def validate_pdf_bytes(content: bytes) -> None:
     """Raise CVAdapterError unless `content` looks like a real rendered PDF.
 
@@ -103,11 +115,11 @@ class CVAdapter:
             ) from exc
         except httpx.TimeoutException as exc:
             raise CVAdapterError(
-                f"pdf-service timed out after {_DEFAULT_TIMEOUT}s", code="pdf_service_unreachable"
+                f"pdf-service timed out after {_DEFAULT_TIMEOUT}s", code=transport_error_code(exc)
             ) from exc
         except httpx.HTTPError as exc:
             raise CVAdapterError(
-                f"HTTP error calling pdf-service: {exc}", code="pdf_service_unreachable"
+                f"HTTP error calling pdf-service: {exc}", code=transport_error_code(exc)
             ) from exc
 
         if response.status_code != 200:

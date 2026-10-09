@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 from core import config_store
 from core.deps import AgentDeps
-from core.generation_failure import exception_code, exception_reason, soft_failure
+from core.generation_failure import exception_code, exception_reason, language_code, soft_failure
 from core.settings import Settings
 from db import database
 
@@ -87,7 +87,8 @@ class CVWorker:
                 log.error("CVWorker: failed v#%d: %s", vacancy_id, err_msg)
                 # Rollback + the failure on the vacancy in one write (shown until the next success).
                 await database.fail_generation(
-                    vacancy_id, "cv", err_msg, "analyzed", code=exception_code(exc)
+                    vacancy_id, "cv", err_msg, "analyzed", code=exception_code(exc),
+                    lang=language_code(language),
                 )
 
     async def _fresh_llm(self, phase: str) -> object:

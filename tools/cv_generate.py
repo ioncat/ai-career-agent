@@ -45,6 +45,7 @@ from core.cv_metrics import (
 )
 from core.candidate_name import resolve_candidate_name
 from core.deps import AgentDeps
+from core.generation_failure import ANALYSIS_MISSING_TEXT, JD_MISSING_TEXT, WARNING_SIGN
 from core.llm_client import LLMError
 from core.translit import safe_filename_stem
 from db import database
@@ -116,12 +117,12 @@ async def cv_generate(
     # ── Read source files ─────────────────────────────────────────────────────
     jd_path = Path(markdown_path)
     if not jd_path.exists():
-        return f"⚠️ Файл JD.md не найден:\n<code>{jd_path}</code>"
+        return f"{WARNING_SIGN} {JD_MISSING_TEXT}:\n<code>{jd_path}</code>"
 
     analysis_path = jd_path.parent / "JD_analysis.md"
     if not analysis_path.exists():
         return (
-            f"⚠️ JD_analysis.md не найден. Сначала запусти анализ для вакансии #{vacancy_id}."
+            f"{WARNING_SIGN} {ANALYSIS_MISSING_TEXT}. Сначала запусти анализ для вакансии #{vacancy_id}."
         )
 
     jd_text = jd_path.read_text(encoding="utf-8")

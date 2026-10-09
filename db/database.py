@@ -690,13 +690,14 @@ GENERATION_FAILURE_REASON_MAX = 500
 
 
 def decode_generation_failure(raw: str | None) -> dict | None:
-    """Parse the stored `last_generation_failure` JSON into {kind, target, reason, code, at}.
+    """Parse the stored `last_generation_failure` JSON into {kind, target, reason, code, lang, at}.
 
     `target` is "cv" or "cover" for kind "pdf" (which document failed to render) and
     None for kind "cv" / "cover". None for NULL, empty, unparsable or malformed values
     (including kind "pdf" without a valid target), so an old row or a bad value never
     breaks an API response. `code` (core/failure_codes.py) is None on rows recorded before
-    codes existed.
+    codes existed. `lang` is the language the failed CV run was requested with ("en" | "uk" |
+    "both" | "auto"), so a retry can repeat it; None for a cover or PDF failure and for old rows.
     """
     if not raw:
         return None
@@ -718,16 +719,20 @@ def decode_generation_failure(raw: str | None) -> dict | None:
         "target": target,
         "reason": str(data.get("reason") or ""),
         "code": code if isinstance(code, str) and code else None,
+        "lang": data["lang"] if isinstance(data.get("lang"), str) and data["lang"] else None,
         "at": data.get("at"),
     }
 
 
-def _failure_payload(kind: str, reason: str, target: str | None = None, code: str | None = None) -> str:
+def _failure_payload(
+    kind: str, reason: str, target: str | None = None, code: str | None = None, lang: str | None = None
+) -> str:
     return json.dumps(
         {
             "kind": kind,
             "target": target,
             "code": code,
+            "lang": lang,
             "reason": (reason or "")[:GENERATION_FAILURE_REASON_MAX],
             "at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
         },
@@ -736,7 +741,8 @@ def _failure_payload(kind: str, reason: str, target: str | None = None, code: st
 
 
 async def fail_generation(
-    vacancy_id: int, kind: str, reason: str, rollback_status: str, code: str | None = None
+    vacancy_id: int, kind: str, reason: str, rollback_status: str, code: str | None = None,
+    lang: str | None = None,
 ) -> None:
     """Record a failed CV / cover generation and roll the status back, in one write.
 
@@ -752,7 +758,7 @@ async def fail_generation(
         await db.execute(
             "UPDATE vacancies SET status = ?, last_generation_failure = ?, "
             "updated_at = datetime('now'), declined_at = NULL WHERE id = ?",
-            (rollback_status, _failure_payload(kind, reason, code=code), vacancy_id),
+            (rollback_status, _failure_payload(kind, reason, code=code, lang=lang), vacancy_id),
         )
         await db.commit()
 

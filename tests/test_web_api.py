@@ -2574,7 +2574,7 @@ async def test_failure_for_a_fetch_failed_vacancy(client):
         assert item["status"] == "fetch_failed"
         assert item["failure"] == {
             "kind": "fetch", "target": None, "reason": "Fetch failed 5x - giving up: 503",
-            "at": item["updated_at"], "retry": "fetch", "code": "fetch_gave_up",
+            "at": item["updated_at"], "retry": "fetch", "code": "fetch_gave_up", "lang": None,
         }
         assert item["failure"]["at"].endswith("Z")
 
@@ -2621,7 +2621,7 @@ async def test_a_failure_recorded_before_codes_existed_reads_as_unknown(client):
 
     for item in _both(client, vid):
         assert item["failure"]["code"] == "unknown"
-        assert item["generation_failure"]["code"] is None
+        assert item["generation_failure"]["code"] == "unknown"       # the same value in both fields
 
 
 @pytest.mark.asyncio
@@ -2641,3 +2641,46 @@ async def test_every_failure_code_in_the_api_is_in_the_vocabulary(client):
 
     for vid in ids:
         assert _both(client, vid)[0]["failure"]["code"] in failure_codes.ALL_CODES
+
+
+@pytest.mark.asyncio
+async def test_failure_is_null_while_a_retry_runs_and_returns_if_it_fails_again(client):
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/fp-retry/", status="cv_generating")
+    await database.fail_generation(vid, "cv", "first failure", "analyzed", code="llm_error")
+    assert _both(client, vid)[0]["failure"]["reason"] == "first failure"
+
+    await database.update_vacancy_status(vid, "cv_generating")             # the user pressed retry
+    for item in _both(client, vid):
+        assert item["status"] == "cv_generating"
+        assert item["failure"] is None                                     # no stale red mark, no live retry button
+
+    await database.fail_generation(vid, "cv", "second failure", "analyzed", code="llm_timeout")
+    for item in _both(client, vid):
+        assert (item["failure"]["reason"], item["failure"]["code"]) == ("second failure", "llm_timeout")
+
+
+@pytest.mark.asyncio
+async def test_generation_failure_and_failure_always_carry_the_same_code(client):
+    vids = []
+    for n, code in enumerate(["llm_error", None, "a_code_from_the_future"]):
+        vid = await database.insert_vacancy(url=f"https://djinni.co/jobs/fp-same{n}/", status="cv_generating")
+        await database.fail_generation(vid, "cv", "x", "analyzed", code=code)
+        vids.append(vid)
+
+    for vid in vids:
+        for item in _both(client, vid):
+            assert item["generation_failure"]["code"] == item["failure"]["code"]
+
+
+@pytest.mark.asyncio
+async def test_failure_exposes_the_language_of_a_failed_cv_run(client):
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/fp-lang/", status="cv_generating")
+    await database.fail_generation(vid, "cv", "boom", "analyzed", code="llm_error", lang="uk")
+    old = await database.insert_vacancy(url="https://djinni.co/jobs/fp-lang-old/", status="cv_generating")
+    await database.fail_generation(old, "cv", "boom", "analyzed")                # no language, like an old row
+
+    for item in _both(client, vid):
+        assert item["failure"]["lang"] == "uk"
+        assert item["generation_failure"]["lang"] == "uk"
+    for item in _both(client, old):
+        assert item["failure"]["lang"] is None
