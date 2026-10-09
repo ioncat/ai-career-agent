@@ -2717,3 +2717,85 @@ async def test_the_failure_mark_and_retry_come_back_after_a_restart_mid_retry(cl
     failure = client.get(f"/api/vacancies/{vid}").json()["failure"]
     assert (failure["kind"], failure["retry"], failure["lang"], failure["reason"]) == \
         ("cv", "cv", "uk", "first failure")
+
+
+# ── model lists: no repeated names (Ollama /api/tags once returned a tag twice) ──
+
+def _http_client_returning(payload):
+    """Patch web.api's httpx client so GET returns the given JSON."""
+    from unittest.mock import MagicMock
+    resp = MagicMock()
+    resp.json = MagicMock(return_value=payload)
+    resp.raise_for_status = MagicMock()
+    client = AsyncMock()
+    client.get = AsyncMock(return_value=resp)
+    ctx = MagicMock()
+    ctx.__aenter__ = AsyncMock(return_value=client)
+    ctx.__aexit__ = AsyncMock(return_value=False)
+    return patch("web.api.httpx.AsyncClient", return_value=ctx)
+
+
+def test_dedupe_models_keeps_order_and_drops_repeats_and_junk():
+    from web.api import _dedupe_models
+    assert _dedupe_models(["b", "a", "b", "", "  ", None, 3, "a", "c"]) == ["b", "a", "c"]
+    assert _dedupe_models(None) == [] and _dedupe_models([]) == []
+
+
+@pytest.mark.asyncio
+async def test_fetch_ollama_models_removes_a_tag_returned_twice():
+    from web.api import _fetch_ollama_models
+    tags = {"models": [{"name": "gemma4:e2b"}, {"name": "mistral:7b"}, {"name": "gemma4:e2b"}, {"name": "qwen3:8b"}]}
+
+    with _http_client_returning(tags):
+        models = await _fetch_ollama_models("http://localhost:11434")
+
+    assert models == ["gemma4:e2b", "mistral:7b", "qwen3:8b"]
+
+
+@pytest.mark.asyncio
+async def test_fetch_anthropic_models_removes_a_repeated_id():
+    from web.api import _fetch_anthropic_models
+    payload = {"data": [{"id": "claude-a"}, {"id": "claude-b"}, {"id": "claude-a"}]}
+
+    with _http_client_returning(payload):
+        models = await _fetch_anthropic_models("key")
+
+    assert models == ["claude-b", "claude-a"]
+
+
+@pytest.mark.asyncio
+async def test_a_cached_list_with_a_repeated_name_is_served_without_it():
+    """The live cache can already hold a duplicate for up to 24 hours."""
+    import json as _json
+    from web.api import _get_available_models
+    await database.set_kv("models:ollama_api", _json.dumps(["gemma4:e2b", "mistral:7b", "gemma4:e2b"]))
+
+    assert await _get_available_models("ollama_api") == ["gemma4:e2b", "mistral:7b"]
+
+
+@pytest.mark.asyncio
+async def test_a_fresh_fetch_with_a_duplicate_is_cached_and_returned_unique(monkeypatch):
+    import json as _json
+    from web.api import _get_available_models
+    tags = {"models": [{"name": "a"}, {"name": "a"}, {"name": "b"}]}
+    monkeypatch.setenv("OLLAMA_BASE_URL", "http://localhost:11434")
+
+    with _http_client_returning(tags):
+        models = await _get_available_models("ollama_api", force=True)
+
+    assert models == ["a", "b"]
+    cached, _ = await database.get_kv("models:ollama_api")
+    assert _json.loads(cached) == ["a", "b"]
+
+
+@pytest.mark.asyncio
+async def test_the_config_endpoint_returns_unique_available_models(client, monkeypatch):
+    import json as _json
+    monkeypatch.setenv("LLM_PROVIDER", "claude_cli")
+    await database.insert_user(name="Dedupe", telegram_chat_id=7301, skill_type="pm")
+    await database.set_user_settings(1, llm_provider="claude_cli", llm_model=None, thinking_effort="off")
+    await database.set_kv("models:claude_cli", _json.dumps(["claude-sonnet-5", "claude-sonnet-5", "claude-opus-4-8"]))
+
+    cfg = client.get("/api/config").json()
+
+    assert cfg["available_models"] == ["claude-sonnet-5", "claude-opus-4-8"]

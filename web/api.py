@@ -471,6 +471,21 @@ _FALLBACK_MODELS: dict[str, list[str]] = {
 _MODELS_CACHE_TTL_HOURS = 24
 
 
+def _dedupe_models(names) -> list[str]:
+    """The names without repeats, in their original order; non-strings and blanks are dropped.
+
+    Ollama's /api/tags has returned the same tag twice, and a repeated name crashes a client
+    dropdown that needs unique values.
+    """
+    seen: set[str] = set()
+    unique: list[str] = []
+    for name in names or []:
+        if isinstance(name, str) and name.strip() and name not in seen:
+            seen.add(name)
+            unique.append(name)
+    return unique
+
+
 async def _fetch_anthropic_models(api_key: str) -> list[str]:
     """Fetch model IDs from Anthropic /v1/models. Returns [] on error."""
     try:
@@ -483,7 +498,7 @@ async def _fetch_anthropic_models(api_key: str) -> list[str]:
             data = resp.json()
             models = [m["id"] for m in data.get("data", []) if "id" in m]
             # Sort: newest first (descending by id string — works for claude-* naming)
-            return sorted(models, reverse=True)
+            return sorted(_dedupe_models(models), reverse=True)
     except Exception as exc:
         log.warning("Failed to fetch Anthropic models: %s", exc)
         return []
@@ -496,7 +511,7 @@ async def _fetch_ollama_models(base_url: str) -> list[str]:
             resp = await client.get(f"{base_url.rstrip('/')}/api/tags")
             resp.raise_for_status()
             data = resp.json()
-            return [m["name"] for m in data.get("models", []) if "name" in m]
+            return _dedupe_models([m["name"] for m in data.get("models", []) if "name" in m])
     except Exception as exc:
         log.warning("Failed to fetch Ollama models: %s", exc)
         return []
@@ -517,7 +532,9 @@ async def _get_available_models(provider: str, force: bool = False) -> list[str]
         try:
             age = datetime.datetime.utcnow() - datetime.datetime.fromisoformat(updated_at)
             if age.total_seconds() < _MODELS_CACHE_TTL_HOURS * 3600:
-                return json.loads(cached_value)
+                # De-duplicated on the way out too: a cache written before the fetchers did it can
+                # hold a repeated name for up to a day.
+                return _dedupe_models(json.loads(cached_value))
         except Exception:
             pass  # bad cache entry — refetch
 
@@ -533,6 +550,7 @@ async def _get_available_models(provider: str, force: bool = False) -> list[str]
     else:
         models = _FALLBACK_MODELS.get(provider, [])
 
+    models = _dedupe_models(models)
     if models:
         await database.set_kv(cache_key, json.dumps(models))
 
