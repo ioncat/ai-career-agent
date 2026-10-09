@@ -12,6 +12,7 @@ from dataclasses import dataclass
 
 from core import config_store
 from core.deps import AgentDeps
+from core.generation_failure import exception_reason, soft_failure_reason
 from core.settings import Settings
 from db import database
 
@@ -77,12 +78,15 @@ class CoverWorker:
                     profile=self._deps.profile,
                 )
                 ctx = _Ctx(deps=fresh_deps)
-                await cv_cover(ctx, vacancy_id)  # type: ignore[arg-type]
+                result = await cv_cover(ctx, vacancy_id)  # type: ignore[arg-type]
+                if (reason := soft_failure_reason(result)) is not None:
+                    raise RuntimeError(reason)
                 log.info("CoverWorker: done — v#%d", vacancy_id)
             except Exception as exc:
-                err_msg = str(exc)[:500]
+                err_msg = exception_reason(exc)[:500]
                 log.error("CoverWorker: failed v#%d: %s", vacancy_id, err_msg)
-                await database.update_vacancy_status(vacancy_id, "cv_generated")
+                # Rollback + the failure on the vacancy in one write (shown until the next success).
+                await database.fail_generation(vacancy_id, "cover", err_msg, "cv_generated")
 
     async def _fresh_llm(self, phase: str) -> object:
         """Build LLM provider for `phase` via core.config_store (single source of truth).

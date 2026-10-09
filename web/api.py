@@ -68,6 +68,18 @@ def _utc_z(value):
     return value.replace(" ", "T", 1) + "Z"
 
 
+def _expose_generation_failure(item: dict) -> None:
+    """Replace the raw `last_generation_failure` column by `generation_failure`.
+
+    Shape: null, or {"kind": "cv" | "cover", "reason": str, "at": ISO 8601 UTC with Z}.
+    A NULL, old or malformed column value gives null, never an error.
+    """
+    failure = database.decode_generation_failure(item.pop("last_generation_failure", None))
+    if failure is not None:
+        failure["at"] = _utc_z(failure["at"])
+    item["generation_failure"] = failure
+
+
 def _normalize_dates(item: dict) -> dict:
     """Mutate + return item — appends 'Z' to every known date field present."""
     for key in _DATE_FIELDS:
@@ -372,6 +384,7 @@ async def api_vacancies(
         # itself is NOT sent here — full model output is heavy for a list
         # response; fetched on demand via GET /api/vacancies/{id} instead.
         item["blocker_flag"] = bool(item.get("blocker_flag"))
+        _expose_generation_failure(item)
         raw_output = item.pop("blocker_raw_output", None)
         item["blocker_checked"] = bool(raw_output)
         raw_reasons = item.pop("blocker_reasons", None)
@@ -1758,6 +1771,7 @@ async def api_vacancy(vacancy_id: int):
     if row is None:
         raise HTTPException(status_code=404, detail="Vacancy not found")
     item = _normalize_dates(dict(row))
+    _expose_generation_failure(item)
     item["applied_twin_id"] = await database.get_applied_twin_id(vacancy_id)
     item["company_applied_id"] = await database.get_company_applied_id(vacancy_id)
     return item

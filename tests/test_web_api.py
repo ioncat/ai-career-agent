@@ -2368,3 +2368,41 @@ async def test_decline_works_on_a_fetch_failed_vacancy(client):
     row = await database.get_vacancy_by_id(vid)
     assert row["status"] == "declined"
     assert row["declined_at"] is not None
+
+
+# ── generation_failure in the vacancy APIs ────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_list_and_detail_expose_a_generation_failure(client):
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/gf-api/", status="cv_generating")
+    await database.fail_generation(vid, "cv", "LLM timeout", "analyzed")
+
+    listed = next(r for r in client.get("/api/vacancies").json() if r["id"] == vid)
+    detail = client.get(f"/api/vacancies/{vid}").json()
+
+    for item in (listed, detail):
+        assert item["status"] == "analyzed"
+        assert item["generation_failure"]["kind"] == "cv"
+        assert item["generation_failure"]["reason"] == "LLM timeout"
+        assert item["generation_failure"]["at"].endswith("Z")
+        assert "last_generation_failure" not in item
+
+
+@pytest.mark.asyncio
+async def test_a_vacancy_without_a_failure_has_generation_failure_null(client):
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/gf-none/")
+
+    listed = next(r for r in client.get("/api/vacancies").json() if r["id"] == vid)
+
+    assert listed["generation_failure"] is None
+    assert client.get(f"/api/vacancies/{vid}").json()["generation_failure"] is None
+
+
+@pytest.mark.asyncio
+async def test_since_poll_returns_the_vacancy_after_a_failure(client):
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/gf-since/", status="cv_generating")
+    await database.fail_generation(vid, "cover", "boom", "cv_generated")
+
+    rows = client.get("/api/vacancies", params={"since": "2000-01-01T00:00:00"}).json()
+
+    assert next(r for r in rows if r["id"] == vid)["generation_failure"]["kind"] == "cover"

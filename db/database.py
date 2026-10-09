@@ -19,6 +19,7 @@ import logging
 import sqlite3
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import AsyncIterator
 from urllib.parse import urlparse, urlunparse
@@ -265,6 +266,12 @@ async def init_db() -> None:
             # stable unique company id within that board, already extracted by
             # the parser at fetch time but never stored. See core.dedup.profile_key.
             "ALTER TABLE vacancies ADD COLUMN company_profile_url TEXT",
+            # Last failed CV / cover generation (2026-10-09): JSON
+            # {"kind": "cv"|"cover", "reason": ..., "at": "YYYY-MM-DD HH:MM:SS"} so the
+            # failure stays visible on the vacancy after the toast is gone. NULL = none.
+            # Written by fail_generation(); cleared by update_vacancy_status() when the
+            # same kind succeeds.
+            "ALTER TABLE vacancies ADD COLUMN last_generation_failure TEXT",
         ]:
             try:
                 await db.execute(migration)
@@ -643,6 +650,11 @@ async def update_vacancy_status(vacancy_id: int, status: str) -> None:
     Skip button (status='declined') and Restore (status='analyzed'/'fetched')
     through this one shared setter, same dedicated-timestamp pattern as
     applied_at.
+
+    Writing 'cv_generated' / 'cover_generated' also clears a stored generation
+    failure of that kind, in the same transaction: the success status and the end
+    of the failure mark are one change, so a client polling with `since` never sees
+    one without the other. A failure of the other kind stays.
     """
     log.info("DB: vacancy #%d status -> %s", vacancy_id, status)
     declined_at_expr = "datetime('now')" if status == "declined" else "NULL"
@@ -654,6 +666,73 @@ async def update_vacancy_status(vacancy_id: int, status: str) -> None:
             WHERE id = ?
             """,
             (status, vacancy_id),
+        )
+        kind = _SUCCESS_STATUS_KIND.get(status)
+        if kind:
+            cursor = await db.execute(
+                "SELECT last_generation_failure FROM vacancies WHERE id = ?", (vacancy_id,)
+            )
+            row = await cursor.fetchone()
+            stored = decode_generation_failure(row["last_generation_failure"]) if row else None
+            if stored and stored["kind"] == kind:
+                await db.execute(
+                    "UPDATE vacancies SET last_generation_failure = NULL WHERE id = ?",
+                    (vacancy_id,),
+                )
+        await db.commit()
+
+
+# Status written on a successful run -> the kind of generation whose stored failure it ends.
+_SUCCESS_STATUS_KIND = {"cv_generated": "cv", "cover_generated": "cover"}
+GENERATION_KINDS = ("cv", "cover")
+GENERATION_FAILURE_REASON_MAX = 500
+
+
+def decode_generation_failure(raw: str | None) -> dict | None:
+    """Parse the stored `last_generation_failure` JSON into {kind, reason, at}.
+
+    None for NULL, empty, unparsable or malformed values, so an old row or a bad
+    value never breaks an API response.
+    """
+    if not raw:
+        return None
+    try:
+        data = json.loads(raw)
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(data, dict) or data.get("kind") not in GENERATION_KINDS:
+        return None
+    return {
+        "kind": data["kind"],
+        "reason": str(data.get("reason") or ""),
+        "at": data.get("at"),
+    }
+
+
+async def fail_generation(vacancy_id: int, kind: str, reason: str, rollback_status: str) -> None:
+    """Record a failed CV / cover generation and roll the status back, in one write.
+
+    kind is 'cv' or 'cover'; reason is cut to GENERATION_FAILURE_REASON_MAX characters;
+    the time is stored in UTC. Status and failure change together (and updated_at is
+    bumped), so a client polling with `since` gets both. declined_at is cleared like
+    any non-declined status in update_vacancy_status.
+    """
+    if kind not in GENERATION_KINDS:
+        raise ValueError(f"unknown generation kind {kind!r}")
+    log.info("DB: vacancy #%d %s generation failed -> status %s", vacancy_id, kind, rollback_status)
+    payload = json.dumps(
+        {
+            "kind": kind,
+            "reason": (reason or "")[:GENERATION_FAILURE_REASON_MAX],
+            "at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+        },
+        ensure_ascii=False,
+    )
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE vacancies SET status = ?, last_generation_failure = ?, "
+            "updated_at = datetime('now'), declined_at = NULL WHERE id = ?",
+            (rollback_status, payload, vacancy_id),
         )
         await db.commit()
 
