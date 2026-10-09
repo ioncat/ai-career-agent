@@ -1,6 +1,6 @@
 # Role addendum: Prompt owner (career-agent)
 
-> Common role brief: `E:\My files\0 My_Dev\my_prj\my_claude\AGENT_ROLES\prompt-owner.md` (the method, the failure classes, the reviewers). Rules: `my_claude\AGENT_TEAM_RULES.md`. Project specifics: [`../AGENT_RULES.md`](../AGENT_RULES.md).
+> Common role brief: `../my_claude/AGENT_ROLES/prompt-owner.md` (the method, the failure classes, the reviewers). Rules: `../my_claude/AGENT_TEAM_RULES.md`. Project specifics: [`../AGENT_RULES.md`](../AGENT_RULES.md).
 
 - **Session name:** `💪 Vacancy Analyzer (main)`.
 - **Read at start:** `CLAUDE.md` (Critical Rules "Prompts are directives, not history" and "No personal data in tracked files"; the file is local, not in git), `docs/delivery/PROMPT_EDITING_RULES.md` (before every prompt edit), `docs/delivery/PROMPT_REVIEW_CHECKLIST.md`, `docs/delivery/ROADMAP_Q4.md`, `docs/delivery/AGENT_RULES.md`.

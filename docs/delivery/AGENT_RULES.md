@@ -1,6 +1,6 @@
 # Agent rules: career-agent addendum
 
-> The common rules for every agent session live **outside the repo**, in `E:\My files\0 My_Dev\my_prj\my_claude\AGENT_TEAM_RULES.md` (cross-project, personal; the role briefs are in `my_claude\AGENT_ROLES\`). Read that file first. This page holds only what is specific to `career-agent`; rule numbers are the same as in the common file, so "rule 5" means the same thing in both. Role addenda for this project: [`roles/`](roles/).
+> The common rules for every agent session live **outside the repo**, in `../my_claude/AGENT_TEAM_RULES.md` (cross-project, personal; the role briefs are in `../my_claude/AGENT_ROLES/`). Read that file first. This page holds only what is specific to `career-agent`; rule numbers are the same as in the common file, so "rule 5" means the same thing in both. Role addenda for this project: [`roles/`](roles/).
 
 ## Project specifics, by rule
 
@@ -32,4 +32,4 @@
 
 ## Role addenda
 
-[dispatcher](roles/dispatcher.md) · [backend](roles/backend.md) · [flutter](roles/flutter.md) · [prompt-owner](roles/prompt-owner.md) · [code-reviewer](roles/code-reviewer.md). Startup line for a new session: "Read `E:\My files\0 My_Dev\my_prj\my_claude\AGENT_ROLES\<role>.md`, then `docs/delivery/roles/<role>.md`, and follow them."
+[dispatcher](roles/dispatcher.md) · [backend](roles/backend.md) · [flutter](roles/flutter.md) · [prompt-owner](roles/prompt-owner.md) · [code-reviewer](roles/code-reviewer.md). Startup line for a new session: "Read `../my_claude/AGENT_ROLES/<role>.md`, then `docs/delivery/roles/<role>.md`, and follow them."

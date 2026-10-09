@@ -1,6 +1,6 @@
 # Role addendum: Flutter agent (career-agent)
 
-> Common role brief: `E:\My files\0 My_Dev\my_prj\my_claude\AGENT_ROLES\frontend.md`. Rules: `my_claude\AGENT_TEAM_RULES.md`, project specifics: [`../AGENT_RULES.md`](../AGENT_RULES.md).
+> Common role brief: `../my_claude/AGENT_ROLES/frontend.md`. Rules: `../my_claude/AGENT_TEAM_RULES.md`, project specifics: [`../AGENT_RULES.md`](../AGENT_RULES.md).
 
 - **Session name:** `🦋 Flutter-agent`.
 - **Stack:** Flutter desktop (Windows), the owner's primary interface. No browser preview exists: you cannot see the screen, the owner confirms in the running app.

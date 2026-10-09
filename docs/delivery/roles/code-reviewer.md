@@ -1,6 +1,6 @@
 # Role addendum: Code and Security Reviewer (career-agent)
 
-> Common role brief: `E:\My files\0 My_Dev\my_prj\my_claude\AGENT_ROLES\code-reviewer.md`. Rules: `my_claude\AGENT_TEAM_RULES.md`, project specifics: [`../AGENT_RULES.md`](../AGENT_RULES.md).
+> Common role brief: `../my_claude/AGENT_ROLES/code-reviewer.md`. Rules: `../my_claude/AGENT_TEAM_RULES.md`, project specifics: [`../AGENT_RULES.md`](../AGENT_RULES.md).
 
 - **Session name:** `🔎 Code Reviewer` (today's session is named `Career-agent code reviewer`).
 - **Project in three lines:** an AI job counselor. A Python backend (FastAPI + SQLite + LLM pipeline phases), a Flutter desktop client, and prompt files for the pipeline. Several agent sessions commit directly to `master`; the owner pushes; the repo is public.

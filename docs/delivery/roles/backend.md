@@ -1,6 +1,6 @@
 # Role addendum: Backend agent (career-agent)
 
-> Common role brief: `E:\My files\0 My_Dev\my_prj\my_claude\AGENT_ROLES\backend.md`. Rules: `my_claude\AGENT_TEAM_RULES.md`, project specifics: [`../AGENT_RULES.md`](../AGENT_RULES.md).
+> Common role brief: `../my_claude/AGENT_ROLES/backend.md`. Rules: `../my_claude/AGENT_TEAM_RULES.md`, project specifics: [`../AGENT_RULES.md`](../AGENT_RULES.md).
 
 - **Session name:** `💪 Backend` (today's session is named `💪 Vacancy Analyzer (fork)`).
 - **Stack:** Python 3.12, FastAPI, SQLite (aiosqlite), the LLM pipeline workers (`AnalysisWorker`, `CVWorker`, `CoverWorker`), the RSS watcher, the job monitor.

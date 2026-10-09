@@ -1,6 +1,6 @@
 # Role addendum: Dispatcher (career-agent)
 
-> Common role brief: `E:\My files\0 My_Dev\my_prj\my_claude\AGENT_ROLES\dispatcher.md`. Rules: `my_claude\AGENT_TEAM_RULES.md`, project specifics: [`../AGENT_RULES.md`](../AGENT_RULES.md).
+> Common role brief: `../my_claude/AGENT_ROLES/dispatcher.md`. Rules: `../my_claude/AGENT_TEAM_RULES.md`, project specifics: [`../AGENT_RULES.md`](../AGENT_RULES.md).
 
 - **Session name:** `CTO`.
 - **Read at start:** `CLAUDE.md`, `docs/delivery/BACKLOG.md`, `docs/delivery/ROADMAP_Q4.md` (the map and the decisions pending from the owner), the latest `.claude/sessions/` log.
