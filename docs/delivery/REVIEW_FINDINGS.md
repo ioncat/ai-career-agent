@@ -20,7 +20,7 @@
 | RF-010 | 2026-10-09 | d531c30 | Low | failure_widgets.dart:160 | `at` parsed but not shown | fixed 583f2dc | |
 | RF-011 | 2026-10-09 | d531c30 | Low | flutter/lib/models/vacancy_failure.dart:40 | Hard `as String?` casts could break the whole list parse | fixed 583f2dc | |
 | RF-012 | 2026-10-09 | d531c30 | Low | failure_widgets.dart:98 | PDF failure without target silently rendered the CV | fixed 583f2dc | |
-| RF-013 | 2026-10-09 | d531c30 | Low | flutter/test/vacancy_failure_test.dart | No test that FailureBlock renders in both header states | open | in BACKLOG Icebox as a widget test |
+| RF-013 | 2026-10-09 | d531c30 | Low | flutter/test/vacancy_failure_test.dart | No test that FailureBlock renders in both header states | backlog | in BACKLOG Icebox as a widget test; the retry mapping itself is unit-tested since 583f2dc |
 | RF-014 | 2026-10-09 | d531c30 | Info | flutter/lib/widgets/vacancy_card.dart:370 | FailurePill built in two branches | fixed 583f2dc | |
 | RF-015 | 2026-10-09 | 9e9b7d7 | Med | core/failure_projection.py:87, db/database.py:306 | Recovery set `cv_queued`, which nothing processes; the failure mark was hidden for good | fixed 3244d84 | recovery to `analyzed` / `cv_generated` |
 | RF-016 | 2026-10-09 | 9e9b7d7 | Info | core/failure_projection.py:87 | An old PDF failure came back after a new CV | fixed 3244d84 | |
@@ -36,3 +36,4 @@
 | RF-026 | 2026-10-09 | d663850 | Info | db/database.py:2025 | Exception in prune after commit makes notify log "DB insert failed" though the row is saved | open | |
 | RF-027 | 2026-10-09 | d663850 | Sec | db/database.py (notifications), future POST /api/events | `code`, title and body are not length-limited or checked against the vocabulary (`key` is capped at 200) | open | close before phase 5 (POST /api/events); in BACKLOG |
 | RF-028 | 2026-10-09 | d663850 | Info | docs | The migration was applied to the live DB by an accidental test run without a backup; no note that other databases need a backup first | open | table was empty, owner accepted the state |
+| RF-029 | 2026-10-09 | 9e9b7d7 | Info | web/api.py:1622 | The render-pdf endpoint reports every transport error as "pdf-service unavailable" with HTTP 503, though the code now tells unreachable from a failed exchange | open | the `code` field is right; only the reason text and HTTP status are generic |
