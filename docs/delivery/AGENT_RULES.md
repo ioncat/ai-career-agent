@@ -4,6 +4,8 @@
 
 Roles used below: **owner** (the human), **dispatcher** (the agent that hands out tasks and collects results), **prompt owner** (the agent that owns `prompts/`, `skill/SKILL.md`, `.claude/commands/` and the review checklist).
 
+**Role briefs:** each role has its own startup file in [`roles/`](roles/): [dispatcher](roles/dispatcher.md), [backend](roles/backend.md), [flutter](roles/flutter.md), [prompt-owner](roles/prompt-owner.md), [code-reviewer](roles/code-reviewer.md) (code review and security review are one role). A new agent, or one that lost its context, needs one line: "Read `docs/delivery/roles/<role>.md` and follow it." The rules below apply to every role.
+
 ## Reports
 
 1. **Where a report goes.** A clean result goes to the dispatcher only, with the commit hash and the test numbers; the dispatcher checks it and gives the owner one line. A problem, a doubt or a decision that needs the owner goes to the owner directly, with a one-line copy to the dispatcher. Hard questions are discussed between the owner and the agent directly, not through the dispatcher.
