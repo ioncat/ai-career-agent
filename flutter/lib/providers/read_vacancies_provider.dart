@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/prefs_health.dart';
 
 const _kReadKey = 'read_vacancy_ids';
 
@@ -19,7 +20,10 @@ class ReadVacanciesNotifier extends AsyncNotifier<Set<int>> {
     final updated = {...current, id};
     state = AsyncData(updated);
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_kReadKey, jsonEncode(updated.toList()));
+    reportPrefsWrite(
+      await prefs.setString(_kReadKey, jsonEncode(updated.toList())),
+      'read marks',
+    );
   }
 }
 

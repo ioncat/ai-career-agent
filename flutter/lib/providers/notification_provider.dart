@@ -5,6 +5,7 @@ import '../models/pipeline_notification.dart';
 import '../repositories/vacancy_repository.dart';
 import '../utils/notification_cursor.dart';
 import 'settings_provider.dart';
+import '../utils/prefs_health.dart';
 
 const _kCursorTsKey = 'notifications_cursor_ts';
 const _kCursorIdsKey = 'notifications_cursor_ids';
@@ -64,8 +65,11 @@ class NotificationNotifier extends AsyncNotifier<NotificationState> {
   Future<void> _saveCursor(NotificationCursor c) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_kCursorTsKey, c.ts);
-      await prefs.setString(_kCursorIdsKey, c.encodeIds());
+      reportPrefsWrite(
+        await prefs.setString(_kCursorTsKey, c.ts) &&
+            await prefs.setString(_kCursorIdsKey, c.encodeIds()),
+        'notification cursor',
+      );
     } catch (_) {}
   }
 

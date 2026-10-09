@@ -21,6 +21,7 @@ import '../utils/toast.dart';
 import 'vacancy_inbox_screen.dart';
 import 'analytics_screen.dart';
 import 'settings_screen.dart';
+import '../utils/prefs_health.dart';
 
 // Nav destinations — 5-stage taxonomy (mirrors core/vacancy_stage.py) + Analytics + Settings.
 // Order must match _AppShellState._folders below (index-aligned for the first 5).
@@ -67,10 +68,20 @@ class _AppShellState extends ConsumerState<AppShell> {
     _lifecycle = AppLifecycleListener(
       onStateChange: (s) => _windowFocused = s == AppLifecycleState.resumed,
     );
+    prefsWriteError.addListener(_onPrefsWriteError);
+  }
+
+  /// A failed local-settings write is shown once, as an error toast that stays
+  /// until closed (see utils/prefs_health.dart).
+  void _onPrefsWriteError() {
+    final msg = prefsWriteError.value;
+    if (msg == null || !mounted) return;
+    showErrorSnackBar(context, msg);
   }
 
   @override
   void dispose() {
+    prefsWriteError.removeListener(_onPrefsWriteError);
     _lifecycle.dispose();
     super.dispose();
   }
@@ -414,7 +425,10 @@ class _AppNavRail extends StatelessWidget {
             _NavRailItem(
               item: _kNavItems[_kSettingsIndex],
               selected: selectedIndex == _kSettingsIndex,
-              badgeCount: unreadNotifCount,
+              // Hidden until the notification history view exists (phase 6):
+              // an unread count with nowhere to read or clear the events only
+              // confused (owner, 2026-10-09).
+              badgeCount: 0,
               onTap: () => onSelected(_kSettingsIndex),
             ),
             const SizedBox(height: 12),

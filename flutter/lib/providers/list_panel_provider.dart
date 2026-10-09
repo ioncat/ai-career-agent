@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/prefs_health.dart';
 
 /// Width bounds for the resizable vacancy-list panel (`vacancy_inbox_screen.dart`).
 /// Min keeps the header's controls (filter/refresh/skip-all menu, search box)
@@ -54,7 +55,7 @@ class ListPanelNotifier extends AsyncNotifier<ListPanelState> {
     final current = state.valueOrNull ?? const ListPanelState();
     final next = !current.collapsed;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_keyCollapsed, next);
+    reportPrefsWrite(await prefs.setBool(_keyCollapsed, next), 'list panel');
     state = AsyncData(current.copyWith(collapsed: next));
   }
 }

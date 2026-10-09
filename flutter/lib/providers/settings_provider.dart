@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/prefs_health.dart';
 
 class AppSettings {
   final String apiUrl;
@@ -48,25 +49,25 @@ class SettingsNotifier extends AsyncNotifier<AppSettings> {
 
   Future<void> updateApiUrl(String url) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_keyApiUrl, url);
+    reportPrefsWrite(await prefs.setString(_keyApiUrl, url), 'API URL');
     state = AsyncData(state.requireValue.copyWith(apiUrl: url));
   }
 
   Future<void> updatePollInterval(int seconds) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_keyPollInterval, seconds);
+    reportPrefsWrite(await prefs.setInt(_keyPollInterval, seconds), 'poll interval');
     state = AsyncData(state.requireValue.copyWith(pollIntervalSeconds: seconds));
   }
 
   Future<void> updateNotifications(bool enabled) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_keyNotifications, enabled);
+    reportPrefsWrite(await prefs.setBool(_keyNotifications, enabled), 'notifications switch');
     state = AsyncData(state.requireValue.copyWith(notificationsEnabled: enabled));
   }
 
   Future<void> updateSinceTimestamp(String ts) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_keySince, ts);
+    reportPrefsWrite(await prefs.setString(_keySince, ts), 'poll time');
     state = AsyncData(state.requireValue.copyWith(sinceTimestamp: ts));
   }
 }

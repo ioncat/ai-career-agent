@@ -8,6 +8,7 @@ import '../utils/backend_time.dart';
 import 'settings_provider.dart';
 import 'vacancy_cv_provider.dart';
 import 'vacancy_detail_provider.dart';
+import '../utils/prefs_health.dart';
 
 enum PollingStatus { idle, polling, found, empty, error }
 
@@ -127,8 +128,14 @@ class VacancyListNotifier extends AsyncNotifier<PollingState> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final json = jsonEncode(items.map((v) => v.toJson()).toList());
-      await prefs.setString(_kCacheKey, json);
-      await prefs.setString(_kCacheTimestampKey, DateTime.now().toIso8601String());
+      reportPrefsWrite(
+        await prefs.setString(_kCacheKey, json) &&
+            await prefs.setString(
+              _kCacheTimestampKey,
+              DateTime.now().toIso8601String(),
+            ),
+        'vacancy list cache',
+      );
     } catch (_) {}
   }
 
