@@ -22,7 +22,7 @@ Marketing's core principle applies across the whole pipeline: understand what's 
 This runs end to end, not as a single-phase check:
 - **Phase 1** — North Star (§1.0.5) is the source of truth; everything downstream traces back to it.
 - **Phase 2 Adaptation Plan** — reframing actions should point toward North Star language, not only toward individual signal coverage.
-- **Phase 3 CV draft** — the SUMMARY must consciously echo the North Star's own image (paraphrased, never JD-verbatim — see Phase 3.7 JD-Echo Risk) so the opening paragraph reads as a direct answer to "what result is this company buying."
+- **Phase 3 CV draft** — the SUMMARY must consciously echo the North Star's own image (paraphrased, never JD-verbatim — see Phase 3.8 JD-Echo Risk) so the opening paragraph reads as a direct answer to "what result is this company buying."
 - **Phase 3.5 self-review** — includes a North Star Alignment check alongside the existing word-frequency/tools checks.
 - **Phase 3.6 signal audit** — ends with an explicit North Star Check line (✅/⚠️/❌) — the "четкая сверка" (clear compliance check) the pipeline closes on before Phase 4.
 - **Phase 4 Cover** — category signal + pain recognition should trace to the same North Star image, not a separate framing.
@@ -35,7 +35,7 @@ Applies to both `pm` and `generic` skill_type prompt sets.
 
 **Output language:**
 1. User communication in chat: the `language` field in the Settings section of `skill/users/[id]/PROFILE.md` (default `en` if not set).
-2. Analysis documents written to disk: **English**, always. That is `JD_analysis.md` and every phase block appended to it (Phase 1, 2, 2.5, 3.5, 3.6, 3.7). Project language policy: analysis output, the tracker and the Flutter UI are English-only. When a phase result is presented in chat, summarize it in the language from point 1.
+2. Analysis documents written to disk: **English**, always. That is `JD_analysis.md` and every phase block appended to it (Phase 1, 2, 2.5, 3.5, 3.6, 3.7, 3.8). Project language policy: analysis output, the tracker and the Flutter UI are English-only. When a phase result is presented in chat, summarize it in the language from point 1.
 3. CV and cover follow the rules below, not this setting.
 
 - **CV language** — default = JD language (English JD → English CV, Ukrainian JD → Ukrainian CV). Final choice = user (pre-flight ask before Phase 3). User can override the default.
@@ -65,7 +65,7 @@ For low-priority or take-a-chance vacancies that already have Phase 1+2. Goes st
 - Phase 2.5 skipped, no question asked (the Adaptation Plan's confirmation questions are not asked either; items without clear profile evidence stay out of the CV).
 - Pre-flight skipped: CV language English (or the one the user adds, e.g. `-lite uk`), default name variant.
 - Short CV: Summary of 2 short paragraphs plus the **1-component** AI paragraph (golden line + portfolio link, never the 2-component form in light mode), one short paragraph per role, ALL Key results kept.
-- Checks: `python scripts/cv_checks.py` only. The voice rules and the language-level rule still apply to the draft but are not checked in this mode (a deliberate trade-off for speed). Phase 3.6 and 3.7 do not run.
+- Checks: `python scripts/cv_checks.py` only. The voice rules and the language-level rule still apply to the draft but are not checked in this mode (a deliberate trade-off for speed). Phase 3.6, 3.7 and 3.8 do not run.
 - No cover unless the user asks.
 Full description: `.claude/commands/analyze.md` → `-lite`.
 
@@ -132,7 +132,7 @@ Phase 3.5: Self-Review     [review tables + verdict shown to user; CV body NEVER
     human review step downstream, so treat every hit as something to fix now.
   → Also run the JD-echo scan — a cheap,
     mechanical pre-filter for CV phrases that mirror the JD's own distinctive wording, run
-    BEFORE any Phase 3.7 isolated audit (which also catches paraphrased, non-literal echo this
+    BEFORE any Phase 3.8 isolated audit (which also catches paraphrased, non-literal echo this
     n-gram scan can't see — the two are layered, not redundant):
     `python -c "import sys; sys.path.insert(0,'.'); from core.cv_metrics import detect_jd_echo; cv=open(r'[path to CV draft]', encoding='utf-8').read(); jd=open(r'[path to JD.md]', encoding='utf-8').read(); print(detect_jd_echo(cv, jd))"`
     Advisory, not auto-blocking — some findings are legitimate shared vocabulary (a required
@@ -169,17 +169,20 @@ Phase 3.6: Signal Audit    [runs after save, verdict shown to user — CV body s
   → If ⚠️ only: present to user, they decide → any applied rewrite also gets the same re-lint, .md only
   → If clean: proceed
 
-  → Once the CV reaches a final, no-more-edits state (end of the Phase 3.5→3.6 arc; if Phase 3.7 runs afterwards and changes the CV, it re-renders once after its confirmed fixes):
+  → Offer Phase 3.7 as one question: "Проверить покрытие ключевых слов для ATS?" (opt-in, never default, not in `-lite`).
+    On yes: run Phase 3.7 (see "Phase 3.7" below), .md edits only, then continue. On no: continue.
+
+  → Once the CV reaches a final, no-more-edits state (end of the Phase 3.5→3.6[→3.7] arc; if Phase 3.8 runs afterwards and changes the CV, it re-renders once after its confirmed fixes):
     generate the PDF exactly once via http://localhost:8002/render → save PDF bytes → present the
     CV.md + CV.pdf together (Rule 8 — never paste full CV text in chat). See "PDF Generation —
     render once, at the end" below — do not render/send a PDF at any earlier point in this arc.
   → Ask: "Переходим к cover?"
 
-  ↓ [Phase 3.7 only if recommendation = apply AND fit_score ≥ 7, or user asks explicitly]
+  ↓ [Phase 3.8 only if recommendation = apply AND fit_score ≥ 7, or user asks explicitly]
 
-Phase 3.7: Editorial Audit  [opt-in final polish — see below]
+Phase 3.8: Editorial Audit  [opt-in final polish — see below]
 
-  ↓ [Phase 4 only if the user explicitly requests a cover; independent of Phase 3.7, a cover can follow Phase 3.6 directly]
+  ↓ [Phase 4 only if the user explicitly requests a cover; independent of Phase 3.8, a cover can follow Phase 3.6 directly]
 
 Phase 4: Cover Message
   → Review/approval cycle (verdict/summary in chat, never the full cover text — Rule 8). Every
@@ -233,7 +236,14 @@ Clean / N sentences removed · CV.md + CV.pdf updated
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✅ Phase 3.7 — Editorial Audit
+✅ Phase 3.7 — ATS Keyword Coverage
+N terms · N present · N inserted · N adjacent · N not claimable
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Phase 3.8 — Editorial Audit
 N findings · N JD-echo · N applied · CV.md + CV.pdf updated
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
@@ -292,12 +302,25 @@ Cognitive + interactive (dialogue + judgment) → stays LLM. The barrier-list sc
 
 ---
 
-## Phase 3.7 — Editorial Audit (opt-in final polish)
+## Phase 3.7 — ATS Keyword Coverage (opt-in)
+
+**Runs after Phase 3.6 and before Phase 3.8, only when the user says yes to the one-question offer — NOT a default step, not in `-lite`.**
+Purpose: make the CV literally contain the JD's load-bearing terms wherever the profile already holds real evidence (automated screening matches literal words). The opposite goal to Phase 3.8's JD-Echo Risk check, so it runs first and hands 3.7 the list of terms it inserted.
+
+Runs inline in the conversation (it is a coverage check, not an audit of prose, so the isolated-subagent rule of Phase 3.8 does not apply). Prompt file: `prompts/[skill_type]/phase3_7_ats_coverage.md`.
+
+- Input: saved CV, `JD.md`, the Signal Coverage Table from `JD_analysis.md`, the profile.
+- Every proposed edit is shown with its exact wording and applied only after the user confirms; edits re-save CV.md only (no PDF), then the mechanical lint and the repetition check run again.
+- Append the table and the line `Inserted terms: ...` to `JD_analysis.md` under `## Phase 3.7: ATS Keyword Coverage`. Pass that line to the Phase 3.8 subagent as its extra input.
+
+---
+
+## Phase 3.8 — Editorial Audit (opt-in final polish)
 
 **Runs after Phase 3.6, only for vacancies that reached a strong outcome — NOT a default step.**
-Purpose: catch writing-craft issues (naturalness, credibility, JD-echo risk) that Phase 3.6 doesn't check — 3.6 audits JD-signal coverage per sentence, 3.7 audits prose quality and whether the document accidentally mirrors the JD's own wording.
+Purpose: catch writing-craft issues (naturalness, credibility, JD-echo risk) that Phase 3.6 doesn't check — 3.6 audits JD-signal coverage per sentence, 3.8 audits prose quality and whether the document accidentally mirrors the JD's own wording.
 
-**Covers CV and Cover both — run separately, one report each.** Both are external-facing documents with the same em-dash/claim-stacking/JD-echo risk; auditing only the CV and shipping an unaudited cover misses half the point. The cover is short (a few sentences) so even one instance of a pattern can matter proportionally more — see `phase3_7_editorial_audit.md` → "Cover Message Variant" for the two dimensions that don't apply to a cover (Show-vs-Tell / metric-credibility, since the cover is deliberately evidence-free by design, per `phase4_cover.md`).
+**Covers CV and Cover both — run separately, one report each.** Both are external-facing documents with the same em-dash/claim-stacking/JD-echo risk; auditing only the CV and shipping an unaudited cover misses half the point. The cover is short (a few sentences) so even one instance of a pattern can matter proportionally more — see `phase3_8_editorial_audit.md` → "Cover Message Variant" for the two dimensions that don't apply to a cover (Show-vs-Tell / metric-credibility, since the cover is deliberately evidence-free by design, per `phase4_cover.md`).
 
 ### Trigger
 
@@ -309,25 +332,26 @@ Self-audit bias is real and measurable: the same auditor (mid-conversation, same
 
 **Note (worktree write persistence):** subagent worktree file writes have been observed to not reliably persist after the agent finishes. Always instruct the subagent to return the FULL audit text verbatim in its final response (not a summary) as the primary deliverable — treat any file it writes as best-effort secondary, and save the returned text yourself.
 
-Give the subagent exactly three inputs, nothing else:
+Give the subagent exactly these inputs, nothing else:
 1. The saved document — CV file (post 3.5/3.6) OR Cover file (post Phase 4 approval), one per run
 2. The vacancy's `JD.md` (for the JD-Echo Risk check — this is why it's a separate input, not folded into a "context" blurb)
 3. A one-two sentence audience/archetype blurb (from Phase 1 `## Quick Scan` → Category, Who they want) — not the full `JD_analysis.md`
+4. The `Inserted terms:` line from Phase 3.7, so terms placed on purpose for keyword matching are not reported as JD-echo. Pass "none" when 3.7 did not run, when it inserted nothing, and always for a Cover audit; the exemption applies to the CV only
 
-Prompt file: `prompts/[skill_type]/phase3_7_editorial_audit.md` (full methodology — 5-step workflow, JD-echo check, output format — lives there, not duplicated here).
+Prompt file: `prompts/[skill_type]/phase3_8_editorial_audit.md` (full methodology — 5-step workflow, JD-echo check, output format — lives there, not duplicated here).
 
-**Python/API pipeline (`tools/cv_generate.py`) note:** the self-audit bias above is specific to Claude-Code-style long conversations. Each Python pipeline phase is already a stateless, isolated LLM call — no subagent indirection needed there, just call the LLM with the phase3_7 prompt directly.
+**Python/API pipeline (`tools/cv_generate.py`) note:** the self-audit bias above is specific to Claude-Code-style long conversations. Each Python pipeline phase is already a stateless, isolated LLM call — no subagent indirection needed there, just call the LLM with the phase3_8 prompt directly.
 
 ### After the audit
 
 - **Quick Win findings** (includes JD-Echo Risk by default) → present to user → confirm → apply → re-save CV.md only. Once all Quick Win fixes for this audit round are applied and confirmed: regenerate the PDF once from the final CV.md (do not render on each individual fix).
 - **Cover audited after its PDF exists** → apply the confirmed fixes to Cover.md only, then re-render Cover.pdf once.
 - **Medium Investment / Major Rewrite** → present, let the user decide — do not auto-apply.
-- Append the full audit output to `JD_analysis.md` under `## Phase 3.7: Editorial Audit`.
+- Append the full audit output to `JD_analysis.md` under `## Phase 3.8: Editorial Audit`.
 
 ### Nature (per EPIC-21)
 
-Cognitive + evaluative → stays LLM, not deterministic. Prompt: `prompts/[skill_type]/phase3_7_editorial_audit.md`.
+Cognitive + evaluative → stays LLM, not deterministic. Prompt: `prompts/[skill_type]/phase3_8_editorial_audit.md`.
 
 ---
 
@@ -373,7 +397,8 @@ ALL phases are skill_type-specific. No universal phase files remain in prompts/ 
 | Phase 3 | `prompts/[skill_type]/phase3_cv_draft.md` | JD text + JD_analysis.md + language + name + **resolved objections** |
 | Phase 3.5 | `prompts/[skill_type]/phase3_5_review.md` | CV draft + JD_analysis.md |
 | Phase 3.6 | `prompts/[skill_type]/phase3_6_signal_audit.md` | Saved CV (EXPERIENCE) + Signal Coverage Table from JD_analysis.md |
-| Phase 3.7 (opt-in) | `prompts/[skill_type]/phase3_7_editorial_audit.md` | Saved CV + JD.md + audience/archetype blurb from Phase 1 Quick Scan |
+| Phase 3.7 (opt-in) | `prompts/[skill_type]/phase3_7_ats_coverage.md` | Saved CV + JD.md + Signal Coverage Table + profile |
+| Phase 3.8 (opt-in) | `prompts/[skill_type]/phase3_8_editorial_audit.md` | Saved CV + JD.md + audience/archetype blurb from Phase 1 Quick Scan + Phase 3.7 inserted terms |
 | Phase 4 | `prompts/[skill_type]/phase4_cover.md` | JD text + approved CV + JD_analysis.md |
 
 ---
@@ -458,7 +483,7 @@ Date: [date]
 ## PDF Generation — render once, at the end
 
 **NON-NEGOTIABLE: never render or send a CV/cover PDF during an iterative edit/review loop.** Every edit-round save
-during Phase 3.5, 3.6, 3.7, or Phase 4's approval cycle touches the `.md` file only. Render the PDF
+during Phase 3.5, 3.6, 3.7, 3.8, or Phase 4's approval cycle touches the `.md` file only. Render the PDF
 exactly once — when the document reaches a final, no-more-edits state for that phase (user says
 "ок"/"всё ок"/no further changes, or the phase ends and hands off to the next one) — then present
 `.md` + `.pdf` together. A PDF render + `SendUserFile` round-trip on every small wording tweak is

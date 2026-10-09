@@ -1,5 +1,5 @@
 """
-tools/cv_editorial_audit.py — Phase 3.7: Editorial Audit (opt-in final polish).
+tools/cv_editorial_audit.py — Phase 3.8: Editorial Audit (opt-in final polish).
 
 Runs after Phase 3.6 (which isn't itself wired into the Python pipeline — this
 tool doesn't depend on it). Not part of the automatic status-driven pipeline
@@ -44,7 +44,7 @@ async def cv_editorial_audit(
     target: str = "cv",
     force: bool = False,
 ) -> str:
-    """Run the Phase 3.7 editorial audit against the saved CV and/or Cover.
+    """Run the Phase 3.8 editorial audit against the saved CV and/or Cover.
 
     Gated by default on a strong-fit outcome (Phase 2 recommendation == 'apply'
     and fit_score >= 7) — this is a multi-pass, higher-cost audit not meant to
@@ -105,7 +105,7 @@ async def cv_editorial_audit(
     audience_blurb = _extract_quick_scan(analysis_text)
 
     skill_dir = _PROMPTS_DIR / ctx.deps.skill_type
-    prompt_path = skill_dir / "phase3_7_editorial_audit.md"
+    prompt_path = skill_dir / "phase3_8_editorial_audit.md"
     if not prompt_path.exists():
         return f"⚠️ Промпт не найден: <code>{prompt_path}</code>"
     phase37_prompt = prompt_path.read_text(encoding="utf-8")
@@ -131,15 +131,15 @@ async def cv_editorial_audit(
             f"Audience context (from Phase 1 Quick Scan):\n\n{audience_blurb}"
         )
 
-        run_id = await database.insert_pipeline_run(vacancy_id, phase=f"phase3_7_{t}")
+        run_id = await database.insert_pipeline_run(vacancy_id, phase=f"phase3_8_{t}")
         await database.update_pipeline_run(run_id, status="running")
 
         try:
-            llm = await ctx.deps.get_llm("phase3_7")
+            llm = await ctx.deps.get_llm("phase3_8")
             report = await llm.complete(user_msg, system=phase37_prompt)
             if u := llm.last_call_usage:
                 await database.insert_llm_usage(
-                    phase=f"phase3_7_{t}", vacancy_id=vacancy_id,
+                    phase=f"phase3_8_{t}", vacancy_id=vacancy_id,
                     user_id=ctx.deps.user_id, **u
                 )
         except LLMError as exc:
@@ -150,7 +150,7 @@ async def cv_editorial_audit(
         await database.update_pipeline_run(run_id, status="done")
 
         # ── Append to JD_analysis.md (never overwrite prior sections of same label) ──
-        section_marker = f"\n\n---\n\n## Phase 3.7: Editorial Audit ({label})"
+        section_marker = f"\n\n---\n\n## Phase 3.8: Editorial Audit ({label})"
         current = analysis_path.read_text(encoding="utf-8")
         cutoff = current.find(section_marker)
         base = current[:cutoff] if cutoff != -1 else current

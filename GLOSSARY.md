@@ -32,8 +32,8 @@
 | **Phase 3 — CV draft** | Internal step, the draft is not shown. Written under the NON-NEGOTIABLE rules in `phase3_cv_draft.md`. |
 | **Phase 3.5 — Self-Review** | Review of the draft: word-frequency and tools tables, mechanical checks, voice, B2 language, North Star alignment, tone. Ends with the corrected CV. |
 | **Phase 3.6 — Signal Audit** | Splits each EXPERIENCE sentence into clauses and checks each against the Signal Coverage Table: valuable, weak, or remove. Ends with a North Star check. |
-| **Phase 3.7 — Editorial Audit** | Opt-in prose-quality audit (naturalness, credibility, JD-echo risk). Runs only for `apply` with fit 7 or higher, or on request, and runs in an isolated subagent to avoid self-audit bias. |
-| **Phase 3.8 — ATS Keyword Coverage** | Planned, not built. Would make sure the CV literally contains the JD's load-bearing keywords wherever real evidence exists. See BACKLOG. |
+| **Phase 3.7 — ATS Keyword Coverage** | Opt-in step after Phase 3.6: checks that the CV literally contains the JD's load-bearing terms wherever the profile has real evidence, and proposes wording that places the term in an existing sentence. Offered as one question, never default, not in `-lite`. Hands Phase 3.8 the list of terms it inserted. |
+| **Phase 3.8 — Editorial Audit** | Opt-in prose-quality audit (naturalness, credibility, JD-echo risk). Runs only for `apply` with fit 7 or higher, or on request, and runs in an isolated subagent to avoid self-audit bias. |
 | **Phase 4 — Cover** | Generates the cover message from the approved CV and the analysis. Deliberately light on evidence; one variant by default. |
 | **Quick Scan** | Summary block at the top of `JD_analysis.md`: Fit, VScore, Recommendation, Category, Who they want, Key Barriers, Hidden Risks, Warnings. Written last in Phase 2 as a summary of the deeper analysis, shown first. |
 | **Internal Analysis** | Phase 2's deep evidence matching (fit dimensions, strong matches, weak spots, objections). Kept for reference, not sent to the user. |
@@ -114,7 +114,7 @@
 | **Manufactured parallel** | An invented or forced link between a JD requirement and a profile fact, usually a shared word. A fabrication-class error; banned. |
 | **AI tooling paragraph** | The fixed one-line "AI tooling across PM workflows…" mention, a default on every CV. A two-component form with human-in-the-loop wording is for roles with real AI depth. The portfolio link appears exactly once. |
 | **Mechanical lint** | `core/cv_metrics.py` checks run in Phase 3.5: `detect_mechanical_violations` (em-dash, banned phrases), `detect_repetition` and `detect_phrase_repetition`, and `detect_jd_echo`. `scripts/cv_checks.py` runs all of them (plus the frequency and tools tables) in one command. |
-| **Self-audit bias** | Measured effect: an auditor in the same conversation as the author scores the text higher than an isolated one. The reason Phase 3.7 runs in an isolated subagent. |
+| **Self-audit bias** | Measured effect: an auditor in the same conversation as the author scores the text higher than an isolated one. The reason Phase 3.8 runs in an isolated subagent. |
 
 ## 7. North Star Signal Tree
 
@@ -129,7 +129,7 @@
 | **Lead signal** | The branch that is both `central` and has `Distinctive = yes` evidence in the profile. The CV leads with it. If none qualifies, the honest output is "No strong differentiator identified". |
 | **Bold-signal** | Check of the JD for selective bold emphasis: if the author bolded only some items, attention shifts to them. Bolding every item by template is not a signal. Rule in `phase1_analysis.md` §1.0.5 Stage 1. |
 | **Unlock condition** | A usage condition written on a profile fact (rare / default-omit / "include only when…"). Phase 2 checks it by the type of work the JD asks for, never by a shared word. |
-| **JD-echo** | CV phrasing lifted from the JD's own wording instead of composed from the candidate's evidence. Caught mechanically by `detect_jd_echo()` and by Phase 3.7. |
+| **JD-echo** | CV phrasing lifted from the JD's own wording instead of composed from the candidate's evidence. Caught mechanically by `detect_jd_echo()` and by Phase 3.8. |
 | **Weak-signal overfit** | Pairing a low-importance, single-mention JD word with a narrow profile fact just because the words match. |
 
 ## 8. Architecture and infrastructure

@@ -1,4 +1,4 @@
-# Phase 3.7: Editorial Audit (opt-in final polish)
+# Phase 3.8: Editorial Audit (opt-in final polish)
 
 Runs after Phase 3.6 Signal Audit, only for vacancies that reached a strong outcome
 (see Trigger below). Last quality gate before the application is sent — evaluates
@@ -33,7 +33,7 @@ just-written text in the same context, self-audit bias is real and measurable: t
 - **Claude Code / manual orchestration:** run this via an isolated subagent
   (`Agent` tool, fresh context, no memory of how the CV was drafted) — not inline
   in the same conversation. Give it only: the CV file, the JD file, and the audience
-  context blurb (see Input below). See SKILL.md → "Phase 3.7" for the exact pattern.
+  context blurb (see Input below). See SKILL.md → "Phase 3.8" for the exact pattern.
 - **Python/API pipeline (`tools/cv_generate.py`):** this bias does not apply —
   each phase is already a stateless, isolated LLM call with only its own inputs, not
   an accumulating conversation. Call the LLM directly with this prompt; no subagent
@@ -48,6 +48,9 @@ just-written text in the same context, self-audit bias is real and measurable: t
 2. The original JD text for this vacancy (`JD.md`) — for the JD-Echo Risk check below
 3. Audience context: role archetype + company type from Phase 1 (`## Quick Scan` →
    Category, Who they want) — one or two sentences, not the full `JD_analysis.md`
+4. The `Inserted terms:` line from Phase 3.7 (the terms it deliberately placed in the CV so the
+   CV literally contains them). Pass "none" when Phase 3.7 did not run, when it inserted nothing, and
+   always for a Cover audit (the Cover carries no ATS terms)
 
 ---
 
@@ -108,8 +111,9 @@ a phrase from the JD — even if the underlying claim is honest. Echoing the
 employer's own phrasing back at them reads as keyword-stuffing to any hiring
 audience, and is a *specific, elevated* risk when the employer's own product
 involves ATS/keyword-matching (they're primed to notice it). Report as its own
-labeled finding ("JD-echo risk") if anything qualifies. If nothing qualifies, say
-so explicitly — do not force a finding.
+labeled finding ("JD-echo risk") if anything qualifies. Do not flag a phrase whose only overlap
+with the JD is one of the Phase 3.7 inserted terms (Input #4): those were placed on purpose for
+literal keyword matching. This exemption applies to the CV only. If nothing qualifies, say so explicitly — do not force a finding.
 
 ## Step 3 — Validate
 
@@ -224,7 +228,7 @@ raw occurrence count as you would for a full-page CV.
 - **JD-Echo Risk findings** → treat as Quick Win by default (cheap, high-value
   fixes) unless the match is the "weaker/category-level" kind explicitly noted as
   defensible.
-- Append the full audit output to `JD_analysis.md` under `## Phase 3.7: Editorial
-  Audit (CV)` or `## Phase 3.7: Editorial Audit (Cover)` — label which document
+- Append the full audit output to `JD_analysis.md` under `## Phase 3.8: Editorial
+  Audit (CV)` or `## Phase 3.8: Editorial Audit (Cover)` — label which document
   was audited, since both may run and both get appended (mirrors the Phase 3.5
   self-review append pattern).

@@ -217,11 +217,11 @@ async def test_run_analyze_notify_receives_correct_user_and_vacancy():
     assert args[2] == 77    # vacancy_id
 
 
-# ── Phase 3.7 Editorial Audit — auto-triggered after CV/Cover, opt-in via gate ──
+# ── Phase 3.8 Editorial Audit — auto-triggered after CV/Cover, opt-in via gate ──
 
 @pytest.mark.asyncio
 async def test_run_generate_cv_triggers_editorial_audit_with_cv_target():
-    """The whole point of Phase 3.7 being 'opt-in' is the gate INSIDE
+    """The whole point of Phase 3.8 being 'opt-in' is the gate INSIDE
     cv_editorial_audit — not a human deciding whether to call it. run_generate_cv
     must call it automatically, every time, for every vacancy."""
     from core.pipeline_runner import run_generate_cv

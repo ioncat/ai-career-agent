@@ -43,3 +43,20 @@ def test_fit_score_counts_each_piece_of_evidence_once():
 def test_cover_prompt_shows_no_relative_clause_self_intro():
     for f in _PM.rglob("*.md"):
         assert not re.search(r"який працює|яка працює", f.read_text(encoding="utf-8")), f.name
+
+
+def test_phase_3_8_exists_and_hands_its_terms_to_phase_3_7():
+    text = _text("phase3_7_ats_coverage.md")
+    assert "Inserted terms:" in text and "literally" in text
+    assert "Not run by default" in text or "not run by default" in text
+    assert "Inserted terms" in _text("phase3_8_editorial_audit.md")
+
+
+def test_skill_and_analyze_wire_phase_3_8_in_and_keep_it_out_of_lite():
+    root = _PM.parent.parent
+    skill = " ".join((root / "skill" / "SKILL.md").read_text(encoding="utf-8").split())
+    analyze = " ".join((root / ".claude" / "commands" / "analyze.md").read_text(encoding="utf-8").split())
+    assert "prompts/[skill_type]/phase3_7_ats_coverage.md" in skill
+    assert "Phase 3.7 — ATS Keyword Coverage" in skill
+    assert "Phase 3.6, 3.7 and 3.8 do not run" in skill
+    assert "Phase 3.6, 3.7 and 3.8 do not run" in analyze

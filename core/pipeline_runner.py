@@ -123,7 +123,7 @@ async def run_generate_cv(
         )
         raise
 
-    # ── Phase 3.7: Editorial Audit (opt-in, best-effort, never blocks CV status) ──
+    # ── Phase 3.8: Editorial Audit (opt-in, best-effort, never blocks CV status) ──
     # Gate (apply + fit>=7) lives inside cv_editorial_audit itself — most vacancies
     # skip here for free (one DB read, no LLM call). Never raises past this point.
     await _run_editorial_audit_best_effort(deps, vacancy_id, target="cv")
@@ -163,17 +163,17 @@ async def run_generate_cover(deps: AgentDeps, vacancy_id: int) -> None:
         )
         raise
 
-    # ── Phase 3.7: Editorial Audit (opt-in, best-effort, never blocks cover status) ──
+    # ── Phase 3.8: Editorial Audit (opt-in, best-effort, never blocks cover status) ──
     await _run_editorial_audit_best_effort(deps, vacancy_id, target="cover")
 
 
 async def _run_editorial_audit_best_effort(
     deps: AgentDeps, vacancy_id: int, target: str
 ) -> None:
-    """Run Phase 3.7 editorial audit as a supplementary, non-blocking step.
+    """Run Phase 3.8 editorial audit as a supplementary, non-blocking step.
 
     Called automatically after CV/Cover generation succeeds — this is what makes
-    Phase 3.7 "opt-in" without needing a human to trigger it: the gate inside
+    Phase 3.8 "opt-in" without needing a human to trigger it: the gate inside
     cv_editorial_audit (Phase 2 recommendation=apply, fit_score>=7) decides
     per-vacancy whether it actually runs. Most vacancies skip for free (a DB
     read, no LLM call) — only genuinely strong matches pay the extra cost.

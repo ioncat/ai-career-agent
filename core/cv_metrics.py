@@ -273,7 +273,7 @@ def detect_jd_echo(cv_text: str, jd_text: str, min_n: int = 2, max_n: int = 6) -
     already counts — unlike self-repetition, echoing the employer's own
     distinctive phrasing back at them is a problem the first time, not just
     on a second occurrence. Found live 2026-09-21, vacancy #1658: an isolated
-    Phase 3.7 audit caught a CV Summary opening sentence built almost
+    Phase 3.8 audit caught a CV Summary opening sentence built almost
     entirely from paraphrased JD clauses, including one verbatim 2-word
     phrase ("running ceremonies") lifted from the exact JD line describing
     what the company does NOT want. min_n defaults to 2 (not 3, like
@@ -282,10 +282,10 @@ def detect_jd_echo(cv_text: str, jd_text: str, min_n: int = 2, max_n: int = 6) -
 
     This is a cheap, advisory pre-filter, not a judgment call — it cannot
     tell "echoed the JD's distinctive voice" apart from "used a shared,
-    expected term" as reliably as a human or an isolated Phase 3.7 read
+    expected term" as reliably as a human or an isolated Phase 3.8 read
     can. It exists to catch the clear, literal cases cheaply in Phase 3.5,
-    before the more expensive Phase 3.7 audit ever runs — not to replace
-    3.7's own JD-Echo Risk check, which also catches paraphrased (non-
+    before the more expensive Phase 3.8 audit ever runs — not to replace
+    3.8's own JD-Echo Risk check, which also catches paraphrased (non-
     literal) echo this n-gram scan cannot see by construction.
 
     Filtered out (to keep findings to genuine candidates, not routine

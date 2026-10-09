@@ -70,7 +70,7 @@ User will provide:
 
 ## Golden Rule — North Star Mirroring (SUMMARY, primary rule)
 
-Before writing SUMMARY, re-read the Phase 1 North Star sentence (§1.0.5 in JD_analysis.md). The SUMMARY must read as a direct, paraphrased answer to it, not a generic positioning statement and never JD-verbatim (see rule 25 / Phase 3.7 JD-Echo Risk) — the same image the employer has in mind, reflected back in the candidate's own words. This always wins over every other emphasis mechanism below — see Emphasis Precedence.
+Before writing SUMMARY, re-read the Phase 1 North Star sentence (§1.0.5 in JD_analysis.md). The SUMMARY must read as a direct, paraphrased answer to it, not a generic positioning statement and never JD-verbatim (see rule 25 / Phase 3.8 JD-Echo Risk) — the same image the employer has in mind, reflected back in the candidate's own words. This always wins over every other emphasis mechanism below — see Emphasis Precedence.
 
 ## CV Structure
 
