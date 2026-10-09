@@ -432,8 +432,8 @@ No dual-availability state — the button's visibility is a direct, deterministi
 **Severity — lower than it looks:** unlike the RSSWatcher fetch-cap bug, `check_feed()` does NOT accumulate stuck state — on failure it just logs and returns 0 new jobs for that cycle; the next 5-min poll starts clean. Worst case = a blind window where fresh postings are missed until the next successful cycle (self-healing, not a pile-up).
 **Action:** watch, no fix attempted yet — if it persists past today (i.e. isn't just today's self-inflicted rate-limit clearing), revisit: add a retry/backoff in `fetch_jobs()`, or a User-Agent/request-pacing review for the Djinni RSS endpoint specifically.
 
-### Fetch given up: Flutter side and other exception classes (backend done 2026-10-09)
-**Open:** (1) Flutter marks a `fetch_failed` vacancy in Inbox and offers "Retry fetch" via `PATCH /api/vacancies/{id}/restore` (Flutter-agent, item 9). (2) Does the retry-cap-and-classify pattern need to apply to OTHER pipeline exception classes (LLM timeouts, PDF render failures)?
+### Fetch given up: other exception classes (backend and Flutter done 2026-10-09)
+**Open:** does the retry-cap-and-classify pattern need to apply to OTHER pipeline exception classes (LLM timeouts, PDF render failures)?
 
 ### Dedup misses same vacancy republished across different source sites (found 2026-07-26)
 **Symptom:** vacancy #778 (Djinni) and #758 (DOU.ua) are the same real-world job (Headway Inc, "Globalization Product Manager", published within 5 min of each other) but exist as two separate, un-deduplicated DB rows — each got its own independent Phase 1+2 analysis with different verdicts (fit 4/decline vs fit 6/take a chance) on essentially the same JD text.
