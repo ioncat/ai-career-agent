@@ -367,7 +367,9 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
                   ],
                 )
               else if (v.status == 'analysis_failed')
-                _FailedBadge(),
+                _FailedBadge()
+              else if (v.status == 'fetch_failed')
+                _FetchFailedBadge(reason: v.analysisError),
               // Row 5: key barrier — show if present regardless of status
               if (v.keyBarriers.isNotEmpty) ...[
                 const SizedBox(height: 8),
@@ -501,6 +503,48 @@ class _FailedBadge extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// The system gave up fetching this vacancy (status fetch_failed). It stays
+/// in Inbox instead of being archived, so the card must say clearly that
+/// something went wrong with it.
+class _FetchFailedBadge extends StatelessWidget {
+  final String? reason;
+
+  const _FetchFailedBadge({this.reason});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final detail = (reason ?? '').trim();
+    return Tooltip(
+      message: detail.isEmpty
+          ? 'The system could not fetch this vacancy. Open it to retry.'
+          : '$detail\nOpen it to retry.',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: cs.errorContainer,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: cs.error),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline_rounded, size: 13, color: cs.error),
+            const SizedBox(width: 4),
+            Text(
+              'Fetch failed',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: cs.onErrorContainer,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

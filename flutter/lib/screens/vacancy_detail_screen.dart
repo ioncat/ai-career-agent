@@ -195,6 +195,7 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
   bool _loadingPrefilter = false;
   bool _refreshing = false;
   bool _loadingRefetch = false;
+  bool _loadingRetryFetch = false;
   // Kept for the "View details" affordance on _PrefilterBanner — the modal
   // is no longer shown automatically (found unreliable/easy-to-miss in
   // practice, 2026-07-17) but raw_output/error are still worth a drill-down.
@@ -312,6 +313,24 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
       }
     } finally {
       if (mounted) setState(() => _loadingAnalyze = false);
+    }
+  }
+
+  /// fetch_failed: the system gave up fetching the posting after several
+  /// attempts. The restore endpoint re-queues the fetch for such a row
+  /// (status -> queued, attempts reset); the watcher retries on its next poll.
+  Future<void> _retryFetch() async {
+    setState(() => _loadingRetryFetch = true);
+    try {
+      await _repo.restore(widget.vacancyId);
+      if (mounted) {
+        ref.read(vacancyListProvider.notifier).refresh();
+        showToast(context, 'Fetch queued again');
+      }
+    } catch (e) {
+      if (mounted) showErrorSnackBar(context, 'Error: $e');
+    } finally {
+      if (mounted) setState(() => _loadingRetryFetch = false);
     }
   }
 
@@ -599,7 +618,12 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final jdAsync = ref.watch(vacancyJdProvider(widget.vacancyId));
+    // No JD was ever saved for a fetch_failed row: show why instead of
+    // loading one, and offer only actions that make sense without a JD.
+    final fetchFailed = widget.vacancy?.status == 'fetch_failed';
+    final jdAsync = fetchFailed
+        ? const AsyncValue<String>.data('')
+        : ref.watch(vacancyJdProvider(widget.vacancyId));
     final role = widget.vacancy?.role ?? '';
     final company = widget.vacancy?.company ?? '';
     final companyWebsite = widget.vacancy?.companyWebsite;
@@ -772,7 +796,30 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                             ),
                           ),
                   ),
-                  if (!widget.restoreMode) ...[
+                  if (fetchFailed)
+                    Tooltip(
+                      message: 'Try to fetch the posting again',
+                      child: FilledButton.icon(
+                        onPressed: _loadingRetryFetch ? null : _retryFetch,
+                        icon: _loadingRetryFetch
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.refresh_rounded, size: 16),
+                        label: const Text('Retry fetch'),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          minimumSize: const Size(0, 36),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      ),
+                    ),
+                  if (!widget.restoreMode && !fetchFailed) ...[
                     Tooltip(
                       message:
                           'Run the critical-blocker pre-filter manually (EPIC-27) — not auto-triggered yet',
@@ -859,7 +906,7 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                       onPressed: _refreshing ? null : _refresh,
                     ),
                   ),
-                  if (widget.url.isNotEmpty)
+                  if (widget.url.isNotEmpty && !fetchFailed)
                     Tooltip(
                       message:
                           'Re-fetch from source — re-pull the JD from the live posting page '
@@ -944,6 +991,9 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
               ? _showPrefilterDetails
               : null,
         ),
+        if (fetchFailed)
+          _FetchFailedBlock(reason: widget.vacancy?.analysisError)
+        else
         // JD content
         Expanded(
           child: jdAsync.when(
@@ -971,6 +1021,70 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ── Fetch failed block — shown in place of the JD for status fetch_failed ─────
+
+/// The system gave up fetching the posting, so there is no JD. Red and at the
+/// top on purpose: the vacancy stays in Inbox (it is never archived without the
+/// user), and this block must make clear something went wrong with it.
+class _FetchFailedBlock extends StatelessWidget {
+  final String? reason;
+
+  const _FetchFailedBlock({this.reason});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final detail = (reason ?? '').trim();
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: cs.errorContainer,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: cs.error, width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.error_outline_rounded, size: 20, color: cs.error),
+              const SizedBox(width: 8),
+              Text(
+                'Fetch failed',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: cs.onErrorContainer,
+                  fontSize: 15,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'The system could not fetch this vacancy from its posting page, '
+            'so there is no job description to analyze. '
+            'Press Retry fetch to try again, or Skip to archive it.',
+            style: TextStyle(color: cs.onErrorContainer, height: 1.35),
+          ),
+          if (detail.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            SelectableText(
+              detail,
+              style: TextStyle(
+                color: cs.onErrorContainer,
+                fontSize: 12.5,
+                fontFamily: 'JetBrains Mono',
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
