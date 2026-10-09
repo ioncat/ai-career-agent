@@ -103,6 +103,21 @@ class VacancyRepository {
     if (response.statusCode != 200) throw Exception('Generate cover failed: ${response.statusCode}');
   }
 
+  /// Re-render a document's PDF (notifications phase 1, retry for a failure
+  /// of kind "pdf"). target: "cv" | "cover".
+  Future<void> renderPdf(int vacancyId, String target) async {
+    final uri = Uri.parse('$baseUrl/api/vacancies/$vacancyId/render-pdf');
+    final response = await http
+        .post(
+          uri,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'target': target}),
+        )
+        .timeout(const Duration(seconds: 60));
+    if (response.statusCode == 404) throw Exception('No $target document to render');
+    if (response.statusCode != 200) throw Exception('Render PDF failed: ${response.statusCode}');
+  }
+
   Future<VacancyCv> getCv(int vacancyId) async {
     final uri = Uri.parse('$baseUrl/api/vacancies/$vacancyId/cv');
     final response = await http.get(uri).timeout(const Duration(seconds: 10));

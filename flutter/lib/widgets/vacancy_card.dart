@@ -8,6 +8,7 @@ import '../providers/vacancy_list_provider.dart';
 import '../repositories/vacancy_repository.dart';
 import '../utils/backend_time.dart';
 import '../utils/toast.dart';
+import 'failure_widgets.dart';
 import 'fit_score_chip.dart';
 import 'vac_score_badge.dart';
 import 'source_badge.dart';
@@ -366,10 +367,15 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
                     ],
                   ],
                 )
-              else if (v.status == 'analysis_failed')
-                _FailedBadge()
-              else if (v.status == 'fetch_failed')
-                _FetchFailedBadge(reason: v.analysisError),
+              else if (v.failure != null)
+                FailurePill(failure: v.failure!),
+              // A failure on an already-scored vacancy (CV / cover / PDF) still
+              // gets its mark, under the scores.
+              if (v.failure != null &&
+                  (v.fitScore != null || v.vacancyScore != null)) ...[
+                const SizedBox(height: 6),
+                FailurePill(failure: v.failure!),
+              ],
               // Row 5: key barrier — show if present regardless of status
               if (v.keyBarriers.isNotEmpty) ...[
                 const SizedBox(height: 8),
@@ -480,69 +486,6 @@ class _TagBadge extends StatelessWidget {
           color: const Color(0xFF5E35B1),
           fontWeight: FontWeight.w700,
           fontSize: 10,
-        ),
-      ),
-    );
-  }
-}
-
-class _FailedBadge extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(Icons.error_outline_rounded, size: 13, color: cs.error),
-        const SizedBox(width: 4),
-        Text(
-          'Analysis failed · tap to retry',
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: cs.error,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// The system gave up fetching this vacancy (status fetch_failed). It stays
-/// in Inbox instead of being archived, so the card must say clearly that
-/// something went wrong with it.
-class _FetchFailedBadge extends StatelessWidget {
-  final String? reason;
-
-  const _FetchFailedBadge({this.reason});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final detail = (reason ?? '').trim();
-    return Tooltip(
-      message: detail.isEmpty
-          ? 'The system could not fetch this vacancy. Open it to retry.'
-          : '$detail\nOpen it to retry.',
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(
-          color: cs.errorContainer,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: cs.error),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.error_outline_rounded, size: 13, color: cs.error),
-            const SizedBox(width: 4),
-            Text(
-              'Fetch failed',
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: cs.onErrorContainer,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
         ),
       ),
     );

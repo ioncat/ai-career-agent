@@ -1,3 +1,5 @@
+import 'vacancy_failure.dart';
+
 List<String> _parseStringList(dynamic raw) {
   if (raw == null) return [];
   if (raw is List) return raw.map((e) => '$e').toList();
@@ -35,6 +37,8 @@ class VacancyListItem {
   final String? updatedAt;
   final List<String> keyBarriers;
   final String? analysisError;
+  // What is wrong right now (backend `failure` projection), null when nothing.
+  final VacancyFailure? failure;
   final bool starred;
   final bool applied;
   // When applied was actually toggled on — Applied folder sorts by this,
@@ -100,6 +104,7 @@ class VacancyListItem {
     this.updatedAt,
     this.keyBarriers = const [],
     this.analysisError,
+    this.failure,
     this.starred = false,
     this.applied = false,
     this.appliedAt,
@@ -141,6 +146,7 @@ class VacancyListItem {
       updatedAt: json['updated_at'] as String?,
       keyBarriers: _parseStringList(json['key_barriers']),
       analysisError: json['analysis_error'] as String?,
+      failure: VacancyFailure.fromJson(json['failure']),
       starred: json['starred'] as bool? ?? false,
       applied: json['applied'] as bool? ?? false,
       appliedAt: json['applied_at'] as String?,
@@ -181,6 +187,7 @@ class VacancyListItem {
         'updated_at': updatedAt,
         'key_barriers': keyBarriers,
         'analysis_error': analysisError,
+        'failure': failure?.toJson(),
         'starred': starred,
         'applied': applied,
         'applied_at': appliedAt,

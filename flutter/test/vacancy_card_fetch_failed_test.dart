@@ -6,7 +6,7 @@ import 'package:career_agent/providers/read_vacancies_provider.dart';
 import 'package:career_agent/providers/settings_provider.dart';
 import 'package:career_agent/widgets/vacancy_card.dart';
 
-// A vacancy the system gave up fetching stays in Inbox with a visible badge.
+// A vacancy with a failure mark shows the one red pill (notifications phase 1).
 
 class _FakeReadVacancies extends ReadVacanciesNotifier {
   @override
@@ -43,6 +43,16 @@ VacancyListItem _vacancy(String status) => VacancyListItem.fromJson({
   'url': 'https://example.com/854',
   'status': status,
   'analysis_error': 'Fetch failed 5x — giving up: parser unreachable',
+  'failure': status == 'fetch_failed'
+      ? {
+          'kind': 'fetch',
+          'target': null,
+          'reason': 'Fetch failed 5x — giving up: parser unreachable',
+          'at': '2026-10-09T10:00:00Z',
+          'retry': 'fetch',
+          'code': 'fetch_gave_up',
+        }
+      : null,
 });
 
 void main() {

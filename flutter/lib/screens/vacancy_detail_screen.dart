@@ -18,6 +18,7 @@ import '../providers/vacancy_cv_provider.dart';
 import '../utils/backend_time.dart';
 import '../utils/salary_kind.dart';
 import '../utils/toast.dart';
+import '../widgets/failure_widgets.dart';
 import '../utils/analyze_guard.dart';
 import '../utils/error_snackbar.dart';
 
@@ -195,7 +196,6 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
   bool _loadingPrefilter = false;
   bool _refreshing = false;
   bool _loadingRefetch = false;
-  bool _loadingRetryFetch = false;
   // Kept for the "View details" affordance on _PrefilterBanner — the modal
   // is no longer shown automatically (found unreliable/easy-to-miss in
   // practice, 2026-07-17) but raw_output/error are still worth a drill-down.
@@ -313,24 +313,6 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
       }
     } finally {
       if (mounted) setState(() => _loadingAnalyze = false);
-    }
-  }
-
-  /// fetch_failed: the system gave up fetching the posting after several
-  /// attempts. The restore endpoint re-queues the fetch for such a row
-  /// (status -> queued, attempts reset); the watcher retries on its next poll.
-  Future<void> _retryFetch() async {
-    setState(() => _loadingRetryFetch = true);
-    try {
-      await _repo.restore(widget.vacancyId);
-      if (mounted) {
-        ref.read(vacancyListProvider.notifier).refresh();
-        showToast(context, 'Fetch queued again');
-      }
-    } catch (e) {
-      if (mounted) showErrorSnackBar(context, 'Error: $e');
-    } finally {
-      if (mounted) setState(() => _loadingRetryFetch = false);
     }
   }
 
@@ -618,9 +600,11 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    // No JD was ever saved for a fetch_failed row: show why instead of
-    // loading one, and offer only actions that make sense without a JD.
-    final fetchFailed = widget.vacancy?.status == 'fetch_failed';
+    // A failure mark (notifications phase 1) is shown by the shared
+    // FailureBlock. A fetch failure means no JD was ever saved: skip loading
+    // one and hide the actions that need it.
+    final failure = widget.vacancy?.failure;
+    final fetchFailed = failure?.hidesJd ?? false;
     final jdAsync = fetchFailed
         ? const AsyncValue<String>.data('')
         : ref.watch(vacancyJdProvider(widget.vacancyId));
@@ -796,29 +780,6 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
                             ),
                           ),
                   ),
-                  if (fetchFailed)
-                    Tooltip(
-                      message: 'Try to fetch the posting again',
-                      child: FilledButton.icon(
-                        onPressed: _loadingRetryFetch ? null : _retryFetch,
-                        icon: _loadingRetryFetch
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Icon(Icons.refresh_rounded, size: 16),
-                        label: const Text('Retry fetch'),
-                        style: FilledButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          minimumSize: const Size(0, 36),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                      ),
-                    ),
                   if (!widget.restoreMode && !fetchFailed) ...[
                     Tooltip(
                       message:
@@ -991,9 +952,9 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
               ? _showPrefilterDetails
               : null,
         ),
-        if (fetchFailed)
-          _FetchFailedBlock(reason: widget.vacancy?.analysisError)
-        else
+        if (failure != null)
+          FailureBlock(vacancyId: widget.vacancyId, failure: failure),
+        if (!fetchFailed)
         // JD content
         Expanded(
           child: jdAsync.when(
@@ -1021,70 +982,6 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
           ),
         ),
       ],
-    );
-  }
-}
-
-// ── Fetch failed block — shown in place of the JD for status fetch_failed ─────
-
-/// The system gave up fetching the posting, so there is no JD. Red and at the
-/// top on purpose: the vacancy stays in Inbox (it is never archived without the
-/// user), and this block must make clear something went wrong with it.
-class _FetchFailedBlock extends StatelessWidget {
-  final String? reason;
-
-  const _FetchFailedBlock({this.reason});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final detail = (reason ?? '').trim();
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: cs.errorContainer,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: cs.error, width: 1.5),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.error_outline_rounded, size: 20, color: cs.error),
-              const SizedBox(width: 8),
-              Text(
-                'Fetch failed',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: cs.onErrorContainer,
-                  fontSize: 15,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'The system could not fetch this vacancy from its posting page, '
-            'so there is no job description to analyze. '
-            'Press Retry fetch to try again, or Skip to archive it.',
-            style: TextStyle(color: cs.onErrorContainer, height: 1.35),
-          ),
-          if (detail.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            SelectableText(
-              detail,
-              style: TextStyle(
-                color: cs.onErrorContainer,
-                fontSize: 12.5,
-                fontFamily: 'JetBrains Mono',
-              ),
-            ),
-          ],
-        ],
-      ),
     );
   }
 }
@@ -1125,202 +1022,6 @@ class _AnalyzingView extends StatelessWidget {
   }
 }
 
-// ── Analysis error view — shown for analysis_failed ──────────────────────────
-
-class _AnalysisErrorView extends ConsumerStatefulWidget {
-  final int vacancyId;
-  final String? errorMessage;
-
-  const _AnalysisErrorView({required this.vacancyId, this.errorMessage});
-
-  @override
-  ConsumerState<_AnalysisErrorView> createState() => _AnalysisErrorViewState();
-}
-
-class _AnalysisErrorViewState extends ConsumerState<_AnalysisErrorView> {
-  bool _retrying = false;
-
-  VacancyRepository get _repo {
-    final apiUrl =
-        ref.read(settingsProvider).valueOrNull?.apiUrl ??
-        'http://localhost:8080';
-    return VacancyRepository(baseUrl: apiUrl);
-  }
-
-  Future<void> _retry() async {
-    setState(() => _retrying = true);
-    try {
-      await _repo.reset(widget.vacancyId);
-      await _repo.analyze(widget.vacancyId);
-      if (mounted) {
-        ref.read(vacancyListProvider.notifier).refresh();
-        showToast(context, 'Reset & queued for analysis');
-      }
-    } catch (e) {
-      if (mounted) {
-        showErrorSnackBar(context, 'Error: $e');
-        setState(() => _retrying = false);
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.error_outline_rounded, size: 48, color: cs.error),
-            const SizedBox(height: 16),
-            Text(
-              'Analysis failed',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            if (widget.errorMessage != null &&
-                widget.errorMessage!.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: cs.errorContainer.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: cs.error.withValues(alpha: 0.3)),
-                ),
-                child: Text(
-                  widget.errorMessage!,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: cs.onSurfaceVariant,
-                    fontFamily: 'monospace',
-                  ),
-                  maxLines: 6,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: _retrying ? null : _retry,
-              icon: _retrying
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(Icons.refresh_rounded),
-              label: Text(_retrying ? 'Resetting...' : 'Reset & Retry'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Analysis error banner — compact dismissible strip for retry-failed state ──
-
-class _AnalysisErrorBanner extends ConsumerStatefulWidget {
-  final int vacancyId;
-  final String? errorMessage;
-  final VoidCallback onDismiss;
-
-  const _AnalysisErrorBanner({
-    required this.vacancyId,
-    required this.onDismiss,
-    this.errorMessage,
-  });
-
-  @override
-  ConsumerState<_AnalysisErrorBanner> createState() =>
-      _AnalysisErrorBannerState();
-}
-
-class _AnalysisErrorBannerState extends ConsumerState<_AnalysisErrorBanner> {
-  bool _retrying = false;
-
-  Future<void> _retry() async {
-    setState(() => _retrying = true);
-    try {
-      final apiUrl =
-          ref.read(settingsProvider).valueOrNull?.apiUrl ??
-          'http://localhost:8080';
-      final repo = VacancyRepository(baseUrl: apiUrl);
-      await repo.reset(widget.vacancyId);
-      await repo.analyze(widget.vacancyId);
-      if (mounted) {
-        ref.read(vacancyListProvider.notifier).refresh();
-        widget.onDismiss();
-      }
-    } catch (e) {
-      if (mounted) {
-        showErrorSnackBar(context, 'Error: $e');
-        setState(() => _retrying = false);
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: BoxDecoration(
-        color: cs.errorContainer.withValues(alpha: 0.35),
-        border: Border(
-          bottom: BorderSide(color: cs.error.withValues(alpha: 0.25)),
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.error_outline_rounded, size: 16, color: cs.error),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              widget.errorMessage?.isNotEmpty == true
-                  ? 'Analysis failed: ${widget.errorMessage}'
-                  : 'Analysis failed — previous results shown',
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          const SizedBox(width: 8),
-          TextButton(
-            onPressed: _retrying ? null : _retry,
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            child: _retrying
-                ? const SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text('Reset & Retry'),
-          ),
-          IconButton(
-            icon: const Icon(Icons.close_rounded, size: 16),
-            onPressed: widget.onDismiss,
-            padding: const EdgeInsets.all(4),
-            constraints: const BoxConstraints(),
-            tooltip: 'Dismiss',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class VacancyDetailScreen extends ConsumerStatefulWidget {
   final int vacancyId;
   final String url;
@@ -1353,7 +1054,6 @@ class _VacancyDetailScreenState extends ConsumerState<VacancyDetailScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   Timer? _cvPollingTimer;
-  bool _errorBannerDismissed = false;
 
   static bool _needsPolling(String? status) =>
       status == 'cv_queued' ||
@@ -1395,9 +1095,6 @@ class _VacancyDetailScreenState extends ConsumerState<VacancyDetailScreen>
         newStatus == 'analyzed') {
       ref.invalidate(vacancyDetailProvider(widget.vacancyId));
     }
-    if (newStatus == 'analysis_failed' && oldStatus != 'analysis_failed') {
-      setState(() => _errorBannerDismissed = false);
-    }
     _startPollingIfNeeded(newStatus);
   }
 
@@ -1426,15 +1123,6 @@ class _VacancyDetailScreenState extends ConsumerState<VacancyDetailScreen>
     // fetch_jd() finishes, which rebuilds this into the real JD view.
     if (status == 'queued' || status == 'fetching') {
       return _AnalyzingView(status: status);
-    }
-
-    // analysis_failed — full blocker only when no prior data; otherwise fall through
-    // to normal view and show a dismissible banner (previous analysis data remains visible)
-    if (status == 'analysis_failed' && widget.vacancy?.fitScore == null) {
-      return _AnalysisErrorView(
-        vacancyId: widget.vacancyId,
-        errorMessage: widget.vacancy?.analysisError,
-      );
     }
 
     // For ALL other statuses (fetched, analyzed, declined): try to load analysis.
@@ -1498,13 +1186,6 @@ class _VacancyDetailScreenState extends ConsumerState<VacancyDetailScreen>
 
         return Column(
           children: [
-            // Error banner for retry-failed state (has prior data, so show tabs)
-            if (status == 'analysis_failed' && !_errorBannerDismissed)
-              _AnalysisErrorBanner(
-                vacancyId: widget.vacancyId,
-                errorMessage: widget.vacancy?.analysisError,
-                onDismiss: () => setState(() => _errorBannerDismissed = true),
-              ),
             // Sticky action bar
             _ActionBar(
               vacancyId: widget.vacancyId,
@@ -1516,6 +1197,12 @@ class _VacancyDetailScreenState extends ConsumerState<VacancyDetailScreen>
               tabController: _tabController,
               onApplied: widget.onApplied,
             ),
+            // Failure mark under the header — same FailureBlock as _JdModeView.
+            if (widget.vacancy?.failure != null)
+              FailureBlock(
+                vacancyId: widget.vacancyId,
+                failure: widget.vacancy!.failure!,
+              ),
             // Tab bar
             TabBar(
               controller: _tabController,
