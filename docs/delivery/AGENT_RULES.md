@@ -14,7 +14,7 @@
 | 11 Services | The backend, parser, PDF service and job monitor run through `launcher.py`; the owner restarts them. Docker is not used on the owner's machine |
 | 12 Personal data | The repo is public: no names, e-mails, chat ids, tokens, employers or stories of the candidate in tracked files. The profile `skill/users/<id>/PROFILE.md` is local and gitignored; guard tests: `test_no_personal_data.py`, `test_prompt_isolation.py` |
 | 14 Quality gates | Tests: `python -m pytest`; Flutter: `flutter test` and `flutter analyze`. Changes to `prompts/`, `skill/SKILL.md`, `.claude/commands/` also need the review checklist (`PROMPT_REVIEW_CHECKLIST.md`) and the guard tests (`test_prompts_directives_only`, `test_profile_contract`, `test_prompts_no_profile_overlap`) |
-| 15 Docs | `docs/delivery/CHANGELOG.md` and `BACKLOG.md`, following `documentation-conventions.md` |
+| 15 Docs | `docs/delivery/CHANGELOG.md` and `BACKLOG.md`, following `documentation-conventions.md`. When you notice a place that assumes one user (a shared cap, a global setting, a default `user_id=1`), add a row to `docs/delivery/MULTIUSER_WATCHLIST.md` (append only) |
 | 16 UI | The Flutter desktop app; there is no browser preview, the owner confirms in the running app. Read the CLAUDE.md section "Vacancy Detail Header/Action-Bar" before touching the vacancy detail screen |
 | 18 Session log | `.claude/sessions/YYYY-MM-DD-short-description.md` (gitignored) |
 | 19 Tests and the live DB | `tests/conftest.py` has an autouse fixture that sets `DB_PATH` to a throwaway file for every test; a test that starts the app (TestClient) therefore cannot open `db/agent.db` |
