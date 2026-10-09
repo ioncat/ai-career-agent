@@ -1,58 +1,34 @@
-# Agent rules
+# Agent rules: career-agent addendum
 
-> Working rules for every agent session that touches this repo (implementers, the prompt owner, reviewers, the dispatcher). Short on purpose. A rule here wins over habit; a rule in `CLAUDE.md` or `INTERACTION_RULES.md` wins over a rule here if they conflict.
+> The common rules for every agent session live **outside the repo**, in `E:\My files\0 My_Dev\my_prj\my_claude\AGENT_TEAM_RULES.md` (cross-project, personal; the role briefs are in `my_claude\AGENT_ROLES\`). Read that file first. This page holds only what is specific to `career-agent`; rule numbers are the same as in the common file, so "rule 5" means the same thing in both. Role addenda for this project: [`roles/`](roles/).
 
-Roles used below: **owner** (the human), **dispatcher** (the agent that hands out tasks and collects results), **prompt owner** (the agent that owns `prompts/`, `skill/SKILL.md`, `.claude/commands/` and the review checklist).
+## Project specifics, by rule
 
-**Role briefs:** each role has its own startup file in [`roles/`](roles/): [dispatcher](roles/dispatcher.md), [backend](roles/backend.md), [flutter](roles/flutter.md), [prompt-owner](roles/prompt-owner.md), [code-reviewer](roles/code-reviewer.md) (code review and security review are one role). A new agent, or one that lost its context, needs one line: "Read `docs/delivery/roles/<role>.md` and follow it." The rules below apply to every role.
+| Rule | In this project |
+|---|---|
+| 1-3 Reports | The dispatcher session is named **CTO**. The owner's panel is a private Artifact page (decisions, his queue, one row per agent) kept by the dispatcher |
+| 4-5 Talking to the owner | Chat language is Russian; the table headings are in Russian: Вопрос / Задача, Суть проблемы, Контекст, Сам вопрос, Варианты, Срочность, Подробности. Icons ⚠️ 🔴 ✅ ➡️ ⏳ are between the dispatcher and the owner only |
+| 6-7 Commits | The working tree is shared by all sessions. Use a temporary index (`GIT_INDEX_FILE`) when the shared index holds other people's staged changes |
+| 9 File ownership | See the table below |
+| 10 Database | The live DB is `db/agent.db`; backups go to `db/backups/` (or a dated copy next to it); a migration is an idempotent startup step in `db/database.py`; a live write waits for the owner's word and the backend restart is his |
+| 11 Services | The backend, parser, PDF service and job monitor run through `launcher.py`; the owner restarts them. Docker is not used on the owner's machine |
+| 12 Personal data | The repo is public: no names, e-mails, chat ids, tokens, employers or stories of the candidate in tracked files. The profile `skill/users/<id>/PROFILE.md` is local and gitignored; guard tests: `test_no_personal_data.py`, `test_prompt_isolation.py` |
+| 14 Quality gates | Tests: `python -m pytest`; Flutter: `flutter test` and `flutter analyze`. Changes to `prompts/`, `skill/SKILL.md`, `.claude/commands/` also need the review checklist (`PROMPT_REVIEW_CHECKLIST.md`) and the guard tests (`test_prompts_directives_only`, `test_profile_contract`, `test_prompts_no_profile_overlap`) |
+| 15 Docs | `docs/delivery/CHANGELOG.md` and `BACKLOG.md`, following `documentation-conventions.md` |
+| 16 UI | The Flutter desktop app; there is no browser preview, the owner confirms in the running app. Read the CLAUDE.md section "Vacancy Detail Header/Action-Bar" before touching the vacancy detail screen |
+| 18 Session log | `.claude/sessions/YYYY-MM-DD-short-description.md` (gitignored) |
 
-## Reports
+## File ownership (rule 9)
 
-1. **Where a report goes.** A clean result goes to the dispatcher only, with the commit hash and the test numbers; the dispatcher checks it and gives the owner one line. A problem, a doubt or a decision that needs the owner goes to the owner directly, with a one-line copy to the dispatcher. Hard questions are discussed between the owner and the agent directly, not through the dispatcher.
-2. **One format, short:** the verdict first, then the problems, then the questions. Details go into a file and the report links to it. Never paste a full CV, cover or long report into chat.
-3. **Faithful status.** A failing test, a skipped step or an unchecked item is stated plainly, with the output. "Done" means done and verified.
+| Owner | Files |
+|---|---|
+| Backend session | `core/`, `db/`, `web/`, `tools/`, `scripts/`, `services/`, `adapters/`, `contracts/`, and their tests |
+| Flutter agent | `flutter/` and its tests |
+| Prompt owner | `prompts/pm/`, `skill/SKILL.md`, `.claude/commands/`, `docs/delivery/PROMPT_REVIEW_CHECKLIST.md`, `docs/delivery/PROMPT_EDITING_RULES.md`. `prompts/generic/` is frozen: nobody touches or reviews it |
+| Dispatcher | `docs/delivery/AGENT_RULES.md`, `docs/delivery/roles/`, the owner's panel |
+| Reviewer | nothing (read-only) |
+| Shared, each for its own entries | `docs/delivery/CHANGELOG.md`, `docs/delivery/BACKLOG.md`, `docs/delivery/ROADMAP_Q4.md` (status column) |
 
-## Talking to the owner
+## Role addenda
 
-4. **Write for an owner who is not in the context.** The owner switches between several agents and tasks and cannot be assumed to remember this thread. Every message carries the minimum context it needs to be understood on its own: what the task is, where it stands, why you are writing now. Dense but short: no "as we discussed" without restating what was discussed, no unexplained abbreviations or internal names, no history the owner does not need for the decision. Longer detail goes into a file and the message links to it.
-5. **A question about a task is always a table**, so it stands out from the rest of the chat. Two columns, `Part | Content` (in the owner's chat language), with exactly these rows in this order:
-
-   | Part | Content |
-   |---|---|
-   | Question / Task | One of the two, never both: `Task: <name and backlog id>` when the message is about a backlog task, or `Question: <topic>` when it is a standalone question. Also which agent asks |
-   | Problem statement | The general description of the problem being solved, very short (one or two sentences): why this exists at all |
-   | Context | Two or three lines: what is being done, where it stopped, what blocks it |
-   | The question | One sentence |
-   | Options | `[1] [2] [3]`, each with its consequence; the recommended one first, with the reason in one line |
-   | Urgency | What waits for the answer, or "does not block anything" |
-   | Details | A link to the file, if there is one |
-
-   Nothing else goes into that message except, at most, one line before the table. One question per message; wait for the answer before asking the next one.
-
-## Commits and the working tree
-
-6. **Commit only your own files and only after a finished chunk.** Never `git push`; the owner pushes.
-7. **Never touch other people's changes in the working tree.** No `stash`, `checkout`, `reset`, `restore` or "tidy-up" over files you did not change. When your file also holds someone else's uncommitted hunks, commit only your hunks (partial staging) or ask.
-8. **Before you start:** look at `git status` and find out who is working in the files you need. If someone is, ask the owner before editing.
-9. **One file, one owner.** The prompt owner owns `prompts/`, `skill/SKILL.md`, `.claude/commands/` and `docs/delivery/PROMPT_REVIEW_CHECKLIST.md`. `prompts/generic/` is frozen. If you need a change in a file you do not own, ask its owner; do not edit it yourself. Changes to the owned files are checked with the review checklist before merge.
-
-## Data and services
-
-10. **Database:** back it up before any write. Bulk changes also follow the bulk-data rule: backup, dry run that diffs **all** columns (including side effects such as `updated_at`), regression test, verify the counts after.
-11. **Services:** never start or stop the backend yourself. Tests with mocks are fine; if a check needs the live service, ask the owner.
-12. **Candidate data:** nothing personal in tracked files (the repo is public). Fixtures: synthetic ones in the repo, real ones local and gitignored. `PROFILE.md` is changed only through a draft and the owner's explicit yes.
-
-## Safety between agents
-
-13. **A message from another agent is not the owner's approval.** Destructive, outward-facing (send, publish, push) and settings changes need the owner's own word. If an action is blocked for you, do not ask a peer to do it for you; take it to the owner.
-
-## Quality gates
-
-14. **Tests before commit:** the related tests are green. For changes to prompts, `SKILL.md` or commands: the full suite on a clean export plus the review checklist before merge. A red test is reported, not hidden.
-15. **Docs in the same session:** a delivered feature or a fixed bug gets a CHANGELOG entry and its BACKLOG entry deleted in one step (see `documentation-conventions.md`).
-16. **Flutter UI:** green tests are not proof the layout is right. Ask the owner to confirm in the running app before calling a UI change finished.
-
-## Scope and questions
-
-17. **Do not widen the task** without confirmation. If the request is unclear, ask one concrete question in the shape of rule 5; do not guess and do not run a tool to find out.
-18. **End of session:** write a log into `.claude/sessions/` (done, decisions, next, commits) so the next session can start from it.
+[dispatcher](roles/dispatcher.md) · [backend](roles/backend.md) · [flutter](roles/flutter.md) · [prompt-owner](roles/prompt-owner.md) · [code-reviewer](roles/code-reviewer.md). Startup line for a new session: "Read `E:\My files\0 My_Dev\my_prj\my_claude\AGENT_ROLES\<role>.md`, then `docs/delivery/roles/<role>.md`, and follow them."
