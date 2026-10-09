@@ -432,8 +432,10 @@ No dual-availability state — the button's visibility is a direct, deterministi
 **Severity — lower than it looks:** unlike the RSSWatcher fetch-cap bug, `check_feed()` does NOT accumulate stuck state — on failure it just logs and returns 0 new jobs for that cycle; the next 5-min poll starts clean. Worst case = a blind window where fresh postings are missed until the next successful cycle (self-healing, not a pile-up).
 **Action:** watch, no fix attempted yet — if it persists past today (i.e. isn't just today's self-inflicted rate-limit clearing), revisit: add a retry/backoff in `fetch_jobs()`, or a User-Agent/request-pacing review for the Djinni RSS endpoint specifically.
 
-### Fetch given up: other exception classes (backend and Flutter done 2026-10-09)
-**Open:** does the retry-cap-and-classify pattern need to apply to OTHER pipeline exception classes (LLM timeouts, PDF render failures)?
+### 🟡 P2 — A failed CV or cover generation leaves no trace on the vacancy (owner, 2026-10-09)
+**What:** when CV or cover generation fails (LLM timeout or provider error, PDF render error), `core/pipeline_runner.py` rolls the status back (`analyzed` / `cv_generated`) and only sends a toast and an OS notification. Once the toast is closed, nothing on the card or in the detail panel says the run failed.
+**Why:** same principle as `fetch_failed` (2026-10-09): a failure must stay visible on the vacancy until the user acts. Fetch and analysis failures already do (`fetch_failed`, `analysis_failed`).
+**Scope:** backend stores the last generation failure per vacancy (kind cv/cover, reason, time; cleared on the next successful run) and exposes it in the vacancy APIs; Flutter shows a red mark on the card and a block with the reason and a retry button in the detail panel. Split: backend session + Flutter agent.
 
 ### Dedup misses same vacancy republished across different source sites (found 2026-07-26)
 **Symptom:** vacancy #778 (Djinni) and #758 (DOU.ua) are the same real-world job (Headway Inc, "Globalization Product Manager", published within 5 min of each other) but exist as two separate, un-deduplicated DB rows — each got its own independent Phase 1+2 analysis with different verdicts (fit 4/decline vs fit 6/take a chance) on essentially the same JD text.
