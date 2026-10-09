@@ -72,6 +72,16 @@ def _utc_z(value):
     return value.replace(" ", "T", 1) + "Z"
 
 
+def _checked_since(since: str | None) -> str | None:
+    """A client's `since` as the database form, or a 400 when it is not an ISO 8601 datetime."""
+    if not since:
+        return None
+    try:
+        return database.normalize_since(since)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 def _expose_generation_failure(item: dict) -> None:
     """Replace the raw `last_generation_failure` column by `generation_failure` and add `failure`.
 
@@ -368,6 +378,7 @@ async def api_vacancies(
     since: ISO 8601 datetime (e.g. 2026-06-20T12:00:00) — returns only rows
            updated after this timestamp. Used by Flutter polling (A5b).
     """
+    since = _checked_since(since)
     rows = await database.list_vacancies(status=status, user_id=user_id, since=since, limit=limit)
     # Applied twin (EPIC-26): computed once from a light all-rows projection,
     # NOT from `rows` — status/since/limit filters would hide the twin.
@@ -2001,6 +2012,7 @@ async def api_notifications(
       limit: max rows (default 50, max 200).
     """
     limit = min(limit, 200)
+    since = _checked_since(since)
     rows = await database.list_notifications(
         user_id=user_id, since=since, unread_only=unread_only, limit=limit
     )

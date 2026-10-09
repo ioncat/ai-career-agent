@@ -1465,6 +1465,30 @@ async def set_vacancy_tags(vacancy_id: int, tags: str) -> None:
         await db.commit()
 
 
+def normalize_since(value: str) -> str:
+    """Turn a client's `since` into the form stored in the database: UTC, "YYYY-MM-DD HH:MM:SS".
+
+    Stored timestamps are written by SQLite's datetime('now') (a space between date and time, no zone) and
+    compared as strings, so a client value with a "T", a "Z", an offset or fractional seconds compared wrongly
+    (" " sorts before "T": a row of the same day was never newer than the cursor). Accepts ISO 8601 with "T" or
+    a space, "Z" or an offset (converted to UTC), fractional seconds (dropped, which only re-fetches the
+    boundary second, and clients de-duplicate by id), a date alone (midnight) and a value without a zone
+    (taken as UTC). Raises ValueError for anything else.
+    """
+    from datetime import datetime, timezone
+
+    text = (value or "").strip()
+    if not text:
+        raise ValueError("empty since")
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError as exc:
+        raise ValueError(f"invalid since {value!r}: not an ISO 8601 datetime") from exc
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+    return parsed.strftime("%Y-%m-%d %H:%M:%S")
+
+
 async def list_vacancies(
     status: str | None = None,
     user_id: int | None = None,
@@ -1488,9 +1512,9 @@ async def list_vacancies(
         if user_id is not None:
             conditions.append("user_id = ?")
             params.append(user_id)
-        if since is not None:
+        if since:
             conditions.append("updated_at >= ?")
-            params.append(since)
+            params.append(normalize_since(since))
 
         where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
         params.append(limit)
@@ -2143,7 +2167,7 @@ async def list_notifications(
     params: list = [user_id]
     if since:
         conditions.append("created_at >= ?")
-        params.append(since)
+        params.append(normalize_since(since))
     if unread_only:
         conditions.append("read = 0")
     where = " AND ".join(conditions)
