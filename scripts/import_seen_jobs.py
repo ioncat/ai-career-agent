@@ -59,7 +59,12 @@ except ImportError:
 
 from db import database
 
-_DEFAULT_SEEN_JOBS = Path(r"E:\My files\0 My_Dev\my_prj\job-board-monitor\seen_jobs.json")
+# Default: the sibling folder of this repo (../job-board-monitor/seen_jobs.json), or the path in the
+# environment variable JOB_BOARD_MONITOR_SEEN_JOBS (not SEEN_JOBS_PATH: that one is career-agent's own file,
+# see core/settings.py). No absolute path of anybody's machine belongs in a tracked file.
+_DEFAULT_SEEN_JOBS = Path(
+    os.environ.get("JOB_BOARD_MONITOR_SEEN_JOBS") or (_ROOT.parent / "job-board-monitor" / "seen_jobs.json")
+)
 _IMPORT_STATUS = "new"
 
 
@@ -126,7 +131,7 @@ def main() -> None:
         type=Path,
         default=_DEFAULT_SEEN_JOBS,
         metavar="PATH",
-        help="Path to seen_jobs.json (default: job-board-monitor repo)",
+        help="Path to seen_jobs.json (default: $JOB_BOARD_MONITOR_SEEN_JOBS, else ../job-board-monitor/seen_jobs.json)",
     )
     parser.add_argument(
         "--user-id",

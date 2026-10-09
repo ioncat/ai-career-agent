@@ -335,7 +335,7 @@ async def test_a_failed_event_build_still_records_the_state(db_path):
 async def test_a_failure_notification_never_carries_the_raw_reason(db_path, _no_real_push):
     """The raw reason can hold a local path or scraped text: it stays on the vacancy, the event gets the code's text."""
     vid = await _vacancy("cv_generating")
-    secret = "C:\\Users\\someone\\vacancies\\inbox\\1\\12 — Секрет\\JD.md не найден"
+    secret = "/data/vacancies/inbox/1/12 — Секрет/JD.md не найден"
 
     with patch("tools.cv_generate.cv_generate", _tool(RuntimeError(secret))):
         await _worker(CVWorker)._execute(vid, "auto", "user")
