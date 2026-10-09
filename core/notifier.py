@@ -53,24 +53,45 @@ _WEB_PUSH_EVENTS: frozenset[PipelineEvent] = frozenset({
 
 
 async def notify(
-    user_id: int,
+    user_id: int | None,
     event: PipelineEvent,
     vacancy_id: int | None = None,
     *,
     title: str = "",
     body: str = "",
+    severity: str | None = None,
+    origin: str = "auto",
+    code: str | None = None,
+    key: str | None = None,
 ) -> None:
     """Persist event to DB and fan-out to enabled channels.
+
+    The first five parameters are the original signature and keep working unchanged. New, all
+    optional: `severity` (success | info | warning | error; default from the event name),
+    `origin` (user | auto | system), `code` (core/failure_codes.py, for failures) and `key`
+    (idempotency key: an event with a key that already exists is neither stored nor pushed
+    again). `user_id` None is a system event (no per-user Web Push).
 
     Never raises — all channel errors are logged and swallowed so a notification
     failure never aborts the pipeline.
     """
     try:
-        await database.insert_notification(user_id, event, vacancy_id, title, body)
+        # Only what was set is passed on, so a legacy call reaches the DB layer exactly as before.
+        extra = {
+            name: value
+            for name, value in (("severity", severity), ("code", code), ("key", key))
+            if value is not None
+        }
+        if origin != "auto":
+            extra["origin"] = origin
+        stored = await database.insert_notification(user_id, event, vacancy_id, title, body, **extra)
+        if stored is None:
+            log.info("notifier: duplicate event skipped (user=%s event=%s key=%s)", user_id, event, key)
+            return
     except Exception as exc:
-        log.error("notifier: DB insert failed (user=%d event=%s): %s", user_id, event, exc)
+        log.error("notifier: DB insert failed (user=%s event=%s): %s", user_id, event, exc)
 
-    if event in _WEB_PUSH_EVENTS:
+    if event in _WEB_PUSH_EVENTS and user_id is not None:
         try:
             await _try_web_push(user_id, title or event, body)
         except Exception as exc:

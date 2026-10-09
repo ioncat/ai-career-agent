@@ -181,18 +181,8 @@ async def init_db() -> None:
             "ALTER TABLE user_settings ADD COLUMN llm_provider TEXT",
             # RSSWatcher retry cap: count failed fetch attempts, give up after N
             "ALTER TABLE vacancies ADD COLUMN fetch_attempts INTEGER NOT NULL DEFAULT 0",
-            # EPIC-21 C2: pipeline event log for Flutter notification polling
-            """CREATE TABLE IF NOT EXISTS notifications (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                vacancy_id  INTEGER REFERENCES vacancies(id) ON DELETE SET NULL,
-                event       TEXT    NOT NULL,
-                title       TEXT    NOT NULL DEFAULT '',
-                body        TEXT    NOT NULL DEFAULT '',
-                read        INTEGER NOT NULL DEFAULT 0,
-                created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
-            )""",
-            "CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications (user_id, created_at)",
+            # EPIC-21 C2: the notifications table (event log for Flutter polling) is created by
+            # schema.sql; its later shape change is _migrate_notifications() below.
             # EPIC-27: per-phase LLM provider/model/effort overrides.
             # Additive — user_settings stays the global default, untouched.
             # No row (or provider IS NULL) for a phase = fall through to the global default.
@@ -280,7 +270,98 @@ async def init_db() -> None:
             except Exception:
                 pass  # column already exists — ignore
 
+        await _migrate_notifications(db)
+
     log.info("DB initialised at %s", _db_path)
+
+
+# ── notifications: schema step (2026-10-09, notifications consensus phase 2) ──
+
+NOTIFICATION_SEVERITIES = ("success", "info", "warning", "error")
+NOTIFICATION_ORIGINS = ("user", "auto", "system")
+NOTIFICATION_KEY_MAX = 200
+# Retention (see prune_notifications). The client polls the newest 50 and a history view shows
+# the last N, so a few weeks of events are plenty; both caps apply.
+NOTIFICATION_RETENTION_DAYS = 90
+NOTIFICATION_RETENTION_MAX_ROWS = 2000
+
+_NOTIFICATIONS_NEW_DDL = """
+CREATE TABLE notifications_new (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    vacancy_id  INTEGER REFERENCES vacancies(id) ON DELETE SET NULL,
+    event       TEXT    NOT NULL,
+    title       TEXT    NOT NULL DEFAULT '',
+    body        TEXT    NOT NULL DEFAULT '',
+    read        INTEGER NOT NULL DEFAULT 0,
+    created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+    severity    TEXT    NOT NULL DEFAULT 'info'
+                        CHECK (severity IN ('success', 'info', 'warning', 'error')),
+    origin      TEXT    NOT NULL DEFAULT 'auto'
+                        CHECK (origin IN ('user', 'auto', 'system')),
+    code        TEXT,
+    key         TEXT
+)
+"""
+
+_NOTIFICATION_COLUMNS = (
+    "id", "user_id", "vacancy_id", "event", "title", "body", "read", "created_at",
+    "severity", "origin", "code", "key",
+)
+
+# What a column gets when the old table does not have it (rows written before the schema step).
+_NOTIFICATION_DEFAULTS = {
+    "severity": (
+        "CASE WHEN substr(event, -7) = '_failed' THEN 'error' "
+        "WHEN substr(event, -5) = '_done' THEN 'success' ELSE 'info' END"
+    ),
+    "origin": "'auto'",
+    "code": "NULL",
+    "key": "NULL",
+}
+
+
+async def _migrate_notifications(db: aiosqlite.Connection) -> None:
+    """Bring `notifications` to its current shape. Idempotent; runs on every startup.
+
+    Rebuilds the table when it still has the old shape (no `severity` column, or `user_id`
+    NOT NULL: SQLite cannot drop NOT NULL in place), copying every row with its id, read flag and
+    time. The rebuild is one transaction: a failure leaves the old table untouched. Rows written
+    before get severity from the event name (`*_failed` error, `*_done` success, else info) and
+    origin 'auto'. Then creates the unique idempotency index (user, key) where a key is set; system
+    events (user_id NULL) are deduplicated among themselves.
+    """
+    cursor = await db.execute("PRAGMA table_info(notifications)")
+    columns = {row[1]: row for row in await cursor.fetchall()}
+    if not columns:
+        return                                    # no table: schema.sql did not create it, nothing to migrate
+    user_id_not_null = bool(columns.get("user_id") and columns["user_id"][3] == 1)
+    if "severity" not in columns or user_id_not_null:
+        select = ", ".join(
+            col if col in columns else _NOTIFICATION_DEFAULTS[col] for col in _NOTIFICATION_COLUMNS
+        )
+        script = (
+            "BEGIN;\n"
+            "DROP TABLE IF EXISTS notifications_new;\n"
+            f"{_NOTIFICATIONS_NEW_DDL};\n"
+            f"INSERT INTO notifications_new ({', '.join(_NOTIFICATION_COLUMNS)}) "
+            f"SELECT {select} FROM notifications;\n"
+            "DROP TABLE notifications;\n"
+            "ALTER TABLE notifications_new RENAME TO notifications;\n"
+            "CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications (user_id, created_at);\n"
+            "COMMIT;"
+        )
+        try:
+            await db.executescript(script)
+        except Exception:
+            await db.execute("ROLLBACK")
+            raise
+        log.info("DB migration applied: notifications rebuilt (severity/origin/code/key, nullable user_id)")
+    await db.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_notifications_key "
+        "ON notifications (COALESCE(user_id, 0), key) WHERE key IS NOT NULL"
+    )
+    await db.commit()
 
 
 async def reset_stuck_statuses() -> None:
@@ -1889,24 +1970,81 @@ async def get_pipeline_runs(vacancy_id: int) -> list[aiosqlite.Row]:
 
 # ── Notification helpers ──────────────────────────────────────────────────────
 
+def default_notification_severity(event: str) -> str:
+    """Severity implied by an event name: `*_failed` error, `*_done` success, anything else info."""
+    if event.endswith("_failed"):
+        return "error"
+    if event.endswith("_done"):
+        return "success"
+    return "info"
+
+
 async def insert_notification(
-    user_id: int,
+    user_id: int | None,
     event: str,
     vacancy_id: int | None = None,
     title: str = "",
     body: str = "",
-) -> int:
-    """Insert a pipeline event notification. Returns new row id."""
+    *,
+    severity: str | None = None,
+    origin: str = "auto",
+    code: str | None = None,
+    key: str | None = None,
+) -> int | None:
+    """Insert an event notification. Returns the new row id.
+
+    user_id None = a system event (shown to every user). `severity` defaults from the event name
+    (default_notification_severity); `origin` is "user", "auto" or "system"; `code` is a
+    core/failure_codes.py value for failure events. `key` is an idempotency key: when an event with
+    the same key already exists for this user (or among system events), nothing is inserted and None
+    is returned. Every 100th row triggers a retention pass (prune_notifications).
+    """
+    severity = severity or default_notification_severity(event)
+    if severity not in NOTIFICATION_SEVERITIES:
+        raise ValueError(f"unknown notification severity {severity!r}")
+    if origin not in NOTIFICATION_ORIGINS:
+        raise ValueError(f"unknown notification origin {origin!r}")
+    key = (key or "").strip() or None
+    if key is not None and len(key) > NOTIFICATION_KEY_MAX:
+        raise ValueError(f"notification key longer than {NOTIFICATION_KEY_MAX} characters")
     async with get_db() as db:
         cursor = await db.execute(
             """
-            INSERT INTO notifications (user_id, vacancy_id, event, title, body)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT OR IGNORE INTO notifications
+                (user_id, vacancy_id, event, title, body, severity, origin, code, key)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (user_id, vacancy_id, event, title, body),
+            (user_id, vacancy_id, event, title, body, severity, origin, code, key),
         )
         await db.commit()
-        return cursor.lastrowid  # type: ignore[return-value]
+        if cursor.rowcount == 0:
+            return None
+        row_id = cursor.lastrowid
+    if row_id and row_id % 100 == 0:
+        await prune_notifications()
+    return row_id
+
+
+async def prune_notifications(
+    max_age_days: int = NOTIFICATION_RETENTION_DAYS,
+    max_rows: int = NOTIFICATION_RETENTION_MAX_ROWS,
+) -> int:
+    """Retention: delete events older than max_age_days, then keep only the newest max_rows.
+
+    Returns how many rows were deleted. Safe to call at any time.
+    """
+    async with get_db() as db:
+        old = await db.execute(
+            "DELETE FROM notifications WHERE created_at < datetime('now', ?)",
+            (f"-{int(max_age_days)} days",),
+        )
+        over = await db.execute(
+            "DELETE FROM notifications WHERE id NOT IN "
+            "(SELECT id FROM notifications ORDER BY created_at DESC, id DESC LIMIT ?)",
+            (int(max_rows),),
+        )
+        await db.commit()
+        return (old.rowcount or 0) + (over.rowcount or 0)
 
 
 async def list_notifications(
@@ -1920,7 +2058,7 @@ async def list_notifications(
     since: ISO 8601 datetime — only rows where created_at >= since.
     unread_only: filter to read=0 rows only.
     """
-    conditions = ["user_id = ?"]
+    conditions = ["(user_id = ? OR user_id IS NULL)"]      # NULL = a system event, shown to everyone
     params: list = [user_id]
     if since:
         conditions.append("created_at >= ?")
@@ -1953,7 +2091,7 @@ async def mark_all_notifications_read(user_id: int) -> None:
     """Mark all unread notifications for user as read."""
     async with get_db() as db:
         await db.execute(
-            "UPDATE notifications SET read = 1 WHERE user_id = ? AND read = 0",
+            "UPDATE notifications SET read = 1 WHERE (user_id = ? OR user_id IS NULL) AND read = 0",
             (user_id,),
         )
         await db.commit()

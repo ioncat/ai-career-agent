@@ -92,6 +92,12 @@ async def main() -> None:
         await repair_markdown_paths(settings.vacancies_path, Path(__file__).resolve().parent)
     except Exception:
         log.exception("DB recovery: markdown_path repair failed (non-fatal)")
+    try:  # retention of the events table (age and count caps); never blocks startup
+        pruned = await database.prune_notifications()
+        if pruned:
+            log.info("DB retention: pruned %d old notification(s)", pruned)
+    except Exception:
+        log.exception("DB retention: notification pruning failed (non-fatal)")
 
     # Seed default user from TELEGRAM_CHAT_ID on first run; returns existing id on subsequent runs.
     default_user_id = await database.get_or_create_default_user(

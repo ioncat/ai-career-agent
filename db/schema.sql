@@ -170,13 +170,20 @@ CREATE INDEX IF NOT EXISTS idx_push_user ON push_subscriptions (user_id);
 
 CREATE TABLE IF NOT EXISTS notifications (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id     INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                                          -- NULL = a system event (job monitor, health check): shown to every user
     vacancy_id  INTEGER REFERENCES vacancies(id) ON DELETE SET NULL,
     event       TEXT    NOT NULL,
     title       TEXT    NOT NULL DEFAULT '',
     body        TEXT    NOT NULL DEFAULT '',
     read        INTEGER NOT NULL DEFAULT 0,
-    created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+    created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+    severity    TEXT    NOT NULL DEFAULT 'info'
+                        CHECK (severity IN ('success', 'info', 'warning', 'error')),
+    origin      TEXT    NOT NULL DEFAULT 'auto'
+                        CHECK (origin IN ('user', 'auto', 'system')),
+    code        TEXT,                     -- core/failure_codes.py value for failure events, else NULL
+    key         TEXT                      -- idempotency key, unique per user (and among system events) when set
 );
 
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications (user_id, created_at);
