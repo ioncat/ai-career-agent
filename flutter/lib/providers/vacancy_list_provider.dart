@@ -6,8 +6,28 @@ import '../models/vacancy.dart';
 import '../repositories/vacancy_repository.dart';
 import '../utils/backend_time.dart';
 import 'settings_provider.dart';
+import 'vacancy_cv_provider.dart';
+import 'vacancy_detail_provider.dart';
 
 enum PollingStatus { idle, polling, found, empty, error }
+
+/// Ids present in both lists whose status or updated_at changed. The per-
+/// vacancy detail caches (analysis, CV) are fetched once and never refresh on
+/// their own; a change seen by the list poll is the one signal that they are
+/// stale (2026-10-09: an analysis finished while the vacancy moved Inbox ->
+/// Analyzed showed the cached empty analysis until a manual Refresh).
+Set<int> changedVacancyIds(
+  List<VacancyListItem> before,
+  List<VacancyListItem> after,
+) {
+  final old = {for (final v in before) v.id: v};
+  return {
+    for (final v in after)
+      if (old[v.id] case final o?
+          when o.status != v.status || o.updatedAt != v.updatedAt)
+        v.id,
+  };
+}
 
 const _kCacheKey = 'vacancy_list_cache';
 const _kCacheTimestampKey = 'vacancy_list_cache_ts';
@@ -137,6 +157,11 @@ class VacancyListNotifier extends AsyncNotifier<PollingState> {
       final repo = VacancyRepository(baseUrl: settings.apiUrl);
       final items = await repo.listVacancies();
       await _saveCache(items);
+
+      for (final id in changedVacancyIds(current?.vacancies ?? const [], items)) {
+        ref.invalidate(vacancyDetailProvider(id));
+        ref.invalidate(vacancyCvProvider(id));
+      }
 
       final existingIds = current?.vacancies.map((v) => v.id).toSet() ?? {};
       final newAnalyzed = items
