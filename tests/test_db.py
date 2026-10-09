@@ -105,11 +105,12 @@ async def test_update_vacancy_status_restore_clears_declined_at():
 
 
 @pytest.mark.asyncio
-async def test_give_up_fetch_sets_declined_at():
+async def test_give_up_fetch_does_not_stamp_declined_at():
+    """Giving up a fetch is not a decline: declined_at (Archive's sort key) stays NULL."""
     vid = await database.insert_vacancy(url="https://djinni.co/jobs/da4/", status="fetching")
     await database.give_up_fetch(vid, "Fetch failed 5x — giving up: 503")
     row = await database.get_vacancy_by_id(vid)
-    assert row["declined_at"] is not None
+    assert row["declined_at"] is None
 
 
 @pytest.mark.asyncio
@@ -120,6 +121,8 @@ async def test_requeue_fetch_clears_declined_at():
     row = await database.get_vacancy_by_id(vid)
     assert row["status"] == "queued"
     assert row["declined_at"] is None
+    assert row["analysis_error"] is None
+    assert row["fetch_attempts"] == 0
 
 
 @pytest.mark.asyncio
@@ -480,11 +483,11 @@ async def test_increment_fetch_attempts_starts_at_zero_and_counts_up():
 
 
 @pytest.mark.asyncio
-async def test_give_up_fetch_declines_and_records_reason():
+async def test_give_up_fetch_marks_fetch_failed_and_records_reason():
     vid = await database.insert_vacancy(url="https://djinni.co/jobs/fa2/", status="fetching")
     await database.give_up_fetch(vid, "Fetch failed 5x — giving up: 503")
     row = await database.get_vacancy_by_id(vid)
-    assert row["status"] == "declined"
+    assert row["status"] == "fetch_failed"
     assert row["analysis_error"] == "Fetch failed 5x — giving up: 503"
 
 

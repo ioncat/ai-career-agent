@@ -10,6 +10,8 @@ from core.vacancy_stage import stage
     [
         # Inbox — not yet analyzed / mid-pipeline before analysis completes
         ("fetched", False, "inbox"),
+        # Fetch given up: no JD yet, stays visible in Inbox (never Archive)
+        ("fetch_failed", False, "inbox"),
         ("analysis_queued", False, "inbox"),
         ("analyzing", False, "inbox"),
         ("cv_queued", False, "inbox"),

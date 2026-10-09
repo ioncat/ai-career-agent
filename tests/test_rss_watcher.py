@@ -443,7 +443,7 @@ async def test_process_fetch_retry_below_cap_requeues():
 
 @pytest.mark.asyncio
 async def test_process_fetch_gives_up_after_max_attempts():
-    """At MAX_FETCH_ATTEMPTS, stop retrying — decline instead of looping forever."""
+    """At MAX_FETCH_ATTEMPTS, stop retrying — give up (fetch_failed) instead of looping forever."""
     from core.rss_watcher import MAX_FETCH_ATTEMPTS
 
     watcher, bot = _make_watcher()
@@ -465,6 +465,7 @@ async def test_process_fetch_gives_up_after_max_attempts():
 
     give_up_msgs = [c for c in bot.send_message.call_args_list if "❌" in c[0][0]]
     assert len(give_up_msgs) == 1
+    assert "Archive" not in give_up_msgs[0][0][0]  # the vacancy stays in Inbox now
     retry_msgs = [c for c in bot.send_message.call_args_list if "⚠️" in c[0][0]]
     assert len(retry_msgs) == 0  # gave-up path, not the still-retrying alert
 

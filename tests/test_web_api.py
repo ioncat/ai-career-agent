@@ -2313,3 +2313,58 @@ async def test_activity_row_without_any_numbers_has_no_estimate(client):
 
     assert entry["input_tokens_estimate"] == 0
     assert entry["input_is_estimate"] is False
+
+
+# ── fetch_failed: stays in Inbox, "Retry fetch" goes through /restore ─────────
+
+@pytest.mark.asyncio
+async def test_fetch_failed_vacancy_is_listed_in_inbox_not_archive(client):
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/ff-stage/", status="fetching")
+    await database.give_up_fetch(vid, "Fetch failed 5x — giving up: 503")
+
+    rows = client.get("/api/vacancies").json()
+    row = next(r for r in rows if r["id"] == vid)
+    assert row["status"] == "fetch_failed"
+    assert row["stage"] == "inbox"
+    assert row["analysis_error"] == "Fetch failed 5x — giving up: 503"
+    assert row["declined_at"] is None
+
+
+@pytest.mark.asyncio
+async def test_restore_retries_a_fetch_failed_vacancy(client):
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/ff-retry/", status="fetching")
+    for _ in range(3):
+        await database.increment_fetch_attempts(vid)
+    await database.give_up_fetch(vid, "Fetch failed 3x — giving up: 503")
+
+    resp = client.patch(f"/api/vacancies/{vid}/restore")
+
+    assert resp.status_code == 200
+    assert resp.json() == {"id": vid, "status": "queued"}
+    row = await database.get_vacancy_by_id(vid)
+    assert row["status"] == "queued"
+    assert row["fetch_attempts"] == 0
+    assert row["analysis_error"] is None
+    assert row["declined_at"] is None
+
+
+@pytest.mark.asyncio
+async def test_restore_still_requeues_a_legacy_declined_row_without_jd(client):
+    """Rows given up before the fetch_failed status existed are 'declined' with no JD."""
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/ff-legacy/")
+    await database.update_vacancy_status(vid, "declined")
+
+    resp = client.patch(f"/api/vacancies/{vid}/restore")
+
+    assert resp.json() == {"id": vid, "status": "queued"}
+
+
+@pytest.mark.asyncio
+async def test_decline_works_on_a_fetch_failed_vacancy(client):
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/ff-decline/", status="fetching")
+    await database.give_up_fetch(vid, "Fetch failed 5x — giving up: 503")
+
+    assert client.patch(f"/api/vacancies/{vid}/decline").status_code == 200
+    row = await database.get_vacancy_by_id(vid)
+    assert row["status"] == "declined"
+    assert row["declined_at"] is not None

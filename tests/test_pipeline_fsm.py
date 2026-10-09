@@ -32,6 +32,7 @@ def test_vacancy_state_values_match_db_strings():
     assert VacancyState.QUEUED           == "queued"
     assert VacancyState.FETCHING         == "fetching"
     assert VacancyState.FETCHED          == "fetched"
+    assert VacancyState.FETCH_FAILED     == "fetch_failed"
     assert VacancyState.ANALYSIS_QUEUED  == "analysis_queued"
     assert VacancyState.ANALYZING        == "analyzing"
     assert VacancyState.ANALYZED         == "analyzed"
@@ -83,6 +84,9 @@ async def test_fsm_transition_unknown_current_status():
     ("queued",           "declined"),
     ("fetching",         "fetched"),
     ("fetching",         "queued"),
+    ("fetching",         "fetch_failed"),
+    ("fetch_failed",     "queued"),
+    ("fetch_failed",     "declined"),
     ("fetched",          "analysis_queued"),
     ("fetched",          "declined"),
     ("analysis_queued",  "analyzing"),
@@ -132,6 +136,9 @@ async def test_fsm_transition_valid(current: str, target: str):
     ("queued",           "cv_generated"),
     ("fetching",         "analyzed"),
     ("fetching",         "analysis_queued"),
+    ("fetch_failed",     "fetched"),
+    ("fetch_failed",     "analysis_queued"),
+    ("queued",           "fetch_failed"),
     ("fetched",          "analyzing"),
     ("fetched",          "cv_queued"),
     ("analysis_queued",  "analyzed"),

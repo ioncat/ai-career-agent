@@ -20,6 +20,7 @@ class VacancyState(StrEnum):
     QUEUED           = "queued"
     FETCHING         = "fetching"
     FETCHED          = "fetched"
+    FETCH_FAILED     = "fetch_failed"   # RSSWatcher gave up fetching; stays in Inbox
     ANALYSIS_QUEUED  = "analysis_queued"
     ANALYZING        = "analyzing"
     ANALYZED         = "analyzed"
@@ -45,6 +46,11 @@ VALID_TRANSITIONS: dict[VacancyState, frozenset[VacancyState]] = {
     VacancyState.FETCHING: frozenset({
         VacancyState.FETCHED,
         VacancyState.QUEUED,           # reset on fetch failure → auto-retry
+        VacancyState.FETCH_FAILED,     # retry cap reached
+    }),
+    VacancyState.FETCH_FAILED: frozenset({
+        VacancyState.QUEUED,           # "Retry fetch"
+        VacancyState.DECLINED,
     }),
     VacancyState.FETCHED: frozenset({
         VacancyState.ANALYSIS_QUEUED,

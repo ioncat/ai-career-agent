@@ -215,14 +215,13 @@ class RSSWatcher:
                         reason = f"Fetch failed {attempts}x — giving up: {str(exc)[:200]}"
                         await database.give_up_fetch(vid, reason)
                         log.error(
-                            "RSSWatcher: v#%d gave up after %d attempts — declined. %s",
+                            "RSSWatcher: v#%d gave up after %d attempts — fetch_failed. %s",
                             vid, attempts, reason,
                         )
                         await self._bot.send_message(
                             f"❌ <b>Не удалось получить вакансию</b> — сдался после {attempts} попыток\n"
                             f'<a href="{url}">{display}</a>\n'
-                            f"Причина: <code>{str(exc)[:200]}</code>\n"
-                            f"Перенесено в Archive."
+                            f"Причина: <code>{str(exc)[:200]}</code>"
                         )
                     else:
                         # Reset to queued so the next poll retries automatically.

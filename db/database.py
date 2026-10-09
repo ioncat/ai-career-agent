@@ -715,27 +715,29 @@ async def increment_fetch_attempts(vacancy_id: int) -> int:
 async def give_up_fetch(vacancy_id: int, error: str | None) -> None:
     """Stop retrying a vacancy that failed to fetch MAX_FETCH_ATTEMPTS times.
 
-    Sets status='declined' (out of Inbox, matches "Inbox Zero" — an
-    unparseable page isn't worth indefinite retries) and records the last
-    error in analysis_error so the reason is visible, not just silently
-    archived. Also stamps declined_at (Archive's sort key) — bypasses
-    update_vacancy_status so it needs its own, same as that function.
+    Sets status='fetch_failed': the vacancy stays in Inbox (core.vacancy_stage),
+    visibly failed, instead of silently moving to Archive — the user decides
+    whether to retry (requeue_fetch) or decline it. The last error goes to
+    analysis_error so the reason is visible. It is not a decline, so
+    declined_at stays NULL (it is Archive's sort key) — bypasses
+    update_vacancy_status, which would stamp or clear it by status name.
     """
     async with get_db() as db:
         await db.execute(
-            "UPDATE vacancies SET status = 'declined', analysis_error = ?, "
-            "updated_at = datetime('now'), declined_at = datetime('now') WHERE id = ?",
+            "UPDATE vacancies SET status = 'fetch_failed', analysis_error = ?, "
+            "updated_at = datetime('now'), declined_at = NULL WHERE id = ?",
             (error, vacancy_id),
         )
         await db.commit()
 
 
 async def requeue_fetch(vacancy_id: int) -> None:
-    """Re-queue a vacancy that gave up fetching (status='declined', no markdown_path).
+    """Re-queue a vacancy that gave up fetching (status='fetch_failed', or a legacy
+    'declined' row with no markdown_path).
 
     Sets status='queued' (picked up by RSSWatcher._poll_once), resets
     fetch_attempts to 0 (otherwise the next single failure would immediately
-    hit MAX_FETCH_ATTEMPTS again and re-decline it) and clears analysis_error.
+    hit MAX_FETCH_ATTEMPTS again and give up again) and clears analysis_error.
     Also clears declined_at — this is a restore path, bypasses
     update_vacancy_status so it needs its own.
     """

@@ -1387,21 +1387,24 @@ async def api_vacancy_decline(vacancy_id: int):
 
 @app.patch("/api/vacancies/{vacancy_id}/restore")
 async def api_vacancy_restore(vacancy_id: int):
-    """Flutter Restore button — moves declined vacancy back to inbox.
+    """Flutter Restore button — moves declined vacancy back to inbox; also the
+    "Retry fetch" button for a vacancy in status 'fetch_failed'.
 
     Restores to 'analyzed' if analysis_json exists, otherwise 'fetched'.
     Preserves all analysis data — only status changes.
 
-    Exception: a vacancy declined by give_up_fetch (MAX_FETCH_ATTEMPTS reached)
-    has no markdown_path — JD.md was never written. Restoring those straight to
-    'fetched' left the row claiming "ready" with no JD to show, surfacing as
-    "Failed to load JD: Exception: JD not found" in Flutter (found live 2026-08-15,
-    v#1154). Route those to 'queued' instead, so RSSWatcher retries the fetch.
+    Exception: a vacancy that give_up_fetch gave up on (MAX_FETCH_ATTEMPTS
+    reached; status 'fetch_failed', or 'declined' on rows from before that
+    status existed) has no markdown_path — JD.md was never written. Restoring
+    those straight to 'fetched' left the row claiming "ready" with no JD to show,
+    surfacing as "Failed to load JD: Exception: JD not found" in Flutter (found
+    live 2026-08-15, v#1154). Route those to 'queued' instead, so RSSWatcher
+    retries the fetch.
     """
     row = await database.get_vacancy_by_id(vacancy_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Vacancy not found")
-    if not row["analysis_json"] and not row["markdown_path"]:
+    if row["status"] == "fetch_failed" or (not row["analysis_json"] and not row["markdown_path"]):
         await database.requeue_fetch(vacancy_id)
         _log_vacancy_patch("restore", vacancy_id, "queued")
         return {"id": vacancy_id, "status": "queued"}

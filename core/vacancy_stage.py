@@ -31,6 +31,9 @@ _LEGACY_TO_CURRENT = {
 
 _PROCESSED_STATUSES = frozenset({"cv_generated", "cover_generating", "cover_generated"})
 _ANALYZED_STATUSES = frozenset({"analyzed", "analysis_failed"})
+# Inbox is the fall-through of stage(). 'fetch_failed' (RSSWatcher gave up on the
+# fetch) deliberately lands there: it has no JD yet and must stay visible in Inbox,
+# not in Archive. Do not add it to a set above.
 
 
 def stage(status: str, applied: bool) -> str:
