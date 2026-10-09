@@ -94,16 +94,7 @@ class NotificationNotifier extends AsyncNotifier<NotificationState> {
       await repo.markNotificationRead(notificationId);
       final updated = (state.valueOrNull?.items ?? [])
           .map((n) => n.id == notificationId
-              ? PipelineNotification(
-                  id: n.id,
-                  userId: n.userId,
-                  vacancyId: n.vacancyId,
-                  event: n.event,
-                  title: n.title,
-                  body: n.body,
-                  read: true,
-                  createdAt: n.createdAt,
-                )
+              ? n.copyWith(read: true)
               : n)
           .toList();
       state = AsyncData(
@@ -118,16 +109,7 @@ class NotificationNotifier extends AsyncNotifier<NotificationState> {
       final repo = VacancyRepository(baseUrl: settings.apiUrl);
       await repo.markAllNotificationsRead();
       final updated = (state.valueOrNull?.items ?? [])
-          .map((n) => PipelineNotification(
-                id: n.id,
-                userId: n.userId,
-                vacancyId: n.vacancyId,
-                event: n.event,
-                title: n.title,
-                body: n.body,
-                read: true,
-                createdAt: n.createdAt,
-              ))
+          .map((n) => n.copyWith(read: true))
           .toList();
       state = AsyncData(
           state.valueOrNull?.copyWith(items: updated) ??
