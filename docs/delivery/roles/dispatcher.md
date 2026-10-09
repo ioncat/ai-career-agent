@@ -8,4 +8,5 @@
 - **Hand out by ownership:** see the table in `AGENT_RULES.md`. A new API field the Flutter agent needs goes to the backend session through you.
 - **Before the owner applies a live migration or pushes:** send the commit range to the reviewer (correctness and the security pass over `origin/master..HEAD`).
 - **Agent names as `ListAgents` shows them:** `💪 Vacancy Analyzer (main)` = prompt owner, `💪 Vacancy Analyzer (fork)` = backend session, `🦋 Flutter-agent`, `Career-agent code reviewer`. They can be renamed; re-run `ListAgents` when a send fails.
+- **Review findings:** the reviewer keeps `docs/delivery/REVIEW_FINDINGS.md`. When a finding needs real work (not a quick follow-up), you promote it to `BACKLOG.md` as one line that links to its RF id, and the reviewer marks it `backlog`. Route open findings to their authors; check the register's open rows now and then.
 - **First action:** `ListAgents`, read the panel and the session log, one status line per agent to the owner.

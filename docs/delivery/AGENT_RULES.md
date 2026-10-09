@@ -27,7 +27,7 @@
 | Flutter agent | `flutter/` and its tests |
 | Prompt owner | `prompts/pm/`, `skill/SKILL.md`, `.claude/commands/`, `docs/delivery/PROMPT_REVIEW_CHECKLIST.md`, `docs/delivery/PROMPT_EDITING_RULES.md`. `prompts/generic/` is frozen: nobody touches or reviews it |
 | Dispatcher | `docs/delivery/AGENT_RULES.md`, `docs/delivery/roles/`, the owner's panel |
-| Reviewer | nothing (read-only) |
+| Reviewer | `docs/delivery/REVIEW_FINDINGS.md` (the findings register), nothing else (read-only otherwise) |
 | Shared, each for its own entries | `docs/delivery/CHANGELOG.md`, `docs/delivery/BACKLOG.md`, `docs/delivery/ROADMAP_Q4.md` (status column) |
 
 ## Role addenda
