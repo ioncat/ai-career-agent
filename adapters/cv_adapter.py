@@ -26,7 +26,15 @@ MIN_PDF_BYTES = 256
 
 
 class CVAdapterError(Exception):
-    """Raised when the pdf-service returns an error or is unreachable."""
+    """Raised when the pdf-service returns an error or is unreachable.
+
+    `code` is a core.failure_codes value ("pdf_service_unreachable", "pdf_service_error",
+    "pdf_invalid", "pdf_write_failed") or None when the cause is not classified.
+    """
+
+    def __init__(self, message: str, code: str | None = None) -> None:
+        super().__init__(message)
+        self.code = code
 
 
 def validate_pdf_bytes(content: bytes) -> None:
@@ -37,9 +45,11 @@ def validate_pdf_bytes(content: bytes) -> None:
     thing everywhere.
     """
     if not content.startswith(PDF_MAGIC):
-        raise CVAdapterError("pdf-service returned a response that is not a PDF")
+        raise CVAdapterError("pdf-service returned a response that is not a PDF", code="pdf_invalid")
     if len(content) < MIN_PDF_BYTES:
-        raise CVAdapterError(f"pdf-service returned a PDF of only {len(content)} bytes (empty render)")
+        raise CVAdapterError(
+            f"pdf-service returned a PDF of only {len(content)} bytes (empty render)", code="pdf_invalid"
+        )
 
 
 class CVAdapter:
@@ -89,19 +99,21 @@ class CVAdapter:
                 )
         except httpx.ConnectError as exc:
             raise CVAdapterError(
-                f"pdf-service unreachable at {self._url}: {exc}"
+                f"pdf-service unreachable at {self._url}: {exc}", code="pdf_service_unreachable"
             ) from exc
         except httpx.TimeoutException as exc:
             raise CVAdapterError(
-                f"pdf-service timed out after {_DEFAULT_TIMEOUT}s"
+                f"pdf-service timed out after {_DEFAULT_TIMEOUT}s", code="pdf_service_unreachable"
             ) from exc
         except httpx.HTTPError as exc:
-            raise CVAdapterError(f"HTTP error calling pdf-service: {exc}") from exc
+            raise CVAdapterError(
+                f"HTTP error calling pdf-service: {exc}", code="pdf_service_unreachable"
+            ) from exc
 
         if response.status_code != 200:
             body = response.text[:300]
             raise CVAdapterError(
-                f"pdf-service returned {response.status_code}: {body}"
+                f"pdf-service returned {response.status_code}: {body}", code="pdf_service_error"
             )
 
         validate_pdf_bytes(response.content)
@@ -110,6 +122,8 @@ class CVAdapter:
         try:
             pdf_path.write_bytes(response.content)
         except OSError as exc:
-            raise CVAdapterError(f"could not write the PDF to {pdf_path}: {exc}") from exc
+            raise CVAdapterError(
+                f"could not write the PDF to {pdf_path}: {exc}", code="pdf_write_failed"
+            ) from exc
         log.info("CVAdapter: PDF written → %s (%d bytes)", pdf_path, len(response.content))
         return pdf_path

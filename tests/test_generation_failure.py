@@ -151,7 +151,7 @@ def test_decode_ignores_missing_or_malformed_values(raw):
 def test_decode_keeps_kind_reason_at():
     raw = json.dumps({"kind": "cover", "reason": "r", "at": "2026-10-09 10:00:00"})
     assert database.decode_generation_failure(raw) == {
-        "kind": "cover", "target": None, "reason": "r", "at": "2026-10-09 10:00:00"}
+        "kind": "cover", "target": None, "reason": "r", "code": None, "at": "2026-10-09 10:00:00"}
 
 
 # ── the workers ───────────────────────────────────────────────────────────────

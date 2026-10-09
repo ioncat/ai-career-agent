@@ -2548,3 +2548,96 @@ async def test_api_exposes_the_pdf_failure_with_its_target(client, tmp_path):
         assert item["generation_failure"]["kind"] == "pdf"
         assert item["generation_failure"]["target"] == "cover"
         assert item["generation_failure"]["at"].endswith("Z")
+
+
+# ── the unified `failure` projection in the vacancy APIs ──────────────────────
+
+def _both(client, vid):
+    listed = next(r for r in client.get("/api/vacancies").json() if r["id"] == vid)
+    return listed, client.get(f"/api/vacancies/{vid}").json()
+
+
+@pytest.mark.asyncio
+async def test_failure_is_null_for_a_healthy_vacancy(client):
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/fp-ok/")
+
+    for item in _both(client, vid):
+        assert item["failure"] is None
+
+
+@pytest.mark.asyncio
+async def test_failure_for_a_fetch_failed_vacancy(client):
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/fp-fetch/", status="fetching")
+    await database.give_up_fetch(vid, "Fetch failed 5x - giving up: 503")
+
+    for item in _both(client, vid):
+        assert item["status"] == "fetch_failed"
+        assert item["failure"] == {
+            "kind": "fetch", "target": None, "reason": "Fetch failed 5x - giving up: 503",
+            "at": item["updated_at"], "retry": "fetch", "code": "fetch_gave_up",
+        }
+        assert item["failure"]["at"].endswith("Z")
+
+
+@pytest.mark.asyncio
+async def test_failure_for_an_analysis_failed_vacancy(client):
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/fp-analysis/", status="analyzing")
+    await database.set_analysis_error(vid, "LLM timeout")
+
+    for item in _both(client, vid):
+        assert item["failure"]["kind"] == "analysis"
+        assert (item["failure"]["retry"], item["failure"]["code"]) == ("analyze", "analysis_failed")
+        assert item["failure"]["reason"] == "LLM timeout"
+
+
+@pytest.mark.asyncio
+async def test_failure_for_a_generation_failure_carries_kind_code_and_retry(client):
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/fp-gen/", status="cv_generating")
+    await database.fail_generation(vid, "cv", "provider down", "analyzed", code="llm_error")
+
+    for item in _both(client, vid):
+        f = item["failure"]
+        assert (f["kind"], f["target"], f["retry"], f["code"], f["reason"]) == \
+            ("cv", None, "cv", "llm_error", "provider down")
+        assert f["at"].endswith("Z")
+        assert item["generation_failure"]["code"] == "llm_error"      # the older field stays
+
+
+@pytest.mark.asyncio
+async def test_failure_for_a_pdf_failure_names_the_target(client):
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/fp-pdf/", status="cover_generated")
+    await database.record_pdf_failure(vid, "cover", "service down", "pdf_service_unreachable")
+
+    for item in _both(client, vid):
+        f = item["failure"]
+        assert (f["kind"], f["target"], f["retry"], f["code"]) == \
+            ("pdf", "cover", "pdf", "pdf_service_unreachable")
+
+
+@pytest.mark.asyncio
+async def test_a_failure_recorded_before_codes_existed_reads_as_unknown(client):
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/fp-old/", status="analyzed")
+    await database.fail_generation(vid, "cover", "old failure", "cv_generated")      # no code, like an old row
+
+    for item in _both(client, vid):
+        assert item["failure"]["code"] == "unknown"
+        assert item["generation_failure"]["code"] is None
+
+
+@pytest.mark.asyncio
+async def test_every_failure_code_in_the_api_is_in_the_vocabulary(client):
+    from core import failure_codes
+    ids = []
+    for n, (status, setup) in enumerate([
+        ("fetching", lambda v: database.give_up_fetch(v, "x")),
+        ("analyzing", lambda v: database.set_analysis_error(v, "x")),
+        ("cv_generating", lambda v: database.fail_generation(v, "cv", "x", "analyzed", code="llm_timeout")),
+        ("cover_generated", lambda v: database.record_pdf_failure(v, "cv", "x", "pdf_invalid")),
+        ("cover_generated", lambda v: database.record_pdf_failure(v, "cv", "x", "made_up")),
+    ]):
+        vid = await database.insert_vacancy(url=f"https://djinni.co/jobs/fp-vocab{n}/", status=status)
+        await setup(vid)
+        ids.append(vid)
+
+    for vid in ids:
+        assert _both(client, vid)[0]["failure"]["code"] in failure_codes.ALL_CODES

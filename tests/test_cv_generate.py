@@ -637,7 +637,7 @@ async def test_pdf_failure_is_recorded_on_the_vacancy_and_the_cv_still_succeeds(
         result = await cv_generate(ctx, 1)
 
     assert "✅" in result
-    mock_db.record_pdf_failure.assert_awaited_once_with(1, "cv", "pdf-service unreachable")
+    mock_db.record_pdf_failure.assert_awaited_once_with(1, "cv", "pdf-service unreachable", None)
     mock_db.clear_pdf_failure.assert_not_awaited()
 
 
@@ -667,3 +667,18 @@ async def test_a_bookkeeping_error_never_breaks_cv_generation(tmp_path):
         result = await cv_generate(ctx, 1)
 
     assert "✅" in result
+
+
+@pytest.mark.asyncio
+async def test_the_pdf_error_code_is_stored_with_the_failure(tmp_path):
+    jd_path, _ = _write_vacancy_files(tmp_path)
+    llm = _make_llm(side_effect=[_PHASE3_DRAFT, _PHASE35_SAMPLE])
+    cv_adapter = AsyncMock(spec=CVAdapter)
+    cv_adapter.generate_pdf = AsyncMock(side_effect=CVAdapterError("empty render", code="pdf_invalid"))
+    ctx = _make_ctx(tmp_path, llm, cv_adapter)
+    mock_db = _mock_db(vacancy_row=_make_vacancy_row(jd_path))
+
+    with patch("tools.cv_generate.database", mock_db):
+        await cv_generate(ctx, 1)
+
+    mock_db.record_pdf_failure.assert_awaited_once_with(1, "cv", "empty render", "pdf_invalid")

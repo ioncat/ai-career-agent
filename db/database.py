@@ -690,12 +690,13 @@ GENERATION_FAILURE_REASON_MAX = 500
 
 
 def decode_generation_failure(raw: str | None) -> dict | None:
-    """Parse the stored `last_generation_failure` JSON into {kind, target, reason, at}.
+    """Parse the stored `last_generation_failure` JSON into {kind, target, reason, code, at}.
 
     `target` is "cv" or "cover" for kind "pdf" (which document failed to render) and
     None for kind "cv" / "cover". None for NULL, empty, unparsable or malformed values
     (including kind "pdf" without a valid target), so an old row or a bad value never
-    breaks an API response.
+    breaks an API response. `code` (core/failure_codes.py) is None on rows recorded before
+    codes existed.
     """
     if not raw:
         return None
@@ -711,19 +712,22 @@ def decode_generation_failure(raw: str | None) -> dict | None:
             return None
     else:
         target = None
+    code = data.get("code")
     return {
         "kind": data["kind"],
         "target": target,
         "reason": str(data.get("reason") or ""),
+        "code": code if isinstance(code, str) and code else None,
         "at": data.get("at"),
     }
 
 
-def _failure_payload(kind: str, reason: str, target: str | None = None) -> str:
+def _failure_payload(kind: str, reason: str, target: str | None = None, code: str | None = None) -> str:
     return json.dumps(
         {
             "kind": kind,
             "target": target,
+            "code": code,
             "reason": (reason or "")[:GENERATION_FAILURE_REASON_MAX],
             "at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
         },
@@ -731,7 +735,9 @@ def _failure_payload(kind: str, reason: str, target: str | None = None) -> str:
     )
 
 
-async def fail_generation(vacancy_id: int, kind: str, reason: str, rollback_status: str) -> None:
+async def fail_generation(
+    vacancy_id: int, kind: str, reason: str, rollback_status: str, code: str | None = None
+) -> None:
     """Record a failed CV / cover generation and roll the status back, in one write.
 
     kind is 'cv' or 'cover'; reason is cut to GENERATION_FAILURE_REASON_MAX characters;
@@ -746,12 +752,12 @@ async def fail_generation(vacancy_id: int, kind: str, reason: str, rollback_stat
         await db.execute(
             "UPDATE vacancies SET status = ?, last_generation_failure = ?, "
             "updated_at = datetime('now'), declined_at = NULL WHERE id = ?",
-            (rollback_status, _failure_payload(kind, reason), vacancy_id),
+            (rollback_status, _failure_payload(kind, reason, code=code), vacancy_id),
         )
         await db.commit()
 
 
-async def record_pdf_failure(vacancy_id: int, target: str, reason: str) -> None:
+async def record_pdf_failure(vacancy_id: int, target: str, reason: str, code: str | None = None) -> None:
     """Record that rendering the PDF of `target` ("cv" or "cover") failed.
 
     Unlike fail_generation, the status is NOT touched: the CV or cover exists and is
@@ -764,7 +770,7 @@ async def record_pdf_failure(vacancy_id: int, target: str, reason: str) -> None:
     async with get_db() as db:
         await db.execute(
             "UPDATE vacancies SET last_generation_failure = ?, updated_at = datetime('now') WHERE id = ?",
-            (_failure_payload("pdf", reason, target), vacancy_id),
+            (_failure_payload("pdf", reason, target, code), vacancy_id),
         )
         await db.commit()
 

@@ -37,8 +37,10 @@ from adapters.djinni_salary_adapter import DjinniSalaryAdapter
 from adapters.parser_adapter import ParserAdapter, ParserError
 from contracts.pipeline import AnalysisJson
 from core import config_store
+from core import failure_codes
 from core import vacancy_stage
 from core.dedup import compute_applied_twins, compute_company_applied
+from core.failure_projection import build_failure
 from core.vacancy_tags import classify as classify_tags
 from core.vacancy_tags import merge_tags
 from db import database
@@ -71,15 +73,24 @@ def _utc_z(value):
 
 
 def _expose_generation_failure(item: dict) -> None:
-    """Replace the raw `last_generation_failure` column by `generation_failure`.
+    """Replace the raw `last_generation_failure` column by `generation_failure` and add `failure`.
 
-    Shape: null, or {"kind": "cv" | "cover", "reason": str, "at": ISO 8601 UTC with Z}.
-    A NULL, old or malformed column value gives null, never an error.
+    `generation_failure`: null, or {"kind": "cv" | "cover" | "pdf", "target": "cv" | "cover" | null,
+    "reason": str, "code": str | null, "at": ISO 8601 UTC with Z}. A NULL, old or malformed column
+    value gives null, never an error. `failure`: the unified projection, see core/failure_projection.py.
     """
     failure = database.decode_generation_failure(item.pop("last_generation_failure", None))
     if failure is not None:
         failure["at"] = _utc_z(failure["at"])
     item["generation_failure"] = failure
+    # One read-only shape for every failure type (core/failure_projection.py); the fields above
+    # stay as they are.
+    item["failure"] = build_failure(
+        status=item.get("status"),
+        analysis_error=item.get("analysis_error"),
+        updated_at=_utc_z(item.get("updated_at")),
+        generation_failure=failure,
+    )
 
 
 def _normalize_dates(item: dict) -> dict:
@@ -1554,10 +1565,10 @@ async def api_vacancy_cv(vacancy_id: int):
     return result
 
 
-async def _note_pdf_failure(vacancy_id: int, target: str, reason: str) -> None:
+async def _note_pdf_failure(vacancy_id: int, target: str, reason: str, code: str | None = None) -> None:
     """Keep a failed PDF render on the vacancy (bookkeeping, never raises)."""
     try:
-        await database.record_pdf_failure(vacancy_id, target, reason)
+        await database.record_pdf_failure(vacancy_id, target, reason, code)
     except Exception as exc:  # noqa: BLE001
         log.warning("api/pdf: could not record the PDF failure for v#%d: %s", vacancy_id, exc)
 
@@ -1608,18 +1619,18 @@ async def _render_doc_pdf_bytes(vacancy_id: int, target: str) -> tuple[Path, byt
             resp = await client.post(f"{pdf_service_url}/render", json={"markdown": markdown_text})
     except httpx.HTTPError as exc:
         reason = f"pdf-service unavailable: {exc}"
-        await _note_pdf_failure(vacancy_id, target, reason)
+        await _note_pdf_failure(vacancy_id, target, reason, failure_codes.PDF_SERVICE_UNREACHABLE)
         raise HTTPException(status_code=503, detail=reason)
 
     if resp.status_code != 200:
         reason = f"pdf-service error {resp.status_code}"
-        await _note_pdf_failure(vacancy_id, target, reason)
+        await _note_pdf_failure(vacancy_id, target, reason, failure_codes.PDF_SERVICE_ERROR)
         raise HTTPException(status_code=502, detail=reason)
 
     try:
         validate_pdf_bytes(resp.content)
     except CVAdapterError as exc:
-        await _note_pdf_failure(vacancy_id, target, str(exc))
+        await _note_pdf_failure(vacancy_id, target, str(exc), exc.code)
         raise HTTPException(status_code=502, detail=str(exc))
     return md_file, resp.content
 
@@ -1676,7 +1687,7 @@ async def api_vacancy_render_pdf(vacancy_id: int, req: RenderPdfRequest):
         pdf_path.write_bytes(pdf_bytes)
     except OSError as exc:
         reason = f"could not write the PDF to {pdf_path.name}: {exc}"
-        await _note_pdf_failure(vacancy_id, req.target, reason)
+        await _note_pdf_failure(vacancy_id, req.target, reason, failure_codes.PDF_WRITE_FAILED)
         raise HTTPException(status_code=500, detail=reason)
     await _note_pdf_ok(vacancy_id, req.target)
     log.info("api/render-pdf: v#%d %s -> %s (%d bytes)", vacancy_id, req.target, pdf_path.name, len(pdf_bytes))
