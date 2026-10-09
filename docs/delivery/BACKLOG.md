@@ -1,5 +1,7 @@
 # career-agent — Backlog
 
+> **From 2026-10-09 open tasks live in Linear** (team VBA). An entry that has moved is deleted here in the same step; the migration plan is `LINEAR_MIGRATION_PLAN.md`. Moved so far: VBA-12 to VBA-22.
+
 > Last updated: 2026-10-07
 > Rules: [documentation-conventions.md](documentation-conventions.md) · History: [CHANGELOG.md](CHANGELOG.md) · Specs: [Epics/](Epics/)
 
@@ -60,30 +62,6 @@
 **2026-09-21 progress:** found live on vacancy #1646 (DAO CV session) that the archetype label alone doesn't reliably reach Phase 3 — a CV led with a business-feature list instead of the technical-complexity framing its own `role_balance.delivery=55%`/archetype implied. Ran a concentration analysis across 88 applied vacancies to check whether `role_balance` is trustworthy enough to build a deterministic enforcement mechanism on top of (it is — see write-up). Shipped a first concrete step: `_RoleBalanceRadar` (Flutter) now classifies and displays the role's shape (Sharp/Dual/Diffuse, >=30% threshold) directly under the chart, so this is visible without reading raw numbers.
 **Write-ups:** [role-balance-determinism-2026-09-07.md](../discovery/role-balance-determinism-2026-09-07.md) (mechanism/reproducibility question, incl. a confirmed Growth-axis lexical-priming bug on #1494) · [role-balance-concentration-analysis-2026-09-21.md](../discovery/role-balance-concentration-analysis-2026-09-21.md) (88-vacancy analysis, threshold validation, next-step proposal).
 **Not started:** the actual Phase 3 enforcement mechanism (deterministic shape → forced Summary+Experience self-justification → Phase 3.5 check against the same number) — sketched in the 2026-09-21 doc §5, not drafted into any prompt yet. Also still open: the Growth lexical-priming fix, and whether to run a determinism probe (re-run a vacancy 3× and compare variance).
-
-### 🟠 P1 — EPIC-24 (`progressive_profile`) — keep investing, or deprecate? (elevated 2026-09-21, needs a dedicated decision session)
-**What:** `progressive_profile` (structured DB profile, separate from markdown `PROFILE.md`) shipped T1–T8, T7/T9 still open. Found live during the phase-by-phase prompt audit (2026-09-21): its write-back (`scripts/profile_merge.py`, called from every Phase 2.5) ran unconditionally regardless of session mode — but `PROFILE_SOURCE` (`.claude/commands/analyze.md`) defaults to `md`, and every real session traced so far ran in that mode, meaning `progressive_profile` has been written to on every resolved objection for months but never actually read back in practice. It also already hit one real reliability failure (`.claude/sessions/2026-08-10-...md`: a `claude` CLI subprocess crash during write-back, worked around at the time by editing `PROFILE.md` directly instead).
-**Gated 2026-09-21 (see CHANGELOG):** write-back now skipped when `PROFILE_SOURCE=md` (the default) — stops the silent, unread cost/risk without deciding the bigger question below.
-**The real open question — explicitly not resolved by the gate above, and explicitly NOT downgraded to icebox (user's framing, 2026-09-21):** is finishing this worth it (T7: trim `PROFILE.md` once DB evidence is trusted; T9: LLM-driven onboarding interview that would naturally populate structured data), or has months of exclusive `PROFILE.md`-markdown usage already settled the question in markdown's favor? Needs the same kind of deliberate, dedicated discussion as the Cover Variant B evidence-heavy debate (2026-09-21, `phase4_cover.md`) — not a quiet default either way.
-**Spec:** [Epics/EPIC-24-progressive-profile.md](Epics/EPIC-24-progressive-profile.md)
-
-### 🟠 P1 — Prompt clarity/structure pass — sequencing, redundancy, directness (added 2026-09-21, not started — **user flagged as top priority for upcoming sessions**)
-**What:** distinct from the correctness audit above (which checked *whether each rule is still valid/enforced*) — this checks *whether the prompt's structure helps the model reason well*: is instruction order sequential and non-confusing, is anything stated redundantly, is anything vague where a firm directive would reduce ambiguity. User's own framing: fewer tokens is a real but secondary benefit — the primary goal is a clearer, less "confusing" task for the model, so it fantasizes less and follows instructions more precisely. Direct evidence this class of problem is real, found *during* the correctness audit even though that wasn't its focus: `phase3_cv_draft.md` had three separate emphasis mechanisms with no stated order (structural, not content, bug — root cause of #1646) and `phase4_cover.md` had a genuine in-file contradiction (Variant B vs. Rule #1).
-**Caution carried over from the correctness audit's own methodology:** rules that already survived an origin/enforcement check are probably not dead weight — this pass should reformulate for clarity, not cut for volume. Trimming a rule that's tied to a real past incident just to save tokens risks reintroducing that incident.
-**Ranked by expected value (highest first):**
-1. `phase3_cv_draft.md` — biggest file (26+ rules, grew again today with Emphasis Precedence), most rule sprawl.
-2. `phase4_cover.md` — grew today too; 3 largely-parallel variants (A/B/C) with some repeated logic worth consolidating.
-3. `phase2_fit.md` — sections were just reordered (today's audit) — worth one clean pass to make sure the new order reads smoothly as a whole, not just mechanically correct.
-4. `phase3_5_review.md`/`phase3_6_signal_audit.md`/`phase3_8_editorial_audit.md` — low priority, already flagged as well-structured reference examples during the correctness audit.
-**Concrete checklist for this pass (not yet run, proposed so a future session doesn't reinvent it):**
-- **Sequential readability** — read top to bottom as the model executes it; does an earlier section set up context a later one needs, or does the model have to jump around?
-- **Cross-file redundancy** — the same rule restated with slightly different wording in multiple files is a real, found pattern this session (e.g. the em-dash ban appears near-verbatim in both `phase3_cv_draft.md` and `phase4_cover.md`; the "Founder Proxy vs Executor" archetype duality is restated in 4 different files). Consider whether a shared rule stated once (with the other files referencing it) reduces both token cost and future drift risk — the archetype vocabulary bleed this session's audit fixed was exactly this failure mode: the same concept asked/stated in two places drifted apart over time.
-- **Vagueness → directive** — flag soft language ("consider", "should", "ideally") that could be a firm imperative instead, where firmness wouldn't lose legitimate flexibility.
-- **Ordering/primacy** — are the highest-frequency, most load-bearing rules near the top of each file, with rare edge cases appropriately buried deep, or is it the reverse? Long prompts risk a model deprioritizing something buried late.
-- **Validate like the correctness audit did (its Step 5):** before calling a rewrite done, spot-check it against 2-3 already-known past incidents for that file — does the reformulated version read as clearly preventing them, not just as shorter text?
-**Sequencing note:** several of these files were just edited today (the correctness audit) — consider letting today's fixes run against a handful of real vacancies first, so this pass tightens prose that's actually been exercised, not prose still fresh from an untested rewrite.
-**Effort/cost estimate (2026-09-21, before starting — not measured yet):** comparable in size to the correctness audit itself (~1800 lines across `prompts/pm/`), but slower per line since it's rewriting for clarity, not searching for bugs — expect roughly one dedicated session per 2-3 files if done thoroughly. Token/cost note: `/analyze` runs through `ClaudeCodeProvider` (a CLI subprocess, likely under a flat Claude subscription, not metered per-token) — so a shorter prompt's main value is probably *not* direct $ savings, it's reduced model confusion (the user's own stated primary goal) and lower context-window pressure; worth confirming the actual billing model before citing $ savings as a justification.
-**Suggested plan:** pilot on **one file first** (`phase4_cover.md` — moderate size, already "warm" from today's edits) — read it end to end with the checklist above, measure the line-count delta and note any real clarity gains, before deciding whether to extend the same pass to the rest.
 
 ### 🟠 P1 — Audit and restructure `CLAUDE.md` — shrink it, move what doesn't belong (added 2026-09-07, for next session)
 **What:** `CLAUDE.md` is read at the start of every session (this project's own convention) — its token cost is paid every single time, whether or not that session's task needs most of it. It has grown substantially and reactively over many sessions (currently v1.24) without a step-back pass. User's explicit framing: "определить, чему там не место, и его ужать, для того, чтобы каждый раз его перечитывая, не тратить избыточное количество токенов."
@@ -146,12 +124,6 @@
 
 ---
 
-### End-to-end CLI acceptance test — full pipeline on real vacancies (added 2026-07-26)
-**What:** run the complete pipeline via CLI/API (`LLM_PROVIDER=claude_api`, not `claude_cli` — need real token/cost numbers, see `docs/discovery/editorial-audit-experiment/README.md`) end-to-end on real vacancies: fetch → Phase 1+2 → Phase 3+3.5 → 3.6 → 4 → **Phase 3.8 auto-trigger** (the new addition this session, `core/pipeline_runner.py` → `tools/cv_editorial_audit.py`).
-**Why:** everything shipped today (Phase 3.8 wiring) is verified only by mocked unit tests (883 green) — never actually run against a live vacancy outside this chat session. This is the real acceptance gate before trusting the automated FSM path.
-**Scope:** pick 2-3 real vacancies (mix of qualifying `apply, fit>=7` and non-qualifying, to confirm the gate skips correctly for free on the latter); confirm CV/Cover files land correctly, `JD_analysis.md` gets the right `## Phase 3.8: Editorial Audit (CV)`/`(Cover)` sections, `analysis_json.p3_7_cv`/`p3_7_cover` populate, notifications fire (`EDITORIAL_AUDIT_DONE`).
-**Priority:** top of Now — do first when tokens allow.
-
 ---
 
 ## 🔴 P0
@@ -207,13 +179,6 @@
 **Found via:** user request to "add the #904 folder to the database", surfaced that it was fetched-only in DB despite finished CV+Cover on disk, and that `JD_analysis.md` was missing entirely.
 
 ---
-
-### Per-archetype skeletal building-block constructs in PROFILE.md, instead of free-form Phase 3 generation (added 2026-07-25)
-**What:** Phase 3 currently writes each role's CV prose freely from the full PROFILE.md context every time. Instead, define fixed, pre-approved "skeletal" phrasing blocks per role/experience, tagged by archetype (delivery, discovery, execution, etc.) — reusable building blocks that Phase 3 selects and lightly adapts per vacancy, rather than generating prose from scratch out of the whole ambient profile.
-**Why:** free generation across the full profile context is the root mechanism behind at least one recurring, user-reported bug (see 🐛 Bugs — "Phase 3 CV draft: cross-role lexical bleed") — vocabulary from one role's canonical text (e.g. HostiServer PM's "post-release issues") leaking into an unrelated role's bullet (Marketplace) within the same generation. A fixed-block architecture removes the mechanism entirely rather than patching each leak as it's found. User has hit generic/unverifiable phrases creeping into CVs "many times" before this one was traced.
-**Scope (undecided, needs design pass):** how many blocks per role, how they're tagged/selected by archetype match to a given vacancy, how much free adaptation Phase 3 is still allowed to do per-vacancy (pure template insertion would lose tailoring quality — needs a balance), relation to EPIC-24 Evidence Bank (`EPIC-24-progressive-profile.md`) — adjacent (both touch how PROFILE.md content is structured) but distinct in purpose: Evidence Bank is about *collecting* evidence; this is about *fixed, non-generative phrasing templates* to prevent generation-time bleed. Should not be silently folded into Evidence Bank without its own design doc (per `core-differentiators.md` house rule: no stub → production without a written design).
-**Concept sketch (added 2026-07-27, unproven — may be dropped):** instead of duplicating PROFILE.md per archetype, tag individual sentences/clauses in place with an inline marker, e.g. `...success criteria before any delivery work started. (|Interviews|)` — same tag can appear on sentences across different roles (Independent + HostiServer both carry `(|Interviews|)`), letting Phase 3 pull all sentences matching a JD's dominant archetype (and mix ratio, e.g. 70/30 Discovery/Delivery) as building blocks instead of generating fresh prose. Two tag layers needed: archetype/class (Discovery/Delivery/etc, positive — used for selection) and theme (topic like `Interviews`, cross-cutting) — plus a separate negative/guardrail tag type for constraints (e.g. "don't imply large team" notes) that filter rather than select. Tag vocabulary must be closed/fixed from the start, not free-form, or it sprawls.
-**Found via:** vacancy #828 (Go Offer), during editorial-audit experiment — see `docs/discovery/editorial-audit-experiment/`.
 
 ---
 
@@ -284,26 +249,6 @@ No dual-availability state — the button's visibility is a direct, deterministi
 **Why:** the rest of "Batch Analysis Mode" shipped 2026-07-24 (see CHANGELOG) — multi-select, `InboxBatchActionBar` (Analyze/Skip + Check Blockers in overflow), standalone "Skip all with blockers", tests. This one sub-item was in the original 2026-07-08 scope and never built; low priority on its own, listed here so it isn't lost.
 **Still open separately:** live-verification in the running app (never confirmed working end-to-end by the user — code shipped and unit-tested, not hands-on tested).
 
-### LLM Quality Parity: SKILL.md rules → API system prompt (added 2026-07-08)
-**What:** audit SKILL.md → extract output-quality rules (tone, language, positioning, per-user overrides) → inject as cached system-prompt block after PROFILE.md in all API/CLI calls.
-**Why:** skill mode sees SKILL.md fully, API mode doesn't → same model produces coarser output ("CLI just follows steps").
-**Scope:**
-- [ ] Audit `skill/SKILL.md` — classify sections: orchestration (Python has it) vs quality (LLM needs it)
-- [ ] Write `prompts/pm/system_quality_rules.md` + `prompts/generic/system_quality_rules.md` + per-user `skill/users/[id]/quality_rules.md`
-- [ ] `core/llm_client.py` — load + append after PROFILE.md (second cached block); same for ClaudeCodeProvider
-- [ ] Validate: same vacancy skill mode vs API mode — compare tone, barriers, positioning, language compliance
-- Progress 2026-10-07: first measurement on #1693 (chat flow vs the app's own pipeline code on copies). The big gap was a provider bug, not the missing rules: the user's own `CLAUDE.md` rules leaked into `claude -p` and Phase 3 returned a question; fixed with an unattended-run guard (`ClaudeCodeProvider(interactive=False)`). After the fix the app output matches the chat flow in decision and structure. Still open: the rules extraction above, the model/effort difference (app: `claude-sonnet-5`, medium), two more vacancies to measure.
-
-### Phase 2.5 Objection Handling in Flutter (4-C4) (added 2026-07-06)
-**What:** after Phase 1+2, present Key Barriers to candidate → user responds with evidence → LLM classifies `resolved | gap` → feeds Phase 3 (address resolved, don't overclaim gaps).
-**Why:** without it CV generation is blind to counter-arguments — misses positioning opportunities or covers real gaps generically.
-**Scope:**
-- [ ] `prompts/pm|generic/phase2_5_objections.md` — classification prompt
-- [ ] `POST /api/vacancies/{id}/barrier-responses` → classified `p2_5` saved to analysis_json
-- [ ] `tools/cv_generate.py` — inject resolved/gap context before Phase 3
-- [ ] Flutter `BarrierResponseScreen` — needs UI design first (blocker)
-
-
 ### Activity: surface claude_cli token estimates + parse real CLI usage (added 2026-07-14)
 **Story:** As a tester comparing providers, I want the Activity tab to show token/cost data for claude_cli runs (currently just "—"), so I can actually compare CLI vs API consumption.
 **Findings (verified in code):** `ClaudeCodeProvider` sets `input_tokens=0/output_tokens=0/cost=0` (CLI `claude -p` returns no usage), but DOES compute + store input estimates `profile_tokens/prompt_tokens/user_tokens = len//4` in `llm_usage`. So input-side estimate exists in DB but is never shown; output is not estimated at all.
@@ -345,14 +290,6 @@ No dual-availability state — the button's visibility is a direct, deterministi
 
 ## 🟡 P2
 
-### Editorial Audit (Phase 3.8): connect it to the app as an optional step (owner decision 2026-10-09, ROADMAP step 3)
-**What:** Phase 3.8 runs only inside the unused `core/pipeline_runner.py`, so it never runs in the app's backend (the `pipeline_runs` table has no such phase). The owner wants it connected to the app later as an **optional** step; the form (a button in the detail panel, or an element of the pipeline) is open.
-**For now:** no change in `pipeline_runner`. **Scope when started:** decide the form with the owner, wire it into the workers or a new endpoint, give it an event and a failure code like the other steps, and add it to the notification routing table.
-
-### Notifications phase 8: the reference document and its drift test (owner decision 2026-10-09)
-**What:** `docs/reference/NOTIFICATIONS_RULES.md` (new folder `docs/reference/`) describes all notification routing in detail (events, origins, channels, texts, retention, keys), written at the end of the notifications plan as an extra last phase.
-**Test:** a test compares the routing table in that document with the table in `core/notifier.py` (data in one place), so the document and the code cannot drift apart. **Depends on:** phase 4 (the router with its table in code). Owner: backend.
-
 ### Input limits and a vocabulary check for event fields, before `POST /api/events` (reviewer, 2026-10-09)
 **State:** `insert_notification` now caps `title` (200) and `body` (300), stores a `code` outside the vocabulary as `unknown` and rejects a `key` over 200; events raised by the workers carry the stable text of the code, not the raw reason (CHANGELOG 2026-10-09).
 **Left (must be done before phase 5):** the endpoint itself rejects (400) an oversized or malformed payload instead of truncating it, checks `code` against `core/failure_codes.py`, and requires the planned shared secret. Owner: backend.
@@ -384,24 +321,6 @@ No dual-availability state — the button's visibility is a direct, deterministi
 **Scope (not started):** `services/parser/`'s Djinni site config needs a second selector for this `<aside>` block (separate from `.job-post__description`); `ParsedDocument` contract needs a field for structured criteria; decide how it feeds the pre-filter (hard pre-check before the LLM call, or extra context appended to the prompt).
 **Priority:** low — the local-model pre-filter work itself is currently exploratory/low-priority; this is an enhancement on an unstable foundation, not urgent.
 
-### Phase 3.6 Signal Audit: Flutter UI + Worker orchestration (added 2026-07-12, estimated 2026-07-14)
-**What:** wire Phase 3.6 into CVWorker + Flutter. Today it exists ONLY in skill mode — prompt `prompts/pm/phase3_6_signal_audit.md` + SKILL.md orchestration; `p3_6` appears nowhere in `tools/core/web/flutter`. Zero backend/Flutter integration.
-**Design:** CVWorker runs Phase 3.6 after CV save → stores findings in `analysis_json.p3_6` (`status: clean|issues`, `findings[]` with `remove|weak` verdicts) → no auto-fix without user confirmation. Flutter `_SignalAuditCard` in CV tab: ✅ clean chip or expandable findings + "Apply fixes".
-**Estimate: ~2–2.5 days total, split into 2 milestones.**
-
-**M1 — Audit read-only (visibility) · ~1–1.5 days (6–10h) · low risk.** Delivers 80% of value: user *sees* "CV clean / 3 noise sentences" — the testing/quality indicator. No auto-edit. Consider pulling M1 to P1 as a testing tool.
-- [ ] `generic` prompt (copy of `pm` — logic is universal) — trivial
-- [ ] `p3_6` schema in `contracts/pipeline.py` + parse findings from markdown output (like `key_barriers` parsing)
-- [ ] CVWorker: after CV save → read EXPERIENCE + Signal Coverage Table → LLM call 3.6 → store `p3_6` (+1 LLM call in pipeline: latency/tokens)
-- [ ] API: expose `p3_6` in analysis response
-- [ ] Flutter `_SignalAuditCard` (clean chip / expandable findings, display only)
-
-**M2 — Apply fixes (auto-edit) · ~0.5–1 day (4–6h) · ⚠️ medium risk.** Do after M1 is proven and the real findings format is seen.
-- [ ] `POST /api/vacancies/{id}/apply-audit-fixes` — **LLM-driven removal** (send CV + 🗑️ list → model returns cleaned CV whole), NOT regex/string-match: LLM excerpt won't match file text exactly (punctuation/line-wraps) → fragile. Costs one more LLM call but reliable.
-- [ ] Re-save CV.md + re-render PDF; `vacancy_track.py update-json --phase p3_6`
-- [ ] Flutter: "Apply fixes" button + `VacancyRepository.applyAuditFixes()`
-- [ ] Tests: removal keeps non-🗑️ sentences intact (guard against over-deletion)
-
 ### Queue journal / log panel (Flutter)
 **What:** visible panel listing all queued vacancies + statuses when anything enters the analysis queue. Useful for future batch mode.
 
@@ -411,10 +330,6 @@ No dual-availability state — the button's visibility is a direct, deterministi
 ### Worker-Critic Pipeline (experiment)
 **What:** adversarial Worker→Critic→revision loop per phase; generalizes Phase 3.5. Experiment first: same vacancy with critic on/off, compare quality vs +50–100% cost.
 **Spec:** [../discovery/worker-critic-pipeline.md](../discovery/worker-critic-pipeline.md)
-
-### Annotated CV Revision
-**What:** select block in CV/Cover preview → annotate → targeted LLM revision without full Phase 3 re-run.
-**Spec:** [../discovery/annotated-cv-revision.md](../discovery/annotated-cv-revision.md)
 
 ### Tech debt
 - [ ] **VScore → VacScore rename** — везде: prompts, SKILL.md, web/reader.py, tracker.html, Flutter
@@ -471,7 +386,6 @@ No dual-availability state — the button's visibility is a direct, deterministi
 - **Pipeline Cost Preview** — token/cost estimate before full run (Telegram UI outdated — redesign for Flutter)
 - **Telegram webhook mode** — config flag, currently long polling (push-only now, low value)
 - **asyncio.Queue → Redis** — when concurrent users justify it
-- **MCP Server** — Career Agent as tool for personal AI agents → [../discovery/mcp-server.md](../discovery/mcp-server.md)
 - **Conversational refinement gap (positioning question, not a ticket)** — real CV/cover quality currently only emerges through Claude Code dialogue (objection handling, self-review approval, signal-audit trims); Flutter app is a tracker/one-shot trigger, not where the work happens. Blocks any pivot toward a standalone (non-Claude-Code) user. Needs a decision, not code, before picking a direction → [../discovery/conversational-refinement-gap.md](../discovery/conversational-refinement-gap.md)
 - **Extensions** — `yt_transcribe.py`, `quote_store.py`, `email_draft.py`, job auto-submit (feasibility research first)
 - **Unit Economics Dashboard** — `GET /api/economics` + Chart.js (cost/vacancy, phase breakdown, cache efficiency, spend). ⚠️ Before aggregating `cost_usd`/`input_tokens`/`output_tokens`: `claude_cli` rows store these as literal `0` (not NULL, no real data — `core/llm_client.py:704-719`), indistinguishable from genuinely-free. Exclude/footnote `WHERE provider='claude_cli'` explicitly instead of summing — see [per-phase-llm-routing.md](../discovery/per-phase-llm-routing.md).
