@@ -6,6 +6,10 @@
 
 ---
 
+## 2026-10-09
+
+- **Process (docs) — `AGENT_RULES.md`: a new group "Talking to the owner" (rules 4 and 5); the later rules moved up by two.** The owner switches between several agents and tasks and was addressed as if always in the context. Rule 4: every message to the owner carries the minimum context needed to be understood on its own, dense but short, with longer detail in a linked file. Rule 5: a question about a task has a fixed shape (task name and id, context in two or three lines, the question in one sentence, numbered options with consequences and the recommended one first, urgency, details link), one question per message.
+
 ## 2026-10-08
 
 - **Feature (Flutter) — one app-wide toast at the top of the window, replacing every bottom SnackBar (`flutter/lib/utils/toast.dart`).** The owner's eyes are at the top of the screen; bottom toasts went unnoticed. New `showToast(context, text, kind:)` / `Toaster.of(context)` (captures the overlay before an `await`) draws on the root overlay, top centre, max width 560, stack of at most 3 with the newest on top, close button on each, an optional action button, and `ToastHandle.dismiss()` for early close ("Preparing PDF..." until "Saved"). Kinds: `info` graphite grey #5F5C66, 3 s (routine confirmations); `notice` accent violet, 10 s (a vacancy moving folder, pipeline events, import); `warning` orange, 6 s (config drift); `error` red, until closed. Hovering any toast pauses the whole stack, so an older toast cannot expire above the hovered one and shift it out from under the cursor (found by the owner while testing). `showErrorSnackBar` keeps its name and now shows an error toast; all other call sites in `app_shell`, `settings_screen`, `vacancy_detail_screen`, `vacancy_inbox_screen`, `vacancy_card` and `phase_llm_config_tile` moved to `showToast`; no `SnackBar` is left in `lib/`. A bug caught by the tests before shipping: a burst of toasts before the first frame inserted the overlay layer several times (`OverlayEntry.mounted` is false until laid out), duplicating every toast. 7 tests in `flutter/test/toast_test.dart`. Confirmed by the owner in the running app.
