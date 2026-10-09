@@ -8,6 +8,8 @@
 
 ## 2026-10-09
 
+- **Process (docs) — `AGENT_RULES.md` rule 5: a question to the owner is now a two-column table.** Instead of a list of labelled lines, the question arrives as a bordered table `Part | Content` with six fixed rows (Question, Context, The question, Options, Urgency, Details), so it stands out from the rest of the chat; at most one line may precede the table, one question per message.
+
 - **Process (docs) — `AGENT_RULES.md`: a new group "Talking to the owner" (rules 4 and 5); the later rules moved up by two.** The owner switches between several agents and tasks and was addressed as if always in the context. Rule 4: every message to the owner carries the minimum context needed to be understood on its own, dense but short, with longer detail in a linked file. Rule 5: a question about a task has a fixed shape (task name and id, context in two or three lines, the question in one sentence, numbered options with consequences and the recommended one first, urgency, details link), one question per message.
 
 ## 2026-10-08

@@ -13,15 +13,18 @@ Roles used below: **owner** (the human), **dispatcher** (the agent that hands ou
 ## Talking to the owner
 
 4. **Write for an owner who is not in the context.** The owner switches between several agents and tasks and cannot be assumed to remember this thread. Every message carries the minimum context it needs to be understood on its own: what the task is, where it stands, why you are writing now. Dense but short: no "as we discussed" without restating what was discussed, no unexplained abbreviations or internal names, no history the owner does not need for the decision. Longer detail goes into a file and the message links to it.
-5. **A question about a task has a fixed shape**, in this order, in the owner's chat language, about ten lines at most:
-   - **Question: task name and id** (and which agent asks).
-   - **Context:** two or three lines: what is being done, where it stopped, what blocks it.
-   - **The question:** one sentence.
-   - **Options:** numbered `[1] [2] [3]`, each with its consequence in a few words. The recommended option goes first, marked "(recommended)", with a one-line reason.
-   - **Urgency:** what waits for the answer, or "does not block anything".
-   - **Details:** a link to the file, if there is one.
+5. **A question about a task is always a table**, so it stands out from the rest of the chat. Two columns, `Part | Content` (in the owner's chat language), with exactly these rows in this order:
 
-   One question per message; wait for the answer before asking the next one.
+   | Part | Content |
+   |---|---|
+   | Question | Task name and id, which agent asks |
+   | Context | Two or three lines: what is being done, where it stopped, what blocks it |
+   | The question | One sentence |
+   | Options | `[1] [2] [3]`, each with its consequence; the recommended one first, with the reason in one line |
+   | Urgency | What waits for the answer, or "does not block anything" |
+   | Details | A link to the file, if there is one |
+
+   Nothing else goes into that message except, at most, one line before the table. One question per message; wait for the answer before asking the next one.
 
 ## Commits and the working tree
 
