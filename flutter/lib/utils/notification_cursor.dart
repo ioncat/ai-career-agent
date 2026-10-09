@@ -56,6 +56,24 @@ class NotificationCursor {
     DateTime now,
   ) => NotificationCursor(now.toUtc().toIso8601String()).advance(existing);
 
+  /// The `since` value for `GET /api/notifications`, in the backend's storage
+  /// format (`YYYY-MM-DD HH:MM:SS`, UTC, whole seconds). The backend compares
+  /// `created_at >= since` as plain strings, so an ISO value with "T" sorts
+  /// after every stored time (" " < "T") and matched nothing: no event was
+  /// ever returned (2026-10-09, found in the owner's first live check).
+  /// Whole seconds round down, so boundary rows come back and [isNew] drops
+  /// the ones already seen.
+  String get sinceParam {
+    try {
+      final t = parseBackendUtc(ts).toUtc();
+      String two(int v) => v.toString().padLeft(2, '0');
+      return '${t.year.toString().padLeft(4, '0')}-${two(t.month)}-${two(t.day)} '
+          '${two(t.hour)}:${two(t.minute)}:${two(t.second)}';
+    } catch (_) {
+      return ts;
+    }
+  }
+
   String encodeIds() => (idsAtTs.toList()..sort()).join(',');
 
   static NotificationCursor? decode(String? ts, String? ids) {

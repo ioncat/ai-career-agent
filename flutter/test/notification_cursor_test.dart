@@ -77,4 +77,26 @@ void main() {
     final five = [for (var i = 0; i < 5; i++) _n(i, t2)];
     expect(splitFresh(five, startup: false).individual.length, 5);
   });
+
+  test('since is sent in the backend storage format, whole seconds', () {
+    expect(
+      const NotificationCursor('2026-10-09T11:40:05.789Z').sinceParam,
+      '2026-10-09 11:40:05',
+    );
+    expect(
+      const NotificationCursor('2026-10-09 11:46:44').sinceParam,
+      '2026-10-09 11:46:44',
+    );
+  });
+
+  test(
+    'a stored event compares >= since as a plain string (backend query)',
+    () {
+      final since = NotificationCursor.firstRun(
+        const [],
+        DateTime.utc(2026, 10, 9, 11, 40),
+      ).sinceParam;
+      expect('2026-10-09 11:46:44'.compareTo(since) >= 0, isTrue);
+    },
+  );
 }

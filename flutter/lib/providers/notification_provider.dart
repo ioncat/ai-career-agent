@@ -93,7 +93,7 @@ class NotificationNotifier extends AsyncNotifier<NotificationState> {
       final repo = VacancyRepository(baseUrl: settings.apiUrl);
       final cursor = _cursor;
       final fetched = await repo.fetchNotifications(
-        since: cursor?.ts,
+        since: cursor?.sinceParam,
         unreadOnly: false,
         limit: 50,
       );
