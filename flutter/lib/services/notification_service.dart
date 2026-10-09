@@ -20,6 +20,17 @@ class NotificationService {
     await notification.show();
   }
 
+  /// One OS notification for many events that arrived while the app was
+  /// closed (notifications phase 3), instead of one per event.
+  static Future<void> showSummary(int count) async {
+    if (!_initialized) return;
+    final notification = LocalNotification(
+      title: 'Career Agent',
+      body: '$count events while the app was closed',
+    );
+    await notification.show();
+  }
+
   static Future<void> showPipelineEvent(PipelineNotification n) async {
     if (!_initialized) return;
     final notification = LocalNotification(

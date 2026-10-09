@@ -54,6 +54,27 @@ class AppShell extends ConsumerStatefulWidget {
 class _AppShellState extends ConsumerState<AppShell> {
   int _selectedIndex = 0;
 
+  // OS (Windows) notifications only while the window is not in focus; when it
+  // is, the in-app toast already shows the event (owner, 2026-10-09). The
+  // Windows embedder reports focus loss as `inactive` and minimize as
+  // `hidden`, so only `resumed` counts as focused.
+  late final AppLifecycleListener _lifecycle;
+  bool _windowFocused = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _lifecycle = AppLifecycleListener(
+      onStateChange: (s) => _windowFocused = s == AppLifecycleState.resumed,
+    );
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
+  }
+
   static const _folders = ['inbox', 'analyzed', 'processed', 'applied', 'archive'];
 
   Future<void> _importJd() async {
@@ -127,7 +148,9 @@ class _AppShellState extends ConsumerState<AppShell> {
     ref.listen<AsyncValue<NotificationState>>(notificationProvider,
         (prev, next) {
       final state = next.valueOrNull;
-      if (state == null || state.fresh.isEmpty) return;
+      if (state == null || (state.fresh.isEmpty && state.summaryCount == 0)) {
+        return;
+      }
 
       // notificationProvider and vacancyListProvider poll on independent
       // timers (same interval, not synchronized) — a fresh pipeline event
@@ -141,9 +164,23 @@ class _AppShellState extends ConsumerState<AppShell> {
 
       if (!(settings?.notificationsEnabled ?? true)) return;
 
+      // Many events while the app was closed: one summary, not a flood.
+      if (state.summaryCount > 0) {
+        if (!_windowFocused) {
+          NotificationService.showSummary(state.summaryCount);
+        }
+        if (context.mounted) {
+          showToast(
+            context,
+            '${state.summaryCount} events while the app was closed',
+            kind: ToastKind.notice,
+          );
+        }
+      }
+
       for (final n in state.fresh) {
-        // OS-level desktop notification
-        NotificationService.showPipelineEvent(n);
+        // OS-level desktop notification, only when the window is not focused
+        if (!_windowFocused) NotificationService.showPipelineEvent(n);
 
         // In-app toast (non-blocking). Failures stay on screen until the
         // user closes them (showErrorSnackBar) — a background pipeline
