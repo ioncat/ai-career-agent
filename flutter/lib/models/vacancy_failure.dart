@@ -7,6 +7,37 @@
 /// the backend (a successful retry), and it carries the only Retry action.
 library;
 
+/// The backend call behind the one Retry button.
+enum RetryCall {
+  /// PATCH /restore — re-queues the fetch of a fetch_failed vacancy.
+  restore,
+
+  /// reset, then POST /analyze — same as the old "Reset & Retry".
+  resetAndAnalyze,
+
+  /// POST /generate-cv (with the failed run's language when known).
+  generateCv,
+
+  /// POST /generate-cover.
+  generateCover,
+
+  /// POST /render-pdf {target}.
+  renderPdf,
+}
+
+/// Statuses in which a run for this vacancy is already going on: a retry would
+/// only get "already in progress" back, and the shown failure is from the
+/// previous run.
+const _runningStatuses = {
+  'queued',
+  'fetching',
+  'analysis_queued',
+  'analyzing',
+  'cv_queued',
+  'cv_generating',
+  'cover_generating',
+};
+
 class VacancyFailure {
   /// fetch | analysis | cv | cover | pdf
   final String kind;
@@ -26,6 +57,9 @@ class VacancyFailure {
   /// Stable code (core/failure_codes.py); the text is picked from it.
   final String code;
 
+  /// Language of the failed CV run (en | uk | ...), when the backend knows it.
+  final String? lang;
+
   const VacancyFailure({
     required this.kind,
     this.target,
@@ -33,19 +67,28 @@ class VacancyFailure {
     this.at = '',
     required this.retry,
     this.code = 'unknown',
+    this.lang,
   });
 
+  /// Tolerant parse: a field of an unexpected type is treated as missing, so
+  /// one odd row never breaks the whole vacancy list.
   static VacancyFailure? fromJson(Object? json) {
-    if (json is! Map<String, dynamic>) return null;
-    final kind = json['kind'] as String? ?? '';
-    if (kind.isEmpty) return null;
+    if (json is! Map) return null;
+    String? str(String key) {
+      final v = json[key];
+      return v is String && v.isNotEmpty ? v : null;
+    }
+
+    final kind = str('kind');
+    if (kind == null) return null;
     return VacancyFailure(
       kind: kind,
-      target: json['target'] as String?,
-      reason: json['reason'] as String? ?? '',
-      at: json['at'] as String? ?? '',
-      retry: json['retry'] as String? ?? '',
-      code: json['code'] as String? ?? 'unknown',
+      target: str('target'),
+      reason: str('reason') ?? '',
+      at: str('at') ?? '',
+      retry: str('retry') ?? '',
+      code: str('code') ?? 'unknown',
+      lang: str('lang'),
     );
   }
 
@@ -56,6 +99,7 @@ class VacancyFailure {
     'at': at,
     'retry': retry,
     'code': code,
+    'lang': lang,
   };
 
   String get _pdfDoc => target == 'cover' ? 'Cover' : 'CV';
@@ -101,16 +145,32 @@ class VacancyFailure {
     _ => 'Something went wrong.',
   };
 
-  /// Label of the one Retry button; null when the retry action is unknown.
-  String? get retryLabel => switch (retry) {
-    'fetch' => 'Retry fetch',
-    'analyze' => 'Retry analysis',
-    'cv' => 'Retry CV',
-    'cover' => 'Retry cover',
-    'pdf' => 'Retry PDF',
+  /// The backend call behind Retry; null when it cannot be retried from here
+  /// (an unknown action, or a PDF failure without a target document).
+  RetryCall? get retryCall => switch (retry) {
+    'fetch' => RetryCall.restore,
+    'analyze' => RetryCall.resetAndAnalyze,
+    'cv' => RetryCall.generateCv,
+    'cover' => RetryCall.generateCover,
+    'pdf' when target == 'cv' || target == 'cover' => RetryCall.renderPdf,
     _ => null,
+  };
+
+  /// Label of the one Retry button; null when there is no retry call.
+  String? get retryLabel => switch (retryCall) {
+    RetryCall.restore => 'Retry fetch',
+    RetryCall.resetAndAnalyze => 'Retry analysis',
+    RetryCall.generateCv => 'Retry CV',
+    RetryCall.generateCover => 'Retry cover',
+    RetryCall.renderPdf => 'Retry PDF',
+    null => null,
   };
 
   /// No job description exists, so the JD view has nothing to show.
   bool get hidesJd => kind == 'fetch';
+
+  /// A run for this vacancy is going on now (e.g. a retry was started): the
+  /// failure shown is from the previous run and Retry must wait.
+  static bool runInProgress(String? status) =>
+      status != null && _runningStatuses.contains(status);
 }

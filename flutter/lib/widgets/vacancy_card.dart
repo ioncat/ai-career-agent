@@ -366,14 +366,11 @@ class _VacancyCardState extends ConsumerState<VacancyCard> {
                       VacScoreBadge(score: v.vacancyScore!),
                     ],
                   ],
-                )
-              else if (v.failure != null)
-                FailurePill(failure: v.failure!),
-              // A failure on an already-scored vacancy (CV / cover / PDF) still
-              // gets its mark, under the scores.
-              if (v.failure != null &&
-                  (v.fitScore != null || v.vacancyScore != null)) ...[
-                const SizedBox(height: 6),
+                ),
+              // One failure mark, under the scores when there are any.
+              if (v.failure != null) ...[
+                if (v.fitScore != null || v.vacancyScore != null)
+                  const SizedBox(height: 6),
                 FailurePill(failure: v.failure!),
               ],
               // Row 5: key barrier — show if present regardless of status

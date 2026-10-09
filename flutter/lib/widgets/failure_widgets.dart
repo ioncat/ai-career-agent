@@ -5,6 +5,7 @@ import '../models/vacancy_failure.dart';
 import '../providers/settings_provider.dart';
 import '../providers/vacancy_list_provider.dart';
 import '../repositories/vacancy_repository.dart';
+import '../utils/backend_time.dart';
 import '../utils/error_snackbar.dart';
 import '../utils/toast.dart';
 
@@ -60,10 +61,16 @@ class FailureBlock extends ConsumerStatefulWidget {
   final int vacancyId;
   final VacancyFailure failure;
 
+  /// The vacancy's current status: while a run is in progress the failure is
+  /// from the previous run, so Retry waits (a second click would only get
+  /// "already in progress").
+  final String? status;
+
   const FailureBlock({
     super.key,
     required this.vacancyId,
     required this.failure,
+    this.status,
   });
 
   @override
@@ -80,24 +87,24 @@ class _FailureBlockState extends ConsumerState<FailureBlock> {
         'http://localhost:8080',
   );
 
-  /// One mapping from `retry` to the backend call.
+  /// One mapping from the failure's retry call to the backend.
   Future<void> _runRetry() async {
     final f = widget.failure;
     final id = widget.vacancyId;
-    switch (f.retry) {
-      case 'fetch':
-        await _repo.restore(id); // re-queues the fetch for a fetch_failed row
-      case 'analyze':
-        await _repo.reset(id); // same as the old Reset & Retry
+    switch (f.retryCall) {
+      case RetryCall.restore:
+        await _repo.restore(id);
+      case RetryCall.resetAndAnalyze:
+        await _repo.reset(id);
         await _repo.analyze(id);
-      case 'cv':
-        await _repo.generateCv(id);
-      case 'cover':
+      case RetryCall.generateCv:
+        await _repo.generateCv(id, language: f.lang ?? 'auto');
+      case RetryCall.generateCover:
         await _repo.generateCover(id);
-      case 'pdf':
-        await _repo.renderPdf(id, f.target ?? 'cv');
-      default:
-        throw Exception('Unknown retry action: ${f.retry}');
+      case RetryCall.renderPdf:
+        await _repo.renderPdf(id, f.target!);
+      case null:
+        throw Exception('This failure cannot be retried from here');
     }
   }
 
@@ -122,26 +129,42 @@ class _FailureBlockState extends ConsumerState<FailureBlock> {
     final f = widget.failure;
     final detail = f.reason.trim();
     final fg = cs.onErrorContainer;
+    final running = VacancyFailure.runInProgress(widget.status);
     final retryLabel = f.retryLabel;
+    final when = f.at.isEmpty ? '' : relativeTimeFromBackend(f.at);
 
     final header = Row(
       children: [
         Icon(Icons.error_outline_rounded, size: 20, color: cs.error),
         const SizedBox(width: 8),
         Expanded(
-          child: Text(
-            f.title,
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              color: fg,
-              fontSize: 15,
+          child: Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(
+                  text: f.title,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: fg,
+                    fontSize: 15,
+                  ),
+                ),
+                if (when.isNotEmpty)
+                  TextSpan(
+                    text: '  ·  $when',
+                    style: TextStyle(
+                      color: fg.withValues(alpha: 0.7),
+                      fontSize: 12.5,
+                    ),
+                  ),
+              ],
             ),
           ),
         ),
         if (retryLabel != null)
           FilledButton.icon(
-            onPressed: _retrying ? null : _retry,
-            icon: _retrying
+            onPressed: _retrying || running ? null : _retry,
+            icon: _retrying || running
                 ? const SizedBox(
                     width: 14,
                     height: 14,
@@ -151,7 +174,7 @@ class _FailureBlockState extends ConsumerState<FailureBlock> {
                     ),
                   )
                 : const Icon(Icons.refresh_rounded, size: 16),
-            label: Text(retryLabel),
+            label: Text(running ? 'Running…' : retryLabel),
             style: FilledButton.styleFrom(
               backgroundColor: cs.error,
               foregroundColor: cs.onError,
@@ -185,6 +208,18 @@ class _FailureBlockState extends ConsumerState<FailureBlock> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           header,
+          if (running) ...[
+            const SizedBox(height: 4),
+            Text(
+              'A new run is in progress; this mark is from the previous one '
+              'and clears when the new run succeeds.',
+              style: TextStyle(
+                color: fg,
+                fontStyle: FontStyle.italic,
+                height: 1.35,
+              ),
+            ),
+          ],
           if (!_collapsed) ...[
             const SizedBox(height: 4),
             Padding(

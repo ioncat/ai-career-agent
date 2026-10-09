@@ -953,7 +953,11 @@ class _JdModeViewState extends ConsumerState<_JdModeView> {
               : null,
         ),
         if (failure != null)
-          FailureBlock(vacancyId: widget.vacancyId, failure: failure),
+          FailureBlock(
+            vacancyId: widget.vacancyId,
+            failure: failure,
+            status: widget.vacancy?.status,
+          ),
         if (!fetchFailed)
         // JD content
         Expanded(
@@ -1202,6 +1206,7 @@ class _VacancyDetailScreenState extends ConsumerState<VacancyDetailScreen>
               FailureBlock(
                 vacancyId: widget.vacancyId,
                 failure: widget.vacancy!.failure!,
+                status: status,
               ),
             // Tab bar
             TabBar(

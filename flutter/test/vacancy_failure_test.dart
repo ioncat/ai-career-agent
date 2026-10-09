@@ -88,4 +88,51 @@ void main() {
       'pdf_write_failed',
     );
   });
+
+  test('each retry maps to exactly one backend call', () {
+    RetryCall? call(String retry, {String? target}) =>
+        VacancyFailure(kind: 'x', retry: retry, target: target).retryCall;
+    expect(call('fetch'), RetryCall.restore);
+    expect(call('analyze'), RetryCall.resetAndAnalyze);
+    expect(call('cv'), RetryCall.generateCv);
+    expect(call('cover'), RetryCall.generateCover);
+    expect(call('pdf', target: 'cover'), RetryCall.renderPdf);
+    expect(call('pdf'), isNull, reason: 'a PDF failure needs its target');
+    expect(call('something_new'), isNull);
+  });
+
+  test('no retry call means no Retry button', () {
+    expect(
+      VacancyFailure.fromJson(_f('pdf', 'pdf', 'pdf_invalid'))!.retryLabel,
+      isNull,
+    );
+  });
+
+  test('a run in progress blocks Retry', () {
+    for (final s in [
+      'cv_generating',
+      'cover_generating',
+      'analyzing',
+      'queued',
+    ]) {
+      expect(VacancyFailure.runInProgress(s), isTrue, reason: s);
+    }
+    for (final s in ['analyzed', 'cv_generated', 'fetch_failed', null]) {
+      expect(VacancyFailure.runInProgress(s), isFalse, reason: '$s');
+    }
+  });
+
+  test('a field of the wrong type does not break the parse', () {
+    final f = VacancyFailure.fromJson({
+      'kind': 'cv',
+      'reason': 42,
+      'retry': 'cv',
+      'code': null,
+      'lang': 'uk',
+    })!;
+    expect(f.reason, '');
+    expect(f.code, 'unknown');
+    expect(f.lang, 'uk');
+    expect(VacancyFailure.fromJson({'kind': 7}), isNull);
+  });
 }

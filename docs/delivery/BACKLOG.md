@@ -448,6 +448,7 @@ No dual-availability state — the button's visibility is a direct, deterministi
 
 ## 🧊 Icebox (P3+)
 
+- **Flutter test: the one FailureBlock in both detail states** (code-review low, 2026-10-09) — no widget test yet proves `FailureBlock` renders under the header in both `_JdModeView` and the tabbed view; it needs a harness for `VacancyDetailScreen` with faked detail/JD/CV providers.
 - **Djinni salary probe: keep any future retry loop spaced minutes apart** (note kept from the closed salary-display entry, 2026-10-08) — on 2026-09-05 the same search query repeated ~6 times in under an hour started returning undeterminable while fresh queries still worked; looks like Djinni soft-throttles a repeated pattern, not the IP (not proven). Live pipeline probes each vacancy once per fetch/republish, so it only matters if a retry loop is added.
 - **Up/Down keyboard-scroll for the Detail panel** — currently mouse-only (deliberate scope cut, 2026-08-25, see keyboard-nav CHANGELOG entries). Would need Detail content to actually claim keyboard focus on click (it doesn't today) plus per-tab scroll wiring (JD/CV/Cover each have their own scroll context) — real effort, not a quick add. User: fine to drop if too much work.
 
