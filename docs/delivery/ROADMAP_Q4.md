@@ -1,6 +1,6 @@
 # Roadmap Q4 2026: a working Flutter app on the shared engine
 
-> Written 2026-10-07, updated the same evening. This is the map; the work items live in [BACKLOG.md](BACKLOG.md). Update the Status column when a step moves.
+> Written 2026-10-07, updated the same evening. This is the map; the work items live in Linear (team `VBA`; the steps are the projects `01` to `11`). Update the Status column when a step moves.
 
 ## Goal
 
@@ -37,7 +37,7 @@ A good CV is produced in the chat today because quality is built there: the mode
 
 The Stage 1 blocker checks in `tools/cv_prefilter.py` hard-code one candidate's values (English level, country, titles, mobile, remote format). That breaks the Q4 criterion "any candidate profile plugs into the same engine" and lets Stage 1 and the Stage 2 prompt disagree. Decision of 2026-10-08: no patches in the old style, solve it by design. A vacancy is turned into a JSON of facts (each with a verbatim quote), the profile carries structured constraints, and a plain comparison does the check. The same facts feed the role axes (step 8), ATS keywords (step 3), filters in the app and MCP (step 10).
 
-Design note: [jd-facts-and-profile-constraints-design-2026-10-08.md](../discovery/jd-facts-and-profile-constraints-design-2026-10-08.md). Status: draft awaiting approval; the constraint fields need the profile schema (step 5). Until it is decided, the Stage 1 English item in BACKLOG stays parked (a draft bridge was written and reverted on 2026-10-08).
+Design note: [jd-facts-and-profile-constraints-design-2026-10-08.md](../discovery/jd-facts-and-profile-constraints-design-2026-10-08.md). Status: draft awaiting approval; the constraint fields need the profile schema (step 5). Until it is decided, the Stage 1 English item (Linear, VBA-25) stays parked (a draft bridge was written and reverted on 2026-10-08).
 
 ## Order
 
