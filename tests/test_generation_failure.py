@@ -303,14 +303,26 @@ async def test_a_render_never_clears_a_cv_or_cover_generation_failure(db_path):
 
 
 @pytest.mark.asyncio
-async def test_a_successful_cv_status_does_not_clear_a_pdf_failure(db_path):
-    """Only the render outcome ends a pdf failure, not the CV status write."""
+async def test_a_new_cv_supersedes_a_pdf_failure_about_the_old_one(db_path):
+    """The failed PDF belonged to the previous CV; the PDF step records a new failure if the new render fails."""
     vid = await _vacancy(26)
     await database.record_pdf_failure(vid, "cv", "boom")
 
     await database.update_vacancy_status(vid, "cv_generated")
 
-    assert (await _failure(vid))["kind"] == "pdf"
+    assert await _failure(vid) is None
+
+
+@pytest.mark.asyncio
+async def test_a_new_cover_supersedes_only_a_cover_pdf_failure(db_path):
+    vid = await _vacancy(27, status="cv_generated")
+    await database.record_pdf_failure(vid, "cv", "cv pdf failed")
+    await database.update_vacancy_status(vid, "cover_generated")
+    assert (await _failure(vid))["target"] == "cv"                 # the CV's PDF is still broken
+
+    await database.record_pdf_failure(vid, "cover", "cover pdf failed")
+    await database.update_vacancy_status(vid, "cover_generated")
+    assert await _failure(vid) is None
 
 
 @pytest.mark.parametrize("raw", ['{"kind": "pdf", "reason": "x"}', '{"kind": "pdf", "target": "letter", "reason": "x"}'])

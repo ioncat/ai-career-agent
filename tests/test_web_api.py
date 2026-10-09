@@ -2684,3 +2684,36 @@ async def test_failure_exposes_the_language_of_a_failed_cv_run(client):
         assert item["generation_failure"]["lang"] == "uk"
     for item in _both(client, old):
         assert item["failure"]["lang"] is None
+
+
+# ── a restart during a generation leaves the vacancy retryable ────────────────
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("stuck,recovered,endpoint", [
+    ("cv_generating", "analyzed", "generate-cv"),
+    ("cover_generating", "cv_generated", "generate-cover"),
+])
+async def test_a_restart_during_a_generation_leaves_the_vacancy_retryable(client, stuck, recovered, endpoint):
+    vid = await database.insert_vacancy(url=f"https://djinni.co/jobs/restart-{stuck}/", status=stuck)
+    # while the run is in progress the endpoint refuses a duplicate
+    assert client.post(f"/api/vacancies/{vid}/{endpoint}").status_code == 409
+
+    await database.reset_stuck_statuses()                      # what the backend does at startup
+
+    item = client.get(f"/api/vacancies/{vid}").json()
+    assert item["status"] == recovered
+    assert client.post(f"/api/vacancies/{vid}/{endpoint}").status_code in (200, 202)   # can be started again
+
+
+@pytest.mark.asyncio
+async def test_the_failure_mark_and_retry_come_back_after_a_restart_mid_retry(client):
+    vid = await database.insert_vacancy(url="https://djinni.co/jobs/restart-mark/", status="cv_generating")
+    await database.fail_generation(vid, "cv", "first failure", "analyzed", code="llm_error", lang="uk")
+    await database.update_vacancy_status(vid, "cv_generating")             # the user pressed Retry
+    assert client.get(f"/api/vacancies/{vid}").json()["failure"] is None   # a run is in progress
+
+    await database.reset_stuck_statuses()                                  # the backend restarts mid-run
+
+    failure = client.get(f"/api/vacancies/{vid}").json()["failure"]
+    assert (failure["kind"], failure["retry"], failure["lang"], failure["reason"]) == \
+        ("cv", "cv", "uk", "first failure")

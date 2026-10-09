@@ -76,7 +76,7 @@ def _expose_generation_failure(item: dict) -> None:
     """Replace the raw `last_generation_failure` column by `generation_failure` and add `failure`.
 
     `generation_failure`: null, or {"kind": "cv" | "cover" | "pdf", "target": "cv" | "cover" | null,
-    "reason": str, "code": str | null, "at": ISO 8601 UTC with Z}. A NULL, old or malformed column
+    "reason": str, "code": str (never null: "unknown" for old rows), "lang": str | null, "at": ISO 8601 UTC with Z}. A NULL, old or malformed column
     value gives null, never an error. `failure`: the unified projection, see core/failure_projection.py.
     """
     failure = database.decode_generation_failure(item.pop("last_generation_failure", None))

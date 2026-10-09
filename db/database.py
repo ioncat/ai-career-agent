@@ -302,12 +302,22 @@ async def reset_stuck_statuses() -> None:
         await db.commit()
         if cur.rowcount:
             log.warning("DB recovery: reset %d stuck 'analyzing' → 'analysis_queued'", cur.rowcount)
+        # A restart drops the workers' in-memory queues, and nothing re-processes 'cv_queued' (only
+        # 'analysis_queued' has a startup re-enqueue), so CV and cover runs are recovered to the status
+        # the user can act on again, not to a queue nobody reads: a stuck status would hide the
+        # failure mark and the retry button for good.
         cur2 = await db.execute(
-            "UPDATE vacancies SET status = 'cv_queued' WHERE status = 'cv_generating'"
+            "UPDATE vacancies SET status = 'analyzed' WHERE status IN ('cv_generating', 'cv_queued')"
         )
         await db.commit()
         if cur2.rowcount:
-            log.warning("DB recovery: reset %d stuck 'cv_generating' → 'cv_queued'", cur2.rowcount)
+            log.warning("DB recovery: reset %d stuck 'cv_generating'/'cv_queued' → 'analyzed'", cur2.rowcount)
+        cur4 = await db.execute(
+            "UPDATE vacancies SET status = 'cv_generated' WHERE status = 'cover_generating'"
+        )
+        await db.commit()
+        if cur4.rowcount:
+            log.warning("DB recovery: reset %d stuck 'cover_generating' → 'cv_generated'", cur4.rowcount)
         cur3 = await db.execute(
             "UPDATE vacancies SET status = 'queued' WHERE status = 'fetching'"
         )
@@ -654,7 +664,9 @@ async def update_vacancy_status(vacancy_id: int, status: str) -> None:
     Writing 'cv_generated' / 'cover_generated' also clears a stored generation
     failure of that kind, in the same transaction: the success status and the end
     of the failure mark are one change, so a client polling with `since` never sees
-    one without the other. A failure of the other kind stays.
+    one without the other. A failure of the other kind stays. A new CV (or cover) also ends a PDF
+    failure about the previous one: that PDF belonged to the old document, and the PDF step records a
+    new failure right after if the new render fails.
     """
     log.info("DB: vacancy #%d status -> %s", vacancy_id, status)
     declined_at_expr = "datetime('now')" if status == "declined" else "NULL"
@@ -674,7 +686,7 @@ async def update_vacancy_status(vacancy_id: int, status: str) -> None:
             )
             row = await cursor.fetchone()
             stored = decode_generation_failure(row["last_generation_failure"]) if row else None
-            if stored and stored["kind"] == kind:
+            if stored and (stored["kind"] == kind or (stored["kind"] == "pdf" and stored["target"] == kind)):
                 await db.execute(
                     "UPDATE vacancies SET last_generation_failure = NULL WHERE id = ?",
                     (vacancy_id,),

@@ -455,8 +455,21 @@ async def test_reset_stuck_statuses_resets_all_three_in_progress_states():
     await database.reset_stuck_statuses()
 
     assert (await database.get_vacancy_by_id(v1))["status"] == "analysis_queued"
-    assert (await database.get_vacancy_by_id(v2))["status"] == "cv_queued"
+    assert (await database.get_vacancy_by_id(v2))["status"] == "analyzed"      # nothing reads cv_queued
     assert (await database.get_vacancy_by_id(v3))["status"] == "queued"
+
+
+@pytest.mark.asyncio
+async def test_reset_stuck_statuses_recovers_cover_and_cv_runs_to_a_retryable_status():
+    """A restart mid-generation must not leave a status nothing processes: the vacancy goes back
+    to the status the user can act on, so the failure mark and the retry button stay reachable."""
+    cover = await database.insert_vacancy(url="https://djinni.co/jobs/r5/", status="cover_generating")
+    queued = await database.insert_vacancy(url="https://djinni.co/jobs/r6/", status="cv_queued")
+
+    await database.reset_stuck_statuses()
+
+    assert (await database.get_vacancy_by_id(cover))["status"] == "cv_generated"
+    assert (await database.get_vacancy_by_id(queued))["status"] == "analyzed"
 
 
 @pytest.mark.asyncio
