@@ -8,8 +8,18 @@ Mocks all external calls (fetch_jd, cv_analyze, send_push, database).
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+import pytest_asyncio
 
 from core.rss_watcher import RSSWatcher
+from db import database
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def _temp_database(tmp_path):
+    """RSSWatcher._process looks the vacancy up in the database before it fetches; those lookups used to run
+    against whatever database was configured, which by default is the live one. Give every test its own."""
+    database.configure(tmp_path / "test.db")
+    await database.init_db()
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

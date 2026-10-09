@@ -277,6 +277,7 @@ async def test_prune_deletes_events_older_than_the_age_cap(db_path):
     old = await database.insert_notification(1, "cv_done")
     fresh = await database.insert_notification(1, "cv_done")
     _backdate(db_path, old, 120)
+    await database.mark_notification_read(old)                   # only READ events are removed by age
 
     deleted = await database.prune_notifications(max_age_days=90, max_rows=1000)
 
@@ -299,6 +300,7 @@ async def test_the_documented_retention_caps_are_the_defaults(db_path):
     assert (database.NOTIFICATION_RETENTION_DAYS, database.NOTIFICATION_RETENTION_MAX_ROWS) == (90, 2000)
     old = await database.insert_notification(1, "cv_done")
     _backdate(db_path, old, 91)
+    await database.mark_notification_read(old)
 
     assert await database.prune_notifications() == 1
 
@@ -386,3 +388,64 @@ async def test_the_notifications_api_returns_the_new_fields_and_system_events(db
     assert (by_event["cv_failed"]["severity"], by_event["cv_failed"]["origin"], by_event["cv_failed"]["code"]) == \
         ("error", "user", "llm_error")
     assert by_event["feed_failing"]["user_id"] is None and by_event["feed_failing"]["severity"] == "warning"
+
+
+# ── review follow-up: errors are not "duplicates", retention policy, rollback ──
+
+@pytest.mark.asyncio
+async def test_a_not_null_violation_surfaces_instead_of_looking_like_a_duplicate(db_path):
+    with pytest.raises(sqlite3.IntegrityError):
+        await database.insert_notification(1, "cv_done", title=None)
+
+
+@pytest.mark.asyncio
+async def test_notify_with_a_bad_value_logs_a_failed_insert_not_a_duplicate(db_path, caplog):
+    import logging
+    caplog.set_level(logging.INFO, logger="core.notifier")
+
+    with _no_push():
+        await notify(1, PipelineEvent.CV_DONE, title=None)
+
+    messages = " ".join(r.getMessage() for r in caplog.records)
+    assert "DB insert failed" in messages and "duplicate" not in messages
+
+
+@pytest.mark.asyncio
+async def test_an_unread_event_survives_the_age_rule_but_not_the_row_cap(db_path):
+    unread_old = await database.insert_notification(1, "cv_failed")
+    read_old = await database.insert_notification(1, "cv_done")
+    _backdate(db_path, unread_old, 200)
+    _backdate(db_path, read_old, 200)
+    await database.mark_notification_read(read_old)
+
+    assert await database.prune_notifications(max_age_days=90, max_rows=1000) == 1      # only the read one
+    assert [r["id"] for r in await database.list_notifications(1)] == [unread_old]
+
+    newer = [await database.insert_notification(1, "cv_done") for _ in range(3)]
+    await database.prune_notifications(max_age_days=90, max_rows=3)                      # the cap covers unread too
+    assert sorted(r["id"] for r in await database.list_notifications(1)) == newer
+
+
+@pytest.mark.asyncio
+async def test_a_failing_retention_pass_does_not_turn_a_saved_insert_into_a_failure(db_path, caplog):
+    import logging
+    caplog.set_level(logging.INFO)
+    for _ in range(99):
+        await database.insert_notification(1, "cv_done")
+
+    with patch.object(database, "prune_notifications", AsyncMock(side_effect=RuntimeError("prune down"))):
+        new_id = await database.insert_notification(1, "cv_done")                       # id 100
+
+    assert new_id is not None
+    assert "retention pass failed" in " ".join(r.getMessage() for r in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_a_failure_before_the_transaction_keeps_its_own_error(db_path):
+    import aiosqlite
+    _make_old_table(db_path, OLD_ROWS)
+
+    async with aiosqlite.connect(db_path) as db:
+        db.executescript = AsyncMock(side_effect=RuntimeError("boom before BEGIN"))
+        with pytest.raises(RuntimeError, match="boom before BEGIN"):
+            await database._migrate_notifications(db)                 # not "no transaction is active"

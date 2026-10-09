@@ -354,7 +354,10 @@ async def _migrate_notifications(db: aiosqlite.Connection) -> None:
         try:
             await db.executescript(script)
         except Exception:
-            await db.execute("ROLLBACK")
+            try:
+                await db.execute("ROLLBACK")
+            except Exception:
+                pass        # the failure came before BEGIN: there is nothing to roll back, keep the real error
             raise
         log.info("DB migration applied: notifications rebuilt (severity/origin/code/key, nullable user_id)")
     await db.execute(
@@ -2010,9 +2013,10 @@ async def insert_notification(
     async with get_db() as db:
         cursor = await db.execute(
             """
-            INSERT OR IGNORE INTO notifications
+            INSERT INTO notifications
                 (user_id, vacancy_id, event, title, body, severity, origin, code, key)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (COALESCE(user_id, 0), key) WHERE key IS NOT NULL DO NOTHING
             """,
             (user_id, vacancy_id, event, title, body, severity, origin, code, key),
         )
@@ -2021,7 +2025,10 @@ async def insert_notification(
             return None
         row_id = cursor.lastrowid
     if row_id and row_id % 100 == 0:
-        await prune_notifications()
+        try:
+            await prune_notifications()
+        except Exception as exc:  # the row is saved; a retention failure is not an insert failure
+            log.warning("notifications: retention pass failed: %s", exc)
     return row_id
 
 
@@ -2029,13 +2036,16 @@ async def prune_notifications(
     max_age_days: int = NOTIFICATION_RETENTION_DAYS,
     max_rows: int = NOTIFICATION_RETENTION_MAX_ROWS,
 ) -> int:
-    """Retention: delete events older than max_age_days, then keep only the newest max_rows.
+    """Retention: delete READ events older than max_age_days, then keep only the newest max_rows.
 
+    Policy: an unread event is never removed by age, so an error nobody has seen yet cannot vanish
+    just because a few weeks passed. The row cap applies to every event, read or not, and is shared
+    by all users; a burst of more than max_rows events pushes the oldest out (including unread ones).
     Returns how many rows were deleted. Safe to call at any time.
     """
     async with get_db() as db:
         old = await db.execute(
-            "DELETE FROM notifications WHERE created_at < datetime('now', ?)",
+            "DELETE FROM notifications WHERE read = 1 AND created_at < datetime('now', ?)",
             (f"-{int(max_age_days)} days",),
         )
         over = await db.execute(
@@ -2088,7 +2098,12 @@ async def mark_notification_read(notification_id: int) -> None:
 
 
 async def mark_all_notifications_read(user_id: int) -> None:
-    """Mark all unread notifications for user as read."""
+    """Mark all unread notifications for user as read.
+
+    Known limit: a system event (user_id NULL) has one read flag for everybody, so one user's
+    read-all marks it read for all. Harmless with a single user; per-user read state would be a
+    separate table.
+    """
     async with get_db() as db:
         await db.execute(
             "UPDATE notifications SET read = 1 WHERE (user_id = ? OR user_id IS NULL) AND read = 0",

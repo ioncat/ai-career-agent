@@ -16,11 +16,17 @@ def allow_external_in_tests(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def never_touch_the_live_database(monkeypatch, tmp_path):
-    """Default DB_PATH to a throwaway file for every test.
+    """Point both database paths at a throwaway file for every test.
 
-    The API's startup (web.api lifespan) opens DB_PATH, default `db/agent.db`, and runs init_db()
-    with its schema migrations. A test that starts the app without pointing DB_PATH at its own
-    database would migrate the real one (this happened once, on a table-rebuild migration). Tests
-    that need a specific database still set DB_PATH themselves; this only closes the default.
+    Two things can open the real `db/agent.db`: the API's startup (web.api lifespan reads the env var
+    DB_PATH, default `db/agent.db`, and runs init_db() with its schema migrations) and any direct
+    `database.*` call in a test that never called `database.configure()` (db.database does not read
+    DB_PATH: its module-level `_db_path` defaults to the live file). A table-rebuild migration once
+    reached the live database this way. Tests that need a specific database still set DB_PATH or call
+    configure() themselves; this only closes the default, and monkeypatch restores both afterwards.
     """
-    monkeypatch.setenv("DB_PATH", str(tmp_path / "guard_default.db"))
+    from db import database
+
+    guard = tmp_path / "guard_default.db"
+    monkeypatch.setenv("DB_PATH", str(guard))
+    monkeypatch.setattr(database, "_db_path", guard)

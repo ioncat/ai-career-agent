@@ -347,6 +347,11 @@ No dual-availability state — the button's visibility is a direct, deterministi
 
 ## 🟡 P2
 
+### Input limits and a vocabulary check for event fields, before `POST /api/events` (reviewer, 2026-10-09)
+**What:** `insert_notification` rejects a `key` over 200 characters, but `title`, `body` and `code` have no length limit and `code` is not checked against `core/failure_codes.py`.
+**Why:** phase 5 of the notifications plan opens `POST /api/events` to other processes (job monitor, health check) and event text becomes Telegram text; unbounded fields are an abuse and storage risk.
+**Scope (must be done before phase 5):** length caps for `title` and `body`, `code` must be in the vocabulary or null, validated in the endpoint and in `insert_notification`; together with the planned shared secret. Owner: backend.
+
 ### Djinni company profile for old rows: fill via re-fetch or a slow rate-limited backfill (added 2026-10-05)
 **What:** `vacancies.company_profile_url` is filled for DOU rows (derived from the URL) and for every vacancy fetched from now on; the ~820 older Djinni rows have none, because Djinni's company link lives in the page DOM.
 **Why:** the profile key is the reliable company identity; without it those rows fall back to name matching (and lose the cross-board link to the same company on DOU).
