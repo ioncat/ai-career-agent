@@ -393,9 +393,10 @@ async def test_the_notifications_api_returns_the_new_fields_and_system_events(db
 # ── review follow-up: errors are not "duplicates", retention policy, rollback ──
 
 @pytest.mark.asyncio
-async def test_a_not_null_violation_surfaces_instead_of_looking_like_a_duplicate(db_path):
+async def test_a_database_error_surfaces_instead_of_looking_like_a_duplicate(db_path):
+    """A constraint other than the key (here the vacancy foreign key) must raise, not return None."""
     with pytest.raises(sqlite3.IntegrityError):
-        await database.insert_notification(1, "cv_done", title=None)
+        await database.insert_notification(1, "cv_done", vacancy_id=987654)
 
 
 @pytest.mark.asyncio
@@ -404,7 +405,7 @@ async def test_notify_with_a_bad_value_logs_a_failed_insert_not_a_duplicate(db_p
     caplog.set_level(logging.INFO, logger="core.notifier")
 
     with _no_push():
-        await notify(1, PipelineEvent.CV_DONE, title=None)
+        await notify(1, PipelineEvent.CV_DONE, 987654, title="t")
 
     messages = " ".join(r.getMessage() for r in caplog.records)
     assert "DB insert failed" in messages and "duplicate" not in messages

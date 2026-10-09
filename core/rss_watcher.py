@@ -22,6 +22,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from core.deps import AgentDeps
+from core.generation_failure import analysis_failure_code, exception_reason
+from core.pipeline_events import ORIGIN_AUTO, finish_analysis, record_analysis_failure
 from core.settings import Settings
 from db import database
 
@@ -131,30 +133,6 @@ class RSSWatcher:
         for row, exc in zip(rows, results):
             if isinstance(exc, Exception):
                 log.error("RSSWatcher: failed %s: %s", row["url"], exc)
-
-    async def _push_result(self, vacancy_id: int) -> None:
-        """Send Web Push notification with fit result after Phase 1+2 completes."""
-        from contracts.pipeline import AnalysisJson
-        from core.push import send_push
-
-        try:
-            row = await database.get_vacancy_by_id(vacancy_id)
-            if not row:
-                return
-            aj_str = row["analysis_json"] if "analysis_json" in row.keys() else None
-            aj = AnalysisJson.model_validate_json(aj_str or "{}")
-            if not aj.p2:
-                return
-            title = row["title"] or f"Vacancy #{vacancy_id}"
-            fit   = aj.p2.fit_score
-            label = aj.p2.recommendation_label
-            await send_push(
-                user_id=self._deps.user_id,
-                title=f"✅ {title}",
-                body=f"Fit {fit}/10 · {label}",
-            )
-        except Exception as exc:
-            log.warning("RSSWatcher: push failed for v#%d: %s", vacancy_id, exc)
 
     @staticmethod
     def _source_label(url: str) -> str:
@@ -277,14 +255,15 @@ class RSSWatcher:
 
             # Step 2: Phase 1+2 analysis → saves JD_analysis.md + analysis_json
             try:
-                await cv_analyze(ctx, vacancy_id)  # type: ignore[arg-type]
-                log.info("RSSWatcher: analysis done — vacancy_id=%d", vacancy_id)
+                result = await cv_analyze(ctx, vacancy_id)  # type: ignore[arg-type]
             except Exception as exc:
                 log.error("RSSWatcher: analysis failed v#%d: %s", vacancy_id, exc)
+                await record_analysis_failure(
+                    self._deps.user_id, vacancy_id, ORIGIN_AUTO,
+                    exception_reason(exc)[:500], analysis_failure_code(exc),
+                )
                 return
 
-            # Step 3: Web Push with fit result (non-fatal if push fails)
-            try:
-                await self._push_result(vacancy_id)
-            except Exception as exc:
-                log.warning("RSSWatcher: push_result error v#%d: %s", vacancy_id, exc)
+            # Step 3: state and event, through the same helper as AnalysisWorker (origin "auto");
+            # Web Push goes through the router, not from here.
+            await finish_analysis(self._deps.user_id, vacancy_id, result, ORIGIN_AUTO)

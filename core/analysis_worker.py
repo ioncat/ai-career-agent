@@ -13,8 +13,8 @@ from dataclasses import dataclass
 from core import config_store
 from core import failure_codes
 from core.deps import AgentDeps
-from core.generation_failure import analysis_failure_code, exception_reason, soft_failure
-from core.pipeline_events import emit_done, emit_failure, record_analysis_failure
+from core.generation_failure import analysis_failure_code, exception_reason
+from core.pipeline_events import finish_analysis, record_analysis_failure
 from core.settings import Settings
 from db import database
 
@@ -133,31 +133,7 @@ class AnalysisWorker:
                     self._deps.user_id, vacancy_id, origin, err_msg, analysis_failure_code(exc),
                 )
             else:
-                await self._finish(vacancy_id, result, origin)
-
-    async def _finish(self, vacancy_id: int, result: object, origin: str) -> None:
-        """The tool returned: decide from the vacancy's state (the truth) what happened, then tell the channels.
-
-        cv_analyze writes `analysis_failed` itself for most failures and `analyzed` on success, and it
-        also reports some failures only as a returned warning text, leaving the vacancy "analyzing"
-        (a missing JD file); that last case is recorded here, so the vacancy cannot stay stuck.
-        """
-        soft = soft_failure(result)
-        row = await database.get_vacancy_by_id(vacancy_id)
-        status = row["status"] if row else None
-        user_id = self._deps.user_id
-        if status == "analysis_failed":
-            reason = (row["analysis_error"] if row else None) or (str(soft) if soft else "")
-            log.error("AnalysisWorker: failed v#%d: %s", vacancy_id, reason)
-            await emit_failure("analysis", user_id, vacancy_id, origin, reason, analysis_failure_code(soft))
-        elif soft is not None:
-            log.error("AnalysisWorker: failed v#%d: %s", vacancy_id, soft)
-            await record_analysis_failure(
-                user_id, vacancy_id, origin, str(soft)[:500], analysis_failure_code(soft)
-            )
-        else:
-            log.info("AnalysisWorker: done — v#%d", vacancy_id)
-            await emit_done("analysis", user_id, vacancy_id, origin)
+                await finish_analysis(self._deps.user_id, vacancy_id, result, origin)
 
     async def _fresh_llm(self, phase: str) -> object:
         """Build LLM provider for `phase` via core.config_store (single source of truth).

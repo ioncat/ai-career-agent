@@ -127,7 +127,7 @@ async def test_poll_once_triggers_fetch_for_queued_vacancy():
     with patch("core.rss_watcher.database", mock_db), \
          patch("tools.cv_fetch_jd.fetch_jd", AsyncMock(return_value=42)), \
          patch("tools.cv_analyze.cv_analyze", AsyncMock()), \
-         patch("core.rss_watcher.RSSWatcher._push_result", AsyncMock()):
+         patch("core.rss_watcher.finish_analysis", AsyncMock()):
         await watcher._poll_once()
 
     # 'fetching' claimed before processing; 'fetched' set after JD saved
@@ -155,7 +155,7 @@ async def test_poll_once_runs_title_stage_when_auto_check_enabled():
     with patch("core.rss_watcher.database", mock_db), \
          patch("tools.cv_fetch_jd.fetch_jd", AsyncMock(return_value=42)), \
          patch("tools.cv_prefilter.apply_title_stage", mock_apply), \
-         patch("core.rss_watcher.RSSWatcher._push_result", AsyncMock()):
+         patch("core.rss_watcher.finish_analysis", AsyncMock()):
         await watcher._poll_once()
 
     mock_apply.assert_awaited_once_with(42, "Product Marketing Lead")
@@ -171,7 +171,7 @@ async def test_poll_once_skips_title_stage_when_auto_check_disabled():
     with patch("core.rss_watcher.database", mock_db), \
          patch("tools.cv_fetch_jd.fetch_jd", AsyncMock(return_value=42)), \
          patch("tools.cv_prefilter.apply_title_stage", mock_apply), \
-         patch("core.rss_watcher.RSSWatcher._push_result", AsyncMock()):
+         patch("core.rss_watcher.finish_analysis", AsyncMock()):
         await watcher._poll_once()
 
     mock_apply.assert_not_awaited()
@@ -190,7 +190,7 @@ async def test_poll_once_title_stage_failure_is_non_fatal():
     with patch("core.rss_watcher.database", mock_db), \
          patch("tools.cv_fetch_jd.fetch_jd", AsyncMock(return_value=42)), \
          patch("tools.cv_analyze.cv_analyze", AsyncMock()), \
-         patch("core.rss_watcher.RSSWatcher._push_result", AsyncMock()):
+         patch("core.rss_watcher.finish_analysis", AsyncMock()):
         await watcher._poll_once()  # must not raise
 
     mock_db.update_vacancy_status.assert_any_await(42, "fetched")
@@ -219,7 +219,7 @@ async def test_poll_once_runs_language_stage_when_title_stage_clean(tmp_path):
          patch("tools.cv_fetch_jd.fetch_jd", AsyncMock(return_value=42)), \
          patch("tools.cv_prefilter.apply_title_stage", mock_apply_title), \
          patch("tools.cv_prefilter.apply_language_stage", mock_apply_language), \
-         patch("core.rss_watcher.RSSWatcher._push_result", AsyncMock()):
+         patch("core.rss_watcher.finish_analysis", AsyncMock()):
         await watcher._poll_once()
 
     mock_apply_language.assert_awaited_once()
@@ -244,7 +244,7 @@ async def test_poll_once_skips_language_stage_when_title_stage_blocked():
          patch("tools.cv_fetch_jd.fetch_jd", AsyncMock(return_value=42)), \
          patch("tools.cv_prefilter.apply_title_stage", mock_apply_title), \
          patch("tools.cv_prefilter.apply_language_stage", mock_apply_language), \
-         patch("core.rss_watcher.RSSWatcher._push_result", AsyncMock()):
+         patch("core.rss_watcher.finish_analysis", AsyncMock()):
         await watcher._poll_once()
 
     mock_apply_language.assert_not_awaited()
@@ -266,7 +266,7 @@ async def test_poll_once_skips_language_stage_when_markdown_path_missing():
          patch("tools.cv_fetch_jd.fetch_jd", AsyncMock(return_value=42)), \
          patch("tools.cv_prefilter.apply_title_stage", mock_apply_title), \
          patch("tools.cv_prefilter.apply_language_stage", mock_apply_language), \
-         patch("core.rss_watcher.RSSWatcher._push_result", AsyncMock()):
+         patch("core.rss_watcher.finish_analysis", AsyncMock()):
         await watcher._poll_once()
 
     mock_apply_language.assert_not_awaited()
@@ -295,7 +295,7 @@ async def test_poll_once_runs_location_stage_when_title_and_language_pass_clean(
          patch("tools.cv_prefilter.apply_location_stage", mock_apply_location), \
          patch("pathlib.Path.exists", return_value=True), \
          patch("pathlib.Path.read_text", return_value="## Vacancy Requirements\n\n** Країни ЄС **\n"), \
-         patch("core.rss_watcher.RSSWatcher._push_result", AsyncMock()):
+         patch("core.rss_watcher.finish_analysis", AsyncMock()):
         await watcher._poll_once()
 
     mock_apply_location.assert_awaited_once()
@@ -366,7 +366,7 @@ async def test_process_sends_notification_before_fetch():
     with patch("core.rss_watcher.database", mock_db), \
          patch("tools.cv_fetch_jd.fetch_jd", track_fetch), \
          patch("tools.cv_analyze.cv_analyze", AsyncMock()), \
-         patch("core.rss_watcher.RSSWatcher._push_result", AsyncMock()):
+         patch("core.rss_watcher.finish_analysis", AsyncMock()):
         await watcher._process(url)
 
     assert call_order == ["notify", "fetch"], "Notification must precede fetch"
@@ -558,7 +558,7 @@ async def test_process_full_auto_runs_analysis():
     with patch("core.rss_watcher.database", mock_db), \
          patch("tools.cv_fetch_jd.fetch_jd", AsyncMock(return_value=1)), \
          patch("tools.cv_analyze.cv_analyze", mock_analyze), \
-         patch("core.rss_watcher.RSSWatcher._push_result", AsyncMock()):
+         patch("core.rss_watcher.finish_analysis", AsyncMock()):
         await watcher._process("https://djinni.co/jobs/1/")
 
     mock_analyze.assert_awaited_once()
@@ -583,7 +583,7 @@ async def test_process_does_not_auto_trigger_prefilter():
          patch("tools.cv_fetch_jd.fetch_jd", AsyncMock(return_value=1)), \
          patch("tools.cv_analyze.cv_analyze", AsyncMock()), \
          patch("tools.cv_prefilter.cv_prefilter", mock_prefilter), \
-         patch("core.rss_watcher.RSSWatcher._push_result", AsyncMock()):
+         patch("core.rss_watcher.finish_analysis", AsyncMock()):
         await watcher._process("https://djinni.co/jobs/1/")
 
     mock_prefilter.assert_not_awaited()
@@ -636,7 +636,7 @@ async def test_notification_not_gated_by_semaphore():
     async def run_process():
         with patch("tools.cv_fetch_jd.fetch_jd", track_fetch), \
              patch("tools.cv_analyze.cv_analyze", AsyncMock()), \
-             patch("core.rss_watcher.RSSWatcher._push_result", AsyncMock()):
+             patch("core.rss_watcher.finish_analysis", AsyncMock()):
             await watcher._process("https://djinni.co/jobs/1/")
 
     task = asyncio.create_task(run_process())
@@ -679,7 +679,7 @@ async def test_semaphore_limits_concurrent_fetches():
 
     with patch("tools.cv_fetch_jd.fetch_jd", slow_fetch), \
          patch("tools.cv_analyze.cv_analyze", AsyncMock()), \
-         patch("core.rss_watcher.RSSWatcher._push_result", AsyncMock()):
+         patch("core.rss_watcher.finish_analysis", AsyncMock()):
         await asyncio.gather(
             watcher._process("https://djinni.co/jobs/1/"),
             watcher._process("https://djinni.co/jobs/2/"),
@@ -713,7 +713,7 @@ async def test_semaphore_concurrency_2_allows_two_parallel():
 
     with patch("tools.cv_fetch_jd.fetch_jd", slow_fetch), \
          patch("tools.cv_analyze.cv_analyze", AsyncMock()), \
-         patch("core.rss_watcher.RSSWatcher._push_result", AsyncMock()):
+         patch("core.rss_watcher.finish_analysis", AsyncMock()):
         await asyncio.gather(
             watcher._process("https://djinni.co/jobs/1/"),
             watcher._process("https://djinni.co/jobs/2/"),

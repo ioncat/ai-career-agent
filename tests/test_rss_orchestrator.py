@@ -63,7 +63,7 @@ async def test_notification_sent_before_fetch():
 
     with patch("tools.cv_fetch_jd.fetch_jd", new=fake_fetch), \
          patch("tools.cv_analyze.cv_analyze", new=fake_analyze), \
-         patch("core.rss_watcher.RSSWatcher._push_result", new=AsyncMock()):
+         patch("core.rss_watcher.finish_analysis", new=AsyncMock()):
         await watcher._process("https://djinni.co/jobs/1", rss_title="PM at Stripe")
 
     bot.send_message.assert_awaited_once()
@@ -84,34 +84,31 @@ async def test_fetch_then_analyze_chained():
 
     with patch("tools.cv_fetch_jd.fetch_jd", new=fake_fetch), \
          patch("tools.cv_analyze.cv_analyze", new=fake_analyze), \
-         patch("core.rss_watcher.RSSWatcher._push_result", new=AsyncMock()):
+         patch("core.rss_watcher.finish_analysis", new=AsyncMock()):
         await watcher._process("https://djinni.co/jobs/99")
 
     assert analyzed_ids == [99]
 
 
 @pytest.mark.asyncio
-async def test_push_result_called_after_analyze():
-    """_push_result called exactly once after successful analyze."""
+async def test_finish_analysis_called_once_after_analyze_with_origin_auto():
+    """The automatic analysis hands its result to the shared helper (state + event + push through the router)."""
     watcher, _ = _make_watcher()
-    push_calls = []
+    calls = []
 
     async def fake_fetch(deps, url):
         return 42
 
     async def fake_analyze(ctx, vid):
-        pass
+        return "analysis result"
 
-    async def fake_push(vid):
-        push_calls.append(vid)
+    async def fake_finish(user_id, vid, result, origin):
+        calls.append((user_id, vid, result, origin))
 
-    watcher._push_result = fake_push
-
-    with patch("tools.cv_fetch_jd.fetch_jd", new=fake_fetch), \
-         patch("tools.cv_analyze.cv_analyze", new=fake_analyze):
+    with patch("tools.cv_fetch_jd.fetch_jd", new=fake_fetch),          patch("tools.cv_analyze.cv_analyze", new=fake_analyze),          patch("core.rss_watcher.finish_analysis", new=fake_finish):
         await watcher._process("https://djinni.co/jobs/42")
 
-    assert push_calls == [42]
+    assert calls == [(1, 42, "analysis result", "auto")]
 
 
 # ── Error handling ─────────────────────────────────────────────────────────────
@@ -130,17 +127,17 @@ async def test_fetch_failure_stops_chain():
 
     with patch("tools.cv_fetch_jd.fetch_jd", new=fake_fetch), \
          patch("tools.cv_analyze.cv_analyze", new=fake_analyze), \
-         patch("core.rss_watcher.RSSWatcher._push_result", new=AsyncMock()):
+         patch("core.rss_watcher.finish_analysis", new=AsyncMock()):
         await watcher._process("https://djinni.co/jobs/1")
 
     assert analyze_called == []
 
 
 @pytest.mark.asyncio
-async def test_analyze_failure_stops_push():
-    """If cv_analyze fails, _push_result is NOT called."""
+async def test_analyze_failure_is_recorded_and_not_finished():
+    """If cv_analyze raises, the failure is recorded (state + event, origin auto) and the finish step is NOT run."""
     watcher, _ = _make_watcher()
-    push_calls = []
+    finished, recorded = [], []
 
     async def fake_fetch(deps, url):
         return 42
@@ -148,105 +145,11 @@ async def test_analyze_failure_stops_push():
     async def fake_analyze(ctx, vid):
         raise RuntimeError("LLM timeout")
 
-    async def fake_push(vid):
-        push_calls.append(vid)
+    async def fake_record(user_id, vid, origin, reason, code):
+        recorded.append((user_id, vid, origin, reason, code))
 
-    watcher._push_result = fake_push
-
-    with patch("tools.cv_fetch_jd.fetch_jd", new=fake_fetch), \
-         patch("tools.cv_analyze.cv_analyze", new=fake_analyze):
+    with patch("tools.cv_fetch_jd.fetch_jd", new=fake_fetch),          patch("tools.cv_analyze.cv_analyze", new=fake_analyze),          patch("core.rss_watcher.finish_analysis", new=AsyncMock(side_effect=lambda *a: finished.append(a))),          patch("core.rss_watcher.record_analysis_failure", new=fake_record):
         await watcher._process("https://djinni.co/jobs/42")
 
-    assert push_calls == []
-
-
-@pytest.mark.asyncio
-async def test_push_failure_does_not_crash_process():
-    """Push failure is non-fatal — _process completes without raising."""
-    watcher, _ = _make_watcher()
-
-    async def fake_fetch(deps, url):
-        return 42
-
-    async def fake_analyze(ctx, vid):
-        pass
-
-    async def broken_push(vid):
-        raise RuntimeError("push service down")
-
-    watcher._push_result = broken_push
-
-    with patch("tools.cv_fetch_jd.fetch_jd", new=fake_fetch), \
-         patch("tools.cv_analyze.cv_analyze", new=fake_analyze):
-        # should not raise
-        await watcher._process("https://djinni.co/jobs/42")
-
-
-# ── _push_result ──────────────────────────────────────────────────────────────
-
-@pytest.mark.asyncio
-async def test_push_result_sends_fit_score():
-    """_push_result reads analysis_json and sends push with fit + label."""
-    from contracts.pipeline import AnalysisJson, FitDimensions, Phase1Data, Phase2Data, VacScoreDims
-
-    watcher, _ = _make_watcher()
-
-    dims = VacScoreDims(company_tier=3, seniority=3, market_scope=2, company_type=3,
-                        company_stage_fit=2, domain_score=4, remote_policy=3, compensation=2)
-    p1 = Phase1Data(role="PM", company="Acme", north_star="ns", primary_archetype="arch",
-                    company_type="product", role_balance={}, dominant_culture="o",
-                    vacscore_dims=dims, vacancy_score=8.0)
-    p2 = Phase2Data(
-        fit_score=8, recommendation="apply", recommendation_label="apply — strong match",
-        category="Exec PM · Remote", who_they_want="Senior PM.",
-        fit_dimensions=FitDimensions(domain_fit=8, execution_fit=8, strategy_fit=8,
-                                     systems_fit=8, stakeholder_fit=8, overall_fit=8),
-    )
-    aj = AnalysisJson(p1=p1, p2=p2).model_dump_json(exclude_none=True)
-    row = _make_vacancy_row(analysis_json=aj)
-
-    push_calls = []
-
-    async def fake_send_push(user_id, title, body):
-        push_calls.append({"user_id": user_id, "title": title, "body": body})
-
-    with patch("db.database.get_vacancy_by_id", new=AsyncMock(return_value=row)), \
-         patch("core.push.send_push", new=fake_send_push):
-        await watcher._push_result(42)
-
-    assert len(push_calls) == 1
-    assert "8/10" in push_calls[0]["body"]
-    assert "apply" in push_calls[0]["body"]
-
-
-@pytest.mark.asyncio
-async def test_push_result_no_op_when_vacancy_missing():
-    """_push_result is silent when vacancy_id not found in DB."""
-    watcher, _ = _make_watcher()
-    push_calls = []
-
-    async def fake_send_push(user_id, title, body):
-        push_calls.append(1)
-
-    with patch("db.database.get_vacancy_by_id", new=AsyncMock(return_value=None)), \
-         patch("core.push.send_push", new=fake_send_push):
-        await watcher._push_result(999)
-
-    assert push_calls == []
-
-
-@pytest.mark.asyncio
-async def test_push_result_no_op_when_no_p2():
-    """_push_result is silent when analysis_json has no p2 yet."""
-    watcher, _ = _make_watcher()
-    push_calls = []
-    row = _make_vacancy_row(analysis_json=None)
-
-    async def fake_send_push(user_id, title, body):
-        push_calls.append(1)
-
-    with patch("db.database.get_vacancy_by_id", new=AsyncMock(return_value=row)), \
-         patch("core.push.send_push", new=fake_send_push):
-        await watcher._push_result(42)
-
-    assert push_calls == []
+    assert finished == []
+    assert recorded == [(1, 42, "auto", "LLM timeout", "analysis_failed")]

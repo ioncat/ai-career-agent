@@ -54,3 +54,29 @@ ALL_CODES = (
 def normalize(code: object) -> str:
     """The code if it is in the vocabulary, else UNKNOWN (also for None and old rows)."""
     return code if isinstance(code, str) and code in ALL_CODES else UNKNOWN
+
+
+# What a user sees in a notification for each code: short, stable, English, and free of technical detail
+# (no file paths, no scraped text, no raw exception). The raw reason stays on the vacancy (`analysis_error`,
+# `generation_failure.reason`) where the card shows it. A test keeps this table complete.
+USER_TEXT = {
+    FETCH_GAVE_UP: "The job description could not be fetched. Retry from the vacancy card.",
+    ANALYSIS_FAILED: "The analysis failed. Open the vacancy to see the reason and retry.",
+    LLM_ERROR: "The model provider returned an error.",
+    LLM_TIMEOUT: "The model did not answer in time.",
+    JD_MISSING: "The job description file is missing.",
+    ANALYSIS_MISSING: "The analysis file is missing.",
+    CV_MISSING: "The CV file is missing.",
+    GENERATION_FAILED: "The generation failed. Open the vacancy to see the reason and retry.",
+    PDF_SERVICE_UNREACHABLE: "The PDF service is not reachable.",
+    PDF_SERVICE_ERROR: "The PDF service returned an error.",
+    PDF_INVALID: "The PDF service returned an empty or broken PDF.",
+    PDF_WRITE_FAILED: "The PDF could not be saved.",
+    UNKNOWN: "Something went wrong. Open the vacancy for details.",
+}
+
+
+def user_text(code: object) -> str:
+    """The notification text for a code (an unknown or missing code reads as UNKNOWN)."""
+    return USER_TEXT[normalize(code)]
+

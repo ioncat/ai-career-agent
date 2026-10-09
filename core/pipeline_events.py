@@ -21,6 +21,7 @@ from __future__ import annotations
 import logging
 
 from core import failure_codes
+from core.generation_failure import analysis_failure_code, soft_failure
 from core.notifier import PipelineEvent, build_event, fan_out, notify
 from db import database
 
@@ -36,17 +37,18 @@ _KINDS = {
 ORIGIN_USER = "user"
 ORIGIN_AUTO = "auto"
 
+LABEL_MAX = 120      # the vacancy label comes from scraped company and title text
+
 
 async def vacancy_label(vacancy_id: int) -> str:
     """"Company — Title", the title alone, the company alone, or "#id"."""
     row = await database.get_vacancy_by_id(vacancy_id)
     if not row:
         return f"#{vacancy_id}"
-    title = row["title"] or ""
-    company = row["company"] or ""
-    if title and company:
-        return f"{company} — {title}"
-    return title or company or f"#{vacancy_id}"
+    title = (row["title"] or "").strip()
+    company = (row["company"] or "").strip()
+    label = f"{company} — {title}" if title and company else (title or company or f"#{vacancy_id}")
+    return label if len(label) <= LABEL_MAX else label[: LABEL_MAX - 1].rstrip() + "…"
 
 
 async def _analysis_summary(vacancy_id: int) -> str:
@@ -75,8 +77,10 @@ async def failure_event(
 ) -> dict:
     _done, failed, noun, _verb = _KINDS[kind]
     label = await vacancy_label(vacancy_id)
+    # The body is the stable text of the code, never the raw reason: the reason can carry a local file path
+    # or scraped text, and it stays on the vacancy (analysis_error / generation_failure.reason) for the card.
     return build_event(
-        failed, user_id, vacancy_id, f"{noun} failed — {label}", (reason or "")[:500],
+        failed, user_id, vacancy_id, f"{noun} failed — {label}", failure_codes.user_text(code),
         origin=origin, code=failure_codes.normalize(code),
     )
 
@@ -114,9 +118,13 @@ async def record_generation_failure(
         event = await failure_event(kind, user_id, vacancy_id, origin, reason, code)
     except Exception as exc:  # noqa: BLE001 - the state write below must happen without it
         log.warning("pipeline_events: %s failure event for v#%s not built: %s", kind, vacancy_id, exc)
-    stored = await database.fail_generation(
-        vacancy_id, kind, reason, rollback_status, code=code, lang=lang, notification=event,
-    )
+    try:
+        stored = await database.fail_generation(
+            vacancy_id, kind, reason, rollback_status, code=code, lang=lang, notification=event,
+        )
+    except Exception as exc:  # noqa: BLE001 - called from an except branch: it must not raise again
+        log.error("pipeline_events: %s failure of v#%s could not be recorded: %s", kind, vacancy_id, exc)
+        return
     if stored and event:
         await fan_out(event["user_id"], event["event"], event["title"], event["body"])
 
@@ -132,6 +140,39 @@ async def record_analysis_failure(
         event = await failure_event("analysis", user_id, vacancy_id, origin, reason, code)
     except Exception as exc:  # noqa: BLE001
         log.warning("pipeline_events: analysis failure event for v#%s not built: %s", vacancy_id, exc)
-    stored = await database.set_analysis_error(vacancy_id, reason, notification=event)
+    try:
+        stored = await database.set_analysis_error(vacancy_id, reason, notification=event)
+    except Exception as exc:  # noqa: BLE001 - called from an except branch: it must not raise again
+        log.error("pipeline_events: analysis failure of v#%s could not be recorded: %s", vacancy_id, exc)
+        return
     if stored and event:
         await fan_out(event["user_id"], event["event"], event["title"], event["body"])
+
+
+async def finish_analysis(user_id: int | None, vacancy_id: int, result: object, origin: str) -> None:
+    """The analysis tool returned: decide from the vacancy's state (the truth) what happened, then tell the channels.
+
+    cv_analyze writes `analysis_failed` itself for most failures and `analyzed` on success, and it also
+    reports some failures only as a returned warning text, leaving the vacancy "analyzing" (a missing JD
+    file); that last case is recorded here, so the vacancy cannot stay stuck. Used by AnalysisWorker and
+    by RSSWatcher's automatic analysis. Never raises.
+    """
+    soft = soft_failure(result)
+    try:
+        row = await database.get_vacancy_by_id(vacancy_id)
+        status = row["status"] if row else None
+        if status == "analysis_failed":
+            reason = (row["analysis_error"] if row else None) or (str(soft) if soft else "")
+            log.error("analysis failed v#%d: %s", vacancy_id, reason)
+            await emit_failure("analysis", user_id, vacancy_id, origin, reason, analysis_failure_code(soft))
+        elif soft is not None:
+            log.error("analysis failed v#%d: %s", vacancy_id, soft)
+            await record_analysis_failure(user_id, vacancy_id, origin, str(soft)[:500], analysis_failure_code(soft))
+        else:
+            log.info("analysis done v#%d", vacancy_id)
+            await emit_done("analysis", user_id, vacancy_id, origin)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("pipeline_events: finishing the analysis of v#%s failed: %s", vacancy_id, exc)
+        if soft is not None:
+            # the tool only returned a warning: do not leave the vacancy "analyzing" because a read failed
+            await record_analysis_failure(user_id, vacancy_id, origin, str(soft)[:500], analysis_failure_code(soft))

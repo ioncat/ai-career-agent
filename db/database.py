@@ -280,6 +280,8 @@ async def init_db() -> None:
 NOTIFICATION_SEVERITIES = ("success", "info", "warning", "error")
 NOTIFICATION_ORIGINS = ("user", "auto", "system")
 NOTIFICATION_KEY_MAX = 200
+NOTIFICATION_TITLE_MAX = 200
+NOTIFICATION_BODY_MAX = 300
 # Retention (see prune_notifications). The client polls the newest 50 and a history view shows
 # the last N, so a few weeks of events are plenty; both caps apply.
 NOTIFICATION_RETENTION_DAYS = 90
@@ -2054,6 +2056,13 @@ async def _insert_notification(
     key = (key or "").strip() or None
     if key is not None and len(key) > NOTIFICATION_KEY_MAX:
         raise ValueError(f"notification key longer than {NOTIFICATION_KEY_MAX} characters")
+    # Scraped or raw text must not blow up a notification or a push payload: cap it. A code outside the
+    # vocabulary is stored as "unknown" (the client picks its text from the code).
+    title = (title or "")[:NOTIFICATION_TITLE_MAX]
+    body = (body or "")[:NOTIFICATION_BODY_MAX]
+    if code is not None:
+        from core import failure_codes
+        code = failure_codes.normalize(code)
     cursor = await db.execute(
         """
         INSERT INTO notifications

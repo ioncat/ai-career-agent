@@ -354,9 +354,8 @@ No dual-availability state — the button's visibility is a direct, deterministi
 **Test:** a test compares the routing table in that document with the table in `core/notifier.py` (data in one place), so the document and the code cannot drift apart. **Depends on:** phase 4 (the router with its table in code). Owner: backend.
 
 ### Input limits and a vocabulary check for event fields, before `POST /api/events` (reviewer, 2026-10-09)
-**What:** `insert_notification` rejects a `key` over 200 characters, but `title`, `body` and `code` have no length limit and `code` is not checked against `core/failure_codes.py`.
-**Why:** phase 5 of the notifications plan opens `POST /api/events` to other processes (job monitor, health check) and event text becomes Telegram text; unbounded fields are an abuse and storage risk.
-**Scope (must be done before phase 5):** length caps for `title` and `body`, `code` must be in the vocabulary or null, validated in the endpoint and in `insert_notification`; together with the planned shared secret. Owner: backend.
+**State:** `insert_notification` now caps `title` (200) and `body` (300), stores a `code` outside the vocabulary as `unknown` and rejects a `key` over 200; events raised by the workers carry the stable text of the code, not the raw reason (CHANGELOG 2026-10-09).
+**Left (must be done before phase 5):** the endpoint itself rejects (400) an oversized or malformed payload instead of truncating it, checks `code` against `core/failure_codes.py`, and requires the planned shared secret. Owner: backend.
 
 ### Djinni company profile for old rows: fill via re-fetch or a slow rate-limited backfill (added 2026-10-05)
 **What:** `vacancies.company_profile_url` is filled for DOU rows (derived from the URL) and for every vacancy fetched from now on; the ~820 older Djinni rows have none, because Djinni's company link lives in the page DOM.
