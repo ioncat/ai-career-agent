@@ -107,7 +107,7 @@ skill/
         └── PROFILE.md   ← опыт, навыки, настройки (language, skill_type, name variants)
 ```
 
-Переключить пользователя: `/analyze -u kosar` или `/analyze -u 1`
+Переключить пользователя: `/analyze -u jdoe` или `/analyze -u 1`
 
 ---
 
